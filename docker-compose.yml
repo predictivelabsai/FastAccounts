@@ -1,0 +1,30 @@
+services:
+  fastaccounts:
+    build:
+      context: .
+      args:
+        FASTACCOUNTS_COMMIT: ${FASTACCOUNTS_COMMIT:-}
+        FASTACCOUNTS_BRANCH: ${FASTACCOUNTS_BRANCH:-}
+        FASTACCOUNTS_BUILD_DATE: ${FASTACCOUNTS_BUILD_DATE:-}
+    ports:
+      - "5012:5012"
+    environment:
+      FASTACCOUNTS_PORT: "5012"
+      FASTACCOUNTS_ENV_LABEL: ${FASTACCOUNTS_ENV_LABEL:-FastAccounts}
+      FASTACCOUNTS_PUBLIC_URL: ${FASTACCOUNTS_PUBLIC_URL:-http://localhost:5012}
+      FASTACCOUNTS_SECRET: ${FASTACCOUNTS_SECRET:?set FASTACCOUNTS_SECRET to a stable random value}
+      FASTACCOUNTS_ENCRYPTION_KEY: ${FASTACCOUNTS_ENCRYPTION_KEY:?set a Fernet encryption key}
+      FASTACCOUNTS_DB: /data/fastaccounts.sqlite
+      FASTACCOUNTS_DATA_DIR: /data
+      DB_URL: ${DB_URL:-}
+      DB_SCHEMA: ${DB_SCHEMA:-fast_accounts}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-http://localhost:5012/auth/google/callback}
+      GOOGLE_ALLOWED_DOMAINS: ${GOOGLE_ALLOWED_DOMAINS:-}
+      GOOGLE_ALLOWED_EMAILS: ${GOOGLE_ALLOWED_EMAILS:-}
+    volumes:
+      - fastaccounts-data:/data
+
+volumes:
+  fastaccounts-data:

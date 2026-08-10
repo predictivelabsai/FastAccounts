@@ -216,3 +216,20 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# FastAccounts databases and accounting evidence
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+data/
+uploads/
+
+# FastAccounts browser and local tooling
+.playwright-mcp/
+.playwright-cli/
+/tmp/
+
+# Local IDE and OS metadata
+.idea/
+.vscode/
+.DS_Store

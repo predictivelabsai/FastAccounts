@@ -1,0 +1,58 @@
+from __future__ import annotations
+
+import sqlite3
+
+import pytest
+
+from database import Database
+from organisations import AccessDenied, OrganisationService
+
+
+def test_empty_migration_is_idempotent(tmp_path):
+    db = Database(path=str(tmp_path / "empty.sqlite"))
+    assert db.migrate() == ["0001_accounting_core", "0002_integrations", "0003_operations", "0004_document_immutability"]
+    assert db.migrate() == []
+    assert db.scalar("SELECT COUNT(*) FROM schema_migrations") == 4
+
+
+def test_migration_preserves_existing_data(tmp_path):
+    path = str(tmp_path / "upgrade.sqlite")
+    db = Database(path=path)
+    db.migrate()
+    org = OrganisationService(db).create(name="Preserved", country_code="UK",
+        entity_type="UK_COMPANY", owner_email="a@example.test")
+    assert db.migrate() == []
+    assert db.one("SELECT name FROM organisations WHERE id=?", (org["id"],))["name"] == "Preserved"
+
+
+def test_unsafe_postgres_schema_is_rejected():
+    with pytest.raises(ValueError, match="unsafe"):
+        Database(url="postgresql://unused", schema='public; DROP SCHEMA public')
+
+
+def test_organisation_entity_country_and_seed_data(db):
+    service = OrganisationService(db)
+    with pytest.raises(ValueError, match="does not belong"):
+        service.create(name="Wrong", country_code="EE", entity_type="UK_COMPANY", owner_email="a@example.test")
+    uk = service.create(name="UK Sole", country_code="UK", entity_type="UK_SOLE_TRADER", owner_email="a@example.test")
+    ee = service.create(name="EE FIE", country_code="EE", entity_type="EE_FIE", owner_email="a@example.test")
+    assert uk["base_currency"] == "GBP" and ee["base_currency"] == "EUR"
+    assert db.scalar("SELECT COUNT(*) FROM accounts WHERE organisation_id=?", (uk["id"],)) == 10
+    assert db.scalar("SELECT COUNT(*) FROM tax_codes WHERE organisation_id=?", (ee["id"],)) == 8
+    assert db.scalar("SELECT COUNT(*) FROM fiscal_periods WHERE organisation_id=?", (uk["id"],)) == 24
+
+
+def test_membership_roles_and_tenant_isolation(db, uk_org, ee_org):
+    service = OrganisationService(db)
+    service.add_member(uk_org["id"], "owner@example.test", "viewer@example.test", "viewer")
+    assert [o["id"] for o in service.for_user("viewer@example.test")] == [uk_org["id"]]
+    with pytest.raises(AccessDenied):
+        service.require(ee_org["id"], "viewer@example.test", {"viewer"})
+    with pytest.raises(AccessDenied):
+        service.add_member(uk_org["id"], "viewer@example.test", "x@example.test", "viewer")
+
+
+def test_database_foreign_keys_are_enforced(db):
+    with pytest.raises(sqlite3.IntegrityError):
+        with db.transaction() as tx:
+            tx.execute("INSERT INTO memberships(id,organisation_id,email,role,created_at) VALUES ('x','missing','x@x.test','viewer','now')")

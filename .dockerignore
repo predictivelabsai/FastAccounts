@@ -1,0 +1,15 @@
+.git
+.github
+.venv
+.pytest_cache
+.playwright-cli
+__pycache__
+*.py[cod]
+*.sqlite
+.env
+.env.*
+!.env.sample
+!.env.coolify.sample
+data
+tests
+docs
