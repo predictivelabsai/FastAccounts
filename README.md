@@ -72,6 +72,12 @@ python scripts/coolify.py deploy --yes
 python scripts/coolify.py status
 ```
 
+Pushes to `main` run the GitHub Actions test/build workflow and, after they are
+accepted by GitHub, a signed push-only webhook asks Coolify to deploy the same
+commit. FastDevOps remains the local control plane for status checks, explicit
+deployments, and environment synchronization; it is not a separate runtime
+service.
+
 See [product roadmap](docs/product_roadmap.md),
 [accounting invariants](docs/accounting_invariants.md),
 [threat model](docs/threat_model.md), and [accountant UAT plan](docs/uat_plan.md).
