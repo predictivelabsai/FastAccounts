@@ -34,7 +34,7 @@ delivered.
   provider submission gates, and database/identity health reporting.
 - Added `FASTACCOUNTS_ENCRYPTION_KEY`, data-directory, CORS, attachment-size,
   and test-auth settings to `.env.sample`. Test auth is hard-disabled by default.
-- Registered `accounts.fastsme.com` in FastDevOps with its own PostgreSQL schema,
+- Registered `fastaccounts.org` in FastDevOps with its own PostgreSQL schema,
   generated secrets, persistent evidence storage, Google callback and health check.
 
 ### Verification

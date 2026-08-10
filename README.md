@@ -61,7 +61,7 @@ startup. Evidence is stored below `FASTACCOUNTS_DATA_DIR`; managed deployments
 must attach persistent storage and add malware scanning.
 
 The Docker image exposes port 5012 and `/healthz`. Deployment is registered in
-the sibling FastDevOps catalogue for `https://accounts.fastsme.com`:
+the sibling FastDevOps catalogue for `https://fastaccounts.org`:
 
 ```bash
 python scripts/coolify.py validate
