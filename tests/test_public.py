@@ -30,10 +30,18 @@ def test_integration_catalogue_lists_platforms_agents_and_bank_plan():
         "Open banking",
     ):
         assert name in rendered
-    assert rendered.count("Adapter ready") == 3
-    assert rendered.count("filing gated") == 2
+    for item in integrations.CATALOGUE:
+        assert item.status not in rendered
     assert "No provider below is connected by default" in rendered
     assert "Configured per object" in rendered
+
+
+def test_integration_status_remains_available_to_internal_workspace():
+    response = client.get("/api/integrations", headers={"X-Test-User": "viewer@test.invalid"})
+    assert response.status_code == 200
+    assert [item["status"] for item in response.json()] == [
+        item.status for item in integrations.CATALOGUE
+    ]
 
 
 def test_provider_logos_have_accessible_alt_text_and_local_assets_resolve():

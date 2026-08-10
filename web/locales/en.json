@@ -1,0 +1,115 @@
+{
+  "meta": {
+    "description": "Open-source bookkeeping and accounting for UK and Estonian businesses."
+  },
+  "language": {
+    "choose": "Choose language"
+  },
+  "nav": {
+    "why": "Why FastAccounts",
+    "integrations": "Integrations",
+    "roadmap": "Roadmap",
+    "sign_in": "Sign In"
+  },
+  "footer": {
+    "tagline": "Open-source bookkeeping for the UK and Estonia.",
+    "integrations": "Integrations",
+    "source": "Source"
+  },
+  "landing": {
+    "title": "Open bookkeeping",
+    "kicker": "Books built for two markets",
+    "headline": "Bookkeeping that stays clear, portable, and accountant-ready.",
+    "lede": "Create invoices, capture bills, reconcile cash, keep an immutable double-entry ledger, and prepare reviewed UK and Estonian VAT workpapers—without adopting a full ERP.",
+    "explore_integrations": "Explore integrations",
+    "view_source": "View the source",
+    "invoice_label": "01 · INVOICE",
+    "invoice_title": "Sell and get paid",
+    "invoice_body": "Country-aware invoices, credit notes, payments, reminders, and a complete receivables trail.",
+    "reconcile_label": "02 · RECONCILE",
+    "reconcile_title": "Know where cash went",
+    "reconcile_body": "Import statements, match with evidence and documents, and review ambiguity before anything posts.",
+    "review_label": "03 · REVIEW",
+    "review_title": "Hand over clean books",
+    "review_body": "VAT workpapers, ledgers, reports, evidence, audit history, and explicit filing-agent plans."
+  },
+  "integrations": {
+    "title": "Integrations",
+    "kicker": "Coexist by design",
+    "headline": "Connect the tools your accountant already uses.",
+    "lede": "FastAccounts can exchange data through tested provider adapters while making direction, ownership, review, and conflicts visible. No provider below is connected by default, and tax submission remains gated.",
+    "accounting_adapters": "3 accounting adapters",
+    "filing_gates": "2 filing gates",
+    "banking_candidate": "Read-only banking candidate",
+    "direction": "Direction",
+    "ownership": "Record ownership",
+    "docs": "Read provider documentation ↗",
+    "review_gate": "Review gate: ",
+    "review_notice": "Imports and exports produce reconciliation records. Direct tax submission stays disabled until provider approval, accountant UAT, and explicit finalisation controls are complete.",
+    "items": {
+      "quickbooks": {
+        "name": "QuickBooks Online",
+        "logo_alt": "QuickBooks logo",
+        "category": "Accounting platform",
+        "description": "Coexist with an existing QuickBooks company through reviewed imports and controlled exports.",
+        "capabilities": ["Contacts", "Invoices and bills", "Payments", "Accounts and tax", "Attachments"],
+        "direction": "Import first · export by policy",
+        "ownership": "Configured per object"
+      },
+      "xero": {
+        "name": "Xero",
+        "logo_alt": "Xero logo",
+        "category": "Accounting platform",
+        "description": "Exchange accounting data with a Xero organisation using tenant-scoped OAuth and explicit conflict review.",
+        "capabilities": ["Contacts", "Invoices and credit notes", "Payments", "Bank transactions", "Reports"],
+        "direction": "Import first · export by policy",
+        "ownership": "Configured per object"
+      },
+      "merit": {
+        "name": "Merit Aktiva",
+        "logo_alt": "Merit Aktiva logo",
+        "category": "Accounting platform",
+        "description": "Support Estonian accountant workflows with HMAC-signed V2 invoice, payment, tax, GL and report exchange.",
+        "capabilities": ["Sales and purchase invoices", "Payments", "Tax IDs", "GL transactions", "Dimensions"],
+        "direction": "Import and export · reviewed",
+        "ownership": "Configured per object"
+      },
+      "hmrc": {
+        "name": "HMRC Making Tax Digital",
+        "logo_alt": "HMRC service mark",
+        "category": "Filing agent",
+        "description": "Prepare accountant-reviewed VAT workpapers now; add sandbox obligations and submission flows before production approval.",
+        "capabilities": ["VAT obligations", "Nine-box workpaper", "Review declaration", "Submission receipt plan"],
+        "direction": "FastAccounts to HMRC",
+        "ownership": "Accountant-approved filing"
+      },
+      "emta": {
+        "name": "Estonian Tax and Customs Board",
+        "logo_alt": "Estonian Tax and Customs Board service mark",
+        "category": "Filing agent",
+        "description": "Generate accountant-reviewed KMD and VD workpapers and retain a stub for a future supported filing channel.",
+        "capabilities": ["KMD workpaper", "VD preparation", "Audit export", "Direct filing discovery"],
+        "direction": "FastAccounts to accountant",
+        "ownership": "Accountant-reviewed export"
+      },
+      "open_banking": {
+        "name": "Open banking",
+        "logo_alt": "Open banking icon",
+        "category": "Bank data",
+        "description": "Read booked transactions through a selected AISP after GB/EE business-bank coverage and legal review.",
+        "capabilities": ["Consent lifecycle", "Accounts and balances", "Booked transactions", "Reconciliation input"],
+        "direction": "Read-only first",
+        "ownership": "Bank remains source"
+      }
+    }
+  },
+  "login": {
+    "title": "Sign in",
+    "kicker": "Secure workspace",
+    "headline": "Sign in to FastAccounts",
+    "body": "Use an approved Google account. Local credentials and open registration are intentionally not enabled in this pilot.",
+    "continue_google": "Continue with Google",
+    "not_configured": "Google sign-in is not configured",
+    "configuration_hint": "Set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and the exact callback URI in your ignored .env."
+  }
+}

@@ -1,0 +1,115 @@
+{
+  "meta": {
+    "description": "Atvērtā pirmkoda grāmatvedība un uzskaite Apvienotās Karalistes un Igaunijas uzņēmumiem."
+  },
+  "language": {
+    "choose": "Izvēlēties valodu"
+  },
+  "nav": {
+    "why": "Kāpēc FastAccounts",
+    "integrations": "Integrācijas",
+    "roadmap": "Attīstības plāns",
+    "sign_in": "Pierakstīties"
+  },
+  "footer": {
+    "tagline": "Atvērtā pirmkoda grāmatvedība Apvienotajai Karalistei un Igaunijai.",
+    "integrations": "Integrācijas",
+    "source": "Pirmkods"
+  },
+  "landing": {
+    "title": "Atvērta grāmatvedība",
+    "kicker": "Grāmatvedība, kas veidota diviem tirgiem",
+    "headline": "Grāmatvedība, kas paliek skaidra, pārnesama un gatava grāmatveža pārbaudei.",
+    "lede": "Izrakstiet rēķinus, reģistrējiet saņemtos rēķinus, saskaņojiet naudas plūsmu, uzturiet nemaināmu divkāršā ieraksta virsgrāmatu un sagatavojiet pārbaudītus Apvienotās Karalistes un Igaunijas PVN darba dokumentus — neieviešot pilnu ERP sistēmu.",
+    "explore_integrations": "Izpētīt integrācijas",
+    "view_source": "Skatīt pirmkodu",
+    "invoice_label": "01 · IZRAKSTI RĒĶINUS",
+    "invoice_title": "Pārdodiet un saņemiet samaksu",
+    "invoice_body": "Valstij pielāgoti rēķini, kredītrēķini, maksājumi, atgādinājumi un pilnīga debitoru vēsture.",
+    "reconcile_label": "02 · SASKAŅO",
+    "reconcile_title": "Ziniet, kur palika nauda",
+    "reconcile_body": "Importējiet izrakstus, sasaistiet tos ar pierādījumiem un dokumentiem un atrisiniet neskaidrības pirms grāmatojumu veikšanas.",
+    "review_label": "03 · PĀRBAUDI",
+    "review_title": "Nododiet sakārtotu grāmatvedību",
+    "review_body": "PVN darba dokumenti, virsgrāmatas, pārskati, pierādījumi, audita vēsture un skaidri nodokļu iesniegšanas aģenta plāni."
+  },
+  "integrations": {
+    "title": "Integrācijas",
+    "kicker": "Savietojamība jau pēc būtības",
+    "headline": "Savienojiet rīkus, kurus jūsu grāmatvedis jau izmanto.",
+    "lede": "FastAccounts var apmainīties ar datiem, izmantojot pārbaudītus pakalpojumu sniedzēju adapterus, vienlaikus skaidri parādot datu virzienu, īpašumtiesības, pārbaudi un konfliktus. Neviens no tālāk norādītajiem pakalpojumu sniedzējiem pēc noklusējuma nav savienots, un nodokļu deklarāciju iesniegšana joprojām ir ierobežota.",
+    "accounting_adapters": "3 grāmatvedības adapteri",
+    "filing_gates": "2 iesniegšanas kontroles posmi",
+    "banking_candidate": "Tikai lasāmas banku integrācijas kandidāts",
+    "direction": "Datu virziens",
+    "ownership": "Datu īpašumtiesības",
+    "docs": "Lasīt pakalpojumu sniedzēja dokumentāciju ↗",
+    "review_gate": "Pārbaudes kontrole: ",
+    "review_notice": "Imports un eksports izveido saskaņošanas ierakstus. Tieša nodokļu deklarāciju iesniegšana paliek atspējota, līdz ir saņemts pakalpojumu sniedzēja apstiprinājums, pabeigta grāmatveža lietotāju pieņemšanas testēšana un ieviesta nepārprotama galīgā apstiprināšana.",
+    "items": {
+      "quickbooks": {
+        "name": "QuickBooks Online",
+        "logo_alt": "QuickBooks logotips",
+        "category": "Grāmatvedības platforma",
+        "description": "Strādājiet līdzās esošam QuickBooks uzņēmumam, izmantojot pārbaudītu importu un kontrolētu eksportu.",
+        "capabilities": ["Kontakti", "Izrakstītie un saņemtie rēķini", "Maksājumi", "Konti un nodokļi", "Pielikumi"],
+        "direction": "Vispirms imports · eksports saskaņā ar politiku",
+        "ownership": "Konfigurējamas katram objektam"
+      },
+      "xero": {
+        "name": "Xero",
+        "logo_alt": "Xero logotips",
+        "category": "Grāmatvedības platforma",
+        "description": "Apmainieties ar grāmatvedības datiem ar Xero organizāciju, izmantojot organizācijai piesaistītu OAuth un skaidru konfliktu pārbaudi.",
+        "capabilities": ["Kontakti", "Rēķini un kredītrēķini", "Maksājumi", "Bankas darījumi", "Pārskati"],
+        "direction": "Vispirms imports · eksports saskaņā ar politiku",
+        "ownership": "Konfigurējamas katram objektam"
+      },
+      "merit": {
+        "name": "Merit Aktiva",
+        "logo_alt": "Merit Aktiva logotips",
+        "category": "Grāmatvedības platforma",
+        "description": "Atbalstiet Igaunijas grāmatvežu darbplūsmas ar HMAC parakstītu V2 rēķinu, maksājumu, nodokļu, virsgrāmatas ierakstu un pārskatu apmaiņu.",
+        "capabilities": ["Izrakstītie un saņemtie rēķini", "Maksājumi", "Nodokļu identifikatori", "Virsgrāmatas darījumi", "Dimensijas"],
+        "direction": "Imports un eksports · pārbaudīts",
+        "ownership": "Konfigurējamas katram objektam"
+      },
+      "hmrc": {
+        "name": "HMRC Making Tax Digital",
+        "logo_alt": "HMRC pakalpojuma zīme",
+        "category": "Deklarāciju iesniegšanas aģents",
+        "description": "Sagatavojiet grāmatveža pārbaudītus PVN darba dokumentus jau tagad; pirms produkcijas apstiprinājuma pievienojiet testa vides saistības un iesniegšanas darbplūsmas.",
+        "capabilities": ["PVN saistības", "Deviņu lauku darba dokuments", "Pārbaudes apliecinājums", "Iesniegšanas kvīts plāns"],
+        "direction": "No FastAccounts uz HMRC",
+        "ownership": "Grāmatveža apstiprināta iesniegšana"
+      },
+      "emta": {
+        "name": "Igaunijas Nodokļu un muitas pārvalde",
+        "logo_alt": "Igaunijas Nodokļu un muitas pārvaldes pakalpojuma zīme",
+        "category": "Deklarāciju iesniegšanas aģents",
+        "description": "Izveidojiet grāmatveža pārbaudītus KMD un VD darba dokumentus un saglabājiet saskarnes sagatavi nākotnē atbalstītam iesniegšanas kanālam.",
+        "capabilities": ["KMD darba dokuments", "VD sagatavošana", "Audita eksports", "Tiešās iesniegšanas izpēte"],
+        "direction": "No FastAccounts grāmatvedim",
+        "ownership": "Grāmatveža pārbaudīts eksports"
+      },
+      "open_banking": {
+        "name": "Atvērtā banku darbība",
+        "logo_alt": "Atvērtās banku darbības ikona",
+        "category": "Bankas dati",
+        "description": "Lasiet iegrāmatotos darījumus ar izvēlēta kontu informācijas pakalpojumu sniedzēja starpniecību pēc Apvienotās Karalistes un Igaunijas uzņēmumu banku pārklājuma un juridiskās pārbaudes.",
+        "capabilities": ["Piekrišanas dzīves cikls", "Konti un atlikumi", "Iegrāmatotie darījumi", "Saskaņošanas ievaddati"],
+        "direction": "Vispirms tikai lasīšana",
+        "ownership": "Banka paliek datu avots"
+      }
+    }
+  },
+  "login": {
+    "title": "Pierakstīšanās",
+    "kicker": "Droša darbvieta",
+    "headline": "Pierakstieties FastAccounts",
+    "body": "Izmantojiet apstiprinātu Google kontu. Vietējās paroles un publiska reģistrācija šajā izmēģinājuma versijā ir apzināti atspējotas.",
+    "continue_google": "Turpināt ar Google",
+    "not_configured": "Pierakstīšanās ar Google nav konfigurēta",
+    "configuration_hint": "Ignorētajā .env failā norādiet GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET un precīzu atzvanīšanas URI."
+  }
+}

@@ -4,7 +4,7 @@ from __future__ import annotations
 import hmac
 import os
 import secrets
-from urllib.parse import quote
+from urllib.parse import quote, unquote, urlsplit
 
 from dotenv import load_dotenv
 
@@ -18,7 +18,7 @@ import integrations
 import version
 from api_app import api
 from database import get_database
-from web import google_auth
+from web import google_auth, i18n
 from web.public import integrations_page, landing_page, login_page, workspace_page
 
 
@@ -39,20 +39,43 @@ async def migrate_database():
 
 
 @rt("/")
-def home(session):
+def home(session, request):
     if session.get("user"):
         return RedirectResponse("/app", status_code=303)
-    return landing_page()
+    return landing_page(i18n.get_lang(session, request))
 
 
 @rt("/integrations")
-def integration_catalogue():
-    return integrations_page()
+def integration_catalogue(session, request):
+    return integrations_page(i18n.get_lang(session, request))
 
 
 @rt("/login")
-def login(error: str = ""):
-    return login_page(error)
+def login(session, request, error: str = ""):
+    return login_page(error, i18n.get_lang(session, request))
+
+
+def _safe_return_path(value: str) -> str:
+    """Preserve a local public route without allowing an external redirect."""
+    value = value or "/"
+    parsed = urlsplit(value)
+    decoded_path = unquote(parsed.path)
+    if (
+        parsed.scheme
+        or parsed.netloc
+        or not decoded_path.startswith("/")
+        or decoded_path.startswith("//")
+        or "\\" in decoded_path
+        or any(ord(character) < 32 for character in unquote(value))
+    ):
+        return "/"
+    return parsed.path + (f"?{parsed.query}" if parsed.query else "")
+
+
+@rt("/set-lang/{code}")
+def set_language(code: str, session, next: str = "/"):
+    i18n.set_lang(session, code)
+    return RedirectResponse(_safe_return_path(next), status_code=303)
 
 
 @rt("/auth/google")

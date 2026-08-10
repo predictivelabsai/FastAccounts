@@ -1,0 +1,115 @@
+{
+  "meta": {
+    "description": "Atvirojo kodo buhalterinė apskaita Jungtinės Karalystės ir Estijos įmonėms."
+  },
+  "language": {
+    "choose": "Pasirinkti kalbą"
+  },
+  "nav": {
+    "why": "Kodėl FastAccounts",
+    "integrations": "Integracijos",
+    "roadmap": "Plėtros planas",
+    "sign_in": "Prisijungti"
+  },
+  "footer": {
+    "tagline": "Atvirojo kodo buhalterinė apskaita Jungtinei Karalystei ir Estijai.",
+    "integrations": "Integracijos",
+    "source": "Pirminis kodas"
+  },
+  "landing": {
+    "title": "Atvira buhalterinė apskaita",
+    "kicker": "Dviem rinkoms sukurta apskaita",
+    "headline": "Buhalterinė apskaita, kuri išlieka aiški, perkeliama ir parengta buhalterio peržiūrai.",
+    "lede": "Išrašykite sąskaitas, registruokite gautas sąskaitas, suderinkite pinigų srautus, tvarkykite nekintamą dvejybinio įrašo didžiąją knygą ir ruoškite peržiūrėtus Jungtinės Karalystės bei Estijos PVM darbo dokumentus — neįsidiegdami visos ERP sistemos.",
+    "explore_integrations": "Peržiūrėti integracijas",
+    "view_source": "Peržiūrėti pirminį kodą",
+    "invoice_label": "01 · IŠRAŠYKITE SĄSKAITAS",
+    "invoice_title": "Parduokite ir gaukite apmokėjimą",
+    "invoice_body": "Šaliai pritaikytos sąskaitos, kreditinės sąskaitos, mokėjimai, priminimai ir išsami gautinų sumų istorija.",
+    "reconcile_label": "02 · SUDERINKITE",
+    "reconcile_title": "Žinokite, kur išleisti pinigai",
+    "reconcile_body": "Importuokite išrašus, susiekite juos su įrodymais ir dokumentais, o neaiškumus išspręskite prieš registruodami įrašus.",
+    "review_label": "03 · PERŽIŪRĖKITE",
+    "review_title": "Perduokite sutvarkytą apskaitą",
+    "review_body": "PVM darbo dokumentai, didžiosios knygos, ataskaitos, įrodymai, audito istorija ir aiškūs mokesčių deklaravimo agento planai."
+  },
+  "integrations": {
+    "title": "Integracijos",
+    "kicker": "Suderinamumas numatytas nuo pradžių",
+    "headline": "Prijunkite įrankius, kuriuos jau naudoja jūsų buhalteris.",
+    "lede": "FastAccounts gali keistis duomenimis per patikrintus paslaugų teikėjų adapterius, aiškiai rodydama duomenų kryptį, nuosavybę, peržiūrą ir konfliktus. Nė vienas toliau nurodytas paslaugų teikėjas nėra prijungtas pagal numatytuosius nustatymus, o mokesčių deklaracijų pateikimas tebėra ribojamas.",
+    "accounting_adapters": "3 apskaitos adapteriai",
+    "filing_gates": "2 deklaravimo kontrolės etapai",
+    "banking_candidate": "Tik skaitomos bankininkystės integracijos kandidatas",
+    "direction": "Duomenų kryptis",
+    "ownership": "Duomenų nuosavybė",
+    "docs": "Skaityti paslaugų teikėjo dokumentaciją ↗",
+    "review_gate": "Peržiūros kontrolė: ",
+    "review_notice": "Importuojant ir eksportuojant sukuriami suderinimo įrašai. Tiesioginis mokesčių deklaracijų pateikimas lieka išjungtas, kol nebus gautas paslaugų teikėjo patvirtinimas, atliktas buhalterio priėmimo testavimas ir įdiegtos aiškios galutinio patvirtinimo kontrolės.",
+    "items": {
+      "quickbooks": {
+        "name": "QuickBooks Online",
+        "logo_alt": "QuickBooks logotipas",
+        "category": "Apskaitos platforma",
+        "description": "Dirbkite kartu su esama QuickBooks įmone, naudodami peržiūrėtą importą ir kontroliuojamą eksportą.",
+        "capabilities": ["Kontaktai", "Išrašytos ir gautos sąskaitos", "Mokėjimai", "Sąskaitos ir mokesčiai", "Priedai"],
+        "direction": "Pirmiausia importas · eksportas pagal taisykles",
+        "ownership": "Konfigūruojama kiekvienam objektui"
+      },
+      "xero": {
+        "name": "Xero",
+        "logo_alt": "Xero logotipas",
+        "category": "Apskaitos platforma",
+        "description": "Keiskitės apskaitos duomenimis su Xero organizacija naudodami organizacijai priskirtą OAuth ir aiškią konfliktų peržiūrą.",
+        "capabilities": ["Kontaktai", "Sąskaitos ir kreditinės sąskaitos", "Mokėjimai", "Banko operacijos", "Ataskaitos"],
+        "direction": "Pirmiausia importas · eksportas pagal taisykles",
+        "ownership": "Konfigūruojama kiekvienam objektui"
+      },
+      "merit": {
+        "name": "Merit Aktiva",
+        "logo_alt": "Merit Aktiva logotipas",
+        "category": "Apskaitos platforma",
+        "description": "Palaikykite Estijos buhalterių darbo eigą keisdamiesi HMAC pasirašytais V2 sąskaitų, mokėjimų, mokesčių, didžiosios knygos įrašų ir ataskaitų duomenimis.",
+        "capabilities": ["Išrašytos ir gautos sąskaitos", "Mokėjimai", "Mokesčių identifikatoriai", "Didžiosios knygos operacijos", "Dimensijos"],
+        "direction": "Importas ir eksportas · peržiūrėta",
+        "ownership": "Konfigūruojama kiekvienam objektui"
+      },
+      "hmrc": {
+        "name": "HMRC Making Tax Digital",
+        "logo_alt": "HMRC paslaugos ženklas",
+        "category": "Deklaracijų teikimo agentas",
+        "description": "Jau dabar ruoškite buhalterio peržiūrėtus PVM darbo dokumentus; prieš patvirtinant gamybinę aplinką pridėkite bandomosios aplinkos prievoles ir pateikimo darbo eigą.",
+        "capabilities": ["PVM prievolės", "Devynių laukų darbo dokumentas", "Peržiūros patvirtinimas", "Pateikimo kvito planas"],
+        "direction": "Iš FastAccounts į HMRC",
+        "ownership": "Buhalterio patvirtintas pateikimas"
+      },
+      "emta": {
+        "name": "Estijos mokesčių ir muitų valdyba",
+        "logo_alt": "Estijos mokesčių ir muitų valdybos paslaugos ženklas",
+        "category": "Deklaracijų teikimo agentas",
+        "description": "Kurkite buhalterio peržiūrėtus KMD ir VD darbo dokumentus ir išlaikykite sąsajos ruošinį būsimam palaikomam pateikimo kanalui.",
+        "capabilities": ["KMD darbo dokumentas", "VD parengimas", "Audito eksportas", "Tiesioginio pateikimo analizė"],
+        "direction": "Iš FastAccounts buhalteriui",
+        "ownership": "Buhalterio peržiūrėtas eksportas"
+      },
+      "open_banking": {
+        "name": "Atviroji bankininkystė",
+        "logo_alt": "Atvirosios bankininkystės piktograma",
+        "category": "Banko duomenys",
+        "description": "Skaitykite užregistruotas operacijas per pasirinktą sąskaitos informacijos paslaugų teikėją, patikrinę Jungtinės Karalystės ir Estijos verslo bankų aprėptį bei teisinį tinkamumą.",
+        "capabilities": ["Sutikimo gyvavimo ciklas", "Sąskaitos ir likučiai", "Užregistruotos operacijos", "Suderinimo įvestis"],
+        "direction": "Pirmiausia tik skaitymas",
+        "ownership": "Bankas lieka duomenų šaltiniu"
+      }
+    }
+  },
+  "login": {
+    "title": "Prisijungimas",
+    "kicker": "Saugi darbo sritis",
+    "headline": "Prisijunkite prie FastAccounts",
+    "body": "Naudokite patvirtintą Google paskyrą. Vietiniai slaptažodžiai ir vieša registracija šioje bandomojoje versijoje sąmoningai išjungti.",
+    "continue_google": "Tęsti su Google",
+    "not_configured": "Prisijungimas su Google nesukonfigūruotas",
+    "configuration_hint": "Ignoruojamame .env faile nurodykite GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET ir tikslų grįžtamojo ryšio URI."
+  }
+}
