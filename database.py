@@ -1,17 +1,74 @@
 """Portable SQLite/PostgreSQL connections and numbered migration runner."""
 from __future__ import annotations
 
+import atexit
 import os
 import re
 import sqlite3
+import threading
+from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Iterator, Sequence
+from typing import Any
 
+from psycopg.rows import dict_row
+from psycopg_pool import ConnectionPool
 
 ROOT = Path(__file__).parent
 MIGRATIONS = ROOT / "migrations"
 SCHEMA_PATTERN = re.compile(r"^[a-z_][a-z0-9_]*$")
+_pools: dict[str, ConnectionPool] = {}
+_pool_lock = threading.Lock()
+
+
+def _pool_limits() -> tuple[int, int]:
+    minimum = int(os.getenv("DB_POOL_MIN_SIZE", "0"))
+    maximum = int(os.getenv("DB_POOL_MAX_SIZE", "3"))
+    if minimum < 0 or maximum < 1 or minimum > maximum:
+        raise ValueError("DB_POOL_MIN_SIZE/MAX_SIZE define an invalid pool range")
+    return minimum, maximum
+
+
+def _postgres_pool(url: str) -> ConnectionPool:
+    """Return the process-wide bounded pool for one PostgreSQL URL."""
+    pool = _pools.get(url)
+    if pool is not None:
+        return pool
+    with _pool_lock:
+        pool = _pools.get(url)
+        if pool is None:
+            minimum, maximum = _pool_limits()
+            pool = ConnectionPool(
+                conninfo=url,
+                min_size=minimum,
+                max_size=maximum,
+                timeout=float(os.getenv("DB_POOL_TIMEOUT", "10")),
+                max_lifetime=float(os.getenv("DB_POOL_RECYCLE", "1800")),
+                max_idle=float(os.getenv("DB_POOL_MAX_IDLE", "300")),
+                kwargs={
+                    "row_factory": dict_row,
+                    "application_name": os.getenv(
+                        "DB_APPLICATION_NAME", "fastaccounts"
+                    ),
+                },
+                check=ConnectionPool.check_connection,
+                open=False,
+            )
+            pool.open()
+            _pools[url] = pool
+    return pool
+
+
+def close_database_pools() -> None:
+    """Close and forget all process pools during shutdown or test reset."""
+    with _pool_lock:
+        pools = list(_pools.values())
+        _pools.clear()
+    for pool in pools:
+        pool.close()
+
+
+atexit.register(close_database_pools)
 
 
 class Transaction:
@@ -53,7 +110,7 @@ class Database:
             raise ValueError("DB_SCHEMA contains an unsafe PostgreSQL identifier")
 
     @classmethod
-    def from_env(cls) -> "Database":
+    def from_env(cls) -> Database:
         return cls(
             url=os.getenv("DB_URL", ""),
             path=os.getenv("FASTACCOUNTS_DB", "") or str(ROOT / "fastaccounts.sqlite"),
@@ -67,12 +124,20 @@ class Database:
             connection.execute("PRAGMA foreign_keys=ON")
             connection.execute("PRAGMA busy_timeout=5000")
             return connection
-        from psycopg import connect
-        from psycopg.rows import dict_row
-
-        connection = connect(self.url, row_factory=dict_row)
-        connection.execute(f'SET search_path TO "{self.schema}", public')
+        pool = _postgres_pool(self.url)
+        connection = pool.getconn()
+        try:
+            connection.execute(f'SET search_path TO "{self.schema}", public')
+        except Exception:
+            pool.putconn(connection, close=True)
+            raise
         return connection
+
+    def _release(self, connection) -> None:
+        if self.dialect == "postgres":
+            _postgres_pool(self.url).putconn(connection)
+        else:
+            connection.close()
 
     @contextmanager
     def transaction(self) -> Iterator[Transaction]:
@@ -84,7 +149,7 @@ class Database:
             connection.rollback()
             raise
         finally:
-            connection.close()
+            self._release(connection)
 
     def one(self, query: str, params: Sequence[Any] = ()) -> dict[str, Any] | None:
         with self.transaction() as tx:
@@ -123,10 +188,7 @@ class Database:
                 connection.close()
             return applied
 
-        from psycopg import connect
-        from psycopg.rows import dict_row
-
-        connection = connect(self.url, row_factory=dict_row)
+        connection = self.connect()
         try:
             connection.execute(f'CREATE SCHEMA IF NOT EXISTS "{self.schema}"')
             connection.execute(f'SET search_path TO "{self.schema}", public')
@@ -155,7 +217,7 @@ class Database:
             connection.rollback()
             raise
         finally:
-            connection.close()
+            self._release(connection)
         return applied
 
 
@@ -177,6 +239,7 @@ def get_database() -> Database:
 def reset_database_cache() -> None:
     global _cached
     _cached = None
+    close_database_pools()
 
 
 _POSTGRES_LEDGER_TRIGGERS = r"""

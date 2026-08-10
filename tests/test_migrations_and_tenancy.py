@@ -30,6 +30,37 @@ def test_unsafe_postgres_schema_is_rejected():
         Database(url="postgresql://unused", schema='public; DROP SCHEMA public')
 
 
+def test_postgres_pool_is_singleton_per_url(monkeypatch):
+    import database
+
+    created = []
+
+    class FakePool:
+        check_connection = staticmethod(lambda connection: None)
+
+        def __init__(self, **kwargs):
+            created.append(kwargs)
+
+        def open(self):
+            pass
+
+        def close(self):
+            pass
+
+    database.close_database_pools()
+    monkeypatch.setattr(database, "ConnectionPool", FakePool)
+    first = database._postgres_pool("postgresql://example/one")
+    second = database._postgres_pool("postgresql://example/one")
+    other = database._postgres_pool("postgresql://example/two")
+
+    assert first is second
+    assert other is not first
+    assert len(created) == 2
+    assert created[0]["min_size"] == 0
+    assert created[0]["max_size"] == 3
+    database.close_database_pools()
+
+
 def test_organisation_entity_country_and_seed_data(db):
     service = OrganisationService(db)
     with pytest.raises(ValueError, match="does not belong"):
