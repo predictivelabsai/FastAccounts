@@ -52,7 +52,13 @@
         "logo_alt": "QuickBooks logotipas",
         "category": "Apskaitos platforma",
         "description": "Dirbkite kartu su esama QuickBooks įmone, naudodami peržiūrėtą importą ir kontroliuojamą eksportą.",
-        "capabilities": ["Kontaktai", "Išrašytos ir gautos sąskaitos", "Mokėjimai", "Sąskaitos ir mokesčiai", "Priedai"],
+        "capabilities": [
+          "Kontaktai",
+          "Išrašytos ir gautos sąskaitos",
+          "Mokėjimai",
+          "Sąskaitos ir mokesčiai",
+          "Priedai"
+        ],
         "direction": "Pirmiausia importas · eksportas pagal taisykles",
         "ownership": "Konfigūruojama kiekvienam objektui"
       },
@@ -61,7 +67,13 @@
         "logo_alt": "Xero logotipas",
         "category": "Apskaitos platforma",
         "description": "Keiskitės apskaitos duomenimis su Xero organizacija naudodami organizacijai priskirtą OAuth ir aiškią konfliktų peržiūrą.",
-        "capabilities": ["Kontaktai", "Sąskaitos ir kreditinės sąskaitos", "Mokėjimai", "Banko operacijos", "Ataskaitos"],
+        "capabilities": [
+          "Kontaktai",
+          "Sąskaitos ir kreditinės sąskaitos",
+          "Mokėjimai",
+          "Banko operacijos",
+          "Ataskaitos"
+        ],
         "direction": "Pirmiausia importas · eksportas pagal taisykles",
         "ownership": "Konfigūruojama kiekvienam objektui"
       },
@@ -70,7 +82,13 @@
         "logo_alt": "Merit Aktiva logotipas",
         "category": "Apskaitos platforma",
         "description": "Palaikykite Estijos buhalterių darbo eigą keisdamiesi HMAC pasirašytais V2 sąskaitų, mokėjimų, mokesčių, didžiosios knygos įrašų ir ataskaitų duomenimis.",
-        "capabilities": ["Išrašytos ir gautos sąskaitos", "Mokėjimai", "Mokesčių identifikatoriai", "Didžiosios knygos operacijos", "Dimensijos"],
+        "capabilities": [
+          "Išrašytos ir gautos sąskaitos",
+          "Mokėjimai",
+          "Mokesčių identifikatoriai",
+          "Didžiosios knygos operacijos",
+          "Dimensijos"
+        ],
         "direction": "Importas ir eksportas · peržiūrėta",
         "ownership": "Konfigūruojama kiekvienam objektui"
       },
@@ -79,7 +97,12 @@
         "logo_alt": "HMRC paslaugos ženklas",
         "category": "Deklaracijų teikimo agentas",
         "description": "Jau dabar ruoškite buhalterio peržiūrėtus PVM darbo dokumentus; prieš patvirtinant gamybinę aplinką pridėkite bandomosios aplinkos prievoles ir pateikimo darbo eigą.",
-        "capabilities": ["PVM prievolės", "Devynių laukų darbo dokumentas", "Peržiūros patvirtinimas", "Pateikimo kvito planas"],
+        "capabilities": [
+          "PVM prievolės",
+          "Devynių laukų darbo dokumentas",
+          "Peržiūros patvirtinimas",
+          "Pateikimo kvito planas"
+        ],
         "direction": "Iš FastAccounts į HMRC",
         "ownership": "Buhalterio patvirtintas pateikimas"
       },
@@ -88,7 +111,12 @@
         "logo_alt": "Estijos mokesčių ir muitų valdybos paslaugos ženklas",
         "category": "Deklaracijų teikimo agentas",
         "description": "Kurkite buhalterio peržiūrėtus KMD ir VD darbo dokumentus ir išlaikykite sąsajos ruošinį būsimam palaikomam pateikimo kanalui.",
-        "capabilities": ["KMD darbo dokumentas", "VD parengimas", "Audito eksportas", "Tiesioginio pateikimo analizė"],
+        "capabilities": [
+          "KMD darbo dokumentas",
+          "VD parengimas",
+          "Audito eksportas",
+          "Tiesioginio pateikimo analizė"
+        ],
         "direction": "Iš FastAccounts buhalteriui",
         "ownership": "Buhalterio peržiūrėtas eksportas"
       },
@@ -97,7 +125,12 @@
         "logo_alt": "Atvirosios bankininkystės piktograma",
         "category": "Banko duomenys",
         "description": "Skaitykite užregistruotas operacijas per pasirinktą sąskaitos informacijos paslaugų teikėją, patikrinę Jungtinės Karalystės ir Estijos verslo bankų aprėptį bei teisinį tinkamumą.",
-        "capabilities": ["Sutikimo gyvavimo ciklas", "Sąskaitos ir likučiai", "Užregistruotos operacijos", "Suderinimo įvestis"],
+        "capabilities": [
+          "Sutikimo gyvavimo ciklas",
+          "Sąskaitos ir likučiai",
+          "Užregistruotos operacijos",
+          "Suderinimo įvestis"
+        ],
         "direction": "Pirmiausia tik skaitymas",
         "ownership": "Bankas lieka duomenų šaltiniu"
       }
@@ -111,5 +144,6 @@
     "continue_google": "Tęsti su Google",
     "not_configured": "Prisijungimas su Google nesukonfigūruotas",
     "configuration_hint": "Ignoruojamame .env faile nurodykite GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET ir tikslų grįžtamojo ryšio URI."
-  }
+  },
+  "nav.pricing": "Kainos"
 }

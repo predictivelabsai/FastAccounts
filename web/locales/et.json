@@ -52,7 +52,13 @@
         "logo_alt": "QuickBooksi logo",
         "category": "Raamatupidamisplatvorm",
         "description": "Kasuta olemasolevat QuickBooksi ettevõtet koos üle vaadatud impordi ja kontrollitud ekspordiga.",
-        "capabilities": ["Kontaktid", "Müügi- ja ostuarved", "Maksed", "Kontod ja maksud", "Manused"],
+        "capabilities": [
+          "Kontaktid",
+          "Müügi- ja ostuarved",
+          "Maksed",
+          "Kontod ja maksud",
+          "Manused"
+        ],
         "direction": "Esmalt import · eksport vastavalt reeglitele",
         "ownership": "Seadistatav objektipõhiselt"
       },
@@ -61,7 +67,13 @@
         "logo_alt": "Xero logo",
         "category": "Raamatupidamisplatvorm",
         "description": "Vaheta raamatupidamisandmeid Xero organisatsiooniga organisatsioonipõhise OAuthi ja selge konfliktide ülevaatuse abil.",
-        "capabilities": ["Kontaktid", "Arved ja kreeditarved", "Maksed", "Pangatehingud", "Aruanded"],
+        "capabilities": [
+          "Kontaktid",
+          "Arved ja kreeditarved",
+          "Maksed",
+          "Pangatehingud",
+          "Aruanded"
+        ],
         "direction": "Esmalt import · eksport vastavalt reeglitele",
         "ownership": "Seadistatav objektipõhiselt"
       },
@@ -70,7 +82,13 @@
         "logo_alt": "Merit Aktiva logo",
         "category": "Raamatupidamisplatvorm",
         "description": "Toeta Eesti raamatupidaja töövooge HMAC-allkirjastatud V2 arvete, maksete, maksude, pearaamatukannete ja aruannete vahetusega.",
-        "capabilities": ["Müügi- ja ostuarved", "Maksed", "Maksutunnused", "Pearaamatukanded", "Dimensioonid"],
+        "capabilities": [
+          "Müügi- ja ostuarved",
+          "Maksed",
+          "Maksutunnused",
+          "Pearaamatukanded",
+          "Dimensioonid"
+        ],
         "direction": "Import ja eksport · üle vaadatud",
         "ownership": "Seadistatav objektipõhiselt"
       },
@@ -79,7 +97,12 @@
         "logo_alt": "HMRC teenusemärk",
         "category": "Deklaratsioonide esitamise agent",
         "description": "Koosta praegu raamatupidaja üle vaadatud käibemaksu tööpaberid; lisa enne tootmiskeskkonna heakskiitu testkeskkonna kohustused ja esitamise töövood.",
-        "capabilities": ["Käibemaksukohustused", "Üheksa lahtriga tööpaber", "Ülevaatuse kinnitus", "Esitamiskviitungi plaan"],
+        "capabilities": [
+          "Käibemaksukohustused",
+          "Üheksa lahtriga tööpaber",
+          "Ülevaatuse kinnitus",
+          "Esitamiskviitungi plaan"
+        ],
         "direction": "FastAccountsist HMRC-le",
         "ownership": "Raamatupidaja kinnitatud esitamine"
       },
@@ -88,7 +111,12 @@
         "logo_alt": "Eesti Maksu- ja Tolliameti teenusemärk",
         "category": "Deklaratsioonide esitamise agent",
         "description": "Koosta raamatupidaja üle vaadatud KMD ja VD tööpaberid ning säilita tulevase toetatud esitamiskanali liides.",
-        "capabilities": ["KMD tööpaber", "VD ettevalmistus", "Auditi eksport", "Otsese esitamise analüüs"],
+        "capabilities": [
+          "KMD tööpaber",
+          "VD ettevalmistus",
+          "Auditi eksport",
+          "Otsese esitamise analüüs"
+        ],
         "direction": "FastAccountsist raamatupidajale",
         "ownership": "Raamatupidaja üle vaadatud eksport"
       },
@@ -97,7 +125,12 @@
         "logo_alt": "Avatud panganduse ikoon",
         "category": "Pangaandmed",
         "description": "Loe broneeritud tehinguid valitud kontoteabe teenusepakkuja kaudu pärast Ühendkuningriigi ja Eesti äripankade katvuse ning õigusliku sobivuse kontrolli.",
-        "capabilities": ["Nõusoleku elutsükkel", "Kontod ja saldod", "Broneeritud tehingud", "Kooskõlastuse sisend"],
+        "capabilities": [
+          "Nõusoleku elutsükkel",
+          "Kontod ja saldod",
+          "Broneeritud tehingud",
+          "Kooskõlastuse sisend"
+        ],
         "direction": "Esmalt ainult lugemisõigus",
         "ownership": "Pank jääb algallikaks"
       }
@@ -111,5 +144,6 @@
     "continue_google": "Jätka Google'iga",
     "not_configured": "Google'iga sisselogimine pole seadistatud",
     "configuration_hint": "Määra eiratud .env-failis GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET ja täpne tagasisuunamise URI."
-  }
+  },
+  "nav.pricing": "Hinnad"
 }
