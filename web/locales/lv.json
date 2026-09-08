@@ -52,7 +52,13 @@
         "logo_alt": "QuickBooks logotips",
         "category": "Grāmatvedības platforma",
         "description": "Strādājiet līdzās esošam QuickBooks uzņēmumam, izmantojot pārbaudītu importu un kontrolētu eksportu.",
-        "capabilities": ["Kontakti", "Izrakstītie un saņemtie rēķini", "Maksājumi", "Konti un nodokļi", "Pielikumi"],
+        "capabilities": [
+          "Kontakti",
+          "Izrakstītie un saņemtie rēķini",
+          "Maksājumi",
+          "Konti un nodokļi",
+          "Pielikumi"
+        ],
         "direction": "Vispirms imports · eksports saskaņā ar politiku",
         "ownership": "Konfigurējamas katram objektam"
       },
@@ -61,7 +67,13 @@
         "logo_alt": "Xero logotips",
         "category": "Grāmatvedības platforma",
         "description": "Apmainieties ar grāmatvedības datiem ar Xero organizāciju, izmantojot organizācijai piesaistītu OAuth un skaidru konfliktu pārbaudi.",
-        "capabilities": ["Kontakti", "Rēķini un kredītrēķini", "Maksājumi", "Bankas darījumi", "Pārskati"],
+        "capabilities": [
+          "Kontakti",
+          "Rēķini un kredītrēķini",
+          "Maksājumi",
+          "Bankas darījumi",
+          "Pārskati"
+        ],
         "direction": "Vispirms imports · eksports saskaņā ar politiku",
         "ownership": "Konfigurējamas katram objektam"
       },
@@ -70,7 +82,13 @@
         "logo_alt": "Merit Aktiva logotips",
         "category": "Grāmatvedības platforma",
         "description": "Atbalstiet Igaunijas grāmatvežu darbplūsmas ar HMAC parakstītu V2 rēķinu, maksājumu, nodokļu, virsgrāmatas ierakstu un pārskatu apmaiņu.",
-        "capabilities": ["Izrakstītie un saņemtie rēķini", "Maksājumi", "Nodokļu identifikatori", "Virsgrāmatas darījumi", "Dimensijas"],
+        "capabilities": [
+          "Izrakstītie un saņemtie rēķini",
+          "Maksājumi",
+          "Nodokļu identifikatori",
+          "Virsgrāmatas darījumi",
+          "Dimensijas"
+        ],
         "direction": "Imports un eksports · pārbaudīts",
         "ownership": "Konfigurējamas katram objektam"
       },
@@ -79,7 +97,12 @@
         "logo_alt": "HMRC pakalpojuma zīme",
         "category": "Deklarāciju iesniegšanas aģents",
         "description": "Sagatavojiet grāmatveža pārbaudītus PVN darba dokumentus jau tagad; pirms produkcijas apstiprinājuma pievienojiet testa vides saistības un iesniegšanas darbplūsmas.",
-        "capabilities": ["PVN saistības", "Deviņu lauku darba dokuments", "Pārbaudes apliecinājums", "Iesniegšanas kvīts plāns"],
+        "capabilities": [
+          "PVN saistības",
+          "Deviņu lauku darba dokuments",
+          "Pārbaudes apliecinājums",
+          "Iesniegšanas kvīts plāns"
+        ],
         "direction": "No FastAccounts uz HMRC",
         "ownership": "Grāmatveža apstiprināta iesniegšana"
       },
@@ -88,7 +111,12 @@
         "logo_alt": "Igaunijas Nodokļu un muitas pārvaldes pakalpojuma zīme",
         "category": "Deklarāciju iesniegšanas aģents",
         "description": "Izveidojiet grāmatveža pārbaudītus KMD un VD darba dokumentus un saglabājiet saskarnes sagatavi nākotnē atbalstītam iesniegšanas kanālam.",
-        "capabilities": ["KMD darba dokuments", "VD sagatavošana", "Audita eksports", "Tiešās iesniegšanas izpēte"],
+        "capabilities": [
+          "KMD darba dokuments",
+          "VD sagatavošana",
+          "Audita eksports",
+          "Tiešās iesniegšanas izpēte"
+        ],
         "direction": "No FastAccounts grāmatvedim",
         "ownership": "Grāmatveža pārbaudīts eksports"
       },
@@ -97,7 +125,12 @@
         "logo_alt": "Atvērtās banku darbības ikona",
         "category": "Bankas dati",
         "description": "Lasiet iegrāmatotos darījumus ar izvēlēta kontu informācijas pakalpojumu sniedzēja starpniecību pēc Apvienotās Karalistes un Igaunijas uzņēmumu banku pārklājuma un juridiskās pārbaudes.",
-        "capabilities": ["Piekrišanas dzīves cikls", "Konti un atlikumi", "Iegrāmatotie darījumi", "Saskaņošanas ievaddati"],
+        "capabilities": [
+          "Piekrišanas dzīves cikls",
+          "Konti un atlikumi",
+          "Iegrāmatotie darījumi",
+          "Saskaņošanas ievaddati"
+        ],
         "direction": "Vispirms tikai lasīšana",
         "ownership": "Banka paliek datu avots"
       }
@@ -111,5 +144,6 @@
     "continue_google": "Turpināt ar Google",
     "not_configured": "Pierakstīšanās ar Google nav konfigurēta",
     "configuration_hint": "Ignorētajā .env failā norādiet GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET un precīzu atzvanīšanas URI."
-  }
+  },
+  "nav.pricing": "Cenas"
 }

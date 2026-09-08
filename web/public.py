@@ -73,6 +73,7 @@ def _nav(lang: str, current: str):
     return Nav(
         A(Span("F", cls="mark"), Span("Fast", Em("Accounts")), href="/", cls="brand"),
         Div(
+            A(T("nav.pricing"), href="/#pricing", cls="nav-link"),
             A(T("nav.why"), href="/#why", cls="nav-link"),
             A(T("nav.integrations"), href="/integrations", cls="nav-link"),
             A(T("nav.roadmap"), href="https://github.com/predictivelabsai/FastAccounts", cls="nav-link"),
@@ -141,6 +142,45 @@ def public_page(*content, title: str, current: str, lang: str):
     )
 
 
+
+def _pricing_section(lang: str):
+    T = lambda text: i18n.translate(text, lang) if hasattr(i18n, "translate") else text
+    # Prefer locale keys when present.
+    def L(key, fallback):
+        try:
+            value = i18n.t(key, lang)
+            return value if value and value != key else fallback
+        except Exception:
+            return fallback
+    return Section(
+        Div(
+            Span(L("pricing.kicker", "Pricing"), cls="kicker"),
+            H2(L("pricing.title", "Simple pricing for every FastSME product.")),
+            P(L("pricing.lede", "Every Fast* product uses the same two options: bring your own cloud for free, or host with us for €1 per month.")),
+            cls="section-heading",
+        ),
+        Div(
+            Article(
+                Span(L("pricing.byoc_eyebrow", "BYOC"), cls="kicker"),
+                H3(L("pricing.byoc_title", "Bring Your Own Cloud")),
+                P(L("pricing.byoc_price", "Free"), style="font-size:36px;font-weight:750;margin:12px 0"),
+                P(L("pricing.byoc_body", "Self-host on your own infrastructure or cloud. Full control of data and upgrades. No per-seat platform fee.")),
+                cls="feature-card",
+            ),
+            Article(
+                Span(L("pricing.hosted_eyebrow", "Hosted"), cls="kicker"),
+                H3(L("pricing.hosted_title", "Host with us")),
+                P(L("pricing.hosted_price", "€1 / month"), style="font-size:36px;font-weight:750;margin:12px 0"),
+                P(L("pricing.hosted_body", "We run the product for you on FastSME-managed infrastructure. €1 per product per month.")),
+                cls="feature-card",
+            ),
+            cls="feature-grid",
+            style="grid-template-columns:repeat(2,minmax(0,1fr))",
+        ),
+        id="pricing",
+        cls="band",
+    )
+
 def landing_page(lang: str = i18n.DEFAULT_LANG):
     T = lambda key: i18n.t(key, lang)
     return public_page(
@@ -165,6 +205,7 @@ def landing_page(lang: str = i18n.DEFAULT_LANG):
             id="why",
             cls="band",
         ),
+        _pricing_section(lang),
         title=T("landing.title"),
         current="/",
         lang=lang,

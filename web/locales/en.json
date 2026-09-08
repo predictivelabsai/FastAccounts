@@ -52,7 +52,13 @@
         "logo_alt": "QuickBooks logo",
         "category": "Accounting platform",
         "description": "Coexist with an existing QuickBooks company through reviewed imports and controlled exports.",
-        "capabilities": ["Contacts", "Invoices and bills", "Payments", "Accounts and tax", "Attachments"],
+        "capabilities": [
+          "Contacts",
+          "Invoices and bills",
+          "Payments",
+          "Accounts and tax",
+          "Attachments"
+        ],
         "direction": "Import first · export by policy",
         "ownership": "Configured per object"
       },
@@ -61,7 +67,13 @@
         "logo_alt": "Xero logo",
         "category": "Accounting platform",
         "description": "Exchange accounting data with a Xero organisation using tenant-scoped OAuth and explicit conflict review.",
-        "capabilities": ["Contacts", "Invoices and credit notes", "Payments", "Bank transactions", "Reports"],
+        "capabilities": [
+          "Contacts",
+          "Invoices and credit notes",
+          "Payments",
+          "Bank transactions",
+          "Reports"
+        ],
         "direction": "Import first · export by policy",
         "ownership": "Configured per object"
       },
@@ -70,7 +82,13 @@
         "logo_alt": "Merit Aktiva logo",
         "category": "Accounting platform",
         "description": "Support Estonian accountant workflows with HMAC-signed V2 invoice, payment, tax, GL and report exchange.",
-        "capabilities": ["Sales and purchase invoices", "Payments", "Tax IDs", "GL transactions", "Dimensions"],
+        "capabilities": [
+          "Sales and purchase invoices",
+          "Payments",
+          "Tax IDs",
+          "GL transactions",
+          "Dimensions"
+        ],
         "direction": "Import and export · reviewed",
         "ownership": "Configured per object"
       },
@@ -79,7 +97,12 @@
         "logo_alt": "HMRC service mark",
         "category": "Filing agent",
         "description": "Prepare accountant-reviewed VAT workpapers now; add sandbox obligations and submission flows before production approval.",
-        "capabilities": ["VAT obligations", "Nine-box workpaper", "Review declaration", "Submission receipt plan"],
+        "capabilities": [
+          "VAT obligations",
+          "Nine-box workpaper",
+          "Review declaration",
+          "Submission receipt plan"
+        ],
         "direction": "FastAccounts to HMRC",
         "ownership": "Accountant-approved filing"
       },
@@ -88,7 +111,12 @@
         "logo_alt": "Estonian Tax and Customs Board service mark",
         "category": "Filing agent",
         "description": "Generate accountant-reviewed KMD and VD workpapers and retain a stub for a future supported filing channel.",
-        "capabilities": ["KMD workpaper", "VD preparation", "Audit export", "Direct filing discovery"],
+        "capabilities": [
+          "KMD workpaper",
+          "VD preparation",
+          "Audit export",
+          "Direct filing discovery"
+        ],
         "direction": "FastAccounts to accountant",
         "ownership": "Accountant-reviewed export"
       },
@@ -97,7 +125,12 @@
         "logo_alt": "Open banking icon",
         "category": "Bank data",
         "description": "Read booked transactions through a selected AISP after GB/EE business-bank coverage and legal review.",
-        "capabilities": ["Consent lifecycle", "Accounts and balances", "Booked transactions", "Reconciliation input"],
+        "capabilities": [
+          "Consent lifecycle",
+          "Accounts and balances",
+          "Booked transactions",
+          "Reconciliation input"
+        ],
         "direction": "Read-only first",
         "ownership": "Bank remains source"
       }
@@ -111,5 +144,6 @@
     "continue_google": "Continue with Google",
     "not_configured": "Google sign-in is not configured",
     "configuration_hint": "Set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and the exact callback URI in your ignored .env."
-  }
+  },
+  "nav.pricing": "Pricing"
 }
