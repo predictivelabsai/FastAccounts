@@ -15,7 +15,7 @@ def test_connector_stubs_are_explicitly_non_live(provider):
     for result in (
         connector.check(),
         connector.pull("invoices", cursor="not-used"),
-        connector.push("contacts", [{"name": "Synthetic Customer"}]),
+        connector.push("contacts", [{"name": "Brightline Media Ltd"}]),
     ):
         assert result.provider == provider
         assert not result.ok

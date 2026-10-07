@@ -10,9 +10,9 @@ from organisations import AccessDenied, OrganisationService
 
 def test_empty_migration_is_idempotent(tmp_path):
     db = Database(path=str(tmp_path / "empty.sqlite"))
-    assert db.migrate() == ["0001_accounting_core", "0002_integrations", "0003_operations", "0004_document_immutability"]
+    assert db.migrate() == ["0001_accounting_core", "0002_integrations", "0003_operations", "0004_document_immutability", "0005_payroll"]
     assert db.migrate() == []
-    assert db.scalar("SELECT COUNT(*) FROM schema_migrations") == 4
+    assert db.scalar("SELECT COUNT(*) FROM schema_migrations") == 5
 
 
 def test_migration_preserves_existing_data(tmp_path):
@@ -71,6 +71,18 @@ def test_organisation_entity_country_and_seed_data(db):
     assert db.scalar("SELECT COUNT(*) FROM accounts WHERE organisation_id=?", (uk["id"],)) == 10
     assert db.scalar("SELECT COUNT(*) FROM tax_codes WHERE organisation_id=?", (ee["id"],)) == 8
     assert db.scalar("SELECT COUNT(*) FROM fiscal_periods WHERE organisation_id=?", (uk["id"],)) == 24
+    assert {row["code"]: row["name"] for row in db.rows(
+        "SELECT code,name FROM accounts WHERE organisation_id=? AND system_role LIKE 'PAYROLL_%'",
+        (ee["id"],),
+    )} == {
+        "6110": "Palgakulu",
+        "6120": "Sotsiaalmaksu kulu",
+        "6130": "Tööandja töötuskindlustusmakse kulu",
+        "2210": "Palgavõlg töötajatele",
+        "2220": "Kinnipeetud tulumaksu võlg",
+        "2230": "Pensioni- ja töötuskindlustusmaksete võlg",
+        "2240": "Sotsiaalmaksu ja tööandja töötuskindlustuse võlg",
+    }
 
 
 def test_membership_roles_and_tenant_isolation(db, uk_org, ee_org):

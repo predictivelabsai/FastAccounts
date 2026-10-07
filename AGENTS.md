@@ -3,9 +3,9 @@
 ## Product boundary
 
 FastAccounts is bookkeeping software for UK and Estonian small businesses, not
-an ERP. Keep inventory, order management, manufacturing, payroll, CRM, and HR
-outside this repository. Integrate with sister products rather than rebuilding
-them here.
+an ERP. Estonian accounting-bureau payroll for client books is in demo scope;
+production UAT is pending. Keep inventory, order management, manufacturing, CRM,
+and HR outside this repository. Integrate with sister products for those workflows.
 
 ## Architecture and accounting invariants
 

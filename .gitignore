@@ -227,6 +227,7 @@ uploads/
 # FastAccounts browser and local tooling
 .playwright-mcp/
 .playwright-cli/
+shots/
 /tmp/
 
 # Local IDE and OS metadata

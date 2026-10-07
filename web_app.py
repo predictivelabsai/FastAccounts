@@ -22,6 +22,15 @@ from web import google_auth, i18n
 from web.public import integrations_page, landing_page, login_page, workspace_page
 
 
+def _page_language(session, request):
+    # Explicit session choice wins; the demo override precedes browser detection.
+    default = os.getenv("FASTACCOUNTS_DEFAULT_LANG", "").strip().lower()
+    if not session.get("lang") and default in i18n.SUPPORTED_LANGS:
+        session["lang"] = default
+    return i18n.get_lang(session, request)
+
+
+
 SECRET = os.getenv("FASTACCOUNTS_SECRET", "").strip() or secrets.token_hex(32)
 PORT = int(os.getenv("FASTACCOUNTS_PORT", "5012"))
 ENV_LABEL = os.getenv("FASTACCOUNTS_ENV_LABEL", "FastAccounts")
@@ -31,6 +40,8 @@ SESSION_HTTPS_ONLY = os.getenv("FASTACCOUNTS_PUBLIC_URL", "").lower().startswith
 app, rt = fast_app(live=False, pico=False, secret_key=SECRET, max_age=8 * 60 * 60,
                    same_site="lax", sess_https_only=SESSION_HTTPS_ONLY)
 app.mount("/api", api)
+# API documents must resolve before FastHTML's catch-all static extension route.
+app.router.routes.insert(0, app.router.routes.pop())
 
 
 @app.on_event("startup")
@@ -42,17 +53,17 @@ async def migrate_database():
 def home(session, request):
     if session.get("user"):
         return RedirectResponse("/app", status_code=303)
-    return landing_page(i18n.get_lang(session, request))
+    return landing_page(_page_language(session, request))
 
 
 @rt("/integrations")
 def integration_catalogue(session, request):
-    return integrations_page(i18n.get_lang(session, request))
+    return integrations_page(_page_language(session, request))
 
 
 @rt("/login")
 def login(session, request, error: str = ""):
-    return login_page(error, i18n.get_lang(session, request))
+    return login_page(error, _page_language(session, request))
 
 
 def _safe_return_path(value: str) -> str:
@@ -105,17 +116,17 @@ def test_login(session, email: str = "demo@fastaccounts.local"):
     """Local/UAT convenience route; hard-disabled unless explicitly enabled."""
     if os.getenv("FASTACCOUNTS_ALLOW_TEST_AUTH", "").lower() != "true":
         return PlainTextResponse("Not found", status_code=404)
-    session["user"] = {"email": email.strip().lower(), "name": "Synthetic Demo User"}
+    session["user"] = {"email": email.strip().lower(), "name": "Demo Kasutaja"}
     session["csrf_token"] = secrets.token_urlsafe(32)
     return RedirectResponse("/app", status_code=303)
 
 
 @rt("/app")
-def workspace(session):
+def workspace(session, request):
     user = session.get("user")
     if not user:
         return RedirectResponse(f"/login?next={quote('/app', safe='')}", status_code=303)
-    return workspace_page(user)
+    return workspace_page(user, _page_language(session, request))
 
 
 @rt("/logout")

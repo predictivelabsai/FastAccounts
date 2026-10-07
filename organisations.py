@@ -32,6 +32,14 @@ UK_ACCOUNTS = (
 )
 
 EE_ACCOUNTS = (
+    ('6110', 'Palgakulu', 'Expense', 'Debit', 'PAYROLL_SALARY'),
+    ('6120', 'Sotsiaalmaksu kulu', 'Expense', 'Debit', 'PAYROLL_SOCIAL'),
+    ('6130', 'Tööandja töötuskindlustusmakse kulu', 'Expense', 'Debit', 'PAYROLL_UI'),
+    ('2210', 'Palgavõlg töötajatele', 'Liability', 'Credit', 'PAYROLL_NET'),
+    ('2220', 'Kinnipeetud tulumaksu võlg', 'Liability', 'Credit', 'PAYROLL_INCOME_TAX'),
+    ('2230', 'Pensioni- ja töötuskindlustusmaksete võlg', 'Liability', 'Credit', 'PAYROLL_WITHHOLDING'),
+    ('2240', 'Sotsiaalmaksu ja tööandja töötuskindlustuse võlg', 'Liability', 'Credit', 'PAYROLL_EMPLOYER_TAX'),
+
     ("1010", "Arvelduskonto", "Asset", "Debit", "BANK"),
     ("1210", "Nõuded ostjate vastu", "Asset", "Debit", "AR"),
     ("1510", "Sisendkäibemaks", "Asset", "Debit", "INPUT_VAT"),
@@ -54,14 +62,14 @@ UK_TAXES = (
 )
 
 EE_TAXES = (
-    ("EE24", "Standard rate 24%", 24, "standard", {"kmd": [1, 4, 5]}),
-    ("EE13", "Reduced rate 13%", 13, "reduced", {"kmd": [2, 4, 5]}),
-    ("EE9", "Reduced rate 9%", 9, "reduced", {"kmd": [2, 4, 5]}),
-    ("EE0", "Zero rated", 0, "zero", {"kmd": [3]}),
-    ("EEEX", "Tax exempt", 0, "exempt", {"kmd": [8]}),
-    ("EEOS", "Outside scope", 0, "out_of_scope", {}),
-    ("EERC", "Reverse charge", 24, "reverse_charge", {"kmd": [1, 4, 5]}),
-    ("EEICS", "Intra-EU supply", 0, "intra_eu", {"kmd": [3], "vd": True}),
+    ("EE24", "Standardmäär 24%", 24, "standard", {"kmd": [1, 4, 5]}),
+    ("EE13", "Vähendatud määr 13%", 13, "reduced", {"kmd": [2, 4, 5]}),
+    ("EE9", "Vähendatud määr 9%", 9, "reduced", {"kmd": [2, 4, 5]}),
+    ("EE0", "Nullmääraga käive", 0, "zero", {"kmd": [3]}),
+    ("EEEX", "Maksuvaba käive", 0, "exempt", {"kmd": [8]}),
+    ("EEOS", "Käibemaksu kohaldamisalast väljas", 0, "out_of_scope", {}),
+    ("EERC", "Pöördmaksustamine", 24, "reverse_charge", {"kmd": [1, 4, 5]}),
+    ("EEICS", "Ühendusesisene käive", 0, "intra_eu", {"kmd": [3], "vd": True}),
 )
 
 
