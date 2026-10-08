@@ -15,6 +15,7 @@ import integrations
 import version
 from banking import BankingService
 from automation import AutomationService, email_configured, email_status
+from connectors.registry import provider_metadata
 from database import get_database
 from documents import DocumentService
 from integration_service import IntegrationService
@@ -139,8 +140,21 @@ class TaxPrepareIn(BaseModel):
 
 class IntegrationIn(BaseModel):
     credentials: dict[str, Any]
-    config: dict[str, Any] = {}
+    config: dict[str, Any] = Field(default_factory=dict)
     external_tenant_id: str = ""
+
+
+class IntegrationTestIn(BaseModel):
+    credentials: dict[str, Any] = Field(default_factory=dict)
+    config: dict[str, Any] = Field(default_factory=dict)
+
+
+class ConnectorResultOut(BaseModel):
+    provider: str
+    operation: str
+    ok: bool
+    live: bool
+    message: str
 
 
 class JournalLineIn(BaseModel):
@@ -560,14 +574,43 @@ def create_journal(organisation_id: str, payload: JournalIn, user: User = Depend
 @api.get("/integrations")
 def integration_catalogue(user: User = Depends(current_user)):
     del user
-    return [item.__dict__ for item in integrations.CATALOGUE]
+    return [{**item.__dict__, **provider_metadata(item.key)} for item in integrations.CATALOGUE]
+
+
+@api.get("/organisations/{organisation_id}/integrations")
+def organisation_integrations(organisation_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, {"owner", "administrator"})
+    return IntegrationService().connections(organisation_id)
 
 
 @api.post("/organisations/{organisation_id}/integrations/{provider}")
 def configure_integration(organisation_id: str, provider: str, payload: IntegrationIn,
                           user: User = Depends(require_csrf)):
     _require(organisation_id, user, {"owner", "administrator"})
-    return IntegrationService().configure(organisation_id, provider, actor=user.email, **payload.model_dump())
+    service = IntegrationService()
+    connection = service.configure(
+        organisation_id, provider, actor=user.email, **payload.model_dump()
+    )
+    return service.public_connection(connection)
+
+
+@api.post(
+    "/organisations/{organisation_id}/integrations/{provider}/test",
+    response_model=ConnectorResultOut,
+)
+def test_integration(organisation_id: str, provider: str, payload: IntegrationTestIn,
+                     user: User = Depends(require_csrf)):
+    _require(organisation_id, user, {"owner", "administrator"})
+    return IntegrationService().test_connection(
+        organisation_id, provider, actor=user.email, **payload.model_dump()
+    )
+
+
+@api.post("/organisations/{organisation_id}/integrations/{provider}/disconnect")
+def disconnect_integration(organisation_id: str, provider: str,
+                           user: User = Depends(require_csrf)):
+    _require(organisation_id, user, {"owner", "administrator"})
+    return IntegrationService().disconnect(organisation_id, provider, actor=user.email)
 
 # Accounting-bureau payroll API. Monetary values are returned as decimal strings.
 

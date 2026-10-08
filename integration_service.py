@@ -9,11 +9,10 @@ import os
 
 from cryptography.fernet import Fernet, InvalidToken
 
+from connectors.base import ConnectorResult
+from connectors.registry import PROVIDERS, connector_for, registration_for
 from core_utils import audit, canonical_json, new_id, sha256_bytes, utc_now
 from database import Database, get_database
-
-
-PROVIDERS = {"quickbooks", "xero", "merit", "hmrc", "emta", "open_banking"}
 
 
 class CredentialVault:
@@ -51,8 +50,10 @@ class IntegrationService:
     def configure(self, organisation_id: str, provider: str, *, credentials: dict,
                   config: dict, actor: str, external_tenant_id: str = "") -> dict:
         key = provider.strip().lower()
-        if key not in PROVIDERS:
-            raise ValueError("Unknown integration provider")
+        try:
+            registration_for(key)
+        except KeyError as error:
+            raise ValueError("Unknown integration provider") from error
         connection_id, now = new_id(), utc_now()
         encrypted = self.vault.encrypt(credentials)
         with self.db.transaction() as tx:
@@ -87,6 +88,71 @@ class IntegrationService:
         if include_credentials:
             row["credentials"] = self.vault.decrypt(encrypted) if encrypted else {}
         return row
+
+    @staticmethod
+    def public_connection(connection: dict) -> dict:
+        """Return the API-safe connection fields only."""
+        config = connection.get("config")
+        if config is None:
+            config = json.loads(connection.get("config_json", "{}"))
+        return {
+            "id": connection["id"],
+            "provider": connection["provider"],
+            "status": connection["status"],
+            "external_tenant_id": connection.get("external_tenant_id"),
+            "config": config,
+            "updated_at": connection["updated_at"],
+            "registry_status": registration_for(connection["provider"]).status,
+        }
+
+    def connections(self, organisation_id: str) -> list[dict]:
+        rows = self.db.rows(
+            "SELECT id,provider,status,external_tenant_id,config_json,updated_at "
+            "FROM integration_connections WHERE organisation_id=? ORDER BY provider",
+            (organisation_id,),
+        )
+        return [self.public_connection(row) for row in rows]
+
+    def connection_for_provider(self, organisation_id: str, provider: str) -> dict:
+        key = provider.strip().lower()
+        try:
+            registration_for(key)
+        except KeyError as error:
+            raise ValueError("Unknown integration provider") from error
+        row = self.db.one(
+            "SELECT * FROM integration_connections WHERE organisation_id=? AND provider=?",
+            (organisation_id, key),
+        )
+        if not row:
+            raise KeyError("Integration connection not found")
+        row["config"] = json.loads(row.pop("config_json"))
+        row.pop("encrypted_credentials", None)
+        return row
+
+    def test_connection(self, organisation_id: str, provider: str, *, credentials: dict,
+                        config: dict, actor: str) -> ConnectorResult:
+        key = provider.strip().lower()
+        try:
+            connector = connector_for(key, credentials=credentials, config=config)
+        except KeyError as error:
+            raise ValueError("Unknown integration provider") from error
+        result = connector.check()
+        connection = self.db.one(
+            "SELECT id FROM integration_connections WHERE organisation_id=? AND provider=?",
+            (organisation_id, key),
+        )
+        if connection:
+            status = "Connected" if result.ok and result.live else "Error"
+            self.set_status(connection["id"], status, actor=actor, message=result.message)
+        return result
+
+    def disconnect(self, organisation_id: str, provider: str, *, actor: str) -> dict:
+        connection = self.connection_for_provider(organisation_id, provider)
+        updated = self.set_status(
+            connection["id"], "Disconnected", actor=actor,
+            message="Connection disconnected by an authorised organisation member.",
+        )
+        return self.public_connection(updated)
 
     def set_status(self, connection_id: str, status: str, *, actor: str, message: str = "") -> dict:
         allowed = {"Disconnected", "Configured", "Connected", "Error", "Reauth Required"}

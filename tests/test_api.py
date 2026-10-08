@@ -3,16 +3,21 @@ from __future__ import annotations
 import os
 import json
 import socket
+from dataclasses import replace
 from datetime import date, timedelta
 
 import httpx
 import pytest
+from cryptography.fernet import Fernet
 from fastapi.testclient import TestClient
 
 import automation
 from api_app import api, current_user, require_csrf
+from connectors.base import ConnectorResult
+from connectors.registry import REGISTRY
 from database import reset_database_cache
 from documents import DocumentService
+from organisations import OrganisationService
 
 
 @pytest.fixture
@@ -39,6 +44,196 @@ def automation_api(db, uk_org, monkeypatch):
             network.setattr(socket.socket, "connect", blocked)
             yield client, f"/organisations/{uk_org['id']}", invoice
     reset_database_cache()
+
+
+@pytest.fixture
+def integration_api(db, uk_org, monkeypatch):
+    def blocked(*args, **kwargs):
+        raise AssertionError("Live network is forbidden")
+
+    encryption_key = Fernet.generate_key().decode()
+    monkeypatch.setenv("FASTACCOUNTS_DB", db.path)
+    monkeypatch.setenv("DB_URL", "")
+    monkeypatch.setenv("FASTACCOUNTS_ALLOW_TEST_AUTH", "true")
+    monkeypatch.setenv("FASTACCOUNTS_ENCRYPTION_KEY", encryption_key)
+    reset_database_cache()
+    with TestClient(api, headers={"X-Test-User": "owner@example.test"}) as client:
+        with monkeypatch.context() as network:
+            network.setattr(socket.socket, "connect", blocked)
+            yield client, f"/organisations/{uk_org['id']}"
+    reset_database_cache()
+
+
+class FakeCheckConnector:
+    def __init__(self, provider: str, *, ok: bool, live: bool, message: str):
+        self.key = provider
+        self.result = ConnectorResult(
+            provider=provider, operation="check", ok=ok, live=live, message=message,
+        )
+
+    def check(self):
+        return self.result
+
+    def pull(self, object_type, *, cursor=None):
+        raise AssertionError((object_type, cursor))
+
+    def push(self, object_type, records):
+        raise AssertionError((object_type, records))
+
+
+def test_integration_catalogue_exposes_registry_fields(integration_api):
+    client, _ = integration_api
+    response = client.get("/integrations")
+    assert response.status_code == 200
+    catalogue = {item["key"]: item for item in response.json()}
+    assert [field["name"] for field in catalogue["quickbooks"]["credential_fields"]] == [
+        "access_token", "realm_id", "sandbox",
+    ]
+    assert catalogue["quickbooks"]["registry_status"] == "Adapter ready"
+    assert catalogue["hmrc"]["registry_status"] == "Planning stub"
+    assert catalogue["personio"]["registry_status"] == "Roadmap · adapter not built"
+    assert "Adapter not yet built" in catalogue["personio"]["credential_note"]
+
+
+def test_integration_test_success_failure_disconnect_and_redaction(
+    integration_api, db, monkeypatch,
+):
+    client, base = integration_api
+    configured_secret = "configured-secret-value"
+    configured = client.post(base + "/integrations/xero", json={
+        "credentials": {"access_token": configured_secret, "tenant_id": "tenant-a"},
+        "config": {"direction": "import"}, "external_tenant_id": "tenant-a",
+    })
+    assert configured.status_code == 200, configured.text
+    assert configured_secret not in configured.text
+    assert set(configured.json()) == {
+        "id", "provider", "status", "external_tenant_id", "config", "updated_at",
+        "registry_status",
+    }
+
+    captured = {}
+
+    def successful_factory(credentials, config):
+        captured["credentials"] = credentials
+        captured["config"] = config
+        return FakeCheckConnector("xero", ok=True, live=True, message="Synthetic check passed")
+
+    monkeypatch.setitem(
+        REGISTRY, "xero", replace(REGISTRY["xero"], factory=successful_factory),
+    )
+    ephemeral_secret = "ephemeral-test-secret"
+    checked = client.post(base + "/integrations/xero/test", json={
+        "credentials": {"access_token": ephemeral_secret, "tenant_id": "tenant-b"},
+        "config": {"sandbox": True},
+    })
+    assert checked.status_code == 200, checked.text
+    assert checked.json() == {
+        "provider": "xero", "operation": "check", "ok": True, "live": True,
+        "message": "Synthetic check passed",
+    }
+    assert captured == {
+        "credentials": {"access_token": ephemeral_secret, "tenant_id": "tenant-b"},
+        "config": {"sandbox": True},
+    }
+    assert ephemeral_secret not in checked.text
+
+    listed = client.get(base + "/integrations")
+    assert listed.status_code == 200
+    assert listed.json()[0]["status"] == "Connected"
+    assert configured_secret not in listed.text and ephemeral_secret not in listed.text
+    raw = db.one("SELECT encrypted_credentials FROM integration_connections WHERE provider='xero'")
+    assert configured_secret not in raw["encrypted_credentials"]
+    assert ephemeral_secret not in raw["encrypted_credentials"]
+
+    monkeypatch.setitem(
+        REGISTRY, "xero",
+        replace(REGISTRY["xero"], factory=lambda _credentials, _config: FakeCheckConnector(
+            "xero", ok=False, live=True, message="Synthetic check failed",
+        )),
+    )
+    failed = client.post(base + "/integrations/xero/test", json={"credentials": {}})
+    assert failed.status_code == 200
+    assert failed.json()["ok"] is False
+    assert client.get(base + "/integrations").json()[0]["status"] == "Error"
+
+    disconnected = client.post(base + "/integrations/xero/disconnect")
+    assert disconnected.status_code == 200
+    assert disconnected.json()["status"] == "Disconnected"
+    actions = db.rows(
+        "SELECT action,details_json FROM audit_events WHERE object_id=? ORDER BY created_at",
+        (configured.json()["id"],),
+    )
+    assert [item["action"] for item in actions].count("integration.status_changed") == 3
+
+
+def test_roadmap_test_is_non_live_and_does_not_persist_test_credentials(
+    integration_api, db,
+):
+    client, base = integration_api
+    response = client.post(base + "/integrations/personio", json={
+        "credentials": {"placeholder": "saved-placeholder"}, "config": {},
+    })
+    assert response.status_code == 200
+    checked = client.post(base + "/integrations/personio/test", json={
+        "credentials": {"placeholder": "ephemeral-placeholder"},
+    })
+    assert checked.status_code == 200
+    assert checked.json()["ok"] is False and checked.json()["live"] is False
+    assert "Adapter not yet built for this provider" in checked.json()["message"]
+    listed = client.get(base + "/integrations").json()
+    assert listed[0]["status"] == "Error"
+    assert all(item["status"] != "Connected" for item in listed)
+    raw = db.one("SELECT encrypted_credentials FROM integration_connections WHERE provider='personio'")
+    assert "saved-placeholder" not in raw["encrypted_credentials"]
+    assert "ephemeral-placeholder" not in raw["encrypted_credentials"]
+
+    before = db.scalar("SELECT COUNT(*) FROM integration_connections")
+    unconfigured = client.post(base + "/integrations/deel/test", json={
+        "credentials": {"placeholder": "never-persisted"},
+    })
+    assert unconfigured.status_code == 200 and unconfigured.json()["live"] is False
+    assert db.scalar("SELECT COUNT(*) FROM integration_connections") == before
+
+
+def test_integration_routes_are_tenant_scoped(integration_api, db):
+    client, base = integration_api
+    configured = client.post(base + "/integrations/xero", json={
+        "credentials": {"access_token": "one", "tenant_id": "one"}, "config": {},
+    })
+    assert configured.status_code == 200
+    other_org = OrganisationService(db).create(
+        name="Other tenant", country_code="UK", entity_type="UK_COMPANY",
+        owner_email="other@example.test",
+    )
+    other_base = f"/organisations/{other_org['id']}"
+    other_headers = {"X-Test-User": "other@example.test"}
+    assert client.get(other_base + "/integrations", headers=other_headers).json() == []
+    assert client.post(other_base + "/integrations/merit", headers=other_headers, json={
+        "credentials": {"api_id": "other", "api_key": "other-secret"}, "config": {},
+    }).status_code == 200
+    assert [item["provider"] for item in client.get(base + "/integrations").json()] == ["xero"]
+    assert [item["provider"] for item in client.get(
+        other_base + "/integrations", headers=other_headers,
+    ).json()] == ["merit"]
+
+    for method, path, payload in (
+        ("GET", "/integrations", None),
+        ("POST", "/integrations/xero/test", {"credentials": {}}),
+        ("POST", "/integrations/xero/disconnect", None),
+    ):
+        assert client.request(
+            method, base + path, headers=other_headers, json=payload,
+        ).status_code == 403
+
+
+def test_unknown_integration_provider_is_rejected(integration_api):
+    client, base = integration_api
+    assert client.post(base + "/integrations/fasthr", json={
+        "credentials": {}, "config": {},
+    }).status_code == 422
+    assert client.post(base + "/integrations/fasthrm/test", json={
+        "credentials": {},
+    }).status_code == 422
 
 
 def create_api_schedule(client, base, invoice, **changes):

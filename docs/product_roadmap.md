@@ -511,3 +511,21 @@ work, with import-first direction and per-object ownership. Adapter delivery
 will require provider access, tenant-scoped credential design, field mapping,
 idempotency and reconciliation tests, and accountant UAT before any readiness
 claim or unattended data flow is enabled.
+
+## 17. Integration connection lifecycle (2026-10-09)
+
+The connector registry now covers every public catalogue key and is the single
+source for adapter readiness and ordered credential-field metadata. QuickBooks,
+Xero and Merit retain their adapter-ready classification; HMRC, e-MTA and open
+banking remain explicit planning stubs; all 20 HR/payroll providers resolve to
+no-network roadmap stubs until reviewed adapters are delivered.
+
+Owner and administrator APIs can configure, list, test and disconnect a
+tenant-scoped provider connection. Tests use credentials supplied in the test
+request without storing those test values. A configured connection records the
+result as `Connected` only when a connector reports both `ok=True` and
+`live=True`; every other result records `Error`, including roadmap stubs. An
+unconfigured provider can be checked without creating a connection row. API
+responses expose only connection identity, status, external tenant, non-secret
+configuration, update time and registry status; credentials and encrypted
+material remain internal to the credential vault.

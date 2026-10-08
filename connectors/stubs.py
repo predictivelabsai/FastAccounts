@@ -7,11 +7,6 @@ from typing import Any
 from .base import ConnectorResult
 
 
-SUPPORTED_PROVIDERS = {
-    "quickbooks", "xero", "merit", "hmrc", "emta", "open_banking",
-}
-
-
 @dataclass(frozen=True)
 class StubConnector:
     key: str
@@ -40,8 +35,26 @@ class StubConnector:
         return self._result(f"push:{object_type}")
 
 
+@dataclass(frozen=True)
+class RoadmapStubConnector(StubConnector):
+    """A no-network connector for catalogue entries whose adapter is unbuilt."""
+
+    def _result(self, operation: str) -> ConnectorResult:
+        return ConnectorResult(
+            provider=self.key,
+            operation=operation,
+            ok=False,
+            live=False,
+            message=(
+                "Adapter not yet built for this provider; see the integrations page; "
+                "no credential was read, no network request was made, and no accounting "
+                "record was changed."
+            ),
+        )
+
+
 def connector_for(provider: str) -> StubConnector:
-    key = provider.strip().lower()
-    if key not in SUPPORTED_PROVIDERS:
-        raise KeyError(f"Unknown connector: {provider}")
-    return StubConnector(key)
+    """Compatibility import; the registry is the canonical dispatcher."""
+    from .registry import connector_for as registry_connector_for
+
+    return registry_connector_for(provider)

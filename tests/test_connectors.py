@@ -4,6 +4,8 @@ from __future__ import annotations
 import pytest
 
 from connectors import connector_for
+from connectors.registry import PROVIDERS, provider_metadata
+from integrations import CATALOGUE
 
 
 @pytest.mark.parametrize(
@@ -28,3 +30,35 @@ def test_connector_stubs_are_explicitly_non_live(provider):
 def test_unknown_connector_is_rejected():
     with pytest.raises(KeyError, match="Unknown connector"):
         connector_for("made-up-provider")
+
+
+def test_registry_covers_every_catalogue_provider():
+    catalogue_keys = {item.key for item in CATALOGUE}
+    assert PROVIDERS == catalogue_keys
+    for provider in catalogue_keys:
+        connector = connector_for(provider)
+        assert connector.key == provider
+
+
+def test_roadmap_connectors_are_explicitly_non_live():
+    result = connector_for("personio").check()
+    assert not result.ok
+    assert not result.live
+    assert result.operation == "check"
+    assert "Adapter not yet built for this provider" in result.message
+    assert "no network request was made" in result.message
+
+
+def test_credential_field_metadata_is_ordered_and_complete():
+    assert [field["name"] for field in provider_metadata("quickbooks")["credential_fields"]] == [
+        "access_token", "realm_id", "sandbox",
+    ]
+    assert [field["name"] for field in provider_metadata("xero")["credential_fields"]] == [
+        "access_token", "tenant_id",
+    ]
+    assert [field["name"] for field in provider_metadata("merit")["credential_fields"]] == [
+        "api_id", "api_key",
+    ]
+    for provider in ("hmrc", "emta", "open_banking"):
+        assert provider_metadata(provider)["credential_note"].startswith("TBD:")
+    assert "Adapter not yet built" in provider_metadata("personio")["credential_note"]
