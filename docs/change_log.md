@@ -260,7 +260,7 @@ delivered.
   Estonian copy checked with Estonian spelling/morphology tooling. The demo UK book
   gains an idempotent "Retainer – Willow Design" monthly schedule whose next run is
   7 days out; reminder stages are exercised by the existing overdue demo invoices.
-- Verified the full pytest suite: 146 passed, one optional PostgreSQL test skipped,
+- Verified the full pytest suite: 147 passed, one optional PostgreSQL test skipped,
   on local Python 3.14.6, including service tests for issue/restart idempotency,
   catch-up, ladder boundaries, opt-out and unconnected-email failure (MockTransport;
   no live network), API tests, i18n parity and a Playwright workspace regression.

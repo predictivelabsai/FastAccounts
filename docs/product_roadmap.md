@@ -480,6 +480,6 @@ The demo UK book ships an idempotent "Retainer – Willow Design" monthly schedu
 whose next run is 7 days out; reminder stages are exercised by the existing overdue
 demonstration invoices. The workspace gains a localized "Recurring & reminders"
 view (schedules, run history, reminders due) and localized UI in English, Estonian,
-Latvian and Lithuanian. The full suite passed (146 passed, one optional PostgreSQL
+Latvian and Lithuanian. The full suite passed (147 passed, one optional PostgreSQL
 test skipped) on local Python 3.14.6; accountant UAT for real-world reminder copy
 and delivery remains pending.
