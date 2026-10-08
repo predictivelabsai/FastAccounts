@@ -589,6 +589,7 @@ def workspace_page(user: dict, lang: str = "en"):
         Div(
             Aside(
                 A(Span("F", cls="app-mark"), Span("FastAccounts"), href="/app", cls="app-brand"),
+                A(version.label(), href="/healthz", title=version.detail(), cls="app-version", data_testid="app-version"),
                 Div(
                     Button(T("actions.create_organisation"), id="org-trigger", cls="org-trigger", type="button", aria_haspopup="menu", aria_expanded="false", aria_controls="org-menu"),
                     Div(id="org-menu", cls="org-menu", role="menu", hidden=True),
