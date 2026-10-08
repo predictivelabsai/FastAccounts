@@ -180,7 +180,7 @@ def test_existing_books_upgrade(tmp_path, monkeypatch):
         tx.execute("DELETE FROM accounts WHERE organisation_id=? AND system_role LIKE 'PAYROLL_%'", (org['id'],))
     before = db.rows('SELECT * FROM accounts WHERE organisation_id=? ORDER BY code', (org['id'],))
     monkeypatch.setattr(database, 'MIGRATIONS', original)
-    assert db.migrate() == ['0005_payroll']
+    assert db.migrate() == ['0005_payroll', '0006_automation']
     after = db.rows("SELECT * FROM accounts WHERE organisation_id=? AND system_role NOT LIKE 'PAYROLL_%' ORDER BY code", (org['id'],))
     assert before == after
     assert len(db.rows("SELECT * FROM accounts WHERE organisation_id=? AND system_role LIKE 'PAYROLL_%'", (org['id'],))) == 7
@@ -245,14 +245,16 @@ def test_demo_documents_balances_matches_and_repeatability(db, monkeypatch):
         assert ('Männi Pilveteenused OÜ' if ee else 'Pine Cloud Ltd') in contact_names
         assert not any('Synthetic' in name or 'Acme' in name for name in contact_names)
         assert {r['reference'] for r in db.rows('SELECT reference FROM invoices WHERE organisation_id=?', (oid,))} == {
-            f'SALES-2026-{i:03d}' for i in range(1, 19)}
+            f'SALES-2026-{i:03d}' for i in range(1, 19)} | (set() if ee else {'AUTOMATION-WILLOW-TEMPLATE'})
+        assert db.rows('SELECT status FROM invoices WHERE organisation_id=? AND reference=?',
+                       (oid, 'AUTOMATION-WILLOW-TEMPLATE')) == ([] if ee else [{'status': 'Draft'}])
         assert {r['supplier_number'] for r in db.rows('SELECT supplier_number FROM bills WHERE organisation_id=?', (oid,))} == {
             f'SUP-2026-{i:03d}' for i in range(1, 9)}
         assert all(r['external_id'].startswith(f"BANK-{org['country_code']}-") for r in db.rows(
             'SELECT external_id FROM bank_transactions WHERE organisation_id=?', (oid,)))
-        for table, expected in [('invoices', 18), ('bills', 8), ('bank_transactions', 28), ('contacts', 10)]:
+        for table, expected in [('invoices', 18 if ee else 19), ('bills', 8), ('bank_transactions', 28), ('contacts', 10)]:
             assert db.scalar(f'SELECT COUNT(*) FROM {table} WHERE organisation_id=?', (oid,)) == expected
-        assert {r['status'] for r in db.rows('SELECT status FROM invoices WHERE organisation_id=?', (oid,))} == {'Issued', 'Part Paid', 'Paid'}
+        assert {r['status'] for r in db.rows('SELECT status FROM invoices WHERE organisation_id=?', (oid,))} == {'Issued', 'Part Paid', 'Paid'} | (set() if ee else {'Draft'})
         assert {r['status'] for r in db.rows('SELECT status FROM bills WHERE organisation_id=?', (oid,))} == {'Approved', 'Part Paid', 'Paid', 'In Review'}
         assert db.scalar("SELECT COUNT(*) FROM invoices WHERE organisation_id=? AND due_date='2026-09-10' AND status='Issued'", (oid,)) == 1
         pending = db.rows("SELECT * FROM bank_transactions WHERE organisation_id=? AND status!='Reconciled'", (oid,))

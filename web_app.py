@@ -14,6 +14,7 @@ from fasthtml.common import RedirectResponse, fast_app, serve
 from starlette.responses import JSONResponse
 from starlette.responses import PlainTextResponse
 
+import automation
 import integrations
 import version
 from api_app import api
@@ -47,6 +48,7 @@ app.router.routes.insert(0, app.router.routes.pop())
 @app.on_event("startup")
 async def migrate_database():
     get_database().migrate()
+    automation.start_automation_worker()
 
 
 @rt("/")

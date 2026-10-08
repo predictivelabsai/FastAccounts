@@ -122,6 +122,31 @@ def _seed_organisation(country: str) -> dict:
     return organisation
 
 
+def _seed_automation(organisation: dict) -> None:
+    from datetime import date, timedelta
+    from automation import AutomationService
+    db = get_database()
+    oid, name = organisation['id'], "Retainer – Willow Design"
+    if db.one("SELECT id FROM invoice_schedules WHERE organisation_id=? AND name=?", (oid, name)):
+        return
+    docs = DocumentService(db)
+    contact = db.one("SELECT * FROM contacts WHERE organisation_id=? AND name=?", (oid, "Willow Design Ltd"))
+    if not contact:
+        contact = docs.create_contact(oid, name="Willow Design Ltd", country_code="GB",
+                                      contact_type="customer", email="willow@example.invalid")
+    reference = "AUTOMATION-WILLOW-TEMPLATE"
+    invoice = db.one("SELECT id FROM invoices WHERE organisation_id=? AND reference=?", (oid, reference))
+    if not invoice:
+        account = db.one("SELECT id FROM accounts WHERE organisation_id=? AND system_role='SALES'", (oid,))
+        tax = db.one("SELECT id FROM tax_codes WHERE organisation_id=? AND code='UK20'", (oid,))
+        invoice = docs.create_invoice(oid, contact_id=contact['id'], issue_date=date.today().isoformat(),
+            due_date=(date.today() + timedelta(days=14)).isoformat(), actor=DEMO_EMAIL, reference=reference,
+            lines=[dict(description="Monthly design retainer", quantity=1, unit_price="750.00",
+                        account_id=account['id'], tax_code_id=tax['id'])])
+    AutomationService(db).create_schedule(oid, template_invoice_id=invoice['id'], interval_kind="monthly",
+        next_run_date=date.today() + timedelta(days=7), name=name, auto_email=False, actor=DEMO_EMAIL)
+
+
 def _seed_payroll(organisation: dict) -> None:
     from payroll import PayrollService
     from core_utils import new_id
@@ -158,6 +183,7 @@ def seed_demo() -> list[dict]:
     db = get_database()
     db.migrate()
     organisations = [_seed_organisation("UK"), _seed_organisation("EE")]
+    _seed_automation(organisations[0])
     _seed_payroll(organisations[1])
     return organisations
 

@@ -233,3 +233,36 @@ delivered.
   selection, Escape/outside-click closing, and the full pytest suite:
   95 passed, one optional PostgreSQL test skipped, on local Python 3.14.6.
   No external network access was used.
+
+## 2026-10-08 — Automation demo: recurring invoices and payment reminders
+
+- Added recurring invoice schedules for UK books with weekly, monthly, quarterly
+  or custom-day intervals, an optional end date and optional auto-email. Due
+  schedules issue ordinary invoices through the standard sequential numbering and
+  immutable balanced ledger path; catch-up covers up to 24 missed periods, one
+  transaction per period. Idempotency uses a compare-and-set next-run claim plus a
+  unique (schedule, period) constraint, so restarts and concurrent ticks never
+  double-issue and repeated runs over the same period issue nothing.
+- Added a three-stage payment-reminder ladder (3 days before due, then 7 and 14
+  days overdue), derived from each invoice's due date, with per-stage send events
+  (never double-sent, including on failure) and per-invoice opt-out.
+- Sends use the existing Postmark delivery path only: with POSTMARK_API_TOKEN or
+  FROM_EMAIL unset nothing is sent and no success is faked. The recurring view
+  shows a localized "email not connected" notice, the integrations page gained an
+  email-connection status card (provider and masked sender, no credentials), and
+  manual sends fail with an explanatory message. A background worker is available
+  for deployments via FASTACCOUNTS_AUTOMATION_WORKER (default off and never started
+  in tests; FASTACCOUNTS_AUTOMATION_POLL_SECONDS, default 60s); .env.sample documents
+  both. No real email is sent in the demo.
+- Workspace gains a localized "Recurring & reminders" view (schedules table,
+  new-schedule dialog, pause/resume, run now with history, reminders-due table with
+  per-stage send and skip actions) in English, Estonian, Latvian and Lithuanian;
+  Estonian copy checked with Estonian spelling/morphology tooling. The demo UK book
+  gains an idempotent "Retainer – Willow Design" monthly schedule whose next run is
+  7 days out; reminder stages are exercised by the existing overdue demo invoices.
+- Verified the full pytest suite: 146 passed, one optional PostgreSQL test skipped,
+  on local Python 3.14.6, including service tests for issue/restart idempotency,
+  catch-up, ladder boundaries, opt-out and unconnected-email failure (MockTransport;
+  no live network), API tests, i18n parity and a Playwright workspace regression.
+  Accountant UAT for reminder copy and real delivery remains pending. No external
+  network access was used.
