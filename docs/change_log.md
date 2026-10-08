@@ -4,6 +4,26 @@ Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as
 delivered.
 
+## 2026-10-08 — FastSME public landing presentation
+
+- Ported the FastHRM public design system with self-hosted Bricolage Grotesque
+  and Hanken Grotesk fonts, ink/lime colours, pill buttons, a sticky navigation
+  bar and a plain F brand tile. The existing favicon is unchanged.
+- Rebuilt the landing with a dark hero, inert synthetic accounting dashboard,
+  suite band, numbered features, accounting-bureau split, two pricing cards,
+  five FAQs, closing CTA and product/resource footer. The dashboard overlaps
+  the hero on desktop and is hidden at widths of 680px or less.
+- Localized the new content in English, Estonian, Latvian and Lithuanian,
+  including the payroll demo/UAT and integration limitations. Translated the
+  existing Latvian/Lithuanian bureau, pricing and navigation placeholders.
+- Applied the shared shell to integrations and sign-in, retaining routes,
+  language selection and authentication behaviour. A single language dropdown
+  moves into the mobile menu without duplicate IDs. Workspace rendering and
+  accounting workflows are unchanged; roadmap scope and status are unchanged.
+- Verified 30 public/i18n tests, render smoke checks for all 12 page/language
+  combinations, and Chromium desktop/mobile screenshots and menu interactions.
+  The repository virtual environment uses Python 3.14.6; Python 3.12 runtime
+  verification was not performed. Preview servers were stopped after checks.
 ## 2026-10-08 — Payroll 0.2.1: part-time, hourly pay and social tax minimum
 
 - Migration `0006_payroll_part_time_hourly` (SQLite rebuilds `employees` to
@@ -222,3 +242,23 @@ delivered.
 
 - All implementation phases remain unchecked. No capability is represented as
   production-ready or compliant.
+
+
+## 2026-10-08 — Violet public-site redesign
+
+- Replaced the public ink/lime palette with violet accents, white-on-accent
+  controls, deep violet ink and pale violet surfaces. Preserved self-hosted
+  fonts, responsive navigation, mobile action placement, scroll locking,
+  Escape handling, skip links, focus states and reduced-motion support.
+- Added a gradient hero, browser-framed synthetic dashboard with three inert
+  glass cards, a four-step bureau workflow, an old/new comparison, factual
+  product stats and five native details/summary FAQs. Restyled the existing
+  feature, bureau, pricing, CTA and footer sections, integrations and sign-in.
+- Added 29 landing keys in English, Estonian, Latvian and Lithuanian. Existing
+  pricing and FAQ copy is unchanged; bank connectivity and direct filing
+  limitations remain explicit. Roadmap scope and status are unchanged.
+- Verified the full pytest suite: 95 passed, one optional PostgreSQL test
+  skipped, on local Python 3.14.6. Checked 36 offline browser renders across
+  all four languages, three public pages and desktop/tablet/mobile widths,
+  including overflow, FAQ keyboard operation and mobile menu behaviour.
+  Inspected desktop/mobile screenshots; no external network access was used.

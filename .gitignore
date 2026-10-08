@@ -234,3 +234,7 @@ shots/
 .idea/
 .vscode/
 .DS_Store
+
+# Local design references and scratch artifacts
+docs/ref/
+.tmp/
