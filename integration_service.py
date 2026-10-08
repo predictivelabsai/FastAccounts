@@ -197,14 +197,20 @@ class IntegrationService:
         return self.db.one("SELECT * FROM sync_runs WHERE id=?", (sync_id,)) or {}
 
     def complete_sync(self, sync_id: str, *, read_count: int = 0, write_count: int = 0,
-                      cursor: str = "", error: str = "") -> dict:
-        status = "Failed" if error else "Completed"
-        with self.db.transaction() as tx:
-            tx.execute(
-                "UPDATE sync_runs SET status=?,read_count=?,write_count=?,cursor_after=?,error_message=?,completed_at=? WHERE id=?",
-                (status, read_count, write_count, cursor or None, error or None, utc_now(), sync_id),
-            )
-        return self.db.one("SELECT * FROM sync_runs WHERE id=?", (sync_id,)) or {}
+                      cursor: str = "", error: str = "", review_required: bool = False,
+                      tx=None) -> dict:
+        status = "Failed" if error else "Review Required" if review_required else "Completed"
+        values = (status, read_count, write_count, cursor or None, error or None, utc_now(), sync_id)
+        query = (
+            "UPDATE sync_runs SET status=?,read_count=?,write_count=?,cursor_after=?,"
+            "error_message=?,completed_at=? WHERE id=?"
+        )
+        if tx is None:
+            with self.db.transaction() as owned_tx:
+                owned_tx.execute(query, values)
+                return owned_tx.one("SELECT * FROM sync_runs WHERE id=?", (sync_id,)) or {}
+        tx.execute(query, values)
+        return tx.one("SELECT * FROM sync_runs WHERE id=?", (sync_id,)) or {}
 
     def conflict(self, sync_id: str, *, provider: str, object_type: str,
                  conflict_type: str, local_id: str = "", external_id: str = "",

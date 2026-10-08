@@ -4,6 +4,20 @@ Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as
 delivered.
 
+## 2026-10-09 — Reviewed employee-import pipeline
+
+- Added a tenant-scoped staging area for connector employee records. Pulls use
+  stored encrypted connection credentials, preserve provider cursors, deduplicate
+  repeated external IDs within a run, and suggest unique employee matches by
+  email or personal ID without writing payroll data.
+- Added owner/administrator review APIs to inspect staged payloads, apply or
+  reject selected rows, and triage recent sync runs. Employee creation and updates
+  reuse payroll validation and exact Decimal quantization; invalid rows become
+  reviewable conflicts while the rest of the batch continues.
+- Added idempotent external mappings, audited row outcomes without payload blobs,
+  tenant/role/CSRF coverage, and no-network connector tests including roadmap-stub
+  and failure paths.
+
 ## 2026-10-09 — Integration connection lifecycle
 
 - Added one connector registry covering all 26 public catalogue providers, with

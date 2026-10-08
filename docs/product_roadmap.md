@@ -529,3 +529,19 @@ unconfigured provider can be checked without creating a connection row. API
 responses expose only connection identity, status, external tenant, non-secret
 configuration, update time and registry status; credentials and encrypted
 material remain internal to the credential vault.
+
+## 18. Reviewed employee-import pipeline (2026-10-09)
+
+Configured connectors can now pull employee master data into a tenant-scoped
+staging area without changing payroll records. The review queue preserves sync
+cursors, deduplicates repeated provider IDs within each run, and suggests a local
+employee only when email or personal ID identifies exactly one record; ambiguous
+matches remain explicit review items.
+
+Owners and administrators decide which staged rows to apply or reject. Applied
+rows reuse the payroll service's validation and Decimal rules, create or update
+employees through idempotent external mappings, and record per-row outcomes.
+Invalid records fail independently with a sync conflict, so one bad salary, name,
+or pension field cannot partially apply that row or stop the rest of the batch.
+No roadmap connector becomes live through this work: unbuilt adapters still fail
+clearly and stage no records, and automated tests make no provider network calls.

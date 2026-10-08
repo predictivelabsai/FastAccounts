@@ -263,17 +263,19 @@ class PayrollService:
             row[key] = bool(row[key])
         return row
 
-    def save_employee(self, organisation_id, *, actor, employee_id=None, **changes):
+    def save_employee(self, organisation_id, *, actor, employee_id=None, tx=None, **changes):
         import sqlite3
         from psycopg.errors import UniqueViolation
         try:
-            return self._save_employee(organisation_id, actor=actor, employee_id=employee_id, **changes)
+            return self._save_employee(
+                organisation_id, actor=actor, employee_id=employee_id, tx=tx, **changes
+            )
         except (sqlite3.IntegrityError, UniqueViolation) as exc:
             if 'employees.organisation_id, employees.name' in str(exc) or getattr(exc, 'sqlstate', '') == '23505':
                 raise PayrollConflict('An employee with this name already exists') from exc
             raise
 
-    def _save_employee(self, organisation_id, *, actor, employee_id=None, **changes):
+    def _save_employee(self, organisation_id, *, actor, employee_id=None, tx=None, **changes):
         fields = ('name', 'email', 'personal_id', 'gross_salary', 'funded_pension_percent',
                   'apply_tax_free_minimum', 'board_member', 'active', 'pay_basis', 'fte', 'hourly_rate',
                   'social_tax_minimum_exemption', 'employment_start_date', 'employment_end_date')
@@ -282,37 +284,44 @@ class PayrollService:
         # Keep the legacy board_member flag and the pay basis in step when only one is sent.
         if 'pay_basis' in changes and 'board_member' not in changes and changes['pay_basis'] in PAY_BASES:
             changes['board_member'] = changes['pay_basis'] == 'board_fee'
-        with self.db.transaction() as tx:
-            self._organisation(tx, organisation_id)
-            if employee_id:
-                data = tx.one('SELECT * FROM employees WHERE organisation_id=? AND id=?', (organisation_id, employee_id))
-                if not data:
-                    raise KeyError('Employee not found')
-                if 'board_member' in changes and 'pay_basis' not in changes:
-                    if changes['board_member'] in (True, 1):
-                        changes['pay_basis'] = 'board_fee'
-                    elif data.get('pay_basis') == 'board_fee':
-                        changes['pay_basis'] = 'monthly'
-                data.update(changes)
-            else:
-                data = dict(email=None, personal_id=None, apply_tax_free_minimum=False, board_member=False, active=True)
-                data.update(changes)
-                data.setdefault('funded_pension_percent', 0 if data['board_member'] else 2)
-            data = self._employee_values(data)
-            record_id = employee_id or new_id()
-            if employee_id:
-                result = tx.execute('UPDATE employees SET '+','.join(f'{f}=?' for f in fields)+
-                                    ' WHERE organisation_id=? AND id=?',
-                                    tuple(data.get(f) for f in fields)+(organisation_id, record_id))
-            else:
-                result = tx.execute('INSERT INTO employees(id,organisation_id,created_at,'+','.join(fields)+') '
-                                    'VALUES ('+','.join('?' for _ in range(len(fields)+3))+') '
-                                    'ON CONFLICT(organisation_id,name) DO NOTHING',
-                                    (record_id, organisation_id, utc_now())+tuple(data.get(f) for f in fields))
-            if result.rowcount != 1:
-                raise PayrollConflict('An employee with this name already exists')
-            audit(tx, organisation_id, actor, 'payroll.employee.updated' if employee_id else 'payroll.employee.created', 'employee', record_id)
-            return self._serialize_employee(tx.one('SELECT * FROM employees WHERE organisation_id=? AND id=?', (organisation_id, record_id)))
+        if tx is None:
+            with self.db.transaction() as owned_tx:
+                return self._save_employee_tx(
+                    owned_tx, organisation_id, actor, employee_id, fields, changes
+                )
+        return self._save_employee_tx(tx, organisation_id, actor, employee_id, fields, changes)
+
+    def _save_employee_tx(self, tx, organisation_id, actor, employee_id, fields, changes):
+        self._organisation(tx, organisation_id)
+        if employee_id:
+            data = tx.one('SELECT * FROM employees WHERE organisation_id=? AND id=?', (organisation_id, employee_id))
+            if not data:
+                raise KeyError('Employee not found')
+            if 'board_member' in changes and 'pay_basis' not in changes:
+                if changes['board_member'] in (True, 1):
+                    changes['pay_basis'] = 'board_fee'
+                elif data.get('pay_basis') == 'board_fee':
+                    changes['pay_basis'] = 'monthly'
+            data.update(changes)
+        else:
+            data = dict(email=None, personal_id=None, apply_tax_free_minimum=False, board_member=False, active=True)
+            data.update(changes)
+            data.setdefault('funded_pension_percent', 0 if data['board_member'] else 2)
+        data = self._employee_values(data)
+        record_id = employee_id or new_id()
+        if employee_id:
+            result = tx.execute('UPDATE employees SET '+','.join(f'{f}=?' for f in fields)+
+                                ' WHERE organisation_id=? AND id=?',
+                                tuple(data.get(f) for f in fields)+(organisation_id, record_id))
+        else:
+            result = tx.execute('INSERT INTO employees(id,organisation_id,created_at,'+','.join(fields)+') '
+                                'VALUES ('+','.join('?' for _ in range(len(fields)+3))+') '
+                                'ON CONFLICT(organisation_id,name) DO NOTHING',
+                                (record_id, organisation_id, utc_now())+tuple(data.get(f) for f in fields))
+        if result.rowcount != 1:
+            raise PayrollConflict('An employee with this name already exists')
+        audit(tx, organisation_id, actor, 'payroll.employee.updated' if employee_id else 'payroll.employee.created', 'employee', record_id)
+        return self._serialize_employee(tx.one('SELECT * FROM employees WHERE organisation_id=? AND id=?', (organisation_id, record_id)))
 
     def _run(self, tx, organisation_id, run_id):
         run = tx.one('SELECT * FROM pay_runs WHERE organisation_id=? AND id=?', (organisation_id, run_id))

@@ -15,6 +15,7 @@ class ConnectorResult:
     live: bool
     message: str
     records: tuple[dict[str, Any], ...] = field(default_factory=tuple)
+    cursor: str | None = None
 
 
 class Connector(Protocol):

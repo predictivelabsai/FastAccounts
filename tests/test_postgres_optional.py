@@ -13,7 +13,7 @@ from organisations import OrganisationService
 def test_postgres_migrations_and_tenant_bootstrap():
     schema="fast_accounts_test_"+uuid4().hex[:10]
     db=Database(url=os.environ["TEST_POSTGRES_URL"],schema=schema)
-    assert db.migrate()==["0001_accounting_core","0002_integrations","0003_operations","0004_document_immutability", "0005_payroll", "0006_payroll_part_time_hourly", "0007_automation"]
+    assert db.migrate()==["0001_accounting_core","0002_integrations","0003_operations","0004_document_immutability", "0005_payroll", "0006_payroll_part_time_hourly", "0007_automation", "0008_import_staging"]
     assert db.migrate()==[]
     org=OrganisationService(db).create(name="Postgres Synthetic",country_code="UK",entity_type="UK_COMPANY",owner_email="pg@example.test")
     assert db.scalar("SELECT COUNT(*) FROM accounts WHERE organisation_id=?",(org["id"],))==10
@@ -36,7 +36,7 @@ def test_postgres_payroll_0006_upgrade_and_sample_run(tmp_path, monkeypatch):
     with db.transaction() as tx:
         tx.execute("INSERT INTO employees(id,organisation_id,name,gross_salary,funded_pension_percent,board_member,created_at) VALUES ('pg-board',?,'Old Board',1500,0,1,'2026-01-01')",(org["id"],))
     monkeypatch.setattr(database,"MIGRATIONS",original)
-    assert db.migrate()==["0006_payroll_part_time_hourly"]
+    assert db.migrate()==["0006_payroll_part_time_hourly", "0007_automation", "0008_import_staging"]
     service=PayrollService(db)
     assert service.employees(org["id"])[0]["pay_basis"]=="board_fee"
     for employee in SAMPLE_PAYROLL_EMPLOYEES:

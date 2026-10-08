@@ -19,6 +19,7 @@ from connectors.registry import provider_metadata
 from database import get_database
 from documents import DocumentService
 from integration_service import IntegrationService
+from import_service import ImportService
 from ledger import LedgerService, PostingLine
 from organisations import APPROVE_ROLES, WRITE_ROLES, AccessDenied, OrganisationService
 from governance import GovernanceService
@@ -155,6 +156,14 @@ class ConnectorResultOut(BaseModel):
     ok: bool
     live: bool
     message: str
+
+
+class IntegrationSyncIn(BaseModel):
+    object_type: str = Field(min_length=1, max_length=80)
+
+
+class IntegrationApplyIn(BaseModel):
+    decisions: dict[str, Literal["apply", "reject"]] = Field(default_factory=dict)
 
 
 class JournalLineIn(BaseModel):
@@ -611,6 +620,61 @@ def disconnect_integration(organisation_id: str, provider: str,
                            user: User = Depends(require_csrf)):
     _require(organisation_id, user, {"owner", "administrator"})
     return IntegrationService().disconnect(organisation_id, provider, actor=user.email)
+
+
+@api.post("/organisations/{organisation_id}/integrations/{provider}/sync")
+def run_integration_sync(
+    organisation_id: str,
+    provider: str,
+    payload: IntegrationSyncIn,
+    user: User = Depends(require_csrf),
+):
+    _require(organisation_id, user, {"owner", "administrator"})
+    return ImportService().run_sync(
+        organisation_id, provider, payload.object_type, actor=user.email
+    )
+
+
+@api.get("/organisations/{organisation_id}/integrations/{provider}/sync/{sync_run_id}")
+def integration_sync_review(
+    organisation_id: str,
+    provider: str,
+    sync_run_id: str,
+    user: User = Depends(current_user),
+):
+    _require(organisation_id, user, {"owner", "administrator"})
+    result = ImportService().get_staged(organisation_id, sync_run_id=sync_run_id)
+    if result["summary"]["provider"] != provider.strip().lower():
+        raise KeyError("Sync run not found")
+    return result
+
+
+@api.post("/organisations/{organisation_id}/integrations/{provider}/sync/{sync_run_id}/apply")
+def apply_integration_sync(
+    organisation_id: str,
+    provider: str,
+    sync_run_id: str,
+    payload: IntegrationApplyIn,
+    user: User = Depends(require_csrf),
+):
+    _require(organisation_id, user, {"owner", "administrator"})
+    return ImportService().apply_staged(
+        organisation_id,
+        provider,
+        sync_run_id,
+        payload.decisions,
+        actor=user.email,
+    )
+
+
+@api.get("/organisations/{organisation_id}/integrations/{provider}/syncs")
+def integration_syncs(
+    organisation_id: str,
+    provider: str,
+    user: User = Depends(current_user),
+):
+    _require(organisation_id, user, {"owner", "administrator"})
+    return ImportService().syncs(organisation_id, provider)
 
 # Accounting-bureau payroll API. Monetary values are returned as decimal strings.
 
