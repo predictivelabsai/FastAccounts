@@ -262,3 +262,19 @@ delivered.
   all four languages, three public pages and desktop/tablet/mobile widths,
   including overflow, FAQ keyboard operation and mobile menu behaviour.
   Inspected desktop/mobile screenshots; no external network access was used.
+
+
+## 2026-10-08 — Workspace violet retheme and org switcher fix
+
+- Rethemed the signed-in workspace (static/app.css) to the violet palette:
+  a violet-600 accent with a violet-800 strong accent, deep violet ink for
+  the sidebar and dark surfaces, violet-tinted neutral scale, violet-tinted
+  selection and shadows. Accounting behaviour, templates and routes are
+  unchanged.
+- Fixed the company switcher: the org menu now opens downward from the
+  trigger (8px gap) instead of upward, so it no longer collides with the
+  topbar or clips mid-list, at both desktop and mobile widths.
+- Verified with Playwright menu geometry at 1440x900 and 430x900, org
+  selection, Escape/outside-click closing, and the full pytest suite:
+  95 passed, one optional PostgreSQL test skipped, on local Python 3.14.6.
+  No external network access was used.
