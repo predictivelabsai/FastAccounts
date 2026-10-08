@@ -154,14 +154,73 @@ def _seed_payroll(organisation: dict) -> None:
             service.approve(org_id, run['id'], actor=DEMO_EMAIL)
 
 
+SAMPLE_PAYROLL_ORG = "Demo OÜ (sample payroll)"
+# Seven synthetic Estonian employees (FastHRM fixture ee_sample_employees.json,
+# test IDs only) covering full-time, part-time, hourly, II pillar 0/2/4/6%,
+# the basic exemption, the social tax minimum and a board-member fee.
+SAMPLE_PAYROLL_EMPLOYEES = [
+    dict(name='Mari Tamm', personal_id='48803142718', email='mari.tamm@demo-ou.example', gross_salary='946.00',
+         apply_tax_free_minimum=True, employment_start_date='2024-04-01'),
+    dict(name='Jaan Kask', personal_id='37911025128', email='jaan.kask@demo-ou.example', gross_salary='2400.00',
+         employment_start_date='2019-09-16'),
+    dict(name='Kadri Saar', personal_id='49207253384', email='kadri.saar@demo-ou.example', gross_salary='3800.00',
+         funded_pension_percent=4, employment_start_date='2021-02-01'),
+    dict(name='Andres Mets', personal_id='37501302245', email='andres.mets@demo-ou.example', gross_salary='5500.00',
+         funded_pension_percent=6, employment_start_date='2018-05-02'),
+    dict(name='Liis Kuusk', personal_id='60106094177', email='liis.kuusk@demo-ou.example', gross_salary='700.00',
+         fte='0.5', funded_pension_percent=0, apply_tax_free_minimum=True, employment_start_date='2025-08-18'),
+    dict(name='Peeter Oja', personal_id='39610216556', email='peeter.oja@demo-ou.example', pay_basis='hourly',
+         hourly_rate='8.00', apply_tax_free_minimum=True, employment_start_date='2026-01-05'),
+    dict(name='Toomas Rebane', personal_id='37204181439', email='toomas.rebane@demo-ou.example', pay_basis='board_fee',
+         gross_salary='1500.00', funded_pension_percent=2, employment_start_date='2018-01-10'),
+]
+# Hours for the hourly employee: September approved, October left as a draft to review.
+SAMPLE_PAYROLL_RUNS = {'2026-09': '168', '2026-10': '176'}
+
+
+def _seed_sample_payroll() -> dict:
+    """Clearly labelled sample-payroll organisation, created through the normal services."""
+    import calendar
+    from core_utils import new_id
+    from payroll import PayrollService
+    db = get_database()
+    organisation = db.one("SELECT * FROM organisations WHERE name=?", (SAMPLE_PAYROLL_ORG,))
+    if not organisation:
+        organisation = OrganisationService(db).create(
+            name=SAMPLE_PAYROLL_ORG, country_code="EE", entity_type="EE_OU", owner_email=DEMO_EMAIL,
+            registration_no="14999992")
+    oid = organisation['id']
+    service = PayrollService(db)
+    existing = {e['name']: e for e in service.employees(oid)}
+    for employee in SAMPLE_PAYROLL_EMPLOYEES:
+        if employee['name'] not in existing:
+            service.save_employee(oid, actor=DEMO_EMAIL, **employee)
+    hourly = {e['id']: e for e in service.employees(oid) if e['pay_basis'] == 'hourly'}
+    for period, hours in SAMPLE_PAYROLL_RUNS.items():
+        year, month = map(int, period.split('-'))
+        with db.transaction() as tx:
+            tx.execute("INSERT INTO fiscal_periods(id,organisation_id,code,starts_on,ends_on) VALUES (?,?,?,?,?) ON CONFLICT(organisation_id,code) DO NOTHING",
+                       (new_id(), oid, period, period+'-01', f'{period}-{calendar.monthrange(year, month)[1]}'))
+        run = next((r for r in service.runs(oid) if r['period'] == period), None)
+        if run is None:
+            run = service.create_run(oid, period=period, actor=DEMO_EMAIL, hours={eid: hours for eid in hourly})
+        if run['status'] == 'Draft' and period != '2026-10':
+            service.approve(oid, run['id'], actor=DEMO_EMAIL)
+    return organisation
+
+
 def seed_demo() -> list[dict]:
+    """Seed the UK and Estonian demo books (returned) plus the sample-payroll organisation."""
     db = get_database()
     db.migrate()
     organisations = [_seed_organisation("UK"), _seed_organisation("EE")]
     _seed_payroll(organisations[1])
+    _seed_sample_payroll()
     return organisations
 
 
 if __name__ == "__main__":
     for organisation in seed_demo():
         print(f"Seeded {organisation['name']} ({organisation['id']})")
+    sample = get_database().one("SELECT id,name FROM organisations WHERE name=?", (SAMPLE_PAYROLL_ORG,))
+    print(f"Seeded {sample['name']} ({sample['id']})")

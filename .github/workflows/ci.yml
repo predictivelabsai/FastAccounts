@@ -22,7 +22,7 @@ jobs:
           FASTACCOUNTS_DB=/tmp/fastaccounts-ci.sqlite python - <<'PY'
           from database import get_database
           db = get_database()
-          assert db.migrate() == ['0001_accounting_core', '0002_integrations', '0003_operations', '0004_document_immutability', '0005_payroll']
+          assert db.migrate() == ['0001_accounting_core', '0002_integrations', '0003_operations', '0004_document_immutability', '0005_payroll', '0006_payroll_part_time_hourly']
           assert db.migrate() == []
           PY
       - name: Secret pattern guard

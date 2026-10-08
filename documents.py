@@ -615,6 +615,11 @@ def payroll_pdf(organisation: dict, run: dict) -> bytes:
     def label(et, en):
         return text(et if ee else en)
 
+    from web import i18n
+    from payroll import SOCIAL_TAX_MINIMUM_EXEMPTION_LABELS
+    def catalogue(key):
+        return text(i18n.t('workspace.' + key, 'et' if ee else 'en'))
+
     output = BytesIO()
     canvas = Canvas(output, pagesize=A4)
     width, height = A4
@@ -629,6 +634,8 @@ def payroll_pdf(organisation: dict, run: dict) -> bytes:
         ('Kinnipeetud summad kokku', 'Total employee withholdings', 'withholding_total'),
         ('Netopalk', 'Net payable', 'net'),
         ('Sotsiaalmaks (tööandja)', 'Employer social tax', 'social_tax'),
+        (None, 'Social tax base', 'social_tax_base'),
+        (None, 'Social tax minimum top-up', 'social_tax_minimum_topup'),
         ('Töötuskindlustusmakse (tööandja)', 'Employer unemployment insurance', 'ui_employer'),
         ('Tööandja kulu kokku', 'Total employer cost', 'employer_cost'),
     ]
@@ -645,16 +652,25 @@ def payroll_pdf(organisation: dict, run: dict) -> bytes:
                    label('Kuupäev', 'Date') + ': ' + str(run.get('approved_at') or run.get('created_at') or '-')[:10],
                    label('Olek', 'Status') + ': ' + status + ' | EUR',
                    label('Juhatuse liige', 'Board member') if item['board_member'] else label('Töötaja', 'Employee')]
+        if item.get('pay_basis') == 'hourly' and item.get('hours') is not None:
+            details.append(f"{catalogue('Hourly rate')}: {item['hourly_rate']} EUR × {item['hours']} {catalogue('Hours').lower()}")
+        if item.get('fte') not in (None, '1'):
+            details.append(f"{catalogue('Work-time fraction (FTE)')}: {item['fte']}")
+        reason = item.get('social_tax_minimum_exemption')
+        if reason in SOCIAL_TAX_MINIMUM_EXEMPTION_LABELS:
+            details.append(f"{catalogue('Social tax minimum exemption')}: {catalogue(SOCIAL_TAX_MINIMUM_EXEMPTION_LABELS[reason])}")
         for detail in details:
             for line in simpleSplit(text(detail), regular, 11, width-84):
                 canvas.drawString(42, y, line)
                 y -= 16
         y -= 24
         for et, en, key in rows:
+            if key == 'social_tax_minimum_topup' and not money(item.get(key)):
+                continue
             canvas.setFont(bold if key in ('net', 'employer_cost', 'withholding_total') else regular, 11)
-            canvas.drawString(42, y, label(et, en))
-            canvas.drawRightString(width-42, y, f"{money(item[key]):.2f}")
-            y -= 28
+            canvas.drawString(42, y, catalogue(en) if et is None else label(et, en))
+            canvas.drawRightString(width-42, y, f"{money(item.get(key)):.2f}")
+            y -= 26
         canvas.setFont(regular, 9)
         notes = ([
             'TSD deklaratsioon koostatakse raamatupidajale ülevaatamiseks; otse EMTA-le esitamine ootab kasutajapoolset vastuvõtutestimist (UAT).',
