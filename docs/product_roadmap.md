@@ -498,3 +498,16 @@ view (schedules, run history, reminders due) and localized UI in English, Estoni
 Latvian and Lithuanian. The full suite passed (147 passed, one optional PostgreSQL
 test skipped) on local Python 3.14.6; accountant UAT for real-world reminder copy
 and delivery remains pending.
+## 16. HR and payroll software catalogue (2026-10-09)
+
+The public integration catalogue now records 20 HR and payroll systems as
+possible data sources for accounting-bureau payroll. The intended workflow is
+for employee master data, working time, absences and other payroll inputs to
+flow from a client's chosen HR system into FastAccounts as reviewed imports;
+these products are integrations, not competing FastAccounts modules.
+
+No HR adapter has been built. Every entry is explicitly labelled as roadmap
+work, with import-first direction and per-object ownership. Adapter delivery
+will require provider access, tenant-scoped credential design, field mapping,
+idempotency and reconciliation tests, and accountant UAT before any readiness
+claim or unattended data flow is enabled.

@@ -103,7 +103,7 @@
     "faq4_q": "Vai varu apskatīt kodu un mitināt programmatūru pats?",
     "faq4_a": "Jā. FastAccounts ir pieejams GitHub ar MIT licenci. Varat izmantot, mainīt un paši mitināt programmatūru saskaņā ar licences noteikumiem, saglabājot autortiesību paziņojumu un licences tekstu.",
     "faq5_q": "Kādas integrācijas ir pieejamas?",
-    "faq5_a": "Katalogā ir pārbaudīti adapteri QuickBooks Online, Xero un Merit Aktiva. Neviens pakalpojumu sniedzējs nav pieslēgts pēc noklusējuma. Tieša iesniegšana HMRC un Igaunijas nodokļu iestādei joprojām ir ierobežota; atvērtās banku darbības integrācija tikai datu lasīšanai vēl tiek apsvērta. Tvērumu un pārskatīšanas prasības skatiet integrāciju lapā.",
+    "faq5_a": "Katalogā ir pārbaudīti adapteri QuickBooks Online, Xero un Merit Aktiva. Neviens pakalpojumu sniedzējs nav pieslēgts pēc noklusējuma. Tieša iesniegšana HMRC un Igaunijas nodokļu iestādei joprojām ir ierobežota; atvērtās banku darbības integrācija tikai datu lasīšanai vēl tiek apsvērta. Darbinieku pamatdatu un algu aprēķina ievaddatu saņemšana no klientu personāla sistēmām ir ceļa kartē; neviens personāla sistēmas adapteris vēl nav izveidots. Tvērumu un pārskatīšanas prasības skatiet integrāciju lapā.",
     "cta_title": "Katra klienta grāmatvedība vienuviet.",
     "cta_body": "Atveriet darbvietu vai izpētiet pirmkodu un mitiniet FastAccounts paši.",
     "mock_browser": "FastAccounts / Darbvieta",
@@ -222,7 +222,7 @@
         "direction": "No FastAccounts grāmatvedim",
         "ownership": "Grāmatveža pārbaudīts eksports"
       },
-      "open_banking": {
+    "open_banking": {
         "name": "Atvērtā banku darbība",
         "logo_alt": "Atvērtās banku darbības ikona",
         "category": "Bankas dati",
@@ -234,8 +234,188 @@
           "Saskaņošanas ievaddati"
         ],
         "direction": "Vispirms tikai lasīšana",
-        "ownership": "Banka paliek datu avots"
-      }
+      "ownership": "Banka paliek datu avots"
+    },
+    "bamboohr": {
+      "name": "BambooHR",
+      "logo_alt": "BambooHR pagaidu zīme",
+      "category": "Personāla programmatūra",
+      "description": "Izmantojiet BambooHR darbinieku datus kā pārskatāmu avotu biroja algu aprēķina iestatīšanai un ievaddatiem.",
+      "capabilities": ["Darbinieku pamatdati", "Darbinieku portāla piezīmes", "Prombūtne", "Organizācijas struktūra", "Dokumenti"],
+      "direction": "Vispirms imports · eksports saskaņā ar politiku",
+      "ownership": "Konfigurējams katram objektam"
+    },
+    "personio": {
+      "name": "Personio",
+      "logo_alt": "Personio pagaidu zīme",
+      "category": "Personāla programmatūra",
+      "description": "Izmantojiet Eiropas personāla risinājumu kā pārskatāmu darbinieku un algu aprēķina ievaddatu avotu.",
+      "capabilities": ["Darbinieku dati", "Darba laika uzskaite", "Prombūtne", "Dokumenti", "Algu aprēķina ievaddati"],
+      "direction": "Vispirms imports · eksports saskaņā ar politiku",
+      "ownership": "Konfigurējams katram objektam"
+    },
+    "hibob": {
+      "name": "Bob (HiBob)",
+      "logo_alt": "Bob by HiBob pagaidu zīme",
+      "category": "Personāla programmatūra",
+      "description": "Importējiet atlasītus Bob personāla datus pārskatīšanai pirms biroja algu aprēķina.",
+      "capabilities": ["Darbinieku katalogs", "Darba attiecību dzīves cikls", "Darba laika pārvaldība"],
+      "direction": "Vispirms imports · eksports saskaņā ar politiku",
+      "ownership": "Konfigurējams katram objektam"
+    },
+    "zoho_people": {
+      "name": "Zoho People",
+      "logo_alt": "Zoho People pagaidu zīme",
+      "category": "Personāla programmatūra",
+      "description": "Izmantojiet Zoho People darbinieku un darba laika datus kā pārskatītus algu aprēķina ievaddatus.",
+      "capabilities": ["Darbinieku dati", "Darba laika uzskaite", "Atvaļinājumi", "Darba laika tabulas", "Veidlapas"],
+      "direction": "Vispirms imports · eksports saskaņā ar politiku",
+      "ownership": "Konfigurējams katram objektam"
+    },
+    "employment_hero": {
+      "name": "Employment Hero",
+      "logo_alt": "Employment Hero pagaidu zīme",
+      "category": "Personāla programmatūra",
+      "description": "Nododiet atlasītus Employment Hero personāla datus pārskatīšanai pirms biroja algu aprēķina.",
+      "capabilities": ["Darbinieku dati", "Darba uzsākšana", "Atvaļinājumi", "Darba laika tabulas", "Algu aprēķina ievaddati"],
+      "direction": "Vispirms imports · eksports saskaņā ar politiku",
+      "ownership": "Konfigurējams katram objektam"
+    },
+    "workday": {
+      "name": "Workday",
+      "logo_alt": "Workday pagaidu zīme",
+      "category": "Personāla programmatūra",
+      "description": "Izmantojiet uzņēmuma līmeņa HCM darbinieku un algu datus kā pārskatāmu avotu biroja algu aprēķinam.",
+      "capabilities": ["Darbinieku dati", "Organizācijas struktūra", "Darba laiks un prombūtne", "Atlīdzība", "Algu aprēķina ievaddati"],
+      "direction": "Vispirms imports · eksports saskaņā ar politiku",
+      "ownership": "Konfigurējams katram objektam"
+    },
+    "hrmaster": {
+      "name": "HRmaster (HR Master)",
+      "logo_alt": "HRmaster pagaidu zīme",
+      "category": "Personāla programmatūra",
+      "description": "Izmantojiet Ungārijas personāla risinājumu kā pārskatāmu darbinieku un algu aprēķina ievaddatu avotu.",
+      "capabilities": ["Personāla dati", "Algu aprēķina ievaddati", "Personāla atlase", "Novērtēšana", "Cafeteria labumi"],
+      "direction": "Vispirms imports · eksports saskaņā ar politiku",
+      "ownership": "Konfigurējams katram objektam"
+    },
+    "gusto": {
+      "name": "Gusto",
+      "logo_alt": "Gusto pagaidu zīme",
+      "category": "Personāla programmatūra",
+      "description": "Izmantojiet ASV algu platformu kā pārskatāmu avotu, ja klienta uzņēmumu grupā ir ASV juridiskā persona.",
+      "capabilities": ["Darbinieku dati", "Algu aprēķina ievaddati", "Atvaļinājumi", "Labumu dati", "Līgumdarbinieku dati"],
+      "direction": "Vispirms imports · eksports saskaņā ar politiku",
+      "ownership": "Konfigurējams katram objektam"
+    },
+    "rippling": {
+      "name": "Rippling",
+      "logo_alt": "Rippling pagaidu zīme",
+      "category": "Personāla programmatūra",
+      "description": "Importējiet atlasītus personāla datus pārskatīšanai pirms klienta algu aprēķina.",
+      "capabilities": ["Darbinieku dati", "Darba uzsākšana", "Darba laiks un apmeklējums", "Atvaļinājumi", "Algu aprēķina ievaddati"],
+      "direction": "Vispirms imports · eksports saskaņā ar politiku",
+      "ownership": "Konfigurējams katram objektam"
+    },
+    "deel": {
+      "name": "Deel",
+      "logo_alt": "Deel pagaidu zīme",
+      "category": "Personāla programmatūra",
+      "description": "Izmantojiet globālā algu aprēķina un juridiskā darba devēja datus kā pārskatītus biroja algu aprēķina ievaddatus.",
+      "capabilities": ["Darbinieku dati", "Līgumi", "Globālā algu aprēķina ievaddati", "Atvaļinājumi", "Izdevumi"],
+      "direction": "Vispirms imports · eksports saskaņā ar politiku",
+      "ownership": "Konfigurējams katram objektam"
+    },
+    "odoo_hr": {
+      "name": "Odoo HR",
+      "logo_alt": "Odoo HR pagaidu zīme",
+      "category": "Personāla programmatūra",
+      "description": "Katram klientam konfigurējiet Odoo URL un datubāzes nosaukumu, lai veiktu pārskatāmus importus ar XML-RPC vai JSON-RPC.",
+      "capabilities": ["Darbinieku dati", "Darba laika uzskaite", "Atvaļinājumi", "Personāla atlase", "Izdevumi"],
+      "direction": "Vispirms imports · eksports saskaņā ar politiku",
+      "ownership": "Konfigurējams katram objektam"
+    },
+    "persona_fujitsu": {
+      "name": "Fujitsu Persona",
+      "logo_alt": "Fujitsu Persona pagaidu zīme",
+      "category": "Personāla programmatūra",
+      "description": "Igaunijas vecākā personāla un algu programmatūra darbojas kopš 1995. gada. Tās moduļi var nodrošināt pārskatāmus darbinieku un algu aprēķina ievaddatus.",
+      "capabilities": ["Personāla dati", "Algu aprēķins", "Darba laika uzskaite", "Pašapkalpošanās portāls"],
+      "direction": "Vispirms imports · eksports saskaņā ar politiku",
+      "ownership": "Konfigurējams katram objektam"
+    },
+    "wemply": {
+      "name": "Wemply",
+      "logo_alt": "Wemply pagaidu zīme",
+      "category": "Personāla programmatūra",
+      "description": "Modulāru personāla, darba laika un Igaunijas algu platformu izmanto vairāk nekā 1000 uzņēmumu. Wemply ieguva titulu “Aasta HR lahendus 2025”.",
+      "capabilities": ["Personāla pārvaldība", "Darba laika uzskaite", "Igaunijas algu aprēķins", "TSD pārskati", "TÖR pārskati"],
+      "direction": "Vispirms imports · eksports saskaņā ar politiku",
+      "ownership": "Konfigurējams katram objektam"
+    },
+    "hours24": {
+      "name": "hours24",
+      "logo_alt": "hours24 pagaidu zīme",
+      "category": "Personāla programmatūra",
+      "description": "Mākslīgā intelekta atbalstīta darba laika uzskaite un grafiku plānošana, ko izmanto Igaunijā un Somijā. Līdz pieciem darbiniekiem pieejams bezmaksas plāns.",
+      "capabilities": ["MI atbalstīta laika ievade", "Darba laika dati", "Darba grafiki"],
+      "direction": "Vispirms imports · eksports saskaņā ar politiku",
+      "ownership": "Konfigurējams katram objektam"
+    },
+    "yester": {
+      "name": "Yester",
+      "logo_alt": "Yester pagaidu zīme",
+      "category": "Personāla programmatūra",
+      "description": "Igaunijas darbaspēka platforma darbojas kopš 2000. gada un aptver darba uzsākšanu, izdevumus, komandējumus un braucienu uzskaiti. Tā ir cieši integrēta ar Merit Tarkvara.",
+      "capabilities": ["Darba uzsākšana", "Izdevumu atskaites", "Komandējumi", "Braucienu uzskaite", "Merit integrācija"],
+      "direction": "Vispirms imports · eksports saskaņā ar politiku",
+      "ownership": "Konfigurējams katram objektam"
+    },
+    "hrm4baltics": {
+      "name": "HRM4Baltics (Digmatix)",
+      "logo_alt": "HRM4Baltics pagaidu zīme",
+      "category": "Personāla programmatūra",
+      "description": "Microsoft Dynamics 365 Business Central personāla risinājums aptver Igaunijas, Latvijas un Lietuvas algu aprēķinu. Tajā ir X-tee integrācija.",
+      "capabilities": ["Personāla dati", "Igaunijas algu aprēķins", "Latvijas algu aprēķins", "Lietuvas algu aprēķins", "X-tee integrācija"],
+      "direction": "Vispirms imports · eksports saskaņā ar politiku",
+      "ownership": "Konfigurējams katram objektam"
+    },
+    "merit_palk": {
+      "name": "Merit Palk",
+      "logo_alt": "Merit Palk pagaidu zīme",
+      "category": "Personāla programmatūra",
+      "description": "Igaunijā visvairāk izmantotā algu programmatūra apkalpo vairāk nekā 25 000 uzņēmumu un ir bez maksas līdz diviem darbiniekiem. Tā var darboties kopā ar esošo Merit Aktiva grāmatvedības adapteri.",
+      "capabilities": ["Darbinieku dati", "Algu aprēķins", "Algas lapiņas", "TSD sagatavošana", "Savienojums ar Merit Aktiva"],
+      "direction": "Vispirms imports · eksports saskaņā ar politiku",
+      "ownership": "Konfigurējams katram objektam"
+    },
+    "taavi_palk": {
+      "name": "Taavi Palk",
+      "logo_alt": "Taavi Palk pagaidu zīme",
+      "category": "Personāla programmatūra",
+      "description": "Igaunijas algu programmatūru izmanto vairāk nekā 1500 uzņēmumu. Tā sagatavo normatīvos pārskatus un eksportē algas lapiņas uz Igaunijas grāmatvedības sistēmām.",
+      "capabilities": ["TSD pārskati", "Reģistru pārskati", "Statistikas pārskati", "Algas lapiņu eksports"],
+      "direction": "Vispirms imports · eksports saskaņā ar politiku",
+      "ownership": "Konfigurējams katram objektam"
+    },
+    "andevis": {
+      "name": "Andevis",
+      "logo_alt": "Andevis pagaidu zīme",
+      "category": "Personāla programmatūra",
+      "description": "Pielāgojams Igaunijas personāla risinājums, kura moduļi var nodrošināt pārskatāmus personāla un algu aprēķina ievaddatus.",
+      "capabilities": ["Personāla dati", "Darba laika uzskaite", "Algu aprēķins", "Apmācības", "Attīstības pārrunas"],
+      "direction": "Vispirms imports · eksports saskaņā ar politiku",
+      "ownership": "Konfigurējams katram objektam"
+    },
+    "eeva": {
+      "name": "Eeva (Eetasoft)",
+      "logo_alt": "Eeva pagaidu zīme",
+      "category": "Personāla programmatūra",
+      "description": "Eeva personāla modulis pārvalda galvenos darba attiecību datus un ir saistīts ar Eeva algu aprēķinu. Dati biroja algu aprēķinā nonāktu tikai ar pārskatītu importu.",
+      "capabilities": ["Līgumi", "Rīkojumi", "Atvaļinājumi", "ISCO klasifikators", "Saite ar Eeva algu aprēķinu"],
+      "direction": "Vispirms imports · eksports saskaņā ar politiku",
+      "ownership": "Konfigurējams katram objektam"
+    }
     }
   },
   "login": {

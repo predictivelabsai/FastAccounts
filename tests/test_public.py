@@ -119,6 +119,35 @@ def test_integration_catalogue_lists_platforms_agents_and_bank_plan():
     assert "Configured per object" in rendered
 
 
+def test_hr_software_catalogue_is_complete_and_renders_in_every_locale():
+    expected_keys = {
+        "bamboohr", "personio", "hibob", "zoho_people", "employment_hero",
+        "workday", "hrmaster", "gusto", "rippling", "deel", "odoo_hr",
+        "persona_fujitsu", "wemply", "hours24", "yester", "hrm4baltics",
+        "merit_palk", "taavi_palk", "andevis", "eeva",
+    }
+    hr_entries = [item for item in integrations.CATALOGUE if item.category == "HR software"]
+
+    assert {item.key for item in hr_entries} == expected_keys
+    assert len(hr_entries) == 20
+    assert all(item.status == "Roadmap · no adapter yet" for item in hr_entries)
+    assert all(item.direction == "Import first · export by policy" for item in hr_entries)
+    assert all(item.ownership == "Configured per object" for item in hr_entries)
+
+    for lang in ("en", "et", "lv", "lt"):
+        page = BeautifulSoup(str(integrations_page(lang)), "html.parser")
+        localized_category = i18n.integration_copy(lang, "bamboohr")["category"]
+        cards = [
+            card for card in page.select(".integration")
+            if card.select_one(".category").get_text(strip=True) == localized_category
+        ]
+        assert len(cards) == 20
+        rendered_names = {card.h2.get_text(strip=True) for card in cards}
+        assert rendered_names == {
+            i18n.integration_copy(lang, item.key)["name"] for item in hr_entries
+        }
+
+
 def test_integration_status_remains_available_to_internal_workspace():
     response = client.get("/api/integrations", headers={"X-Test-User": "viewer@test.invalid"})
     assert response.status_code == 200

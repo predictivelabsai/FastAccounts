@@ -103,7 +103,7 @@
     "faq4_q": "Ar galiu peržiūrėti kodą ir pats priglobti programinę įrangą?",
     "faq4_a": "Taip. FastAccounts kodas prieinamas GitHub pagal MIT licenciją. Galite naudoti, keisti ir patys priglobti programinę įrangą pagal šios licencijos sąlygas, išsaugodami autorių teisių pranešimą ir licencijos tekstą.",
     "faq5_q": "Kokios integracijos prieinamos?",
-    "faq5_a": "Kataloge yra išbandyti QuickBooks Online, Xero ir Merit Aktiva adapteriai. Pagal numatytuosius nustatymus neprijungtas nė vienas paslaugų teikėjas. Tiesioginis teikimas HMRC ir Estijos mokesčių institucijai tebėra ribojamas, o atvirosios bankininkystės integracija tik duomenims skaityti dar svarstoma. Apimtį ir peržiūros reikalavimus rasite integracijų puslapyje.",
+    "faq5_a": "Kataloge yra išbandyti QuickBooks Online, Xero ir Merit Aktiva adapteriai. Pagal numatytuosius nustatymus neprijungtas nė vienas paslaugų teikėjas. Tiesioginis teikimas HMRC ir Estijos mokesčių institucijai tebėra ribojamas, o atvirosios bankininkystės integracija tik duomenims skaityti dar svarstoma. Darbuotojų pagrindinių duomenų ir darbo užmokesčio įvesties gavimas iš klientų personalo sistemų įtrauktas į planą; dar nesukurtas nė vienas personalo sistemos adapteris. Apimtį ir peržiūros reikalavimus rasite integracijų puslapyje.",
     "cta_title": "Kiekvieno kliento apskaita vienoje vietoje.",
     "cta_body": "Atverkite darbo erdvę arba susipažinkite su kodu ir priglobkite FastAccounts patys.",
     "mock_browser": "FastAccounts / Darbo erdvė",
@@ -222,7 +222,7 @@
         "direction": "Iš FastAccounts buhalteriui",
         "ownership": "Buhalterio peržiūrėtas eksportas"
       },
-      "open_banking": {
+    "open_banking": {
         "name": "Atviroji bankininkystė",
         "logo_alt": "Atvirosios bankininkystės piktograma",
         "category": "Banko duomenys",
@@ -234,8 +234,188 @@
           "Suderinimo įvestis"
         ],
         "direction": "Pirmiausia tik skaitymas",
-        "ownership": "Bankas lieka duomenų šaltiniu"
-      }
+      "ownership": "Bankas lieka duomenų šaltiniu"
+    },
+    "bamboohr": {
+      "name": "BambooHR",
+      "logo_alt": "Laikinas BambooHR ženklas",
+      "category": "Personalo programinė įranga",
+      "description": "Naudokite BambooHR darbuotojų duomenis kaip peržiūrimą šaltinį apskaitos biuro darbo užmokesčio nustatymams ir įvesčiai.",
+      "capabilities": ["Darbuotojų pagrindiniai duomenys", "Darbuotojų portalo pastabos", "Neatvykimai", "Organizacijos struktūra", "Dokumentai"],
+      "direction": "Pirmiausia importas · eksportas pagal taisykles",
+      "ownership": "Konfigūruojama kiekvienam objektui"
+    },
+    "personio": {
+      "name": "Personio",
+      "logo_alt": "Laikinas Personio ženklas",
+      "category": "Personalo programinė įranga",
+      "description": "Naudokite Europos personalo sistemą kaip peržiūrimą darbuotojų ir darbo užmokesčio įvesties duomenų šaltinį.",
+      "capabilities": ["Darbuotojų duomenys", "Darbo laiko apskaita", "Neatvykimai", "Dokumentai", "Darbo užmokesčio įvestis"],
+      "direction": "Pirmiausia importas · eksportas pagal taisykles",
+      "ownership": "Konfigūruojama kiekvienam objektui"
+    },
+    "hibob": {
+      "name": "Bob (HiBob)",
+      "logo_alt": "Laikinas Bob by HiBob ženklas",
+      "category": "Personalo programinė įranga",
+      "description": "Importuokite pasirinktus Bob personalo duomenis peržiūrai prieš apskaitos biuro darbo užmokesčio skaičiavimą.",
+      "capabilities": ["Darbuotojų katalogas", "Darbo santykių ciklas", "Darbo laiko valdymas"],
+      "direction": "Pirmiausia importas · eksportas pagal taisykles",
+      "ownership": "Konfigūruojama kiekvienam objektui"
+    },
+    "zoho_people": {
+      "name": "Zoho People",
+      "logo_alt": "Laikinas Zoho People ženklas",
+      "category": "Personalo programinė įranga",
+      "description": "Naudokite Zoho People darbuotojų ir darbo laiko duomenis kaip peržiūrėtą darbo užmokesčio įvestį.",
+      "capabilities": ["Darbuotojų duomenys", "Darbo laiko apskaita", "Atostogos", "Darbo laiko žiniaraščiai", "Formos"],
+      "direction": "Pirmiausia importas · eksportas pagal taisykles",
+      "ownership": "Konfigūruojama kiekvienam objektui"
+    },
+    "employment_hero": {
+      "name": "Employment Hero",
+      "logo_alt": "Laikinas Employment Hero ženklas",
+      "category": "Personalo programinė įranga",
+      "description": "Pateikite pasirinktus Employment Hero personalo duomenis peržiūrai prieš įtraukiant juos į apskaitos biuro darbo užmokesčio skaičiavimą.",
+      "capabilities": ["Darbuotojų duomenys", "Įdarbinimas", "Atostogos", "Darbo laiko žiniaraščiai", "Darbo užmokesčio įvestis"],
+      "direction": "Pirmiausia importas · eksportas pagal taisykles",
+      "ownership": "Konfigūruojama kiekvienam objektui"
+    },
+    "workday": {
+      "name": "Workday",
+      "logo_alt": "Laikinas Workday ženklas",
+      "category": "Personalo programinė įranga",
+      "description": "Naudokite įmonės lygio HCM darbuotojų ir atlygio duomenis kaip peržiūrimą apskaitos biuro darbo užmokesčio šaltinį.",
+      "capabilities": ["Darbuotojų duomenys", "Organizacijos struktūra", "Darbo laikas ir neatvykimai", "Atlygis", "Darbo užmokesčio įvestis"],
+      "direction": "Pirmiausia importas · eksportas pagal taisykles",
+      "ownership": "Konfigūruojama kiekvienam objektui"
+    },
+    "hrmaster": {
+      "name": "HRmaster (HR Master)",
+      "logo_alt": "Laikinas HRmaster ženklas",
+      "category": "Personalo programinė įranga",
+      "description": "Naudokite Vengrijos personalo sistemą kaip peržiūrimą darbuotojų ir darbo užmokesčio įvesties duomenų šaltinį.",
+      "capabilities": ["Personalo duomenys", "Darbo užmokesčio įvestis", "Darbuotojų atranka", "Vertinimai", "Cafeteria išmokos"],
+      "direction": "Pirmiausia importas · eksportas pagal taisykles",
+      "ownership": "Konfigūruojama kiekvienam objektui"
+    },
+    "gusto": {
+      "name": "Gusto",
+      "logo_alt": "Laikinas Gusto ženklas",
+      "category": "Personalo programinė įranga",
+      "description": "Naudokite JAV darbo užmokesčio platformą kaip peržiūrimą šaltinį, kai kliento įmonių grupėje yra JAV juridinis asmuo.",
+      "capabilities": ["Darbuotojų duomenys", "Darbo užmokesčio įvestis", "Atostogos", "Išmokų duomenys", "Rangovų duomenys"],
+      "direction": "Pirmiausia importas · eksportas pagal taisykles",
+      "ownership": "Konfigūruojama kiekvienam objektui"
+    },
+    "rippling": {
+      "name": "Rippling",
+      "logo_alt": "Laikinas Rippling ženklas",
+      "category": "Personalo programinė įranga",
+      "description": "Importuokite pasirinktus personalo duomenis peržiūrai prieš kliento darbo užmokesčio skaičiavimą.",
+      "capabilities": ["Darbuotojų duomenys", "Įdarbinimas", "Darbo laikas ir lankomumas", "Atostogos", "Darbo užmokesčio įvestis"],
+      "direction": "Pirmiausia importas · eksportas pagal taisykles",
+      "ownership": "Konfigūruojama kiekvienam objektui"
+    },
+    "deel": {
+      "name": "Deel",
+      "logo_alt": "Laikinas Deel ženklas",
+      "category": "Personalo programinė įranga",
+      "description": "Naudokite pasaulinio darbo užmokesčio ir oficialaus darbdavio duomenis kaip peržiūrėtą apskaitos biuro darbo užmokesčio įvestį.",
+      "capabilities": ["Darbuotojų duomenys", "Sutartys", "Pasaulinio darbo užmokesčio įvestis", "Atostogos", "Išlaidos"],
+      "direction": "Pirmiausia importas · eksportas pagal taisykles",
+      "ownership": "Konfigūruojama kiekvienam objektui"
+    },
+    "odoo_hr": {
+      "name": "Odoo HR",
+      "logo_alt": "Laikinas Odoo HR ženklas",
+      "category": "Personalo programinė įranga",
+      "description": "Kiekvienam klientui sukonfigūruokite Odoo URL ir duomenų bazės pavadinimą, kad galėtumėte atlikti peržiūrimus importus per XML-RPC arba JSON-RPC.",
+      "capabilities": ["Darbuotojų duomenys", "Darbo laiko apskaita", "Atostogos", "Darbuotojų atranka", "Išlaidos"],
+      "direction": "Pirmiausia importas · eksportas pagal taisykles",
+      "ownership": "Konfigūruojama kiekvienam objektui"
+    },
+    "persona_fujitsu": {
+      "name": "Fujitsu Persona",
+      "logo_alt": "Laikinas Fujitsu Persona ženklas",
+      "category": "Personalo programinė įranga",
+      "description": "Seniausia Estijos personalo ir darbo užmokesčio programinė įranga veikia nuo 1995 metų. Jos moduliai gali teikti peržiūrimus darbuotojų ir darbo užmokesčio įvesties duomenis.",
+      "capabilities": ["Personalo duomenys", "Darbo užmokesčio skaičiavimas", "Darbo laiko apskaita", "Savitarnos portalas"],
+      "direction": "Pirmiausia importas · eksportas pagal taisykles",
+      "ownership": "Konfigūruojama kiekvienam objektui"
+    },
+    "wemply": {
+      "name": "Wemply",
+      "logo_alt": "Laikinas Wemply ženklas",
+      "category": "Personalo programinė įranga",
+      "description": "Modulinę personalo, darbo laiko ir Estijos darbo užmokesčio platformą naudoja daugiau nei 1000 įmonių. Wemply pelnė titulą „Aasta HR lahendus 2025“.",
+      "capabilities": ["Personalo valdymas", "Darbo laiko apskaita", "Estijos darbo užmokestis", "TSD ataskaitos", "TÖR ataskaitos"],
+      "direction": "Pirmiausia importas · eksportas pagal taisykles",
+      "ownership": "Konfigūruojama kiekvienam objektui"
+    },
+    "hours24": {
+      "name": "hours24",
+      "logo_alt": "Laikinas hours24 ženklas",
+      "category": "Personalo programinė įranga",
+      "description": "Dirbtinio intelekto padedama darbo laiko apskaita ir grafikų planavimas, naudojami Estijoje ir Suomijoje. Iki penkių darbuotojų siūlomas nemokamas planas.",
+      "capabilities": ["DI padedamas laiko įvedimas", "Darbo laiko duomenys", "Darbo grafikai"],
+      "direction": "Pirmiausia importas · eksportas pagal taisykles",
+      "ownership": "Konfigūruojama kiekvienam objektui"
+    },
+    "yester": {
+      "name": "Yester",
+      "logo_alt": "Laikinas Yester ženklas",
+      "category": "Personalo programinė įranga",
+      "description": "Nuo 2000 metų veikianti Estijos darbo jėgos platforma apima įdarbinimą, išlaidas, komandiruotes ir kelionių žurnalus. Ji glaudžiai integruota su Merit Tarkvara.",
+      "capabilities": ["Įdarbinimas", "Išlaidų ataskaitos", "Komandiruotės", "Kelionių žurnalai", "Merit integracija"],
+      "direction": "Pirmiausia importas · eksportas pagal taisykles",
+      "ownership": "Konfigūruojama kiekvienam objektui"
+    },
+    "hrm4baltics": {
+      "name": "HRM4Baltics (Digmatix)",
+      "logo_alt": "Laikinas HRM4Baltics ženklas",
+      "category": "Personalo programinė įranga",
+      "description": "Microsoft Dynamics 365 Business Central personalo sprendimas apima Estijos, Latvijos ir Lietuvos darbo užmokesčio skaičiavimą. Jame yra X-tee integracija.",
+      "capabilities": ["Personalo duomenys", "Estijos darbo užmokestis", "Latvijos darbo užmokestis", "Lietuvos darbo užmokestis", "X-tee integracija"],
+      "direction": "Pirmiausia importas · eksportas pagal taisykles",
+      "ownership": "Konfigūruojama kiekvienam objektui"
+    },
+    "merit_palk": {
+      "name": "Merit Palk",
+      "logo_alt": "Laikinas Merit Palk ženklas",
+      "category": "Personalo programinė įranga",
+      "description": "Plačiausiai Estijoje naudojama darbo užmokesčio programinė įranga aptarnauja daugiau nei 25 000 įmonių ir yra nemokama iki dviejų darbuotojų. Ji gali veikti kartu su esamu Merit Aktiva apskaitos adapteriu.",
+      "capabilities": ["Darbuotojų duomenys", "Darbo užmokesčio skaičiavimas", "Algalapiai", "TSD parengimas", "Sąsaja su Merit Aktiva"],
+      "direction": "Pirmiausia importas · eksportas pagal taisykles",
+      "ownership": "Konfigūruojama kiekvienam objektui"
+    },
+    "taavi_palk": {
+      "name": "Taavi Palk",
+      "logo_alt": "Laikinas Taavi Palk ženklas",
+      "category": "Personalo programinė įranga",
+      "description": "Estijos darbo užmokesčio programinę įrangą naudoja daugiau nei 1500 įmonių. Ji rengia teisės aktuose numatytas ataskaitas ir eksportuoja algalapius į Estijos apskaitos sistemas.",
+      "capabilities": ["TSD ataskaitos", "Registrų ataskaitos", "Statistikos ataskaitos", "Algalapių eksportas"],
+      "direction": "Pirmiausia importas · eksportas pagal taisykles",
+      "ownership": "Konfigūruojama kiekvienam objektui"
+    },
+    "andevis": {
+      "name": "Andevis",
+      "logo_alt": "Laikinas Andevis ženklas",
+      "category": "Personalo programinė įranga",
+      "description": "Pritaikomas Estijos personalo sprendimas, kurio moduliai gali teikti peržiūrimus personalo ir darbo užmokesčio įvesties duomenis.",
+      "capabilities": ["Personalo duomenys", "Darbo laiko apskaita", "Darbo užmokesčio skaičiavimas", "Mokymai", "Tobulėjimo pokalbiai"],
+      "direction": "Pirmiausia importas · eksportas pagal taisykles",
+      "ownership": "Konfigūruojama kiekvienam objektui"
+    },
+    "eeva": {
+      "name": "Eeva (Eetasoft)",
+      "logo_alt": "Laikinas Eeva ženklas",
+      "category": "Personalo programinė įranga",
+      "description": "Eeva personalo modulis tvarko pagrindinius darbo santykių duomenis ir yra susietas su Eeva darbo užmokesčio sistema. Duomenys į apskaitos biuro darbo užmokestį patektų tik peržiūrėto importo būdu.",
+      "capabilities": ["Sutartys", "Įsakymai", "Atostogos", "ISCO klasifikatorius", "Sąsaja su Eeva darbo užmokesčiu"],
+      "direction": "Pirmiausia importas · eksportas pagal taisykles",
+      "ownership": "Konfigūruojama kiekvienam objektui"
+    }
     }
   },
   "login": {
