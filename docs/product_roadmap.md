@@ -452,3 +452,18 @@ can still be English.
 Rules and corrected arithmetic fixtures are in
 [payroll rules](payroll_rules.md). Production accountant UAT remains pending;
 TSD filing, payment execution, leave, benefits, and general HR are not included.
+
+## 14. Payroll part-time, hourly pay and social tax minimum (2026-10-08, v0.2.1)
+
+Delivered for the bureau prospect demo: part-time work-time fraction with a
+pro-rated minimum wage, hourly pay from hours entered on the run (minimum
+EUR 5.67/h from April 2026), monthly/hourly/board-fee pay basis, II pillar 0%
+for anyone outside the scheme, and the 2026 social tax minimum obligation
+(EUR 886 base, top-up posted as an employer cost) with per-employee EMTA
+exemption reasons and calendar-day pro-rating for partial months. A clearly
+labelled "Demo OÜ (sample payroll)" seed organisation carries seven synthetic
+employees. Still open: the reduced minimum for the employer applying the basic
+exemption when there are several employers, Töötukassa social tax relief for
+reduced-work-ability staff, automatic pro-rating of monthly pay for partial
+months, pension-age unemployment insurance, leave and sickness pay, TSD export.
+See [payroll rules](payroll_rules.md).

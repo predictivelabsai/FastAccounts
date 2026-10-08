@@ -487,15 +487,25 @@ def configure_integration(organisation_id: str, provider: str, payload: Integrat
 # Accounting-bureau payroll API. Monetary values are returned as decimal strings.
 
 
+PayBasis = Literal['monthly', 'hourly', 'board_fee']
+
+
 class EmployeeIn(BaseModel):
     name: str = Field(min_length=1, max_length=180)
     email: str | None = None
     personal_id: str | None = None
-    gross_salary: Decimal = Field(gt=0, max_digits=12, decimal_places=2)
+    # Monthly salary or board fee; leave empty for hourly employees.
+    gross_salary: Decimal | None = Field(default=None, gt=0, max_digits=12, decimal_places=2)
     funded_pension_percent: Decimal = Decimal('2')
     apply_tax_free_minimum: bool = False
     board_member: bool = False
     active: bool = True
+    pay_basis: PayBasis | None = None
+    fte: Decimal | None = Field(default=None, gt=0, le=1, decimal_places=4)
+    hourly_rate: Decimal | None = Field(default=None, gt=0, max_digits=12, decimal_places=4)
+    social_tax_minimum_exemption: str | None = None
+    employment_start_date: str | None = None
+    employment_end_date: str | None = None
 
 
 class EmployeePatch(BaseModel):
@@ -507,10 +517,18 @@ class EmployeePatch(BaseModel):
     apply_tax_free_minimum: bool | None = None
     board_member: bool | None = None
     active: bool | None = None
+    pay_basis: PayBasis | None = None
+    fte: Decimal | None = Field(default=None, gt=0, le=1, decimal_places=4)
+    hourly_rate: Decimal | None = Field(default=None, gt=0, max_digits=12, decimal_places=4)
+    social_tax_minimum_exemption: str | None = None
+    employment_start_date: str | None = None
+    employment_end_date: str | None = None
 
 
 class PayRunIn(BaseModel):
     period: str = Field(pattern=r'^\d{4}-(0[1-9]|1[0-2])$')
+    # Hours worked per hourly employee id for this month.
+    hours: dict[str, Decimal] | None = None
 
 
 @api.exception_handler(PayrollConflict)
@@ -545,7 +563,7 @@ def payroll_runs(organisation_id: str, user: User = Depends(current_user)):
 @api.post('/organisations/{organisation_id}/pay-runs', status_code=201)
 def payroll_create_run(organisation_id: str, payload: PayRunIn, user: User = Depends(require_csrf)):
     _require(organisation_id, user, WRITE_ROLES)
-    return PayrollService().create_run(organisation_id, period=payload.period, actor=user.email)
+    return PayrollService().create_run(organisation_id, period=payload.period, actor=user.email, hours=payload.hours)
 
 
 @api.post('/organisations/{organisation_id}/pay-runs/{run_id}/approve')

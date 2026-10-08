@@ -24,7 +24,17 @@
             "'": "&#39;",
           })[c],
       ),
-    tr = (k) => esc(t(k));
+    tr = (k) => esc(t(k)),
+    // Server errors may be "<employee>: <catalogue message>< EUR figures>".
+    translateError = (message) => {
+      if (catalog.workspace?.[message]) return t(message);
+      const named = /^(.+?): (.+)$/.exec(String(message ?? ""));
+      if (!named) return message;
+      const [, key, figures = ""] = /^(.*?)((?: EUR | \().*)?$/.exec(named[2]);
+      return catalog.workspace?.[key]
+        ? `${named[1]}: ${t(key)}${figures}`
+        : message;
+    };
   let csrf = "",
     organisations = [],
     org = null,
@@ -32,6 +42,38 @@
     reportTab = "trial-balance",
     invoiceFilter = "All",
     contactFilter = "All";
+  const payBases = [
+      ["monthly", "Monthly salary"],
+      ["hourly", "Hourly pay"],
+      ["board_fee", "Board member fee"],
+    ],
+    // Codes match payroll.SOCIAL_TAX_MINIMUM_EXEMPTIONS (EMTA, SMS § 2 lg 3–4).
+    socialTaxExemptions = [
+      ["", "None – minimum obligation applies"],
+      ["state_pension", "State pension recipient"],
+      ["reduced_work_ability", "Partial or no work ability"],
+      ["child_care", "Raising a child under 3 or three or more children under 19"],
+      ["student", "Pupil or student"],
+      ["previously_unemployed", "Registered unemployed for 6+ months before hiring"],
+      ["shortened_working_time", "Shortened working time (minors aged 7–17, teachers)"],
+      ["local_council_member", "Local council member"],
+      ["ship_crew", "Ship crew member"],
+      ["foreign_service_spouse", "Foreign-service spouse allowance"],
+      ["long_term_sick_leave_work", "Working on long-term sick leave"],
+      ["absent_whole_month", "Absent for the whole month (leave, sickness, strike, service)"],
+      ["multiple_employers", "Another employer applies the basic exemption"],
+      ["board_member", "Board member – no minimum obligation"],
+    ],
+    exemptionLabel = (code) =>
+      t((socialTaxExemptions.find(([v]) => v === code) || [, code])[1]),
+    partTime = (x) =>
+      x.fte && Number(x.fte) < 1
+        ? `<small>${tr("Part-time")} ${esc(num(x.fte))}</small>`
+        : "",
+    hoursNote = (x) =>
+      x.pay_basis === "hourly" && x.hours != null
+        ? `<small>${esc(money(x.hourly_rate, "EUR"))} × ${esc(num(x.hours))} ${tr("Hours").toLowerCase()}</small>`
+        : "";
   const payrollSupported = (organisation) =>
     organisation?.country_code === "EE" && organisation?.base_currency === "EUR";
   const today = () => {
@@ -130,7 +172,7 @@
               .join("; ")
           : d.detail || t("Request failed. Please try again."),
       );
-      e.message = t(e.message);
+      e.message = translateError(e.message);
       e.status = r.status;
       e.detail = d.detail;
       throw e;
@@ -928,9 +970,14 @@
               (employees || []).map((x) =>
                 row([
                   td(
-                    `<strong>${esc(x.name)}</strong>${x.board_member ? `<small>${pill("Board member")}</small>` : ""}`,
+                    `<strong>${esc(x.name)}</strong>${x.board_member ? `<small>${pill("Board member")}</small>` : ""}${partTime(x)}${x.social_tax_minimum_exemption ? `<small>${tr("Social tax minimum exemption")}: ${esc(exemptionLabel(x.social_tax_minimum_exemption))}</small>` : ""}`,
                   ),
-                  cash(x.gross_salary, "EUR"),
+                  x.pay_basis === "hourly"
+                    ? td(
+                        `${esc(money(x.hourly_rate, "EUR"))} ${tr("per hour")}`,
+                        "numeric",
+                      )
+                    : cash(x.gross_salary, "EUR"),
                   td(num(x.funded_pension_percent) + "%", "numeric"),
                   td(tr(x.apply_tax_free_minimum ? "Yes" : "No")),
                   td(pill(x.active ? "Active" : "Inactive")),
@@ -1436,6 +1483,8 @@
       active: true,
       apply_tax_free_minimum: true,
       funded_pension_percent: 2,
+      pay_basis: "monthly",
+      fte: "1",
     };
     const d = dialog(
       employee ? "Edit employee" : "Add employee",
@@ -1443,12 +1492,32 @@
         field("Name", "name", e.name || "", "text", "required") +
           field("Email", "email", e.email || "", "email") +
           field("Personal ID", "personal_id", e.personal_id || "") +
+          select(
+            "Pay basis",
+            "pay_basis",
+            payBases.map(([v, l]) => [v, t(l)]),
+            e.pay_basis || (e.board_member ? "board_fee" : "monthly"),
+          ) +
           field(
-            "Gross salary",
+            "Monthly salary or board fee",
             "gross_salary",
             e.gross_salary ?? "",
             "number",
-            'required min="0.01" step="0.01"',
+            'min="0.01" step="0.01"',
+          ) +
+          field(
+            "Hourly rate",
+            "hourly_rate",
+            e.hourly_rate ?? "",
+            "number",
+            'min="0.01" step="0.0001"',
+          ) +
+          field(
+            "Work-time fraction (FTE)",
+            "fte",
+            e.fte ?? "1",
+            "number",
+            'required min="0.0001" max="1" step="0.0001"',
           ) +
           select(
             "Pension %",
@@ -1461,34 +1530,71 @@
             ],
             Number(e.funded_pension_percent),
           ) +
+          select(
+            "Social tax minimum exemption",
+            "social_tax_minimum_exemption",
+            socialTaxExemptions
+              .filter(([v]) => v !== "board_member")
+              .map(([v, l]) => [v, t(l)]),
+            e.social_tax_minimum_exemption || "",
+          ) +
+          field(
+            "Employment start date",
+            "employment_start_date",
+            e.employment_start_date || "",
+            "date",
+          ) +
+          field(
+            "Employment end date",
+            "employment_end_date",
+            e.employment_end_date || "",
+            "date",
+          ) +
           check(
             "Apply tax-free minimum",
             "apply_tax_free_minimum",
             e.apply_tax_free_minimum,
           ) +
-          check("Board member", "board_member", e.board_member) +
           check("Active", "active", e.active),
       ),
     );
     const employeeForm = d.querySelector("form");
-    const updatePension = () => {
-      const pension = employeeForm.elements.funded_pension_percent;
-      const board = employeeForm.elements.board_member.checked;
-      pension.querySelector('option[value="0"]').disabled = !board;
-      if (!board && pension.value === "0") pension.value = "2";
+    const updateBasis = () => {
+      const basis = employeeForm.elements.pay_basis.value,
+        hourly = basis === "hourly",
+        board = basis === "board_fee";
+      const show = (name, visible) => {
+        const input = employeeForm.elements[name];
+        input.closest("label").style.display = visible ? "" : "none";
+        input.disabled = !visible;
+        input.required = visible && name !== "social_tax_minimum_exemption";
+      };
+      show("gross_salary", !hourly);
+      show("hourly_rate", hourly);
+      show("social_tax_minimum_exemption", !board);
     };
-    employeeForm.elements.board_member.onchange = updatePension;
-    updatePension();
+    employeeForm.elements.pay_basis.onchange = updateBasis;
+    updateBasis();
     bindForm(d, async (data, f) => {
-      for (const k of ["apply_tax_free_minimum", "board_member", "active"])
+      for (const k of ["apply_tax_free_minimum", "active"])
         data[k] = f.elements[k].checked;
+      data.board_member = data.pay_basis === "board_fee";
+      for (const k of ["gross_salary", "hourly_rate"])
+        if (!data[k]) delete data[k];
+      for (const k of [
+        "social_tax_minimum_exemption",
+        "employment_start_date",
+        "employment_end_date",
+      ])
+        if (!data[k]) data[k] = null;
       await post(url, data, employee ? "PATCH" : "POST");
       await saved(d);
     });
   }
   function payrollWizard(employees) {
     const url = path("/pay-runs"),
-      active = employees.filter((x) => x.active);
+      active = employees.filter((x) => x.active),
+      hourly = active.some((x) => x.pay_basis === "hourly");
     if (!active.length) {
       toast(t("Add an active employee before running payroll."), "info");
       return employeeDialog();
@@ -1498,20 +1604,39 @@
       form(
         field("Month", "period", today().slice(0, 7), "month", "required") +
           `<div class="full-width"><h3>${tr("Included employees")}</h3>${table(
-            ["Name", ["Gross salary"]],
+            ["Name", ["Gross salary"], ["Hours worked"]],
             active.map((x) =>
-              row([td(esc(x.name)), cash(x.gross_salary, "EUR")]),
+              row([
+                td(`${esc(x.name)}${partTime(x)}`),
+                x.pay_basis === "hourly"
+                  ? td(
+                      `${esc(money(x.hourly_rate, "EUR"))} ${tr("per hour")}`,
+                      "numeric",
+                    )
+                  : cash(x.gross_salary, "EUR"),
+                td(
+                  x.pay_basis === "hourly"
+                    ? `<input name="hours:${esc(x.id)}" type="number" min="0.01" max="744" step="0.01" required aria-label="${tr("Hours worked")}: ${esc(x.name)}"><span class="field-error" data-error="hours:${esc(x.id)}"></span>`
+                    : "",
+                  "numeric",
+                ),
+              ]),
             ),
-          )}<p class="muted">${tr("Employee details are frozen when the draft is created. Review before approval.")}</p></div>`,
+          )}${hourly ? `<p class="muted">${tr("Enter hours worked for each hourly employee.")}</p>` : ""}<p class="muted">${tr("Employee details are frozen when the draft is created. Review before approval.")}</p></div>`,
         "Create draft",
       ),
     );
     bindForm(d, async (data) => {
+      const hours = Object.fromEntries(
+        Object.entries(data)
+          .filter(([k]) => k.startsWith("hours:"))
+          .map(([k, v]) => [k.slice(6), v]),
+      );
       confirmAction(
         "Create payroll draft",
         `${tr("Month")}: ${esc(data.period)}<br>${num(active.length)} ${tr("employees")}`,
         async () => {
-          await post(url, { period: data.period });
+          await post(url, { period: data.period, hours });
           await saved(d);
         },
       );
@@ -1542,16 +1667,23 @@
         ["Income tax"],
         ["Pension"],
         ["Net"],
+        ["Social tax"],
         ["Employer cost"],
         "Actions",
       ],
       items.map((x, i) =>
         row([
-          td(esc(x.employee_name || x.name || x.employee?.name)),
-          cash(x.gross_salary ?? x.gross, "EUR"),
+          td(
+            `${esc(x.employee_name || x.name || x.employee?.name)}${hoursNote(x)}${partTime(x)}`,
+          ),
+          cash(x.gross ?? x.gross_salary, "EUR"),
           cash(x.income_tax, "EUR"),
           cash(x.funded_pension ?? x.employee_pension ?? x.pension, "EUR"),
           cash(x.net_salary ?? x.net, "EUR"),
+          td(
+            `${esc(money(x.social_tax, "EUR"))}${Number(x.social_tax_minimum_topup) > 0 ? `<small>${tr("Social tax minimum top-up")}: ${esc(money(x.social_tax_minimum_topup, "EUR"))}</small>` : ""}`,
+            "numeric",
+          ),
           cash(x.employer_cost, "EUR"),
           td(
             draft
