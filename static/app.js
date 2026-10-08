@@ -128,6 +128,10 @@
           "In bank": "info",
           Overdue: "danger",
           Active: "success",
+          Connected: "success",
+          Disconnected: "warning",
+          Sent: "success",
+          Failed: "danger",
           Posted: "success",
           Reviewed: "success",
           Suggested: "info",
@@ -664,6 +668,114 @@
           }),
       );
     },
+    recurring: async (c) => {
+      const [schedules, reminders, invoices] = await Promise.all([
+        api(c.url("/invoice-schedules")),
+        api(c.url("/reminders/due")),
+        api(c.url("/invoices")),
+      ]);
+      const intervals = { weekly: "Weekly", monthly: "Monthly", quarterly: "Quarterly", custom_days: "Custom days" },
+        stages = ["3 days before due", "7 days overdue", "14 days overdue"],
+        emailNotice = "Email delivery is not connected. Set POSTMARK_API_TOKEN and FROM_EMAIL to send reminders.";
+      // The due endpoint excludes opted-out invoices; keep them reachable for opting back in.
+      const items = [...reminders.items, ...invoices.filter((x) =>
+        x.reminders_disabled && ["Issued", "Part Paid"].includes(x.status) &&
+        !reminders.items.some((r) => r.invoice_id === x.id)
+      ).map((x) => ({ ...x, invoice_id: x.id, stage: null }))];
+      if (!c.mount(page(t("Recurring invoices"), t("Recurring & reminders"),
+        button("New schedule", "newSchedule", true),
+        `<section class="section">${table(
+          ["Customer", "Name", "Interval", "Next run", "End date", "Auto-email", "Status", "Actions"],
+          schedules.map((x) => row([
+            td(esc(x.contact_name)), td(esc(x.name)),
+            td(esc(x.interval_kind === "custom_days" ? t("Every {days} days").replace("{days}", num(x.interval_days)) : t(intervals[x.interval_kind]))),
+            td(date(x.next_run_date)), td(date(x.end_date)),
+            td(x.auto_email ? `<span aria-label="${tr("Auto-email")}">✓</span>` : "—"),
+            td(pill(x.active ? "Active" : "Paused")),
+            td(button(x.active ? "Pause" : "Resume", "toggleSchedule", false, `data-id="${esc(x.id)}"`) +
+              button("Run now", "runSchedule", false, `data-id="${esc(x.id)}" ${!x.active || x.next_run_date > today() ? "disabled" : ""}`) +
+              button("History", "scheduleHistory", false, `data-id="${esc(x.id)}"`)),
+          ]))
+        )}</section><section class="section"><div class="section-head"><h2>${tr("Reminders due")}</h2></div>
+        ${reminders.email_connected === false ? `<div class="notice" role="status">${tr(emailNotice)}</div>` : ""}
+        ${items.length ? table(["Number", "Customer", "Due date", "Stage", "Status", "Skip"], items.map((x, index) => row([
+          td(esc(x.number)), td(esc(x.contact_name)), td(date(x.due_date)),
+          td(x.stage == null ? "—" : tr(stages[x.stage])),
+          td(x.sent ? pill("Sent") : x.reminders_disabled ? pill("Skipped") : button("Send reminder", "sendReminder", false, `data-index="${index}"`)),
+          td(button("Skip", "skipReminder", false, `data-index="${index}" aria-pressed="${Boolean(x.reminders_disabled)}"`)),
+        ]))) : empty("No reminders due")}</section>`))) return;
+      bindActions(content, {
+        newSchedule: () => {
+          const d = dialog("New schedule", form(
+            field("Name", "name") +
+            select("Template invoice", "template_invoice_id", invoices.filter((x) => !x.document_type || x.document_type === "invoice").map((x) => [x.id, `${x.number || t("Draft")} · ${x.contact_name}`])) +
+            select("Interval", "interval_kind", Object.entries(intervals).map(([k, v]) => [k, t(v)]), "monthly") +
+            field("Days", "interval_days", "1", "number", 'min="1" max="365" step="1" required') +
+            field("Next run", "next_run_date", today(), "date", "required") +
+            field("End date", "end_date", "", "date") + check("Auto-email", "auto_email", false), "Create schedule"));
+          d.querySelector('[name="template_invoice_id"]').required = true;
+          const interval = d.querySelector('[name="interval_kind"]'), days = d.querySelector('[name="interval_days"]');
+          const updateDays = () => {
+            days.disabled = interval.value !== "custom_days";
+            days.closest("label").hidden = days.disabled;
+          };
+          interval.onchange = updateDays;
+          updateDays();
+          bindForm(d, async (v) => {
+            await post(c.url("/invoice-schedules"), {
+              ...v, interval_days: v.interval_kind === "custom_days" ? Number(v.interval_days) : null,
+              end_date: v.end_date || null, auto_email: v.auto_email === "on",
+            });
+            await saved(d);
+          });
+        },
+        toggleSchedule: async (b) => {
+          b.disabled = true;
+          try {
+            const schedule = schedules.find((x) => String(x.id) === b.dataset.id);
+            await post(c.url(`/invoice-schedules/${b.dataset.id}`), { active: !schedule.active }, "PATCH");
+            await render();
+          } finally { b.disabled = false; }
+        },
+        runSchedule: async (b) => {
+          b.disabled = true;
+          try {
+            const result = await post(c.url(`/invoice-schedules/${b.dataset.id}/run-now`));
+            const count = result.runs.filter((x) => x.status === "Issued").length;
+            const schedule = schedules.find((x) => String(x.id) === b.dataset.id);
+            toast(count > 0 ? t("Invoices created: {count}").replace("{count}", num(count)) :
+              t("Not due yet — next run {date}").replace("{date}", date(schedule.next_run_date)));
+            result.runs.filter((x) => x.status === "Failed").forEach((x) => toast(t(x.error_message || "Failed"), "error"));
+            await render();
+          } finally { b.disabled = false; }
+        },
+        scheduleHistory: async (b) => {
+          const schedule = await api(c.url(`/invoice-schedules/${b.dataset.id}`));
+          if (org?.id !== c.oid || location.hash !== "#recurring") return;
+          dialog("History", table(["Date", "Number", "Status", "Error"], schedule.runs.map((x) => row([
+            td(date(x.run_date)), td(esc(x.invoice_number || "—")), td(pill(x.status)), td(tr(x.error_message || "—")),
+          ]))));
+        },
+        sendReminder: async (b) => {
+          b.disabled = true;
+          try {
+            const x = items[Number(b.dataset.index)];
+            const result = await post(c.url(`/invoices/${x.invoice_id}/reminders/${x.stage}/send`));
+            if (result.status === "Failed") toast(t(result.error_message || "Failed"), "error");
+            else toast(t("Reminder sent"));
+            await render();
+          } finally { b.disabled = false; }
+        },
+        skipReminder: async (b) => {
+          b.disabled = true;
+          try {
+            const x = items[Number(b.dataset.index)];
+            await post(c.url(`/invoices/${x.invoice_id}/reminders/opt-out`), { reminders_disabled: !x.reminders_disabled });
+            await render();
+          } finally { b.disabled = false; }
+        },
+      });
+    },
     bills: async (c) => {
       const rows = await api(c.url("/bills"));
       if (
@@ -1041,14 +1153,14 @@
       });
     },
     integrations: async (c) => {
-      const rows = await api("/integrations");
+      const [rows, email] = await Promise.all([api("/integrations"), api("/email-status")]);
       if (
         !c.mount(
           page(
             t("Integrations"),
             t("Connect your accounting workflow."),
             link("Public catalogue", "/integrations"),
-            `<div class="integration-list">${rows
+            `<section class="card section"><div class="section-head"><h2>${tr("Email delivery")}</h2>${pill(email.connected ? "Connected" : "Disconnected")}</div><p>Postmark${email.from_email ? ` · ${esc(email.from_email)}` : ""}</p><p class="muted">${tr("Connect email delivery by setting POSTMARK_API_TOKEN and FROM_EMAIL in the deployment environment (.env).")}</p></section><div class="integration-list">${rows
               .map((x) => {
                 const copy = catalog.integrations?.items?.[x.key] || {};
                 return `<article class="card integration-row"><img src="${esc(x.logo)}" alt="${esc(copy.name || x.name)}"><div><h2>${esc(copy.name || x.name)}</h2>${pill(x.status)}<p>${esc(copy.description || x.description)}</p><small class="muted">${esc(copy.direction || x.direction || "")}</small></div></article>`;
@@ -1737,6 +1849,7 @@
           banking: "bank",
           contacts: "people",
           payroll: "people",
+          recurring: "document",
           accounting: "chart",
         }[a.dataset.view],
       ),

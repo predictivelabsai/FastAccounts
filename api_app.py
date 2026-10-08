@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 import integrations
 import version
 from banking import BankingService
+from automation import AutomationService, email_configured, email_status
 from database import get_database
 from documents import DocumentService
 from integration_service import IntegrationService
@@ -80,6 +81,32 @@ class BillIn(BaseModel):
     notes: str = ""
     document_type: Literal["bill", "supplier_credit"] = "bill"
     lines: list[LineIn] = Field(min_length=1)
+
+
+class InvoiceScheduleIn(BaseModel):
+    template_invoice_id: str
+    interval_kind: Literal["weekly", "monthly", "quarterly", "custom_days"]
+    next_run_date: str
+    interval_days: int | None = None
+    end_date: str | None = None
+    auto_email: bool = False
+    name: str = ""
+
+
+class InvoiceSchedulePatch(BaseModel):
+    model_config = {"extra": "forbid"}
+
+    name: str = Field(default=None)
+    interval_kind: Literal["weekly", "monthly", "quarterly", "custom_days"] = Field(default=None)
+    interval_days: int | None = None
+    next_run_date: str = Field(default=None)
+    end_date: str | None = None
+    auto_email: bool = Field(default=None)
+    active: bool = Field(default=None)
+
+
+class ReminderOptOutIn(BaseModel):
+    reminders_disabled: bool
 
 
 class BankAccountIn(BaseModel):
@@ -212,6 +239,12 @@ def list_organisations(user: User = Depends(current_user)):
     return OrganisationService().for_user(user.email)
 
 
+@api.get("/email-status")
+def get_email_status(user: User = Depends(current_user)):
+    del user
+    return email_status()
+
+
 @api.post("/organisations", status_code=201)
 def create_organisation(payload: OrganisationIn, user: User = Depends(require_csrf)):
     return OrganisationService().create(**payload.model_dump(), owner_email=user.email)
@@ -296,6 +329,58 @@ def invoice_xml(organisation_id: str, invoice_id: str, user: User = Depends(curr
     _require(organisation_id, user, {"owner", "administrator", "accountant", "approver", "viewer"})
     DocumentService().invoice(invoice_id, organisation_id)
     return Response(DocumentService().invoice_xml(invoice_id), media_type="application/xml")
+
+
+@api.post("/organisations/{organisation_id}/invoice-schedules", status_code=201)
+def create_invoice_schedule(organisation_id: str, payload: InvoiceScheduleIn, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return AutomationService().create_schedule(organisation_id, actor=user.email, **payload.model_dump())
+
+
+@api.get("/organisations/{organisation_id}/invoice-schedules")
+def list_invoice_schedules(organisation_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, {"owner", "administrator", "accountant", "approver", "viewer"})
+    return AutomationService().list_schedules(organisation_id)
+
+
+@api.get("/organisations/{organisation_id}/invoice-schedules/{schedule_id}")
+def get_invoice_schedule(organisation_id: str, schedule_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, {"owner", "administrator", "accountant", "approver", "viewer"})
+    return AutomationService().schedule(schedule_id, organisation_id)
+
+
+@api.patch("/organisations/{organisation_id}/invoice-schedules/{schedule_id}")
+def update_invoice_schedule(organisation_id: str, schedule_id: str, payload: InvoiceSchedulePatch,
+                            user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return AutomationService().update_schedule(schedule_id, organisation_id, actor=user.email,
+                                               **payload.model_dump(exclude_unset=True))
+
+
+@api.post("/organisations/{organisation_id}/invoice-schedules/{schedule_id}/run-now")
+def run_invoice_schedule(organisation_id: str, schedule_id: str, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return {"runs": [AutomationService().run_now(schedule_id, organisation_id, actor=user.email)]}
+
+
+@api.get("/organisations/{organisation_id}/reminders/due")
+def reminders_due(organisation_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, {"owner", "administrator", "accountant", "approver", "viewer"})
+    return {"email_connected": email_configured(), "items": AutomationService().reminders_due(organisation_id)}
+
+
+@api.post("/organisations/{organisation_id}/invoices/{invoice_id}/reminders/opt-out")
+def reminders_opt_out(organisation_id: str, invoice_id: str, payload: ReminderOptOutIn,
+                      user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return AutomationService().set_reminders_opt_out(invoice_id, organisation_id, actor=user.email,
+                                                     **payload.model_dump())
+
+
+@api.post("/organisations/{organisation_id}/invoices/{invoice_id}/reminders/{stage}/send")
+def send_reminder(organisation_id: str, invoice_id: str, stage: int, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return AutomationService().send_reminder(invoice_id, organisation_id, stage=stage, actor=user.email, client=None)
 
 
 @api.get("/organisations/{organisation_id}/bills")

@@ -178,56 +178,69 @@ class DocumentService:
             raise ValueError(f"Chart of accounts is missing {role}")
         return row["id"]
 
-    def issue_invoice(self, invoice_id: str, *, actor: str) -> dict:
+    def issue_invoice(self, invoice_id: str, *, actor: str, tx=None) -> dict:
+        if tx is not None:
+            return self._issue_invoice_tx(tx, invoice_id, actor)
         with self.db.transaction() as tx:
-            invoice = tx.one("SELECT * FROM invoices WHERE id=?", (invoice_id,))
-            if not invoice:
-                raise KeyError("Invoice not found")
-            if invoice["status"] != "Draft":
-                return self.invoice(invoice_id)
-            lines = tx.rows("SELECT * FROM invoice_lines WHERE invoice_id=? ORDER BY line_number", (invoice_id,))
-            number = self._next_number(tx, invoice["organisation_id"], invoice["document_type"])
-            ar = self._role_account(tx, invoice["organisation_id"], "AR")
-            output_vat = self._role_account(tx, invoice["organisation_id"], "OUTPUT_VAT")
-            grouped: dict[str, Decimal] = defaultdict(Decimal)
-            for line in lines:
-                grouped[line["account_id"]] += money(line["net_amount"])
-            is_credit = invoice["document_type"] == "credit_note"
-            posting_lines = [PostingLine(
-                account_id=ar,
-                debit=Decimal("0") if is_credit else money(invoice["total"]),
-                credit=money(invoice["total"]) if is_credit else Decimal("0"),
-                contact_id=invoice["contact_id"], due_date=invoice["due_date"],
+            return self._issue_invoice_tx(tx, invoice_id, actor)
+
+    def _issue_invoice_tx(self, tx, invoice_id: str, actor: str) -> dict:
+        def result():
+            row = tx.one(
+                "SELECT i.*,c.name contact_name,c.email contact_email,c.address contact_address,c.vat_no contact_vat_no "
+                "FROM invoices i JOIN contacts c ON c.id=i.contact_id WHERE i.id=?", (invoice_id,),
+            )
+            row["lines"] = tx.rows("SELECT * FROM invoice_lines WHERE invoice_id=? ORDER BY line_number", (invoice_id,))
+            return row
+
+        invoice = tx.one("SELECT * FROM invoices WHERE id=?", (invoice_id,))
+        if not invoice:
+            raise KeyError("Invoice not found")
+        if invoice["status"] != "Draft":
+            return result()
+        lines = tx.rows("SELECT * FROM invoice_lines WHERE invoice_id=? ORDER BY line_number", (invoice_id,))
+        number = self._next_number(tx, invoice["organisation_id"], invoice["document_type"])
+        ar = self._role_account(tx, invoice["organisation_id"], "AR")
+        output_vat = self._role_account(tx, invoice["organisation_id"], "OUTPUT_VAT")
+        grouped: dict[str, Decimal] = defaultdict(Decimal)
+        for line in lines:
+            grouped[line["account_id"]] += money(line["net_amount"])
+        is_credit = invoice["document_type"] == "credit_note"
+        posting_lines = [PostingLine(
+            account_id=ar,
+            debit=Decimal("0") if is_credit else money(invoice["total"]),
+            credit=money(invoice["total"]) if is_credit else Decimal("0"),
+            contact_id=invoice["contact_id"], due_date=invoice["due_date"],
+            memo=number, source_line_type="invoice", source_line_id=invoice_id,
+        )]
+        for account_id, amount in grouped.items():
+            posting_lines.append(PostingLine(
+                account_id=account_id, debit=amount if is_credit else Decimal("0"),
+                credit=Decimal("0") if is_credit else amount,
+                contact_id=invoice["contact_id"], memo=number,
+                source_line_type="invoice", source_line_id=invoice_id,
+            ))
+        if money(invoice["tax_total"]):
+            posting_lines.append(PostingLine(
+                account_id=output_vat,
+                debit=money(invoice["tax_total"]) if is_credit else Decimal("0"),
+                credit=Decimal("0") if is_credit else money(invoice["tax_total"]),
                 memo=number, source_line_type="invoice", source_line_id=invoice_id,
-            )]
-            for account_id, amount in grouped.items():
-                posting_lines.append(PostingLine(
-                    account_id=account_id, debit=amount if is_credit else Decimal("0"),
-                    credit=Decimal("0") if is_credit else amount,
-                    contact_id=invoice["contact_id"], memo=number,
-                    source_line_type="invoice", source_line_id=invoice_id,
-                ))
-            if money(invoice["tax_total"]):
-                posting_lines.append(PostingLine(
-                    account_id=output_vat,
-                    debit=money(invoice["tax_total"]) if is_credit else Decimal("0"),
-                    credit=Decimal("0") if is_credit else money(invoice["tax_total"]),
-                    memo=number, source_line_type="invoice", source_line_id=invoice_id,
-                ))
-            batch = self.ledger.post(
-                organisation_id=invoice["organisation_id"], voucher_type=invoice["document_type"],
-                voucher_id=invoice_id, voucher_code=number, posting_date=invoice["tax_point_date"],
-                lines=posting_lines, actor=actor, currency=invoice["currency"],
-                exchange_rate=decimal(invoice["exchange_rate"]), tx=tx,
-            )
-            now = utc_now()
-            tx.execute(
-                "UPDATE invoices SET number=?,status='Issued',posting_batch_id=?,issued_at=?,updated_at=? WHERE id=?",
-                (number, batch["id"], now, now, invoice_id),
-            )
-            audit(tx, invoice["organisation_id"], actor, "invoice.issued", "invoice", invoice_id,
-                  {"number": number, "posting_batch_id": batch["id"]})
-        return self.invoice(invoice_id)
+            ))
+        batch = self.ledger.post(
+            organisation_id=invoice["organisation_id"], voucher_type=invoice["document_type"],
+            voucher_id=invoice_id, voucher_code=number, posting_date=invoice["tax_point_date"],
+            lines=posting_lines, actor=actor, currency=invoice["currency"],
+            exchange_rate=decimal(invoice["exchange_rate"]), tx=tx,
+        )
+        now = utc_now()
+        tx.execute(
+            "UPDATE invoices SET number=?,status='Issued',posting_batch_id=?,issued_at=?,updated_at=? WHERE id=?",
+            (number, batch["id"], now, now, invoice_id),
+        )
+        audit(tx, invoice["organisation_id"], actor, "invoice.issued", "invoice", invoice_id,
+              {"number": number, "posting_batch_id": batch["id"]})
+        return result()
 
     def create_bill(self, organisation_id: str, *, contact_id: str, supplier_number: str,
                     bill_date: str, due_date: str, lines: list[dict], actor: str,
@@ -527,7 +540,8 @@ class DocumentService:
         SubElement(totals, "Gross").text = str(invoice["total"])
         return tostring(root, encoding="utf-8", xml_declaration=True)
 
-    def send_invoice_email(self, invoice_id: str, *, actor: str, client=None) -> dict:
+    def send_invoice_email(self, invoice_id: str, *, actor: str, client=None,
+                           subject=None, text_body=None) -> dict:
         """Send after posting through Postmark and retain a delivery audit record."""
         import httpx
 
@@ -543,8 +557,8 @@ class DocumentService:
         delivery_id, now = new_id(), utc_now()
         payload = {
             "From": from_email, "To": recipient,
-            "Subject": f"Invoice {invoice['number']} from {organisation.get('name', 'FastAccounts')}",
-            "TextBody": f"Please find invoice {invoice['number']} for {invoice['currency']} {money(invoice['total']):.2f} attached.",
+            "Subject": subject if subject is not None else f"Invoice {invoice['number']} from {organisation.get('name', 'FastAccounts')}",
+            "TextBody": text_body if text_body is not None else f"Please find invoice {invoice['number']} for {invoice['currency']} {money(invoice['total']):.2f} attached.",
             "MessageStream": "outbound",
             "Attachments": [{"Name": f"{invoice['number']}.pdf", "Content": base64.b64encode(self.invoice_pdf(invoice_id)).decode(),
                              "ContentType": "application/pdf"}],

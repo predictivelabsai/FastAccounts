@@ -572,6 +572,7 @@ def workspace_page(user: dict, lang: str = "en"):
     groups = [
         ("bureau", [("overview", "overview")]),
         ("documents", [("invoices", "invoices"), ("bills", "bills"), ("contacts", "contacts")]),
+        ("automation", [("recurring", "recurring")]),
         ("money", [("banking", "banking")]),
         ("accounting", [("accounting", "accounting"), ("tax", "tax")]),
         ("payroll", [("payroll", "payroll")]),

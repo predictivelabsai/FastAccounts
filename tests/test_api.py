@@ -1,11 +1,245 @@
 from __future__ import annotations
 
 import os
+import json
+import socket
+from datetime import date, timedelta
 
+import httpx
+import pytest
 from fastapi.testclient import TestClient
 
-from api_app import api
+import automation
+from api_app import api, current_user, require_csrf
 from database import reset_database_cache
+from documents import DocumentService
+
+
+@pytest.fixture
+def automation_api(db, uk_org, monkeypatch):
+    def blocked(*args, **kwargs):
+        raise AssertionError("Live network is forbidden")
+    monkeypatch.delenv("POSTMARK_API_TOKEN", raising=False)
+    monkeypatch.delenv("FROM_EMAIL", raising=False)
+    monkeypatch.setenv("FASTACCOUNTS_DB", db.path)
+    monkeypatch.setenv("DB_URL", "")
+    monkeypatch.setenv("FASTACCOUNTS_ALLOW_TEST_AUTH", "true")
+    reset_database_cache()
+    docs = DocumentService(db)
+    contact = docs.create_contact(uk_org["id"], name="Synthetic API customer", country_code="GB",
+                                  email="customer@example.invalid")
+    account = db.scalar("SELECT id FROM accounts WHERE organisation_id=? AND system_role='SALES'", (uk_org["id"],))
+    invoice = docs.create_invoice(uk_org["id"], contact_id=contact["id"], issue_date=date.today().isoformat(),
+        due_date=(date.today() - timedelta(days=20)).isoformat(), actor="owner@example.test",
+        lines=[dict(description="API retainer", quantity="1", unit_price="100", account_id=account)])
+    invoice = docs.issue_invoice(invoice["id"], actor="owner@example.test")
+    with TestClient(api, headers={"X-Test-User": "owner@example.test"}) as client:
+        # Windows creates the event loop's socket pair while entering TestClient.
+        with monkeypatch.context() as network:
+            network.setattr(socket.socket, "connect", blocked)
+            yield client, f"/organisations/{uk_org['id']}", invoice
+    reset_database_cache()
+
+
+def create_api_schedule(client, base, invoice, **changes):
+    response = client.post(base + "/invoice-schedules", json={
+        "template_invoice_id": invoice["id"], "interval_kind": "monthly",
+        "next_run_date": date.today().isoformat(), **changes,
+    })
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
+def test_api_schedule_create_list_patch_and_read_only_gets(automation_api, db):
+    client, base, invoice = automation_api
+    schedule = create_api_schedule(client, base, invoice)
+    assert schedule["lines"][0]["description"] == "API retainer"
+    assert schedule["runs"] == []
+    url = base + "/invoice-schedules/" + schedule["id"]
+    next_date = (date.today() + timedelta(days=5)).isoformat()
+    response = client.patch(url, json={"next_run_date": next_date, "auto_email": True})
+    assert response.status_code == 200, response.text
+    assert response.json()["next_run_date"] == next_date
+    assert response.json()["auto_email"] == 1
+    assert response.json()["interval_kind"] == "monthly"
+    tables = ("invoice_schedules", "invoice_schedule_lines", "schedule_runs", "invoices",
+              "invoice_reminder_events", "invoice_deliveries", "audit_events")
+    before = {table: db.rows(f"SELECT * FROM {table} ORDER BY id") for table in tables}
+    listed = client.get(base + "/invoice-schedules").json()
+    assert listed[0]["id"] == schedule["id"]
+    assert listed[0]["contact_name"] == "Synthetic API customer"
+    assert listed[0]["interval_kind"] == "monthly"
+    assert listed[0]["last_run_date"] is None and listed[0]["last_invoice_number"] is None
+    assert client.get(url).json() == response.json()
+    assert client.get(base + "/reminders/due").status_code == 200
+    assert client.get("/email-status").status_code == 200
+    assert before == {table: db.rows(f"SELECT * FROM {table} ORDER BY id") for table in tables}
+
+
+def test_api_schedule_run_now_sequence_and_duplicate_period(automation_api, db):
+    client, base, invoice = automation_api
+    schedule = create_api_schedule(client, base, invoice)
+    url = base + "/invoice-schedules/" + schedule["id"]
+    response = client.post(url + "/run-now")
+    assert response.status_code == 200, response.text
+    run = response.json()["runs"][0]
+    assert run["status"] == "Issued"
+    assert int(run["invoice"]["number"][-6:]) == int(invoice["number"][-6:]) + 1
+    history = client.get(url).json()["runs"]
+    assert history[0]["status"] == "Issued"
+    assert history[0]["invoice_number"] == run["invoice"]["number"]
+    listed = client.get(base + "/invoice-schedules").json()[0]
+    assert listed["last_run_date"] == run["run_date"]
+    assert listed["last_invoice_number"] == run["invoice"]["number"]
+    # run_now advances the cursor and allows early runs; retry the original period explicitly.
+    assert client.patch(url, json={"next_run_date": schedule["next_run_date"]}).status_code == 200
+    before = db.scalar("SELECT COUNT(*) FROM invoices")
+    retry = client.post(url + "/run-now")
+    assert retry.status_code == 200 and retry.json()["runs"][0]["status"] == "Skipped"
+    assert db.scalar("SELECT COUNT(*) FROM invoices") == before
+    assert db.scalar("SELECT COUNT(*) FROM schedule_runs") == 1
+
+
+def test_api_schedule_history_order(automation_api, monkeypatch):
+    client, base, invoice = automation_api
+    today = date.today()
+    schedule = create_api_schedule(client, base, invoice, interval_kind="custom_days", interval_days=1,
+                                   next_run_date=(today - timedelta(days=1)).isoformat())
+    url = base + "/invoice-schedules/" + schedule["id"]
+    original_date = automation._date
+    monkeypatch.setattr(automation, "_date", lambda value=None: original_date(
+        value if value is not None else (today - timedelta(days=1)).isoformat()))
+    assert client.post(url + "/run-now").json()["runs"][0]["status"] == "Issued"
+    monkeypatch.setattr(automation, "_date", original_date)
+    assert client.post(url + "/run-now").json()["runs"][0]["status"] == "Issued"
+    runs = client.get(url).json()["runs"]
+    assert [r["run_date"] for r in runs] == [today.isoformat(), (today - timedelta(days=1)).isoformat()]
+
+
+def test_api_reminders_due_and_opt_out(automation_api, db):
+    client, base, invoice = automation_api
+    due = client.get(base + "/reminders/due")
+    assert due.status_code == 200
+    assert due.json()["email_connected"] is False
+    assert [(r["invoice_id"], r["stage"]) for r in due.json()["items"]] == [(invoice["id"], s) for s in (0, 1, 2)]
+    url = base + f"/invoices/{invoice['id']}/reminders/opt-out"
+    for disabled in (True, False):
+        response = client.post(url, json={"reminders_disabled": disabled})
+        assert response.status_code == 200
+        assert response.json() == {"invoice_id": invoice["id"], "reminders_disabled": disabled}
+        assert client.get(base + "/reminders/due").json()["items"] == ([] if disabled else due.json()["items"])
+        action = "reminder.opt_out" if disabled else "reminder.opt_in"
+        event = db.one("SELECT * FROM audit_events WHERE action=? AND object_id=?", (action, invoice["id"]))
+        assert event["organisation_id"] == invoice["organisation_id"] and event["actor"] == "owner@example.test"
+
+
+def test_api_reminder_not_connected(automation_api, db):
+    client, base, invoice = automation_api
+    response = client.post(base + f"/invoices/{invoice['id']}/reminders/0/send")
+    assert response.status_code == 422
+    assert response.json()["detail"] == "Email delivery is not connected. Set POSTMARK_API_TOKEN and FROM_EMAIL to send reminders."
+    assert db.scalar("SELECT COUNT(*) FROM invoice_deliveries") == 0
+    assert db.scalar("SELECT COUNT(*) FROM invoice_reminder_events") == 0
+
+
+def test_api_reminder_mock_transport_delivery_and_duplicate(automation_api, db, monkeypatch):
+    client, base, invoice = automation_api
+    monkeypatch.setenv("POSTMARK_API_TOKEN", "synthetic-token")
+    monkeypatch.setenv("FROM_EMAIL", "sender@example.invalid")
+    requests, clients = [], []
+    def respond(request):
+        requests.append(json.loads(request.content))
+        return httpx.Response(200, json={"MessageID": "synthetic-message"})
+    def factory():
+        http = httpx.Client(transport=httpx.MockTransport(respond))
+        clients.append(http)
+        return http
+    monkeypatch.setattr(automation, "HTTP_CLIENT_FACTORY", factory)
+    url = base + f"/invoices/{invoice['id']}/reminders/0/send"
+    response = client.post(url)
+    assert response.status_code == 200, response.text
+    event = response.json()
+    assert event["status"] == event["delivery"]["status"] == "Sent"
+    delivery = db.one("SELECT * FROM invoice_deliveries WHERE id=?", (event["delivery_id"],))
+    assert delivery["status"] == "Sent" and delivery["provider_message_id"] == "synthetic-message"
+    assert delivery["created_by"] == "owner@example.test"
+    assert requests[0]["Subject"] == f"Payment reminder: invoice {invoice['number']}"
+    assert invoice["due_date"] in requests[0]["TextBody"]
+    assert requests[0]["Attachments"][0]["ContentType"] == "application/pdf"
+    assert clients[0].is_closed
+    repeat = client.post(url)
+    assert repeat.status_code == 422 and "already sent" in repeat.json()["detail"]
+    assert len(requests) == 1 and db.scalar("SELECT COUNT(*) FROM invoice_deliveries") == 1
+    assert client.get(base + "/reminders/due").json()["email_connected"] is True
+
+
+def test_api_email_status_masking_and_auth(automation_api, monkeypatch):
+    client, _, _ = automation_api
+    assert client.get("/email-status").json() == {"connected": False, "provider": "postmark", "from_email": ""}
+    monkeypatch.setenv("FROM_EMAIL", "accounts@example.com")
+    assert client.get("/email-status").json()["from_email"] == ""
+    monkeypatch.setenv("POSTMARK_API_TOKEN", "synthetic-token")
+    response = client.get("/email-status")
+    assert response.json() == {"connected": True, "provider": "postmark", "from_email": "a•••@example.com"}
+    assert "accounts@example.com" not in response.text
+    assert client.get("/email-status", headers={"X-Test-User": ""}).status_code == 401
+
+
+@pytest.mark.parametrize("changes", [
+    {"interval_kind": "yearly"}, {"interval_kind": "custom_days"}, {"interval_days": 0},
+    {"next_run_date": "not-a-date"}, {"end_date": "1900-01-01"}, {"next_run_date": None},
+    {"name": None}, {"active": None}, {"unsupported": True},
+])
+def test_api_schedule_invalid_patch(automation_api, changes):
+    client, base, invoice = automation_api
+    schedule = create_api_schedule(client, base, invoice)
+    url = base + "/invoice-schedules/" + schedule["id"]
+    assert client.patch(url, json=changes).status_code == 422
+    assert client.get(url).json() == schedule
+
+
+def test_api_automation_tenant_scoping_and_roles(automation_api, db, ee_org, monkeypatch):
+    client, base, invoice = automation_api
+    schedule = create_api_schedule(client, base, invoice)
+    other = f"/organisations/{ee_org['id']}"
+    monkeypatch.setenv("POSTMARK_API_TOKEN", "synthetic-token")
+    monkeypatch.setenv("FROM_EMAIL", "sender@example.invalid")
+    assert client.get(other + "/invoice-schedules").json() == []
+    assert client.get(other + "/reminders/due").json()["items"] == []
+    assert client.post(other + "/invoice-schedules", json={"template_invoice_id": invoice["id"],
+        "interval_kind": "monthly", "next_run_date": date.today().isoformat()}).status_code == 404
+    requests = [
+        ("GET", "/invoice-schedules/" + schedule["id"], None),
+        ("PATCH", "/invoice-schedules/" + schedule["id"], {"active": False}),
+        ("POST", "/invoice-schedules/" + schedule["id"] + "/run-now", None),
+        ("POST", f"/invoices/{invoice['id']}/reminders/opt-out", {"reminders_disabled": True}),
+        ("POST", f"/invoices/{invoice['id']}/reminders/0/send", None),
+    ]
+    for method, path, payload in requests:
+        assert client.request(method, other + path, json=payload).status_code == 404
+        assert client.request(method, base + path, json=payload,
+                              headers={"X-Test-User": "outsider@example.invalid"}).status_code == 403
+    with db.transaction() as tx:
+        tx.execute("UPDATE memberships SET role='viewer' WHERE organisation_id=?", (invoice["organisation_id"],))
+    for path in ("/invoice-schedules", "/invoice-schedules/" + schedule["id"], "/reminders/due"):
+        assert client.get(base + path).status_code == 200
+    for method, path, payload in requests[1:]:
+        assert client.request(method, base + path, json=payload).status_code == 403
+    assert client.post(base + "/invoice-schedules", json={"template_invoice_id": invoice["id"],
+        "interval_kind": "monthly", "next_run_date": date.today().isoformat()}).status_code == 403
+
+
+def test_api_automation_stage_validation_and_dependencies(automation_api, monkeypatch):
+    client, base, invoice = automation_api
+    monkeypatch.setenv("POSTMARK_API_TOKEN", "synthetic-token")
+    monkeypatch.setenv("FROM_EMAIL", "sender@example.invalid")
+    for stage in (-1, 3, "invalid"):
+        assert client.post(base + f"/invoices/{invoice['id']}/reminders/{stage}/send").status_code == 422
+    routes = [r for r in api.routes if "invoice-schedules" in r.path or "/reminders/" in r.path or r.path == "/email-status"]
+    assert len(routes) == 9
+    for route in routes:
+        expected = current_user if route.methods == {"GET"} else require_csrf
+        assert expected in [d.call for d in route.dependant.dependencies]
 
 
 def test_api_auth_openapi_and_full_invoice_flow(tmp_path,monkeypatch):

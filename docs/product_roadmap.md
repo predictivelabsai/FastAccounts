@@ -388,7 +388,8 @@ open AR/AP reconcile; no silent overwrite or duplicate posting is possible.
 - [x] Sandbox-capable consent/requisition and read-only normalized transaction adapter;
 - [ ] Production reconnect, scheduled pull and operational monitoring after legal review;
 - [x] Deterministic import fingerprinting and explainable match confidence;
-- [ ] Optional AI field/match suggestions remain a post-UAT roadmap item behind human approval.
+- [ ] Optional AI field/match suggestions remain a post-UAT roadmap item behind human approval;
+- [x] Demo-scope recurring invoices and the payment-reminder ladder (see section 15).
 
 **Exit:** consent expiry and bank/provider outages are recoverable; transaction
 replay is idempotent; no suggestion auto-posts without an explicit policy.
@@ -467,3 +468,33 @@ exemption when there are several employers, Töötukassa social tax relief for
 reduced-work-ability staff, automatic pro-rating of monthly pay for partial
 months, pension-age unemployment insurance, leave and sickness pay, TSD export.
 See [payroll rules](payroll_rules.md).
+
+## 15. Automation demo: recurring invoices and payment reminders (2026-10-08)
+
+UK books can now turn any issued or draft invoice into a recurring schedule
+(weekly, monthly, quarterly or a custom day interval, optional end date, optional
+auto-email). When a schedule comes due — including catch-up for up to 24 missed
+periods — the service claims it with a compare-and-set date update and deduplicates
+with a unique (schedule, period) constraint, then issues an ordinary invoice through
+the standard sequential numbering and immutable balanced ledger batch path. Missed
+or partial worker gaps never double-issue: a crash before commit retries the period,
+and a second pass over an already-run period issues nothing.
+
+Payment reminders follow a three-stage ladder (3 days before due, then 7 and 14
+days overdue), computed from each invoice's due date. Every attempt is recorded as
+a per-stage event, so a stage is never sent twice, including on failure; individual
+invoices can opt out. Sends go through the existing Postmark delivery path: when
+`POSTMARK_API_TOKEN`/`FROM_EMAIL` are unset, nothing is sent and no success is
+faked — the UI shows an "email not connected" notice, the integrations page shows
+the connection status, and manual sends fail with an explanatory message instead of
+a fabricated success. A background worker is available for deployed instances via
+`FASTACCOUNTS_AUTOMATION_WORKER=true` (off by default; poll interval
+`FASTACCOUNTS_AUTOMATION_POLL_SECONDS`, default 60 s) and is env-gated off in tests.
+
+The demo UK book ships an idempotent "Retainer – Willow Design" monthly schedule
+whose next run is 7 days out; reminder stages are exercised by the existing overdue
+demonstration invoices. The workspace gains a localized "Recurring & reminders"
+view (schedules, run history, reminders due) and localized UI in English, Estonian,
+Latvian and Lithuanian. The full suite passed (147 passed, one optional PostgreSQL
+test skipped) on local Python 3.14.6; accountant UAT for real-world reminder copy
+and delivery remains pending.
