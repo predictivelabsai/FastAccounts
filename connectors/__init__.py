@@ -1,9 +1,6 @@
-"""External accounting, filing-agent, and bank connector contracts."""
+"""External accounting, filing-agent, bank, HR, and payroll connectors."""
 
 from .base import Connector, ConnectorResult
-from .stubs import connector_for
-
-__all__ = ["Connector", "ConnectorResult", "connector_for"]
 from .providers import (
     EMTAExportProvider,
     HMRCProvider,
@@ -13,8 +10,12 @@ from .providers import (
     QuickBooksProvider,
     XeroProvider,
 )
+from .registry import PROVIDERS, REGISTRY, connector_for, provider_metadata
+from .stubs import RoadmapStubConnector, StubConnector
 
 __all__ = [
-    "EMTAExportProvider", "HMRCProvider", "MeritProvider", "OpenBankingProvider",
-    "ProviderError", "QuickBooksProvider", "XeroProvider",
+    "Connector", "ConnectorResult", "EMTAExportProvider", "HMRCProvider",
+    "MeritProvider", "OpenBankingProvider", "PROVIDERS", "ProviderError",
+    "QuickBooksProvider", "REGISTRY", "RoadmapStubConnector", "StubConnector",
+    "XeroProvider", "connector_for", "provider_metadata",
 ]

@@ -22,6 +22,20 @@ def test_credential_encryption_and_redacted_connection(db, uk_org):
     assert "secret" not in raw
 
 
+def test_configure_validates_against_complete_registry(db, uk_org):
+    service = IntegrationService(db, CredentialVault(Fernet.generate_key().decode()))
+    connection = service.configure(
+        uk_org["id"], "personio", credentials={"placeholder": "secret"},
+        config={"direction": "import"}, actor="owner@example.test",
+    )
+    assert connection["provider"] == "personio"
+    assert connection["status"] == "Configured"
+    with pytest.raises(ValueError, match="Unknown integration provider"):
+        service.configure(
+            uk_org["id"], "fasthr", credentials={}, config={}, actor="owner@example.test",
+        )
+
+
 def test_mapping_sync_conflict_and_outbox_are_explicit(db, uk_org):
     service=IntegrationService(db,CredentialVault(Fernet.generate_key().decode()))
     mapping=service.map_record(uk_org["id"],provider="xero",object_type="invoice",local_id="l1",external_id="e1",ownership="fastaccounts",direction="export")

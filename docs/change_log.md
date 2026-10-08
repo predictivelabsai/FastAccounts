@@ -4,6 +4,19 @@ Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as
 delivered.
 
+## 2026-10-09 — Integration connection lifecycle
+
+- Added one connector registry covering all 26 public catalogue providers, with
+  ordered configure-dialog credential metadata and explicit adapter-readiness
+  labels. The 20 HR/payroll entries use no-network roadmap stubs until their
+  reviewed adapters are built.
+- Added owner/administrator APIs to list tenant-scoped connections, test
+  payload credentials without persisting them, record tested connection status
+  with an audit trail when a connection exists, and disconnect a provider.
+- Kept credential values and encrypted material out of every API response;
+  provider checks remain fake/stubbed in automated tests and make no live
+  network calls.
+
 ## 2026-10-09 — HR and payroll software catalogue
 
 - Added 20 global and Estonian HR/payroll providers to the public integration
