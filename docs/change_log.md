@@ -4,6 +4,36 @@ Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as
 delivered.
 
+## 2026-10-08 — Estonian accounting-bureau payroll demo
+
+- Added tenant-scoped employee and monthly payroll APIs, frozen calculations,
+  minimum-wage validation, conflict handling, and multi-page payslip PDFs.
+- Added payroll migration and EE expense/liability accounts for existing and
+  future books; approval posts one balanced batch atomically at month-end.
+- Extended the EE seed with six named synthetic employees, three approved
+  runs (July, August, September 2026), and an October draft. Reruns preserve
+  existing records and immutable posted snapshots.
+- Added payroll math, workflow, isolation, PDF, migration and seed tests.
+- Localized EE payslips with Unicode font embedding, employer registration,
+  TSD review/UAT wording and the following-month tax deadline; Docker installs
+  DejaVu and fontless environments use transliteration.
+- Enriched each fresh UK/EE book with five customers, five suppliers, 18 invoices,
+  eight bills and 28 bank transactions, including reconciled and pending matches.
+- Gated payroll requests and navigation to EE/EUR books, added a localized
+  scope notice and neutral KPI, and consolidated payroll error handling.
+- Added browser regression checks for both languages, non-EE/non-EUR books,
+  organisation switching and a single toast on payroll request failure.
+- Completed the demo locale pass: country-specific contact/bank names and
+  references, Demo Kasutaja test-login identity, Estonian payroll account names,
+  and translated unmatched-bank status in all Baltic workspace catalogues.
+  Verified seeded Estonian tax names through the API and browser; seed amounts,
+  dates, balances and tax mappings are unchanged. The full suite passed (78
+  passed, one optional PostgreSQL test skipped), including browser regressions,
+  on local Python 3.14; Python 3.12 was not installed for target-runtime verification.
+  Existing-database account names are not migrated; fresh books use the seed
+  constants. Backend validation errors and stored payroll memos can still be English.
+- Accounting-bureau payroll is in demo scope; production accountant UAT pending.
+
 ## 2026-08-10 — Engineering pilot 0.2 completed
 
 ### Added

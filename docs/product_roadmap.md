@@ -25,7 +25,8 @@ The daily loop is intentionally small:
 
 - inventory, warehouses, purchase orders, sales orders, manufacturing, or
   logistics;
-- payroll, HR, CRM, project management, or a generic workflow platform;
+- general HR/payroll operations beyond Estonian accounting-bureau client books,
+  CRM, project management, or a generic workflow platform;
 - tax or legal advice, automated audit opinions, or unreviewed AI postings;
 - full UK Corporation Tax/Companies House filing in the first release;
 - direct Estonian annual-report submission in the first release.
@@ -175,7 +176,7 @@ Initial scope:
 
 Later: direct e-MTA submission if a supported, contractually accessible channel
 is confirmed; annual-report taxonomy mapping/export; direct registry filing;
-fixed assets and payroll handoff to Merit Palk/FastHRM.
+fixed assets and broader HR/payroll handoff to Merit Palk/FastHRM.
 
 Sources: [Estonian VAT rates](https://www.emta.ee/en/business-client/taxes-and-payment/value-added-tax/vat-rates-and-supply-exempt-tax/supply-taxable-0-vat-rate-goods),
 [KMD instructions](https://www.emta.ee/sites/default/files/documents/2025-02/vorm_kmd_2025_eng.pdf),
@@ -427,3 +428,27 @@ approval/fraud-header validation, an e-MTA X-Road agreement, Merit/Xero/Intuit
 test-company credentials, and open-banking regulatory/commercial approval. The
 UI and documentation must continue to label those capabilities unavailable until
 their evidence is recorded.
+
+## 13. Accounting-bureau payroll demo (2026-10-08)
+
+Estonian client-book payroll is now demo scope: employee records, frozen monthly
+payslips, draft/approve/delete workflows, atomic balanced payroll posting, and
+localized Unicode multi-page PDF export with employer details and TSD review/UAT
+wording. Payroll requests and navigation are gated to EE/EUR books; other books
+show a neutral KPI and a localized scope notice. Six named synthetic employees,
+July–September 2026 approved runs and an October draft extend the EE demo only.
+Both fresh demo books contain five customers, five suppliers, 18 sales invoices,
+eight supplier bills and 28 bank transactions, with reconciled payments and
+pending document-number matches. Repeated seeding preserves posted records.
+The final demo locale pass is verified: country-specific contact/bank names and
+references, Demo Kasutaja test-login identity, Estonian payroll account names,
+Estonian tax descriptions rendered from the API, and Baltic unmatched-status
+translations. Seed amounts, dates, balances and tax mappings are unchanged.
+The full suite passed (78 passed, one optional PostgreSQL test skipped), including
+browser regressions, on local Python 3.14; Python 3.12 was not installed for
+target-runtime verification. Existing-database account names are not migrated; fresh
+books use the seed constants. Backend validation errors and stored payroll memos
+can still be English.
+Rules and corrected arithmetic fixtures are in
+[payroll rules](payroll_rules.md). Production accountant UAT remains pending;
+TSD filing, payment execution, leave, benefits, and general HR are not included.

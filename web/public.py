@@ -1,6 +1,7 @@
 """Public FastAccounts landing, sign-in, and integration catalogue pages."""
 from __future__ import annotations
 
+import json
 from urllib.parse import quote
 
 from fasthtml.common import *
@@ -15,7 +16,7 @@ TINT = "#ecfdf5"
 
 PUBLIC_CSS = """
 :root{--accent:#087f5b;--accent-dark:#066349;--tint:#ecfdf5;--ink:#10231d;--muted:#607069;--line:#dfe8e4;--soft:#f7faf8}
-*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:#fff;color:var(--ink);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:#fff;color:var(--ink);font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
 a{color:inherit}.nav{min-height:68px;max-width:1180px;margin:auto;padding:12px 24px;display:flex;align-items:center;justify-content:space-between;gap:24px;border-bottom:1px solid var(--line)}
 .brand{display:flex;align-items:center;gap:10px;text-decoration:none;font-weight:800}.mark{width:32px;height:32px;border-radius:10px;background:var(--accent);display:grid;place-items:center;color:white;font-size:17px}.brand em{color:var(--accent);font-style:normal}
 .nav-links,.nav-actions{display:flex;align-items:center;gap:18px}.nav-link{font-size:14px;text-decoration:none;color:var(--muted);font-weight:650}.nav-link:hover{color:var(--accent)}
@@ -31,6 +32,12 @@ a{color:inherit}.nav{min-height:68px;max-width:1180px;margin:auto;padding:12px 2
 .footer{max-width:1180px;margin:auto;padding:30px 24px 46px;border-top:1px solid var(--line);display:flex;justify-content:space-between;gap:20px;color:var(--muted);font-size:13px}.footer-links{display:flex;gap:16px;flex-wrap:wrap}.footer a{color:var(--accent);text-decoration:none}
 @media(max-width:820px){.feature-grid{grid-template-columns:1fr}.integration-grid{grid-template-columns:1fr}.nav-links{display:none}.hero{padding-top:72px}.footer{flex-direction:column}}
 @media(max-width:500px){.nav{padding-inline:16px}.button{padding:9px 13px}.brand span:last-child{font-size:15px}.integration{padding:19px}.integration-head{align-items:center}.integration-logo-wrap{min-width:110px}.integration-logo{max-width:110px}.ownership{grid-template-columns:1fr}.hero,.page-hero,.catalogue{padding-inline:18px}}
+"""
+PUBLIC_CSS += """
+body{font-size:14px}h1,h2,h3{letter-spacing:-.03em}a,button{touch-action:manipulation}:focus-visible{outline:3px solid #58b394;outline-offset:4px}::selection{background:#c8eada}.hero{padding-top:96px;padding-bottom:96px;max-width:1100px;text-align:left;margin:auto}.hero h1{font-size:clamp(40px,5.6vw,68px);max-width:16ch;line-height:1.06;margin:20px 0 26px}.hero .lede{margin-left:0;max-width:660px;font-size:18px;line-height:1.7}.hero-actions{justify-content:flex-start;margin-top:30px}.hero .kicker{display:none}.band{border-top:1px solid var(--line)}.feature strong{color:var(--accent);font-weight:650}.feature h2{font-size:25px;line-height:1.2}.bureau-section{max-width:1100px;margin:auto;padding:90px 28px;display:grid;grid-template-columns:1fr 1.25fr;gap:70px}.bureau-intro h2{font-size:38px;margin:0 0 20px}.bureau-intro p{font-size:16px;line-height:1.75;color:var(--muted);margin-bottom:28px}.bureau-benefits{display:grid;grid-template-columns:1fr 1fr;gap:28px 32px}.bureau-benefits article{border-top:2px solid #bddccc;padding-top:20px}.bureau-benefits h3{font-size:18px;margin:0 0 12px}.bureau-benefits p{font-size:14px;line-height:1.75;color:var(--muted);margin:0}.auth-card{border-radius:20px;box-shadow:0 16px 60px #10231d0c}.button{border-radius:7px}.nav-links{gap:20px}#pricing .feature-grid{gap:24px}#pricing .feature-card{background:white;border:1px solid var(--line);padding:28px;border-radius:14px}#pricing .section-heading{max-width:680px}.footer{font-size:12px}.integration{border-radius:14px}
+@media(max-width:900px){.nav-links{gap:12px}.nav-link{font-size:12px}.bureau-section{gap:32px}.hero{padding-top:64px;padding-bottom:64px}}
+@media(max-width:650px){.bureau-section{grid-template-columns:1fr;padding:56px 22px}.bureau-intro h2{font-size:32px}.bureau-benefits{gap:24px}.hero h1{font-size:42px}.hero .lede{font-size:16px}#pricing .feature-grid{grid-template-columns:1fr!important}.hero-actions{flex-wrap:wrap}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
 """
 
 
@@ -75,6 +82,7 @@ def _nav(lang: str, current: str):
         Div(
             A(T("nav.pricing"), href="/#pricing", cls="nav-link"),
             A(T("nav.why"), href="/#why", cls="nav-link"),
+            A(T("bureau.title"), href="/#bureaus", cls="nav-link"),
             A(T("nav.integrations"), href="/integrations", cls="nav-link"),
             A(T("nav.roadmap"), href="https://github.com/predictivelabsai/FastAccounts", cls="nav-link"),
             cls="nav-links",
@@ -189,7 +197,7 @@ def landing_page(lang: str = i18n.DEFAULT_LANG):
             H1(T("landing.headline")),
             P(T("landing.lede"), cls="lede"),
             Div(
-                A(T("landing.explore_integrations"), href="/integrations", cls="button primary"),
+                A(T("bureau.cta"), href="/login", cls="button primary"),
                 A(T("landing.view_source"), href="https://github.com/predictivelabsai/FastAccounts", cls="button"),
                 cls="hero-actions",
             ),
@@ -204,6 +212,11 @@ def landing_page(lang: str = i18n.DEFAULT_LANG):
             ),
             id="why",
             cls="band",
+        ),
+        Section(
+            Div(H2(T("bureau.title")), P(T("bureau.body")), A(T("bureau.cta"), href="/login", cls="button primary"), cls="bureau-intro"),
+            Div(*[Article(H3(T(f"bureau.{key}_title")), P(T(f"bureau.{key}_body"))) for key in ("clients", "payroll", "matches", "tax")], cls="bureau-benefits"),
+            id="bureaus", cls="bureau-section",
         ),
         _pricing_section(lang),
         title=T("landing.title"),
@@ -281,45 +294,58 @@ def login_page(error: str = "", lang: str = i18n.DEFAULT_LANG):
     )
 
 
-def workspace_page(user: dict):
-    display_name = user.get("name") or user.get("email")
+def workspace_page(user: dict, lang: str = "en"):
+    T = lambda key: i18n.t(key, lang)
+    display_name = user.get("name") or user.get("email") or ""
+    groups = [
+        ("bureau", [("overview", "overview")]),
+        ("documents", [("invoices", "invoices"), ("bills", "bills"), ("contacts", "contacts")]),
+        ("money", [("banking", "banking")]),
+        ("accounting", [("accounting", "accounting"), ("tax", "tax")]),
+        ("payroll", [("payroll", "payroll")]),
+        ("settings", [("integrations", "integrations")]),
+    ]
+    # Escape script delimiters even when catalogue copy contains HTML punctuation.
+    dictionary = {**i18n.catalog("en"), **i18n.catalog(lang)}
+    dictionary["workspace"] = {**i18n.catalog("en").get("workspace", {}), **i18n.catalog(lang).get("workspace", {})}
+    payload = json.dumps(dictionary, ensure_ascii=True).replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
     return (
-        Title("Workspace · FastAccounts"),
+        Title(f"{T('nav.workspace')} · FastAccounts"),
         Meta(name="viewport", content="width=device-width, initial-scale=1"),
         Link(rel="icon", type="image/svg+xml", href="/static/favicon.svg"),
         Link(rel="stylesheet", href="/static/app.css"),
         Div(
             Aside(
                 A(Span("F", cls="app-mark"), Span("FastAccounts"), href="/app", cls="app-brand"),
-                Nav(
-                    A("Overview", href="#overview", data_view="overview", cls="app-nav active"),
-                    A("Invoices", href="#invoices", data_view="invoices", cls="app-nav"),
-                    A("Bills", href="#bills", data_view="bills", cls="app-nav"),
-                    A("Banking", href="#banking", data_view="banking", cls="app-nav"),
-                    A("Accounting", href="#accounting", data_view="accounting", cls="app-nav"),
-                    A("Tax", href="#tax", data_view="tax", cls="app-nav"),
-                    A("Integrations", href="#integrations", data_view="integrations", cls="app-nav"),
-                    cls="app-nav-list",
+                Div(
+                    Button(T("actions.create_organisation"), id="org-trigger", cls="org-trigger", type="button", aria_haspopup="menu", aria_expanded="false", aria_controls="org-menu"),
+                    Div(id="org-menu", cls="org-menu", role="menu", hidden=True),
+                    cls="org-switcher",
                 ),
-                Div(A("Public site", href="/"), A("Sign out", href="/logout"), cls="app-side-links"),
-                cls="app-sidebar",
+                Nav(*[
+                    Div(Span(T(f"nav.{group}"), cls="nav-group"), *[
+                        A(T(f"nav.{label}"), href=f"#{view}", data_view=view, cls="app-nav")
+                        for view, label in items
+                    ]) for group, items in groups
+                ], cls="app-nav-list", aria_label=T("nav.workspace")),
+                Div(
+                    A(T("nav.public_site"), href="/"),
+                    Div(Span(display_name[:1].upper(), cls="user-avatar"), Div(Strong(display_name), A(T("nav.sign_out"), href="/logout")), cls="user-card"),
+                    cls="app-side-links",
+                ), cls="app-sidebar",
             ),
             Div(
                 Header(
-                    Div(Button("☰", id="menu-toggle", aria_label="Open navigation", cls="menu-toggle"),
-                        Div(Span("Workspace", cls="eyebrow"), Strong(display_name))),
-                    Select(Option("Loading organisations…", value=""), id="organisation-select", aria_label="Organisation"),
+                    Div(Button("☰", id="menu-toggle", aria_label=T("nav.open_navigation"), cls="menu-toggle"), Span(T("nav.workspace"), cls="workspace-label"), Strong(id="current-org")),
+                    Div(*[A(info["native"], href=f"/set-lang/{code}?next=/app", lang=code, aria_current="true" if code == lang else "false") for code, info in i18n.LANGUAGES.items() if code in ("en", "et")], cls="workspace-languages", aria_label=T("language.choose")),
                     cls="app-topbar",
                 ),
-                Main(
-                    Div(Span("Loading your books…", cls="loading"), id="app-content"),
-                    cls="app-main",
-                ),
+                Main(Div(Div(cls="skeleton rows-skeleton"), id="app-content", aria_live="polite"), cls="app-main"),
                 cls="app-body",
             ),
-            id="workspace-app",
-            data_user_email=user.get("email", ""),
-            cls="app-shell",
+            id="workspace-app", data_user_email=user.get("email", ""), data_lang=lang, lang=lang, cls="app-shell",
         ),
+        Div(id="toasts", cls="toasts", aria_live="polite"),
+        Script(NotStr(f"window.FASTACCOUNTS_I18N = {payload};")),
         Script(src="/static/app.js"),
     )

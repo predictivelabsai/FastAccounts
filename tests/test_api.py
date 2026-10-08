@@ -40,3 +40,27 @@ def test_api_cross_tenant_access_is_forbidden(tmp_path,monkeypatch):
     owner={"X-Test-User":"owner@test.invalid"};other={"X-Test-User":"other@test.invalid"}
     org=client.post("/organisations",headers=owner,json={"name":"Private","country_code":"EE","entity_type":"EE_OU"}).json()
     assert client.get(f"/organisations/{org['id']}/accounts",headers=other).status_code==403
+
+
+def test_tax_code_descriptions_follow_organisation_country(db, uk_org, ee_org, monkeypatch):
+    monkeypatch.setenv("FASTACCOUNTS_DB", db.path)
+    monkeypatch.setenv("DB_URL", "")
+    client = TestClient(api)
+    headers = {"X-Test-User": "owner@example.test"}
+    expected = {
+        uk_org["id"]: {
+            "UK20": "Standard rate 20%", "UK5": "Reduced rate 5%",
+            "UK0": "Zero rated", "UKEX": "Exempt",
+            "UKOS": "Outside scope", "UKRC": "Reverse charge",
+        },
+        ee_org["id"]: {
+            "EE24": "Standardmäär 24%", "EE13": "Vähendatud määr 13%",
+            "EE9": "Vähendatud määr 9%", "EE0": "Nullmääraga käive",
+            "EEEX": "Maksuvaba käive", "EEOS": "Käibemaksu kohaldamisalast väljas",
+            "EERC": "Pöördmaksustamine", "EEICS": "Ühendusesisene käive",
+        },
+    }
+    for oid, descriptions in expected.items():
+        response = client.get(f"/organisations/{oid}/tax-codes", headers=headers)
+        assert response.status_code == 200
+        assert {row["code"]: row["name"] for row in response.json()} == descriptions

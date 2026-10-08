@@ -571,3 +571,102 @@ class DocumentService:
         if status == "Failed":
             raise RuntimeError(f"Invoice delivery failed: {error}")
         return delivery
+
+
+def locate_pdf_font(bold: bool = False) -> Path | None:
+    """Prefer installed Unicode fonts; no proprietary font files are bundled."""
+    names = (
+        ("C:/Windows/Fonts/arialbd.ttf", "C:/Windows/Fonts/DejaVuSans-Bold.ttf",
+         "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+         "/usr/share/fonts/dejavu-sans-fonts/DejaVuSans-Bold.ttf",
+         "/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf")
+        if bold else
+        ("C:/Windows/Fonts/arial.ttf", "C:/Windows/Fonts/DejaVuSans.ttf",
+         "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+         "/usr/share/fonts/dejavu-sans-fonts/DejaVuSans.ttf",
+         "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf")
+    )
+    return next((Path(name) for name in names if Path(name).is_file()), None)
+
+
+def payroll_pdf(organisation: dict, run: dict) -> bytes:
+    """Render localized payslips with embedded Unicode fonts when available."""
+    import unicodedata
+    from reportlab.lib.pagesizes import A4
+    from reportlab.pdfgen.canvas import Canvas
+    from reportlab.lib.utils import simpleSplit
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+
+    regular_path = locate_pdf_font()
+    regular, bold = 'Helvetica', 'Helvetica-Bold'
+    if regular_path:
+        regular, bold = 'PayrollUnicode', 'PayrollUnicodeBold'
+        pdfmetrics.registerFont(TTFont(regular, str(regular_path)))
+        pdfmetrics.registerFont(TTFont(bold, str(locate_pdf_font(True) or regular_path)))
+
+    def text(value):
+        value = str(value)
+        if regular_path:
+            return value
+        return unicodedata.normalize('NFKD', value).encode('ascii', 'ignore').decode('ascii')
+
+    ee = organisation.get('country_code') == 'EE'
+    def label(et, en):
+        return text(et if ee else en)
+
+    output = BytesIO()
+    canvas = Canvas(output, pagesize=A4)
+    width, height = A4
+    title = label('PALGALEHT', 'PAYSLIP') + ' ' + run['period']
+    canvas.setTitle(title)
+    rows = [
+        ('Brutopalk', 'Gross salary', 'gross'),
+        ('Kogumispension (II sammas)', 'Funded pension (II pillar)', 'funded_pension'),
+        ('Töötuskindlustusmakse (töötaja)', 'Employee unemployment insurance', 'ui_employee'),
+        ('Maksuvaba tulu', 'Tax-free minimum applied', 'tax_free_minimum'),
+        ('Tulumaks', 'Income tax', 'income_tax'),
+        ('Kinnipeetud summad kokku', 'Total employee withholdings', 'withholding_total'),
+        ('Netopalk', 'Net payable', 'net'),
+        ('Sotsiaalmaks (tööandja)', 'Employer social tax', 'social_tax'),
+        ('Töötuskindlustusmakse (tööandja)', 'Employer unemployment insurance', 'ui_employer'),
+        ('Tööandja kulu kokku', 'Total employer cost', 'employer_cost'),
+    ]
+    status = {'Approved': 'Kinnitatud', 'Draft': 'Kavand'}.get(run['status'], run['status']) if ee else run['status']
+    for index, item in enumerate(run['items'], 1):
+        canvas.setFont(bold, 20)
+        canvas.drawString(42, height-55, title)
+        canvas.setFont(regular, 11)
+        y = height-85
+        details = [organisation['name'],
+                   label('Registrikood', 'Registration number') + ': ' + str(organisation.get('registration_no') or '-'),
+                   label('Töötaja', 'Employee') + ': ' + item['employee_name'],
+                   label('Valitud periood', 'Selected period') + ': ' + run['period'],
+                   label('Kuupäev', 'Date') + ': ' + str(run.get('approved_at') or run.get('created_at') or '-')[:10],
+                   label('Olek', 'Status') + ': ' + status + ' | EUR',
+                   label('Juhatuse liige', 'Board member') if item['board_member'] else label('Töötaja', 'Employee')]
+        for detail in details:
+            for line in simpleSplit(text(detail), regular, 11, width-84):
+                canvas.drawString(42, y, line)
+                y -= 16
+        y -= 24
+        for et, en, key in rows:
+            canvas.setFont(bold if key in ('net', 'employer_cost', 'withholding_total') else regular, 11)
+            canvas.drawString(42, y, label(et, en))
+            canvas.drawRightString(width-42, y, f"{money(item[key]):.2f}")
+            y -= 28
+        canvas.setFont(regular, 9)
+        notes = ([
+            'TSD deklaratsioon koostatakse raamatupidajale ülevaatamiseks; otse EMTA-le esitamine ootab kasutajapoolset vastuvõtutestimist (UAT).',
+            'Maksmise tähtaeg: 10. kuupäev (väljamakse tegemise kuule järgneval kuul).',
+        ] if ee else ['2026 accounting-bureau payroll demo - production UAT pending'])
+        y -= 18
+        for note in notes:
+            for line in simpleSplit(text(note), regular, 9, width-84):
+                canvas.drawString(42, y, line)
+                y -= 14
+            y -= 8
+        canvas.drawRightString(width-42, 32, f"{index} / {len(run['items'])}")
+        canvas.showPage()
+    canvas.save()
+    return output.getvalue()

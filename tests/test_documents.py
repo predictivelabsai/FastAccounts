@@ -9,7 +9,7 @@ from documents import DocumentService
 
 def _setup(db, org, contact_type="both"):
     service = DocumentService(db)
-    contact = service.create_contact(org["id"], name="Synthetic Contact", country_code="GB" if org["country_code"] == "UK" else "EE", contact_type=contact_type)
+    contact = service.create_contact(org["id"], name="Willow Design Ltd" if org["country_code"] == "UK" else "Niidu Uuringud OÜ", country_code="GB" if org["country_code"] == "UK" else "EE", contact_type=contact_type)
     accounts = {r["system_role"]: r for r in db.rows("SELECT * FROM accounts WHERE organisation_id=?", (org["id"],))}
     taxes = {r["code"]: r for r in db.rows("SELECT * FROM tax_codes WHERE organisation_id=?", (org["id"],))}
     return service, contact, accounts, taxes

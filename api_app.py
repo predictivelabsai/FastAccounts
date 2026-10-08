@@ -21,6 +21,7 @@ from ledger import LedgerService, PostingLine
 from organisations import APPROVE_ROLES, WRITE_ROLES, AccessDenied, OrganisationService
 from governance import GovernanceService
 from tax import TaxService
+from payroll import PayrollConflict, PayrollService
 
 
 class User(BaseModel):
@@ -482,3 +483,86 @@ def configure_integration(organisation_id: str, provider: str, payload: Integrat
                           user: User = Depends(require_csrf)):
     _require(organisation_id, user, {"owner", "administrator"})
     return IntegrationService().configure(organisation_id, provider, actor=user.email, **payload.model_dump())
+
+# Accounting-bureau payroll API. Monetary values are returned as decimal strings.
+
+
+class EmployeeIn(BaseModel):
+    name: str = Field(min_length=1, max_length=180)
+    email: str | None = None
+    personal_id: str | None = None
+    gross_salary: Decimal = Field(gt=0, max_digits=12, decimal_places=2)
+    funded_pension_percent: Decimal = Decimal('2')
+    apply_tax_free_minimum: bool = False
+    board_member: bool = False
+    active: bool = True
+
+
+class EmployeePatch(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=180)
+    email: str | None = None
+    personal_id: str | None = None
+    gross_salary: Decimal | None = Field(default=None, gt=0, max_digits=12, decimal_places=2)
+    funded_pension_percent: Decimal | None = None
+    apply_tax_free_minimum: bool | None = None
+    board_member: bool | None = None
+    active: bool | None = None
+
+
+class PayRunIn(BaseModel):
+    period: str = Field(pattern=r'^\d{4}-(0[1-9]|1[0-2])$')
+
+
+@api.exception_handler(PayrollConflict)
+async def payroll_conflict(_request: Request, error: PayrollConflict):
+    return JSONResponse({'detail': str(error)}, status_code=409)
+
+
+@api.get('/organisations/{organisation_id}/employees')
+def payroll_employees(organisation_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    return PayrollService().employees(organisation_id)
+
+
+@api.post('/organisations/{organisation_id}/employees', status_code=201)
+def payroll_create_employee(organisation_id: str, payload: EmployeeIn, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return PayrollService().save_employee(organisation_id, actor=user.email, **payload.model_dump(exclude_unset=True))
+
+
+@api.patch('/organisations/{organisation_id}/employees/{employee_id}')
+def payroll_update_employee(organisation_id: str, employee_id: str, payload: EmployeePatch, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return PayrollService().save_employee(organisation_id, employee_id=employee_id, actor=user.email, **payload.model_dump(exclude_unset=True))
+
+
+@api.get('/organisations/{organisation_id}/pay-runs')
+def payroll_runs(organisation_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    return PayrollService().runs(organisation_id)
+
+
+@api.post('/organisations/{organisation_id}/pay-runs', status_code=201)
+def payroll_create_run(organisation_id: str, payload: PayRunIn, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return PayrollService().create_run(organisation_id, period=payload.period, actor=user.email)
+
+
+@api.post('/organisations/{organisation_id}/pay-runs/{run_id}/approve')
+def payroll_approve(organisation_id: str, run_id: str, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, APPROVE_ROLES)
+    return PayrollService().approve(organisation_id, run_id, actor=user.email)
+
+
+@api.delete('/organisations/{organisation_id}/pay-runs/{run_id}', status_code=204)
+def payroll_delete(organisation_id: str, run_id: str, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    PayrollService().delete_run(organisation_id, run_id, actor=user.email)
+    return Response(status_code=204)
+
+
+@api.get('/organisations/{organisation_id}/pay-runs/{run_id}/payslips.pdf')
+def payroll_payslips(organisation_id: str, run_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    return Response(PayrollService().payslips_pdf(organisation_id, run_id), media_type='application/pdf',
+                    headers={'Content-Disposition': 'attachment; filename="payslips.pdf"'})

@@ -49,6 +49,14 @@ def test_browser_language_detection_honours_quality_region_and_fallback():
     assert i18n.detect_language(_request("lt-LT;q=0,et-EE;q=0.6")) == "et"
 
 
+def test_workspace_unmatched_status_translations():
+    for lang, expected in {
+        "en": "Unmatched", "et": "Vastendamata",
+        "lv": "Nesalīdzināts", "lt": "Nesulygintas",
+    }.items():
+        assert i18n.catalog(lang)["workspace"]["Unmatched"] == expected
+
+
 def test_language_dropdown_lists_four_locales_and_preserves_current_route():
     rendered = str(integrations_page("lv"))
     assert '<html lang="lv">' in rendered

@@ -79,6 +79,14 @@ def test_workspace_requires_authentication():
     assert response.headers["location"].startswith("/login?next=")
 
 
+def test_demo_login_displays_demo_user_in_workspace_sidebar(monkeypatch):
+    monkeypatch.setenv("FASTACCOUNTS_ALLOW_TEST_AUTH", "true")
+    with TestClient(app) as demo_client:
+        response = demo_client.get("/auth/test")
+    assert response.status_code == 200
+    assert '<strong>Demo Kasutaja</strong>' in response.text
+
+
 def test_health_reports_every_connector_as_non_live():
     with TestClient(app) as live_client:
         response = live_client.get("/healthz")
@@ -89,4 +97,4 @@ def test_health_reports_every_connector_as_non_live():
     assert payload["integrations"] == len(integrations.CATALOGUE)
     assert payload["live_integrations"] == 0
     assert payload["database"]["status"] == "ok"
-    assert payload["database"]["migrations"] == 4
+    assert payload["database"]["migrations"] == 5
