@@ -4,6 +4,20 @@ Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as
 delivered.
 
+## 2026-10-09 — FastHR employee connector
+
+- Added the first live HR adapter: a pull-only FastHR employee-master import for
+  accounting-bureau payroll, with bearer authentication, connection checks and
+  complete offset pagination over the FastHR employee API.
+- Normalized names, active status and exact two-decimal base salary values for
+  the reviewed employee-import pipeline, while preserving selected FastHR source
+  fields in staged payloads. FastHR does not supply isikukood, funded-pension or
+  board-member settings, so the adapter does not invent them.
+- Registered tenant-configurable base URL and encrypted token credentials, added
+  localized catalogue copy and a neutral placeholder mark, and verified mocked
+  success, authentication, connection, pagination, staging and idempotent apply
+  paths without live provider calls.
+
 ## 2026-10-09 — Reviewed employee-import pipeline
 
 - Added a tenant-scoped staging area for connector employee records. Pulls use

@@ -236,6 +236,15 @@
         "direction": "Read-only first",
       "ownership": "Bank remains source"
     },
+    "fasthr": {
+      "name": "FastHR",
+      "logo_alt": "FastHR placeholder mark",
+      "category": "HR software",
+      "description": "Import FastHR employee master records for reviewed bureau payroll. FastHR does not contain an Estonian personal identification code.",
+      "capabilities": ["Employee master records", "Employment status", "Base salary", "Organisation details"],
+      "direction": "Import · employee master data",
+      "ownership": "FastHR remains source"
+    },
     "bamboohr": {
       "name": "BambooHR",
       "logo_alt": "BambooHR placeholder mark",
