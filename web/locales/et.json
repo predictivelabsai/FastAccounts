@@ -565,6 +565,7 @@
     "Run now": "Koosta arve kohe",
     "History": "Ajalugu",
     "Invoices created: {count}": "Koostatud arveid: {count}",
+    "Not due yet — next run {date}": "Tähtaeg pole veel käes — järgmine arve {date}",
     "Reminders due": "Saatmist ootavad meeldetuletused",
     "Stage": "Etapp",
     "3 days before due": "3 päeva enne maksetähtaega",

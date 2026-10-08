@@ -651,7 +651,7 @@
             td(x.auto_email ? `<span aria-label="${tr("Auto-email")}">✓</span>` : "—"),
             td(pill(x.active ? "Active" : "Paused")),
             td(button(x.active ? "Pause" : "Resume", "toggleSchedule", false, `data-id="${esc(x.id)}"`) +
-              button("Run now", "runSchedule", false, `data-id="${esc(x.id)}" ${x.active ? "" : "disabled"}`) +
+              button("Run now", "runSchedule", false, `data-id="${esc(x.id)}" ${!x.active || x.next_run_date > today() ? "disabled" : ""}`) +
               button("History", "scheduleHistory", false, `data-id="${esc(x.id)}"`)),
           ]))
         )}</section><section class="section"><div class="section-head"><h2>${tr("Reminders due")}</h2></div>
@@ -699,7 +699,10 @@
           b.disabled = true;
           try {
             const result = await post(c.url(`/invoice-schedules/${b.dataset.id}/run-now`));
-            toast(t("Invoices created: {count}").replace("{count}", num(result.runs.filter((x) => x.status === "Issued").length)));
+            const count = result.runs.filter((x) => x.status === "Issued").length;
+            const schedule = schedules.find((x) => String(x.id) === b.dataset.id);
+            toast(count > 0 ? t("Invoices created: {count}").replace("{count}", num(count)) :
+              t("Not due yet — next run {date}").replace("{date}", date(schedule.next_run_date)));
             result.runs.filter((x) => x.status === "Failed").forEach((x) => toast(t(x.error_message || "Failed"), "error"));
             await render();
           } finally { b.disabled = false; }

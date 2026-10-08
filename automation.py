@@ -237,6 +237,8 @@ class AutomationService:
         schedule = self.schedule(schedule_id, organisation_id)
         if not schedule["active"] or (schedule["end_date"] and (_date(schedule["next_run_date"]) > _date(schedule["end_date"]) or _date(today) > _date(schedule["end_date"]))):
             return {"schedule_id": schedule_id, "status": "Skipped"}
+        if _date(schedule["next_run_date"]) > _date(today):
+            return {"schedule_id": schedule_id, "status": "Skipped"}
         return self._run_period(schedule, actor, _date(today))
 
     def _organisations(self, organisation_ids):

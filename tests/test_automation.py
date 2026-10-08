@@ -324,13 +324,28 @@ def test_run_now_advances_one_period_and_is_tenant_scoped(db, uk_org, ee_org):
     service = AutomationService(db)
     s = schedule(db, uk_org)
     day = date.fromisoformat(s["next_run_date"])
-    service.update_schedule(s["id"], uk_org["id"], actor="test", next_run_date=day + timedelta(days=7))
     with pytest.raises(KeyError):
         service.run_now(s["id"], ee_org["id"], actor="test", today=day)
     result = service.run_now(s["id"], uk_org["id"], actor="test", today=day)
     assert result["invoice"]["issue_date"] == day.isoformat()
-    assert result["period_start"] == (day + timedelta(days=7)).isoformat()
+    assert result["period_start"] == day.isoformat()
+    assert service.schedule(s["id"], uk_org["id"])["next_run_date"] == add_interval(day, s).isoformat()
     assert service.run_due(today=day) == []
+
+
+def test_run_now_future_period_skipped_without_writes(db, uk_org):
+    service = AutomationService(db)
+    s = schedule(db, uk_org)
+    day = date.fromisoformat(s["next_run_date"]) - timedelta(days=1)
+    before = db.scalar("SELECT COUNT(*) FROM audit_events")
+    assert s["active"]
+    assert service.run_now(s["id"], uk_org["id"], actor="test", today=day) == {"schedule_id": s["id"], "status": "Skipped"}
+    assert db.scalar("SELECT COUNT(*) FROM invoices") == 1
+    assert DocumentService(db).invoice(s["template_invoice_id"])["status"] == "Draft"
+    assert db.scalar("SELECT COUNT(*) FROM schedule_runs") == 0
+    assert db.scalar("SELECT COUNT(*) FROM posting_batches") == 0
+    assert db.scalar("SELECT COUNT(*) FROM audit_events") == before
+    assert service.schedule(s["id"], uk_org["id"]) == s
 
 
 def test_reminder_failure_does_not_block_next_invoice(db, uk_org, monkeypatch):

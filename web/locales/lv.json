@@ -565,6 +565,7 @@
     "Run now": "Izveidot tagad",
     "History": "Vēsture",
     "Invoices created: {count}": "Izveidotie rēķini: {count}",
+    "Not due yet — next run {date}": "Termiņš vēl nav iestājies — nākamais rēķins {date}",
     "Reminders due": "Nosūtāmie atgādinājumi",
     "Stage": "Posms",
     "3 days before due": "3 dienas pirms apmaksas termiņa",

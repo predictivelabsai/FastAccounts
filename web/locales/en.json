@@ -565,6 +565,7 @@
     "Run now": "Run now",
     "History": "History",
     "Invoices created: {count}": "Invoices created: {count}",
+    "Not due yet — next run {date}": "Not due yet — next run {date}",
     "Reminders due": "Reminders due",
     "Stage": "Stage",
     "3 days before due": "3 days before due",

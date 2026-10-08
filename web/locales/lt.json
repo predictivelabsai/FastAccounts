@@ -565,6 +565,7 @@
     "Run now": "Vykdyti dabar",
     "History": "Istorija",
     "Invoices created: {count}": "Sukurta sąskaitų: {count}",
+    "Not due yet — next run {date}": "Terminas dar neatėjo — kita sąskaita {date}",
     "Reminders due": "Siųstini priminimai",
     "Stage": "Etapas",
     "3 days before due": "3 dienos iki mokėjimo termino",

@@ -1,5 +1,6 @@
 """Browser regressions for recurring invoices and reminder delivery."""
 import json
+from datetime import date, timedelta
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -19,7 +20,8 @@ def test_workspace_automation(monkeypatch, language):
     words = i18n.catalog(language)['workspace']
     notice = 'Email delivery is not connected. Set POSTMARK_API_TOKEN and FROM_EMAIL to send reminders.'
     schedule = dict(id='schedule', contact_name='Willow Design', name='Retainer', interval_kind='monthly',
-                    next_run_date='2026-10-15', end_date=None, auto_email=False, active=True)
+                    next_run_date=(date.today() - timedelta(days=1)).isoformat(),
+                    end_date=None, auto_email=False, active=True)
     invoice = dict(id='invoice', number='INV-001', contact_name='Willow Design', status='Issued',
                    due_date='2026-10-10', reminders_disabled=False, document_type='invoice')
     calls = []
@@ -73,7 +75,7 @@ def test_workspace_automation(monkeypatch, language):
         page.goto('http://workspace.test/app#recurring')
         playwright.expect(page.locator('.app-nav[data-view="recurring"]')).to_be_visible()
         playwright.expect(page.locator('#app-content tbody tr').first).to_contain_text('Retainer')
-        expected_date = page.evaluate("new Intl.DateTimeFormat(document.querySelector('#workspace-app').dataset.lang === 'et' ? 'et-EE' : 'en-GB').format(new Date('2026-10-15T12:00:00'))")
+        expected_date = page.evaluate("value => new Intl.DateTimeFormat(document.querySelector('#workspace-app').dataset.lang === 'et' ? 'et-EE' : 'en-GB').format(new Date(value + 'T12:00:00'))", schedule['next_run_date'])
         playwright.expect(page.locator('#app-content tbody tr').first).to_contain_text(expected_date)
         playwright.expect(page.locator('#app-content .notice')).to_have_text(words[notice])
         assert not any(path.endswith('/send') for path, _, _ in calls)

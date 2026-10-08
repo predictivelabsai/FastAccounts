@@ -102,9 +102,10 @@ def test_api_schedule_run_now_sequence_and_duplicate_period(automation_api, db):
 
 def test_api_schedule_history_order(automation_api, monkeypatch):
     client, base, invoice = automation_api
-    schedule = create_api_schedule(client, base, invoice)
-    url = base + "/invoice-schedules/" + schedule["id"]
     today = date.today()
+    schedule = create_api_schedule(client, base, invoice, interval_kind="custom_days", interval_days=1,
+                                   next_run_date=(today - timedelta(days=1)).isoformat())
+    url = base + "/invoice-schedules/" + schedule["id"]
     original_date = automation._date
     monkeypatch.setattr(automation, "_date", lambda value=None: original_date(
         value if value is not None else (today - timedelta(days=1)).isoformat()))
