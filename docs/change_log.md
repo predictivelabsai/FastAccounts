@@ -25,6 +25,52 @@ delivered.
   The repository virtual environment uses Python 3.14.6; Python 3.12 runtime
   verification was not performed. Preview servers were stopped after checks.
 
+## 2026-10-08 — Payroll 0.2.1: part-time, hourly pay and social tax minimum
+
+- Migration `0006_payroll_part_time_hourly` (SQLite rebuilds `employees` to
+  relax the pension CHECK; PostgreSQL uses an ALTER-based equivalent in
+  `database.py`). Employees gain `pay_basis` (monthly | hourly | board_fee), `fte`,
+  `hourly_rate`, `social_tax_minimum_exemption` and employment start/end dates;
+  pay-run items freeze pay basis, FTE, rate, hours, the applied minimum wage,
+  social tax base, minimum top-up and exemption reason. Existing items are
+  backfilled with `social_tax_base = gross`; posted ledger lines are untouched.
+- Part-time: the minimum wage is pro-rated by FTE (EUR 946 × FTE from
+  01.04.2026, EUR 886 × FTE before; Vabariigi Valitsuse määrus nr 36), which
+  stops part-time staff being rejected wrongly.
+- Hourly pay: gross = hourly rate × hours entered in the "Run payroll" wizard
+  or API `hours`; minimum hourly rate EUR 5.67 from 01.04.2026 (EUR 5.31 before).
+- II pillar 0% is allowed for anyone who has not joined it, not only board members.
+- Social tax minimum obligation: social tax is charged on at least EUR 886/month
+  (EUR 292.38) in 2026, with the shortfall posted as a separate employer-cost line
+  on 6120/2240 ("Sotsiaalmaksu miinimumkohustuse lisamakse"). Pro-rated by
+  calendar days when employment starts or ends mid-month; never applied to board
+  fees; per-employee exemption reasons cover the EMTA list (state pension, partial or
+  no work ability, child care, student, previously unemployed, shortened working
+  time, council member, ship crew, foreign-service spouse, working on long-term sick
+  leave, absent the whole month, multiple employers). Sources: EMTA "Sotsiaalmaks"
+  (updated 20.07.2026) and "Maksumäärad", SMS § 2 lg 2–4, määrus nr 17. Details
+  and the items still out of scope are in `docs/payroll_rules.md`.
+- The basic exemption shown on items and payslips is now the amount actually used,
+  capped at the taxable pay (income tax is unchanged).
+- Employee form, payroll wizard (hours per hourly employee), run breakdown (social
+  tax with top-up, hours, part-time) and payslips (rate × hours, FTE, social tax
+  base, top-up, exemption) updated. All new labels, errors and the top-up memo are
+  in the en/et catalogues (lv/lt carry English fallbacks); named server errors are
+  translated in the browser.
+- Demo seed adds a "Demo OÜ (sample payroll)" organisation with the seven sample
+  employees (full-time, part-time 0.5 FTE, hourly, II pillar 0/2/4/6%, board fee),
+  an approved September 2026 run and an October 2026 draft (gross 16,254.00, net
+  12,480.00, employer cost 21,797.23). Existing demo books are unchanged.
+- Tests: the seven sample employees match the earlier October 2026 calculations to
+  the cent. Added coverage for pro-rated and hourly minimum wages, hours validation,
+  exemptions, partial months, ledger posting of the top-up, API, the SQLite and
+  PostgreSQL 0006 upgrades, translations and seed repeatability. 110 passed on
+  Python 3.13 with PostgreSQL 17 and Playwright enabled; on Python 3.12 (the Docker
+  runtime) 107 passed, with the 3 browser tests skipped because Playwright was not installed.
+- Version 0.2.1; the `VERSION` file now has the release date on line 2, and the
+  workspace sidebar shows the `v0.2.1 · 2026-10-08` chip (`data-testid=app-version`).
+- Added `docs/payroll-plan.md` (bureau payroll discovery and plan).
+
 ## 2026-10-08 — Estonian accounting-bureau payroll demo
 
 - Added tenant-scoped employee and monthly payroll APIs, frozen calculations,
@@ -260,6 +306,8 @@ delivered.
   Estonian copy checked with Estonian spelling/morphology tooling. The demo UK book
   gains an idempotent "Retainer – Willow Design" monthly schedule whose next run is
   7 days out; reminder stages are exercised by the existing overdue demo invoices.
+- Renumbered the automation migration from `0006` to `0007` because payroll's
+  `0006` shipped first in v0.2.1.
 - Verified the full pytest suite: 147 passed, one optional PostgreSQL test skipped,
   on local Python 3.14.6, including service tests for issue/restart idempotency,
   catch-up, ladder boundaries, opt-out and unconnected-email failure (MockTransport;

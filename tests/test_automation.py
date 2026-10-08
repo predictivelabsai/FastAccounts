@@ -257,17 +257,17 @@ def test_populated_upgrade_preserves_posted_data(tmp_path, monkeypatch):
     previous = tmp_path / "previous" / "sqlite"
     previous.mkdir(parents=True)
     for path in (original / "sqlite").glob("*.sql"):
-        if path.stem < "0006":
+        if path.stem < "0007":
             shutil.copyfile(path, previous / path.name)
     monkeypatch.setattr(database, "MIGRATIONS", previous.parent)
     db = Database(path=str(tmp_path / "upgrade.sqlite"))
-    assert len(db.migrate()) == 5
+    assert len(db.migrate()) == 6
     org = OrganisationService(db).create(name="Synthetic upgrade", country_code="UK", entity_type="UK_COMPANY", owner_email="test@example.invalid")
     invoice = template(db, org, issued=True)
     ledger = db.rows("SELECT * FROM gl_entries ORDER BY id")
     audits = db.rows("SELECT * FROM audit_events ORDER BY id")
     monkeypatch.setattr(database, "MIGRATIONS", original)
-    assert db.migrate() == ["0006_automation"]
+    assert db.migrate() == ["0007_automation"]
     assert db.migrate() == []
     current = DocumentService(db).invoice(invoice["id"])
     assert current.pop("reminders_disabled") == 0

@@ -206,6 +206,8 @@ class Database:
                     script = script.split(marker, 1)[0] + _POSTGRES_LEDGER_TRIGGERS
                 elif path.stem == "0004_document_immutability":
                     script = _POSTGRES_DOCUMENT_TRIGGERS
+                elif path.stem == "0006_payroll_part_time_hourly":
+                    script = _POSTGRES_PAYROLL_0006
                 connection.execute(script)
                 connection.execute(
                     "INSERT INTO schema_migrations(version) VALUES (%s)",
@@ -342,4 +344,46 @@ DROP TRIGGER IF EXISTS bill_lines_approved_update ON bill_lines;
 CREATE TRIGGER bill_lines_approved_update BEFORE UPDATE ON bill_lines FOR EACH ROW EXECUTE FUNCTION protect_bill_line();
 DROP TRIGGER IF EXISTS bill_lines_approved_delete ON bill_lines;
 CREATE TRIGGER bill_lines_approved_delete BEFORE DELETE ON bill_lines FOR EACH ROW EXECUTE FUNCTION protect_bill_line();
+"""
+
+
+# PostgreSQL equivalent of migrations/sqlite/0006_payroll_part_time_hourly.sql.
+# The SQLite file rebuilds employees because SQLite cannot drop a CHECK; here the
+# auto-named 0005 pension constraint (normally employees_check) is dropped and replaced.
+_POSTGRES_PAYROLL_0006 = r"""
+DO $$
+DECLARE constraint_name text;
+BEGIN
+    -- Drop the 0005 pension CHECK whatever PostgreSQL named it (normally employees_check).
+    FOR constraint_name IN
+        SELECT conname FROM pg_constraint
+        WHERE conrelid = 'employees'::regclass AND contype = 'c'
+          AND pg_get_constraintdef(oid) LIKE '%funded_pension_percent%'
+    LOOP
+        EXECUTE format('ALTER TABLE employees DROP CONSTRAINT %I', constraint_name);
+    END LOOP;
+END $$;
+ALTER TABLE employees ALTER COLUMN gross_salary DROP NOT NULL;
+ALTER TABLE employees ADD COLUMN pay_basis TEXT NOT NULL DEFAULT 'monthly';
+ALTER TABLE employees ADD COLUMN fte NUMERIC(5,4) NOT NULL DEFAULT 1;
+ALTER TABLE employees ADD COLUMN hourly_rate NUMERIC(12,4);
+ALTER TABLE employees ADD COLUMN social_tax_minimum_exemption TEXT;
+ALTER TABLE employees ADD COLUMN employment_start_date TEXT;
+ALTER TABLE employees ADD COLUMN employment_end_date TEXT;
+UPDATE employees SET pay_basis='board_fee' WHERE board_member=1;
+ALTER TABLE employees ADD CONSTRAINT employees_pension_check CHECK(funded_pension_percent IN (0,2,4,6));
+ALTER TABLE employees ADD CONSTRAINT employees_pay_basis_check CHECK(pay_basis IN ('monthly','hourly','board_fee'));
+ALTER TABLE employees ADD CONSTRAINT employees_fte_check CHECK(fte>0 AND fte<=1);
+ALTER TABLE employees ADD CONSTRAINT employees_hourly_rate_check CHECK(hourly_rate>0);
+ALTER TABLE employees ADD CONSTRAINT employees_pay_amount_check CHECK((pay_basis='hourly' AND hourly_rate IS NOT NULL) OR (pay_basis<>'hourly' AND gross_salary IS NOT NULL));
+ALTER TABLE employees ADD CONSTRAINT employees_board_basis_check CHECK((pay_basis='board_fee' AND board_member=1) OR (pay_basis<>'board_fee' AND board_member=0));
+ALTER TABLE pay_run_items ADD COLUMN pay_basis TEXT NOT NULL DEFAULT 'monthly';
+ALTER TABLE pay_run_items ADD COLUMN fte NUMERIC(5,4) NOT NULL DEFAULT 1;
+ALTER TABLE pay_run_items ADD COLUMN hourly_rate NUMERIC(12,4);
+ALTER TABLE pay_run_items ADD COLUMN hours NUMERIC(7,2);
+ALTER TABLE pay_run_items ADD COLUMN minimum_wage NUMERIC(12,2);
+ALTER TABLE pay_run_items ADD COLUMN social_tax_base NUMERIC(12,2);
+ALTER TABLE pay_run_items ADD COLUMN social_tax_minimum_topup NUMERIC(12,2) NOT NULL DEFAULT 0;
+ALTER TABLE pay_run_items ADD COLUMN social_tax_minimum_exemption TEXT;
+UPDATE pay_run_items SET pay_basis=CASE WHEN board_member=1 THEN 'board_fee' ELSE 'monthly' END, social_tax_base=gross;
 """
