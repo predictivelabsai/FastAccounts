@@ -77,6 +77,22 @@ def test_each_baltic_language_renders_translated_public_and_provider_copy():
         assert provider in str(integrations_page(lang))
 
 
+def test_fasthr_catalogue_copy_exists_in_all_locales():
+    descriptions = {
+        "en": "FastHR does not contain an Estonian personal identification code.",
+        "et": "Isikukood ei sisaldu FastHR-is.",
+        "lv": "FastHR nesatur Igaunijas personas kodu.",
+        "lt": "FastHR nėra Estijos asmens kodo.",
+    }
+    for lang, personal_data_note in descriptions.items():
+        copy = i18n.integration_copy(lang, "fasthr")
+        assert copy["name"] == "FastHR"
+        assert personal_data_note in copy["description"]
+        assert copy["direction"]
+        assert copy["ownership"]
+        assert "FastHR" in str(integrations_page(lang))
+
+
 def test_language_selection_persists_in_signed_session():
     with TestClient(app) as client:
         selected = client.get("/set-lang/et?next=/integrations", follow_redirects=False)

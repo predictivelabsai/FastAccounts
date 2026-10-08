@@ -236,6 +236,15 @@
         "direction": "Vispirms tikai lasīšana",
       "ownership": "Banka paliek datu avots"
     },
+    "fasthr": {
+      "name": "FastHR",
+      "logo_alt": "FastHR pagaidu zīme",
+      "category": "Personāla programmatūra",
+      "description": "Importējiet FastHR darbinieku pamatdatus pārskatītam grāmatvedības biroja algu aprēķinam. FastHR nesatur Igaunijas personas kodu.",
+      "capabilities": ["Darbinieku pamatdati", "Nodarbinātības statuss", "Pamatalga", "Organizācijas dati"],
+      "direction": "Imports · darbinieku pamatdati",
+      "ownership": "FastHR paliek datu avots"
+    },
     "bamboohr": {
       "name": "BambooHR",
       "logo_alt": "BambooHR pagaidu zīme",

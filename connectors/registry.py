@@ -7,6 +7,7 @@ from typing import Any, Callable, Literal, Mapping
 import integrations
 
 from .base import Connector
+from .providers import FastHRProvider
 from .stubs import RoadmapStubConnector, StubConnector
 
 
@@ -53,6 +54,18 @@ _ROADMAP_NOTE = (
 
 
 REGISTRY: dict[str, ConnectorRegistration] = {
+    "fasthr": ConnectorRegistration(
+        status="Adapter ready",
+        factory=lambda credentials, config: FastHRProvider(
+            base_url=credentials.get("base_url") or config.get("base_url") or FastHRProvider.default_base_url,
+            token=credentials.get("token", ""),
+        ),
+        credential_fields=(
+            CredentialField("base_url", "Base URL", required=True, default=FastHRProvider.default_base_url),
+            CredentialField("token", "API token", "secret"),
+        ),
+        credential_note="Pull-only employee master-data access.",
+    ),
     "quickbooks": ConnectorRegistration(
         status="Adapter ready",
         factory=_planning_stub("quickbooks"),

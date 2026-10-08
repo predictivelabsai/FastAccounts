@@ -90,9 +90,55 @@ def test_integration_catalogue_exposes_registry_fields(integration_api):
         "access_token", "realm_id", "sandbox",
     ]
     assert catalogue["quickbooks"]["registry_status"] == "Adapter ready"
+    assert catalogue["fasthr"]["registry_status"] == "Adapter ready"
+    assert [field["name"] for field in catalogue["fasthr"]["credential_fields"]] == [
+        "base_url", "token",
+    ]
     assert catalogue["hmrc"]["registry_status"] == "Planning stub"
     assert catalogue["personio"]["registry_status"] == "Roadmap · adapter not built"
     assert "Adapter not yet built" in catalogue["personio"]["credential_note"]
+
+
+def test_fasthr_connection_list_and_test_use_registry_status_without_live_network(
+    integration_api, monkeypatch,
+):
+    client, base = integration_api
+    configured = client.post(base + "/integrations/fasthr", json={
+        "credentials": {
+            "base_url": "https://fasthr.example.test",
+            "token": "saved-synthetic-token",
+        },
+        "config": {},
+    })
+    assert configured.status_code == 200
+    assert configured.json()["registry_status"] == "Adapter ready"
+
+    captured = {}
+
+    def factory(credentials, config):
+        captured.update(credentials=credentials, config=config)
+        return FakeCheckConnector(
+            "fasthr", ok=True, live=True, message="Synthetic FastHR check passed",
+        )
+
+    monkeypatch.setitem(
+        REGISTRY, "fasthr", replace(REGISTRY["fasthr"], factory=factory),
+    )
+    checked = client.post(base + "/integrations/fasthr/test", json={
+        "credentials": {
+            "base_url": "https://fasthr-check.example.test",
+            "token": "ephemeral-synthetic-token",
+        },
+        "config": {},
+    })
+    assert checked.status_code == 200
+    assert checked.json()["ok"] is True and checked.json()["live"] is True
+    assert captured["credentials"]["token"] == "ephemeral-synthetic-token"
+    listed = client.get(base + "/integrations")
+    assert listed.status_code == 200
+    assert listed.json()[0]["provider"] == "fasthr"
+    assert listed.json()[0]["status"] == "Connected"
+    assert "synthetic-token" not in listed.text
 
 
 def test_integration_test_success_failure_disconnect_and_redaction(
@@ -228,7 +274,7 @@ def test_integration_routes_are_tenant_scoped(integration_api, db):
 
 def test_unknown_integration_provider_is_rejected(integration_api):
     client, base = integration_api
-    assert client.post(base + "/integrations/fasthr", json={
+    assert client.post(base + "/integrations/made-up-provider", json={
         "credentials": {}, "config": {},
     }).status_code == 422
     assert client.post(base + "/integrations/fasthrm/test", json={

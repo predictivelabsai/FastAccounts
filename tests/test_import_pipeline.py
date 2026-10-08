@@ -8,9 +8,11 @@ from dataclasses import replace
 import pytest
 from cryptography.fernet import Fernet
 from fastapi.testclient import TestClient
+import httpx
 
 from api_app import api, current_user, require_csrf
 from connectors.base import ConnectorResult
+from connectors.providers import FastHRProvider
 from connectors.registry import REGISTRY
 from database import reset_database_cache
 from import_service import ImportService
@@ -268,6 +270,97 @@ def test_sync_requires_connection_and_records_connector_failure(db, ee_org, impo
         (ee_org["id"],),
     )
     assert roadmap_run["status"] == "Failed" and roadmap_run["read_count"] == 0
+
+
+def test_fasthr_sync_apply_and_repeat_are_idempotent(db, ee_org, monkeypatch):
+    vault = CredentialVault(Fernet.generate_key().decode())
+    integration = IntegrationService(db, vault)
+    integration.configure(
+        ee_org["id"],
+        "fasthr",
+        credentials={"base_url": "https://fasthr.example.test", "token": "synthetic-token"},
+        config={},
+        actor="owner@example.test",
+    )
+    requests = []
+
+    def handler(request):
+        requests.append(request)
+        return httpx.Response(200, json={
+            "data": [{
+                "id": 42,
+                "code": "EMP-42",
+                "first_name": "  Mari ",
+                "last_name": " Maasik  ",
+                "email": "mari@example.test",
+                "dept_id": 7,
+                "designation": "Account Manager",
+                "manager_id": 3,
+                "branch": "Tallinn",
+                "status": "Active",
+                "date_of_joining": "2025-05-06",
+                "gender": "Female",
+                "base_salary": 2100,
+            }],
+            "meta": {"total": 1, "limit": 200, "offset": 0},
+        })
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+
+    def factory(credentials, config):
+        return FastHRProvider(
+            base_url=credentials["base_url"],
+            token=credentials["token"],
+            client=client,
+        )
+
+    monkeypatch.setitem(REGISTRY, "fasthr", replace(REGISTRY["fasthr"], factory=factory))
+    service = ImportService(db, integration=integration)
+
+    first_sync = service.run_sync(
+        ee_org["id"], "fasthr", "employees", actor="owner@example.test"
+    )
+    staged = service.get_staged(ee_org["id"], sync_run_id=first_sync["id"])["records"]
+    assert staged[0]["external_payload"]["fasthr_designation"] == "Account Manager"
+    first_apply = service.apply_staged(
+        ee_org["id"],
+        "fasthr",
+        first_sync["id"],
+        {staged[0]["id"]: "apply"},
+        actor="owner@example.test",
+    )
+    assert first_apply["applied"] == 1
+    employee_id = first_apply["outcomes"][0]["employee_id"]
+    employee = db.one(
+        "SELECT * FROM employees WHERE organisation_id=? AND id=?",
+        (ee_org["id"], employee_id),
+    )
+    assert employee["name"] == "Mari Maasik"
+    assert str(employee["gross_salary"]) == "2100"
+    mapping = db.one(
+        "SELECT * FROM external_mappings WHERE organisation_id=? AND provider='fasthr' "
+        "AND object_type='employees' AND external_id='42'",
+        (ee_org["id"],),
+    )
+    assert mapping["local_id"] == employee_id
+
+    second_sync = service.run_sync(
+        ee_org["id"], "fasthr", "employees", actor="owner@example.test"
+    )
+    repeated = service.get_staged(ee_org["id"], sync_run_id=second_sync["id"])["records"]
+    second_apply = service.apply_staged(
+        ee_org["id"],
+        "fasthr",
+        second_sync["id"],
+        {repeated[0]["id"]: "apply"},
+        actor="owner@example.test",
+    )
+    assert second_apply["unchanged"] == 1
+    assert db.scalar(
+        "SELECT COUNT(*) FROM employees WHERE organisation_id=?", (ee_org["id"],)
+    ) == 1
+    assert len(requests) == 2
+    assert all(request.headers["authorization"] == "Bearer synthetic-token" for request in requests)
 
 
 @pytest.fixture

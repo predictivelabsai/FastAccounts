@@ -236,6 +236,15 @@
         "direction": "Pirmiausia tik skaitymas",
       "ownership": "Bankas lieka duomenų šaltiniu"
     },
+    "fasthr": {
+      "name": "FastHR",
+      "logo_alt": "Laikinas FastHR ženklas",
+      "category": "Personalo programinė įranga",
+      "description": "Importuokite FastHR darbuotojų pagrindinius duomenis peržiūrimai apskaitos biuro darbo užmokesčio apskaitai. FastHR nėra Estijos asmens kodo.",
+      "capabilities": ["Darbuotojų pagrindiniai duomenys", "Darbo santykių būsena", "Bazinis atlyginimas", "Organizacijos duomenys"],
+      "direction": "Importas · darbuotojų pagrindiniai duomenys",
+      "ownership": "FastHR lieka duomenų šaltiniu"
+    },
     "bamboohr": {
       "name": "BambooHR",
       "logo_alt": "Laikinas BambooHR ženklas",

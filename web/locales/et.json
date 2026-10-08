@@ -236,6 +236,15 @@
         "direction": "Esmalt ainult lugemisõigus",
       "ownership": "Pank jääb algallikaks"
     },
+    "fasthr": {
+      "name": "FastHR",
+      "logo_alt": "FastHR-i ajutine märk",
+      "category": "Palgatarkvara",
+      "description": "Impordi FastHR-i töötajate põhiandmed ülevaadatavasse büroo palgaarvestusse. Isikukood ei sisaldu FastHR-is.",
+      "capabilities": ["Töötajate põhiandmed", "Töösuhte staatus", "Põhipalk", "Organisatsiooniandmed"],
+      "direction": "Import · töötajate põhiandmed",
+      "ownership": "FastHR jääb algallikaks"
+    },
     "bamboohr": {
       "name": "BambooHR",
       "logo_alt": "BambooHR-i ajutine märk",

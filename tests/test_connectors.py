@@ -3,8 +3,8 @@ from __future__ import annotations
 
 import pytest
 
-from connectors import connector_for
-from connectors.registry import PROVIDERS, provider_metadata
+from connectors import FastHRProvider, connector_for
+from connectors.registry import PROVIDERS, REGISTRY, provider_metadata
 from integrations import CATALOGUE
 
 
@@ -36,7 +36,8 @@ def test_registry_covers_every_catalogue_provider():
     catalogue_keys = {item.key for item in CATALOGUE}
     assert PROVIDERS == catalogue_keys
     for provider in catalogue_keys:
-        connector = connector_for(provider)
+        credentials = {"token": "synthetic-token"} if provider == "fasthr" else None
+        connector = connector_for(provider, credentials=credentials)
         assert connector.key == provider
 
 
@@ -62,3 +63,18 @@ def test_credential_field_metadata_is_ordered_and_complete():
     for provider in ("hmrc", "emta", "open_banking"):
         assert provider_metadata(provider)["credential_note"].startswith("TBD:")
     assert "Adapter not yet built" in provider_metadata("personio")["credential_note"]
+
+
+def test_fasthr_registration_is_explicit_and_not_overwritten_by_roadmap_loop():
+    metadata = provider_metadata("fasthr")
+    assert metadata["registry_status"] == "Adapter ready"
+    assert [field["name"] for field in metadata["credential_fields"]] == ["base_url", "token"]
+    assert metadata["credential_fields"][0]["default"] == "https://fasthr.eu"
+    assert metadata["credential_fields"][1]["input_type"] == "secret"
+    connector = connector_for(
+        "fasthr",
+        credentials={"base_url": "https://hr.example.test/", "token": "synthetic-token"},
+    )
+    assert isinstance(connector, FastHRProvider)
+    assert connector.base_url == "https://hr.example.test"
+    assert REGISTRY["fasthr"].status == "Adapter ready"

@@ -545,3 +545,17 @@ Invalid records fail independently with a sync conflict, so one bad salary, name
 or pension field cannot partially apply that row or stop the rest of the batch.
 No roadmap connector becomes live through this work: unbuilt adapters still fail
 clearly and stage no records, and automated tests make no provider network calls.
+
+## 19. FastHR employee connector (2026-10-09)
+
+FastHR is the first live HR source adapter for the reviewed bureau-payroll import
+pipeline. It is pull-only: tenant-scoped bearer credentials read all employee
+pages, stage canonical name, email, active status and exact base salary values,
+and preserve selected FastHR-only fields for review before payroll records change.
+
+The source API does not provide isikukood, funded-pension settings or a
+board-member flag, and the adapter does not infer them. Offset pagination,
+authentication and connection failures, empty results, external mappings and a
+repeat sync/apply cycle are covered with mocked HTTP transport; automated tests
+make no live FastHR requests. Production bureau use still requires customer
+configuration and accountant UAT.

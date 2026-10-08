@@ -7,10 +7,15 @@ import hmac
 import json
 import time
 from datetime import datetime, timezone
+from decimal import Decimal
 from typing import Callable
 from urllib.parse import urlencode
 
 import httpx
+
+from core_utils import money
+
+from .base import ConnectorResult
 
 
 class ProviderError(RuntimeError):
@@ -93,6 +98,149 @@ class XeroProvider(HTTPProvider):
     def create_invoice(self, payload: dict, *, idempotency_key: str) -> dict:
         headers = dict(self.headers, **{"Idempotency-Key": idempotency_key})
         return self.request("POST", f"{self.base_url}/Invoices", json={"Invoices": [payload]}, headers=headers).json()
+
+
+class FastHRProvider(HTTPProvider):
+    """Pull-only employee master-data adapter for FastHR."""
+
+    key = "fasthr"
+    default_base_url = "https://fasthr.eu"
+
+    def __init__(self, base_url: str = default_base_url, *, token: str, **kwargs):
+        super().__init__(**kwargs)
+        self.base_url = str(base_url or self.default_base_url).strip().rstrip("/")
+        token = str(token or "").strip()
+        if len(token) < 8:
+            raise ValueError("FastHR API token must be at least 8 characters")
+        self.headers = {
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/json",
+        }
+
+    @staticmethod
+    def _status_code(error: ProviderError) -> int | None:
+        cause = error.__cause__
+        if isinstance(cause, httpx.HTTPStatusError):
+            return cause.response.status_code
+        return None
+
+    def _employee_page(self, *, limit: int, offset: int | None = None) -> tuple[list[dict], int]:
+        params = {"limit": limit}
+        if offset is not None:
+            params["offset"] = offset
+        response = self.request(
+            "GET",
+            f"{self.base_url}/api/v1/employees",
+            params=params,
+            headers=self.headers,
+        )
+        try:
+            payload = response.json()
+        except ValueError as error:
+            raise ProviderError("FastHR returned an invalid JSON response") from error
+        rows = payload.get("data") if isinstance(payload, dict) else None
+        meta = payload.get("meta") if isinstance(payload, dict) else None
+        if not isinstance(rows, list) or not isinstance(meta, dict):
+            raise ProviderError("FastHR returned an invalid employee response")
+        try:
+            total = int(meta["total"])
+        except (KeyError, TypeError, ValueError) as error:
+            raise ProviderError("FastHR returned invalid employee pagination metadata") from error
+        if total < 0 or any(not isinstance(row, dict) for row in rows):
+            raise ProviderError("FastHR returned invalid employee data")
+        return rows, total
+
+    def check(self) -> ConnectorResult:
+        try:
+            _rows, total = self._employee_page(limit=1)
+        except httpx.RequestError:
+            return ConnectorResult(
+                self.key,
+                "check",
+                False,
+                False,
+                "FastHR API could not be reached due to a connection error or timeout",
+            )
+        except ProviderError as error:
+            status = self._status_code(error)
+            if status in {401, 403}:
+                message = f"FastHR API authentication failed (HTTP {status})"
+            elif status is not None:
+                message = f"FastHR API returned unexpected HTTP {status}"
+            else:
+                message = str(error)
+            return ConnectorResult(self.key, "check", False, True, message)
+        return ConnectorResult(
+            self.key,
+            "check",
+            True,
+            True,
+            f"FastHR API reachable; {total} employees visible",
+        )
+
+    @staticmethod
+    def _employee_record(row: dict) -> dict | None:
+        first_name = str(row.get("first_name") or "").strip()
+        last_name = str(row.get("last_name") or "").strip()
+        name = " ".join(part for part in (first_name, last_name) if part)
+        if not name:
+            return None
+        record = {
+            "external_id": str(row.get("id")),
+            "name": name,
+            "email": row.get("email"),
+            "active": row.get("status") == "Active",
+            "fasthr_code": row.get("code"),
+            "fasthr_designation": row.get("designation"),
+            "fasthr_date_of_joining": row.get("date_of_joining"),
+            "fasthr_status": row.get("status"),
+            "fasthr_gender": row.get("gender"),
+            "fasthr_branch": row.get("branch"),
+        }
+        salary = row.get("base_salary")
+        if salary is not None:
+            decimal_salary = Decimal(str(salary))
+            if decimal_salary > 0:
+                record["gross_salary"] = money(decimal_salary)
+        return record
+
+    def pull(self, object_type: str, *, cursor: str | None = None) -> ConnectorResult:
+        if object_type not in {"employee", "employees"}:
+            raise ValueError("FastHR supports employee imports only")
+        del cursor  # FastHR currently exposes offset pagination, not incremental cursors.
+        records: list[dict] = []
+        offset = 0
+        total = 0
+        while True:
+            rows, total = self._employee_page(limit=200, offset=offset)
+            for row in rows:
+                record = self._employee_record(row)
+                if record is not None:
+                    records.append(record)
+            offset += len(rows)
+            if offset >= total:
+                break
+            if not rows:
+                raise ProviderError("FastHR employee pagination stopped before the reported total")
+        return ConnectorResult(
+            self.key,
+            f"pull:{object_type}",
+            True,
+            True,
+            f"Pulled {len(records)} FastHR employee records",
+            tuple(records),
+            str(total),
+        )
+
+    def push(self, object_type: str, records: list[dict]) -> ConnectorResult:
+        del records
+        return ConnectorResult(
+            self.key,
+            f"push:{object_type}",
+            False,
+            True,
+            "FastHR is a pull-only employee data source; no records were sent",
+        )
 
 
 class MeritProvider(HTTPProvider):
