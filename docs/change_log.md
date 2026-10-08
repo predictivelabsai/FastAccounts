@@ -4,6 +4,20 @@ Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as
 delivered.
 
+## 2026-10-09 — HR and payroll software catalogue
+
+- Added 20 global and Estonian HR/payroll providers to the public integration
+  catalogue as potential employee-master-data and payroll-input sources for
+  accounting-bureau payroll.
+- Labelled every provider `Roadmap · no adapter yet`, with reviewed import-first
+  direction and per-object ownership; no adapter readiness or live connection
+  is claimed.
+- Added complete English, Estonian, Latvian and Lithuanian catalogue copy and
+  landing FAQ scope wording, plus neutral placeholder marks that are explicitly
+  documented as non-official artwork.
+- Added catalogue and four-locale rendering coverage. Provider network access
+  is not exercised by tests.
+
 ## 2026-10-08 — FastSME public landing presentation
 
 - Ported the FastHRM public design system with self-hosted Bricolage Grotesque

@@ -103,7 +103,7 @@
     "faq4_q": "Kas saan lähtekoodi uurida ja tarkvara ise majutada?",
     "faq4_a": "Jah. FastAccounts on GitHubis saadaval MIT-litsentsi alusel. Võid tarkvara selle litsentsi tingimustel kasutada, muuta ja ise majutada, säilitades autoriõiguse teate ning litsentsiteksti.",
     "faq5_q": "Millised integratsioonid on saadaval?",
-    "faq5_a": "Kataloogis on testitud adapterid QuickBooks Online'i, Xero ja Merit Aktiva jaoks. Ükski teenusepakkuja ei ole vaikimisi ühendatud. HMRC-le ja Eesti Maksu- ja Tolliametile otse esitamine on endiselt piiratud ning avatud pangandus on kavandatud ainult lugemiseks. Täpse ulatuse ja ülevaatusnõuded leiad integratsioonide lehelt.",
+    "faq5_a": "Kataloogis on testitud adapterid QuickBooks Online'i, Xero ja Merit Aktiva jaoks. Ükski teenusepakkuja ei ole vaikimisi ühendatud. HMRC-le ja Eesti Maksu- ja Tolliametile otse esitamine on endiselt piiratud ning avatud pangandus on kavandatud ainult lugemiseks. Kliendi personalisüsteemidest pärinevad töötajate põhiandmed ja palgaarvestuse sisendid on teekaardil; ühtegi personaliadapterit pole veel loodud. Täpse ulatuse ja ülevaatusnõuded leiad integratsioonide lehelt.",
     "cta_title": "Iga kliendi raamatupidamine selgelt ühes kohas.",
     "cta_body": "Ava töölaud või tutvu lähtekoodiga ja majuta FastAccountsi ise.",
     "mock_browser": "FastAccounts / Töölaud",
@@ -222,7 +222,7 @@
         "direction": "FastAccountsist raamatupidajale",
         "ownership": "Raamatupidaja üle vaadatud eksport"
       },
-      "open_banking": {
+    "open_banking": {
         "name": "Avatud pangandus",
         "logo_alt": "Avatud panganduse ikoon",
         "category": "Pangaandmed",
@@ -234,8 +234,188 @@
           "Kooskõlastuse sisend"
         ],
         "direction": "Esmalt ainult lugemisõigus",
-        "ownership": "Pank jääb algallikaks"
-      }
+      "ownership": "Pank jääb algallikaks"
+    },
+    "bamboohr": {
+      "name": "BambooHR",
+      "logo_alt": "BambooHR-i ajutine märk",
+      "category": "Palgatarkvara",
+      "description": "Kasuta BambooHR-i töötajaandmeid büroo palgaarvestuse seadistuse ja sisendite ülevaadatava allikana.",
+      "capabilities": ["Töötajate põhiandmed", "Töötajaportaali märkmed", "Puudumised", "Organisatsiooniskeem", "Dokumendid"],
+      "direction": "Esmalt import · eksport vastavalt reeglitele",
+      "ownership": "Seadistatav objektipõhiselt"
+    },
+    "personio": {
+      "name": "Personio",
+      "logo_alt": "Personio ajutine märk",
+      "category": "Palgatarkvara",
+      "description": "Kasuta Euroopa personalitarkvara töötajaandmete ja palgaarvestuse sisendite ülevaadatava allikana.",
+      "capabilities": ["Töötajaandmed", "Tööaja arvestus", "Puudumised", "Dokumendid", "Palgaarvestuse sisendid"],
+      "direction": "Esmalt import · eksport vastavalt reeglitele",
+      "ownership": "Seadistatav objektipõhiselt"
+    },
+    "hibob": {
+      "name": "Bob (HiBob)",
+      "logo_alt": "Bob by HiBobi ajutine märk",
+      "category": "Palgatarkvara",
+      "description": "Too valitud Bobi personaliandmed ülevaadatava impordina büroo palgaarvestusse.",
+      "capabilities": ["Töötajate kataloog", "Töösuhte elutsükkel", "Tööaja haldus"],
+      "direction": "Esmalt import · eksport vastavalt reeglitele",
+      "ownership": "Seadistatav objektipõhiselt"
+    },
+    "zoho_people": {
+      "name": "Zoho People",
+      "logo_alt": "Zoho People'i ajutine märk",
+      "category": "Palgatarkvara",
+      "description": "Kasuta Zoho People'i töötaja- ja tööajaandmeid ülevaadatud palgaarvestuse sisenditena.",
+      "capabilities": ["Töötajaandmed", "Tööaja arvestus", "Puhkused", "Tööajatabelid", "Vormid"],
+      "direction": "Esmalt import · eksport vastavalt reeglitele",
+      "ownership": "Seadistatav objektipõhiselt"
+    },
+    "employment_hero": {
+      "name": "Employment Hero",
+      "logo_alt": "Employment Hero ajutine märk",
+      "category": "Palgatarkvara",
+      "description": "Suuna valitud Employment Hero personaliandmed enne büroo palgaarvestusse jõudmist ülevaatusele.",
+      "capabilities": ["Töötajaandmed", "Tööle asumine", "Puhkused", "Tööajatabelid", "Palgaarvestuse sisendid"],
+      "direction": "Esmalt import · eksport vastavalt reeglitele",
+      "ownership": "Seadistatav objektipõhiselt"
+    },
+    "workday": {
+      "name": "Workday",
+      "logo_alt": "Workday ajutine märk",
+      "category": "Palgatarkvara",
+      "description": "Kasuta ettevõttetaseme HCM-i töötaja- ja palgaandmeid büroo palgaarvestuse ülevaadatava allikana.",
+      "capabilities": ["Töötajaandmed", "Organisatsiooni struktuur", "Tööaeg ja puudumised", "Tasustamine", "Palgaarvestuse sisendid"],
+      "direction": "Esmalt import · eksport vastavalt reeglitele",
+      "ownership": "Seadistatav objektipõhiselt"
+    },
+    "hrmaster": {
+      "name": "HRmaster (HR Master)",
+      "logo_alt": "HRmasteri ajutine märk",
+      "category": "Palgatarkvara",
+      "description": "Kasuta Ungari personalitarkvara töötajaandmete ja palgaarvestuse sisendite ülevaadatava allikana.",
+      "capabilities": ["Personaliandmed", "Palgaarvestuse sisendid", "Värbamine", "Hindamised", "Cafeteria hüved"],
+      "direction": "Esmalt import · eksport vastavalt reeglitele",
+      "ownership": "Seadistatav objektipõhiselt"
+    },
+    "gusto": {
+      "name": "Gusto",
+      "logo_alt": "Gusto ajutine märk",
+      "category": "Palgatarkvara",
+      "description": "Kasuta USA palgaplatvormi ülevaadatava allikana, kui kliendigrupis on USA ettevõte.",
+      "capabilities": ["Töötajaandmed", "Palgaarvestuse sisendid", "Puhkused", "Hüvede andmed", "Töövõtjate andmed"],
+      "direction": "Esmalt import · eksport vastavalt reeglitele",
+      "ownership": "Seadistatav objektipõhiselt"
+    },
+    "rippling": {
+      "name": "Rippling",
+      "logo_alt": "Ripplingi ajutine märk",
+      "category": "Palgatarkvara",
+      "description": "Too valitud personaliandmed kliendiraamatute palgaarvestusse ülevaadatava impordina.",
+      "capabilities": ["Töötajaandmed", "Tööle asumine", "Tööaeg ja kohalolek", "Puhkused", "Palgaarvestuse sisendid"],
+      "direction": "Esmalt import · eksport vastavalt reeglitele",
+      "ownership": "Seadistatav objektipõhiselt"
+    },
+    "deel": {
+      "name": "Deel",
+      "logo_alt": "Deeli ajutine märk",
+      "category": "Palgatarkvara",
+      "description": "Kasuta globaalse palgaarvestuse ja ametliku tööandja teenuse andmeid büroo palgaarvestuse ülevaadatud sisenditena.",
+      "capabilities": ["Töötajaandmed", "Lepingud", "Globaalse palgaarvestuse sisendid", "Puhkused", "Kulud"],
+      "direction": "Esmalt import · eksport vastavalt reeglitele",
+      "ownership": "Seadistatav objektipõhiselt"
+    },
+    "odoo_hr": {
+      "name": "Odoo HR",
+      "logo_alt": "Odoo HR-i ajutine märk",
+      "category": "Palgatarkvara",
+      "description": "Seadista iga kliendi Odoo URL ja andmebaasi nimi, et teha ülevaadatavaid importe XML-RPC või JSON-RPC kaudu.",
+      "capabilities": ["Töötajaandmed", "Tööaja arvestus", "Puhkused", "Värbamine", "Kulud"],
+      "direction": "Esmalt import · eksport vastavalt reeglitele",
+      "ownership": "Seadistatav objektipõhiselt"
+    },
+    "persona_fujitsu": {
+      "name": "Fujitsu Persona",
+      "logo_alt": "Fujitsu Persona ajutine märk",
+      "category": "Palgatarkvara",
+      "description": "Eesti vanim personali- ja palgatarkvara on tegutsenud alates 1995. aastast. Selle moodulid saavad anda ülevaadatavaid töötaja- ja palgaarvestuse sisendeid.",
+      "capabilities": ["Personaliandmed", "Palgaarvestus", "Tööaja arvestus", "Iseteenindusportaal"],
+      "direction": "Esmalt import · eksport vastavalt reeglitele",
+      "ownership": "Seadistatav objektipõhiselt"
+    },
+    "wemply": {
+      "name": "Wemply",
+      "logo_alt": "Wemply ajutine märk",
+      "category": "Palgatarkvara",
+      "description": "Modulaarne personali-, tööaja- ja Eesti palgaarvestuse platvorm, mida kasutab üle 1000 ettevõtte. Wemply pälvis tiitli „Aasta HR lahendus 2025“.",
+      "capabilities": ["Personalihaldus", "Tööaja arvestus", "Eesti palgaarvestus", "TSD aruandlus", "TÖR aruandlus"],
+      "direction": "Esmalt import · eksport vastavalt reeglitele",
+      "ownership": "Seadistatav objektipõhiselt"
+    },
+    "hours24": {
+      "name": "hours24",
+      "logo_alt": "hours24 ajutine märk",
+      "category": "Palgatarkvara",
+      "description": "Tehisintellekti toega tööaja arvestus ja graafikute koostamine, mida kasutatakse Eestis ja Soomes. Kuni viiele töötajale on tasuta pakett.",
+      "capabilities": ["Tehisintellektiga aja sisestus", "Tööajaandmed", "Töögraafikud"],
+      "direction": "Esmalt import · eksport vastavalt reeglitele",
+      "ownership": "Seadistatav objektipõhiselt"
+    },
+    "yester": {
+      "name": "Yester",
+      "logo_alt": "Yesteri ajutine märk",
+      "category": "Palgatarkvara",
+      "description": "Alates 2000. aastast tegutsev Eesti tööjõuplatvorm katab tööle asumise, kulud, lähetused ja sõidupäevikud. See on tihedalt integreeritud Merit Tarkvaraga.",
+      "capabilities": ["Tööle asumine", "Kuluaruanded", "Lähetused", "Sõidupäevikud", "Meriti liidestus"],
+      "direction": "Esmalt import · eksport vastavalt reeglitele",
+      "ownership": "Seadistatav objektipõhiselt"
+    },
+    "hrm4baltics": {
+      "name": "HRM4Baltics (Digmatix)",
+      "logo_alt": "HRM4Balticsi ajutine märk",
+      "category": "Palgatarkvara",
+      "description": "Microsoft Dynamics 365 Business Centralil põhinev personalilahendus katab Eesti, Läti ja Leedu palgaarvestuse. Lahendusel on X-tee liidestus.",
+      "capabilities": ["Personaliandmed", "Eesti palgaarvestus", "Läti palgaarvestus", "Leedu palgaarvestus", "X-tee liidestus"],
+      "direction": "Esmalt import · eksport vastavalt reeglitele",
+      "ownership": "Seadistatav objektipõhiselt"
+    },
+    "merit_palk": {
+      "name": "Merit Palk",
+      "logo_alt": "Merit Palga ajutine märk",
+      "category": "Palgatarkvara",
+      "description": "Eesti enim kasutatud palgatarkvara teenindab üle 25 000 ettevõtte ja on kuni kahele töötajale tasuta. See sobib kokku olemasoleva Merit Aktiva raamatupidamisadapteriga.",
+      "capabilities": ["Töötajaandmed", "Palgaarvestus", "Palgalehed", "TSD ettevalmistus", "Merit Aktiva sidumine"],
+      "direction": "Esmalt import · eksport vastavalt reeglitele",
+      "ownership": "Seadistatav objektipõhiselt"
+    },
+    "taavi_palk": {
+      "name": "Taavi Palk",
+      "logo_alt": "Taavi Palga ajutine märk",
+      "category": "Palgatarkvara",
+      "description": "Eesti palgatarkvara kasutab üle 1500 ettevõtte. See koostab kohustuslikke aruandeid ja ekspordib palgalehti Eesti raamatupidamissüsteemidesse.",
+      "capabilities": ["TSD aruanded", "Registriaruanded", "Statistikaaruanded", "Palgalehtede eksport"],
+      "direction": "Esmalt import · eksport vastavalt reeglitele",
+      "ownership": "Seadistatav objektipõhiselt"
+    },
+    "andevis": {
+      "name": "Andevis",
+      "logo_alt": "Andevise ajutine märk",
+      "category": "Palgatarkvara",
+      "description": "Kohandatav Eesti personalitarkvara, mille moodulid saavad anda ülevaadatavaid personali- ja palgaarvestuse sisendeid.",
+      "capabilities": ["Personaliandmed", "Tööaja arvestus", "Palgaarvestus", "Koolitused", "Arenguvestlused"],
+      "direction": "Esmalt import · eksport vastavalt reeglitele",
+      "ownership": "Seadistatav objektipõhiselt"
+    },
+    "eeva": {
+      "name": "Eeva (Eetasoft)",
+      "logo_alt": "Eeva ajutine märk",
+      "category": "Palgatarkvara",
+      "description": "Eeva personalimoodul haldab põhilisi töösuhteandmeid ja on seotud Eeva palgaarvestusega. Andmed jõuaksid büroo palgaarvestusse ainult ülevaadatud impordina.",
+      "capabilities": ["Lepingud", "Käskkirjad", "Puhkused", "ISCO klassifikaator", "Eeva palgaarvestuse seos"],
+      "direction": "Esmalt import · eksport vastavalt reeglitele",
+      "ownership": "Seadistatav objektipõhiselt"
+    }
     }
   },
   "login": {

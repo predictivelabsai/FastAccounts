@@ -103,7 +103,7 @@
     "faq4_q": "Can I inspect the code and self-host?",
     "faq4_a": "Yes. FastAccounts is available on GitHub under the MIT license. You can use, modify and self-host it under that license, retaining its copyright and permission notice.",
     "faq5_q": "Which integrations are available?",
-    "faq5_a": "The catalogue includes tested adapters for QuickBooks Online, Xero and Merit Aktiva. No provider is connected by default. HMRC and Estonian tax submission remain gated, and open banking is a read-only candidate. See the integrations page for scope and review requirements.",
+    "faq5_a": "The catalogue includes tested adapters for QuickBooks Online, Xero and Merit Aktiva. No provider is connected by default. HMRC and Estonian tax submission remain gated, and open banking is a read-only candidate. Employee master data and payroll inputs from client HR systems are on the roadmap; no HR adapter is built yet. See the integrations page for scope and review requirements.",
     "cta_title": "Give every client's books a clear home.",
     "cta_body": "Start with your workspace, or explore the source and host FastAccounts yourself.",
     "mock_browser": "FastAccounts / Workspace",
@@ -222,7 +222,7 @@
         "direction": "FastAccounts to accountant",
         "ownership": "Accountant-reviewed export"
       },
-      "open_banking": {
+    "open_banking": {
         "name": "Open banking",
         "logo_alt": "Open banking icon",
         "category": "Bank data",
@@ -234,8 +234,188 @@
           "Reconciliation input"
         ],
         "direction": "Read-only first",
-        "ownership": "Bank remains source"
-      }
+      "ownership": "Bank remains source"
+    },
+    "bamboohr": {
+      "name": "BambooHR",
+      "logo_alt": "BambooHR placeholder mark",
+      "category": "HR software",
+      "description": "Use BambooHR employee data as a reviewed source for bureau-payroll setup and inputs.",
+      "capabilities": ["Employee master records", "Employee portal notes", "Time off", "Org chart", "Documents"],
+      "direction": "Import first · export by policy",
+      "ownership": "Configured per object"
+    },
+    "personio": {
+      "name": "Personio",
+      "logo_alt": "Personio placeholder mark",
+      "category": "HR software",
+      "description": "Use the European HR suite as a reviewed source of employee and payroll-input data for bureau payroll.",
+      "capabilities": ["Employee records", "Attendance", "Absences", "Documents", "Payroll inputs"],
+      "direction": "Import first · export by policy",
+      "ownership": "Configured per object"
+    },
+    "hibob": {
+      "name": "Bob (HiBob)",
+      "logo_alt": "Bob by HiBob placeholder mark",
+      "category": "HR software",
+      "description": "Bring selected Bob workforce data into a reviewed bureau-payroll intake.",
+      "capabilities": ["Employee directory", "Employee lifecycle", "Time management"],
+      "direction": "Import first · export by policy",
+      "ownership": "Configured per object"
+    },
+    "zoho_people": {
+      "name": "Zoho People",
+      "logo_alt": "Zoho People placeholder mark",
+      "category": "HR software",
+      "description": "Use Zoho People records and working-time data as reviewed payroll inputs.",
+      "capabilities": ["Employee records", "Attendance", "Leave", "Timesheets", "Forms"],
+      "direction": "Import first · export by policy",
+      "ownership": "Configured per object"
+    },
+    "employment_hero": {
+      "name": "Employment Hero",
+      "logo_alt": "Employment Hero placeholder mark",
+      "category": "HR software",
+      "description": "Stage selected Employment Hero workforce data for review before it enters bureau payroll.",
+      "capabilities": ["Employee records", "Onboarding", "Leave", "Timesheets", "Payroll inputs"],
+      "direction": "Import first · export by policy",
+      "ownership": "Configured per object"
+    },
+    "workday": {
+      "name": "Workday",
+      "logo_alt": "Workday placeholder mark",
+      "category": "HR software",
+      "description": "Treat enterprise HCM worker and payroll-input data as a reviewed source for bureau payroll.",
+      "capabilities": ["Worker records", "Organisation structures", "Time and absence", "Compensation", "Payroll inputs"],
+      "direction": "Import first · export by policy",
+      "ownership": "Configured per object"
+    },
+    "hrmaster": {
+      "name": "HRmaster (HR Master)",
+      "logo_alt": "HRmaster placeholder mark",
+      "category": "HR software",
+      "description": "Use the Hungarian HR suite as a reviewed source for employee records and payroll inputs.",
+      "capabilities": ["Personnel records", "Payroll inputs", "Recruitment", "Evaluations", "Cafeteria benefits"],
+      "direction": "Import first · export by policy",
+      "ownership": "Configured per object"
+    },
+    "gusto": {
+      "name": "Gusto",
+      "logo_alt": "Gusto placeholder mark",
+      "category": "HR software",
+      "description": "Use the US payroll platform as a reviewed source where a client group includes a US entity.",
+      "capabilities": ["Employee records", "Payroll inputs", "Time off", "Benefits data", "Contractor records"],
+      "direction": "Import first · export by policy",
+      "ownership": "Configured per object"
+    },
+    "rippling": {
+      "name": "Rippling",
+      "logo_alt": "Rippling placeholder mark",
+      "category": "HR software",
+      "description": "Bring selected workforce records into a reviewed payroll intake for client books.",
+      "capabilities": ["Employee records", "Onboarding", "Time and attendance", "Leave", "Payroll inputs"],
+      "direction": "Import first · export by policy",
+      "ownership": "Configured per object"
+    },
+    "deel": {
+      "name": "Deel",
+      "logo_alt": "Deel placeholder mark",
+      "category": "HR software",
+      "description": "Use global payroll and employer-of-record data as reviewed inputs for bureau payroll.",
+      "capabilities": ["Worker records", "Contracts", "Global payroll inputs", "Time off", "Expenses"],
+      "direction": "Import first · export by policy",
+      "ownership": "Configured per object"
+    },
+    "odoo_hr": {
+      "name": "Odoo HR",
+      "logo_alt": "Odoo HR placeholder mark",
+      "category": "HR software",
+      "description": "Configure each tenant with its Odoo URL and database name for reviewed imports over XML-RPC or JSON-RPC.",
+      "capabilities": ["Employee records", "Attendance", "Time off", "Recruitment", "Expenses"],
+      "direction": "Import first · export by policy",
+      "ownership": "Configured per object"
+    },
+    "persona_fujitsu": {
+      "name": "Fujitsu Persona",
+      "logo_alt": "Fujitsu Persona placeholder mark",
+      "category": "HR software",
+      "description": "Estonia's oldest personnel and payroll software has served organisations since 1995. Its modules can supply reviewed employee and payroll inputs.",
+      "capabilities": ["Personnel records", "Payroll", "Working time", "Self-service portal"],
+      "direction": "Import first · export by policy",
+      "ownership": "Configured per object"
+    },
+    "wemply": {
+      "name": "Wemply",
+      "logo_alt": "Wemply placeholder mark",
+      "category": "HR software",
+      "description": "A modular staffing, working-time and Estonian payroll platform used by more than 1,000 companies. Wemply was named Aasta HR lahendus 2025.",
+      "capabilities": ["Staffing", "Working time", "Estonian payroll", "TSD reporting", "TÖR reporting"],
+      "direction": "Import first · export by policy",
+      "ownership": "Configured per object"
+    },
+    "hours24": {
+      "name": "hours24",
+      "logo_alt": "hours24 placeholder mark",
+      "category": "HR software",
+      "description": "AI-assisted time tracking and scheduling used in Estonia and Finland. A free tier supports up to five employees.",
+      "capabilities": ["AI-assisted time capture", "Working-time records", "Work schedules"],
+      "direction": "Import first · export by policy",
+      "ownership": "Configured per object"
+    },
+    "yester": {
+      "name": "Yester",
+      "logo_alt": "Yester placeholder mark",
+      "category": "HR software",
+      "description": "An Estonian workforce platform operating since 2000, with onboarding, expenses, travel and driving logs. It is tightly integrated with Merit Tarkvara.",
+      "capabilities": ["Onboarding", "Expense reports", "Business travel", "Driving logs", "Merit integration"],
+      "direction": "Import first · export by policy",
+      "ownership": "Configured per object"
+    },
+    "hrm4baltics": {
+      "name": "HRM4Baltics (Digmatix)",
+      "logo_alt": "HRM4Baltics placeholder mark",
+      "category": "HR software",
+      "description": "A Microsoft Dynamics 365 Business Central HRM solution covering Estonian, Latvian and Lithuanian payroll. It includes X-tee integration.",
+      "capabilities": ["Personnel records", "Estonian payroll", "Latvian payroll", "Lithuanian payroll", "X-tee integration"],
+      "direction": "Import first · export by policy",
+      "ownership": "Configured per object"
+    },
+    "merit_palk": {
+      "name": "Merit Palk",
+      "logo_alt": "Merit Palk placeholder mark",
+      "category": "HR software",
+      "description": "Estonia's most-used payroll software serves more than 25,000 firms and offers a free tier for up to two employees. It can pair with the existing Merit Aktiva accounting adapter.",
+      "capabilities": ["Employee records", "Payroll calculations", "Payslips", "TSD preparation", "Merit Aktiva pairing"],
+      "direction": "Import first · export by policy",
+      "ownership": "Configured per object"
+    },
+    "taavi_palk": {
+      "name": "Taavi Palk",
+      "logo_alt": "Taavi Palk placeholder mark",
+      "category": "HR software",
+      "description": "An Estonian payroll product used by more than 1,500 companies. It prepares statutory reports and exports payslips to Estonian bookkeeping systems.",
+      "capabilities": ["TSD reports", "Register reports", "Statistics reports", "Payslip exports"],
+      "direction": "Import first · export by policy",
+      "ownership": "Configured per object"
+    },
+    "andevis": {
+      "name": "Andevis",
+      "logo_alt": "Andevis placeholder mark",
+      "category": "HR software",
+      "description": "A customisable Estonian HR suite whose modules can provide reviewed personnel and payroll inputs.",
+      "capabilities": ["Personnel records", "Working time", "Payroll", "Training", "Development reviews"],
+      "direction": "Import first · export by policy",
+      "ownership": "Configured per object"
+    },
+    "eeva": {
+      "name": "Eeva (Eetasoft)",
+      "logo_alt": "Eeva by Eetasoft placeholder mark",
+      "category": "HR software",
+      "description": "Eeva's personnel module manages core employment records and is linked to Eeva payroll. Data would enter bureau payroll only through reviewed imports.",
+      "capabilities": ["Contracts", "Orders", "Leave", "ISCO classifier", "Eeva payroll link"],
+      "direction": "Import first · export by policy",
+      "ownership": "Configured per object"
+    }
     }
   },
   "login": {
