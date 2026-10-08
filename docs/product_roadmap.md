@@ -559,3 +559,20 @@ authentication and connection failures, empty results, external mappings and a
 repeat sync/apply cycle are covered with mocked HTTP transport; automated tests
 make no live FastHR requests. Production bureau use still requires customer
 configuration and accountant UAT.
+
+## 21. Finance connector health checks (2026-10-09)
+
+QuickBooks, Xero and Merit connection tests now construct the existing real
+provider adapters from tenant-supplied credentials and perform a lightweight,
+company-scoped health request. Results distinguish a reachable provider that
+rejects credentials from a connection failure or timeout, while response and
+audit messages never include credential values. QuickBooks checks respect the
+sandbox setting; Xero validates the selected tenant; Merit signs the probe with
+the existing HMAC convention.
+
+This work changes connection health checks only. It does not add finance-provider
+pulls to the reviewed import pipeline or change invoice/query submission behavior.
+HMRC, e-MTA and open banking remain explicit planning stubs. Mocked HTTP coverage
+verifies successful, unauthorized and unavailable providers without live network
+calls. Section 20 is reserved for the integration-workspace change pending on its
+separate branch.

@@ -4,6 +4,19 @@ Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as
 delivered.
 
+## 2026-10-09 — Finance connector health checks
+
+- Wired the QuickBooks, Xero and Merit registry entries to their real provider
+  classes so adapter-ready connection tests now make credentialed, company-scoped
+  health requests instead of returning no-network planning-stub results.
+- Added redacted success, authentication-failure and timeout handling for all three
+  providers, including QuickBooks sandbox selection, Xero tenant authorization and
+  Merit HMAC signing. HMRC, e-MTA and open banking remain planning stubs, and no
+  finance connector was added to the reviewed import pipeline.
+- Verified request shapes, real-provider registry construction, credential
+  redaction and tenant connection status transitions using mocked HTTP transports;
+  automated tests make no live provider calls.
+
 ## 2026-10-09 — FastHR employee connector
 
 - Added the first live HR adapter: a pull-only FastHR employee-master import for
