@@ -4,9 +4,11 @@ from __future__ import annotations
 import pytest
 
 from connectors import (
+    BambooHRProvider,
     FastHRProvider,
     FileImportConnector,
     MeritProvider,
+    PersonioProvider,
     QuickBooksProvider,
     XeroProvider,
     connector_for,
@@ -43,13 +45,23 @@ def test_registry_covers_every_catalogue_provider():
     catalogue_keys = {item.key for item in CATALOGUE}
     assert PROVIDERS == catalogue_keys
     for provider in catalogue_keys:
-        credentials = {"token": "synthetic-token"} if provider == "fasthr" else None
+        credentials = {
+            "fasthr": {"token": "synthetic-token"},
+            "personio": {
+                "client_id": "synthetic-client-id",
+                "client_secret": "synthetic-client-secret",
+            },
+            "bamboohr": {
+                "subdomain": "synthetic-company",
+                "api_key": "synthetic-api-key",
+            },
+        }.get(provider)
         connector = connector_for(provider, credentials=credentials)
         assert connector.key == provider
 
 
 def test_roadmap_connectors_are_explicitly_non_live():
-    result = connector_for("personio").check()
+    result = connector_for("hibob").check()
     assert not result.ok
     assert not result.live
     assert result.operation == "check"
@@ -69,7 +81,7 @@ def test_credential_field_metadata_is_ordered_and_complete():
     ]
     for provider in ("hmrc", "emta", "open_banking"):
         assert provider_metadata(provider)["credential_note"].startswith("TBD:")
-    assert "Adapter not yet built" in provider_metadata("personio")["credential_note"]
+    assert "Adapter not yet built" in provider_metadata("hibob")["credential_note"]
 
 
 def test_fasthr_registration_is_explicit_and_not_overwritten_by_roadmap_loop():
@@ -87,6 +99,39 @@ def test_fasthr_registration_is_explicit_and_not_overwritten_by_roadmap_loop():
     assert REGISTRY["fasthr"].status == "Adapter ready"
 
 
+def test_documented_contract_registrations_are_real_and_not_overwritten_by_roadmap_loop():
+    expected_status = "Documented contract · not live-verified"
+    personio_metadata = provider_metadata("personio")
+    bamboo_metadata = provider_metadata("bamboohr")
+    assert personio_metadata["registry_status"] == expected_status
+    assert bamboo_metadata["registry_status"] == expected_status
+    assert [field["name"] for field in personio_metadata["credential_fields"]] == [
+        "client_id", "client_secret",
+    ]
+    assert personio_metadata["credential_fields"][1]["input_type"] == "secret"
+    assert [field["name"] for field in bamboo_metadata["credential_fields"]] == [
+        "subdomain", "api_key",
+    ]
+    assert bamboo_metadata["credential_fields"][1]["input_type"] == "secret"
+
+    personio = connector_for(
+        "personio",
+        credentials={"client_id": "synthetic-client-id", "client_secret": "synthetic-secret"},
+        config={"salary_attribute": "dynamic_12345"},
+    )
+    bamboo = connector_for(
+        "bamboohr",
+        credentials={"subdomain": "synthetic-company", "api_key": "synthetic-api-key"},
+        config={"salary_field_id": "customSalary"},
+    )
+    assert isinstance(personio, PersonioProvider)
+    assert personio.salary_attribute == "dynamic_12345"
+    assert isinstance(bamboo, BambooHRProvider)
+    assert bamboo.salary_field_id == "customSalary"
+    assert REGISTRY["personio"].status == expected_status
+    assert REGISTRY["bamboohr"].status == expected_status
+
+
 def test_file_import_registration_is_ready_without_credentials():
     metadata = provider_metadata("file_import")
     assert metadata["registry_status"] == "Adapter ready"
@@ -96,6 +141,7 @@ def test_file_import_registration_is_ready_without_credentials():
     )
     assert isinstance(connector, FileImportConnector)
     assert connector.pull("employee").records[0]["name"] == "Mari Maasik"
+
 
 def test_finance_registrations_build_real_providers_from_credentials():
     quickbooks = connector_for(

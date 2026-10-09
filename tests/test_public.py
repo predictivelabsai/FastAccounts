@@ -130,7 +130,10 @@ def test_hr_software_catalogue_is_complete_and_renders_in_every_locale():
 
     assert {item.key for item in hr_entries} == expected_keys
     assert len(hr_entries) == 22
-    roadmap_entries = [item for item in hr_entries if item.key not in {"fasthr", "file_import"}]
+    roadmap_entries = [
+        item for item in hr_entries
+        if item.key not in {"fasthr", "file_import", "bamboohr", "personio"}
+    ]
     assert all(item.status == "Roadmap · no adapter yet" for item in roadmap_entries)
     assert all(item.direction == "Import first · export by policy" for item in roadmap_entries)
     assert all(item.ownership == "Configured per object" for item in roadmap_entries)
@@ -138,6 +141,11 @@ def test_hr_software_catalogue_is_complete_and_renders_in_every_locale():
     assert fasthr.status == "Adapter ready"
     assert fasthr.direction == "Import · employee master data"
     assert fasthr.ownership == "FastHR remains source"
+    for key in ("bamboohr", "personio"):
+        documented = next(item for item in hr_entries if item.key == key)
+        assert documented.status == "Documented contract · not live-verified"
+        assert documented.direction.startswith("Import ·")
+        assert documented.ownership.endswith("remains source")
     file_import = next(item for item in hr_entries if item.key == "file_import")
     assert file_import.status == "Adapter ready"
     assert file_import.direction == "Import · uploaded files"

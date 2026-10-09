@@ -258,19 +258,19 @@
       "name": "BambooHR",
       "logo_alt": "BambooHR pagaidu zīme",
       "category": "Personāla programmatūra",
-      "description": "Izmantojiet BambooHR darbinieku datus kā pārskatāmu avotu biroja algu aprēķina iestatīšanai un ievaddatiem.",
-      "capabilities": ["Darbinieku pamatdati", "Darbinieku portāla piezīmes", "Prombūtne", "Organizācijas struktūra", "Dokumenti"],
-      "direction": "Vispirms imports · eksports saskaņā ar politiku",
-      "ownership": "Konfigurējams katram objektam"
+      "description": "Importējiet BambooHR darbinieku kataloga ierakstus pārskatīšanai ar dokumentēta līguma adapteri, kas nav pārbaudīts ar pakalpojuma sniedzēja piekļuves datiem; algai joprojām vajadzīga pārskatīta lauka kartēšana vai vietēja ievade.",
+      "capabilities": ["Darbinieku katalogs", "Vārds un e-pasts", "Statuss, ja tas ir pieejams", "Pielāgoto lauku saglabāšana"],
+      "direction": "Imports · darbinieku katalogs",
+      "ownership": "BambooHR paliek datu avots"
     },
     "personio": {
       "name": "Personio",
       "logo_alt": "Personio pagaidu zīme",
       "category": "Personāla programmatūra",
-      "description": "Izmantojiet Eiropas personāla risinājumu kā pārskatāmu darbinieku un algu aprēķina ievaddatu avotu.",
-      "capabilities": ["Darbinieku dati", "Darba laika uzskaite", "Prombūtne", "Dokumenti", "Algu aprēķina ievaddati"],
-      "direction": "Vispirms imports · eksports saskaņā ar politiku",
-      "ownership": "Konfigurējams katram objektam"
+      "description": "Importējiet atļautos Personio darbinieku atribūtus pārskatīšanai ar dokumentēta līguma adapteri, kas nav pārbaudīts ar pakalpojuma sniedzēja piekļuves datiem; algai joprojām vajadzīga pārskatīta atribūta kartēšana vai vietēja ievade.",
+      "capabilities": ["Darbinieku atribūti", "Nodarbinātības statuss", "Darba attiecību beigu datums", "Pielāgoto atribūtu saglabāšana"],
+      "direction": "Imports · darbinieku pamatdati",
+      "ownership": "Personio paliek datu avots"
     },
     "hibob": {
       "name": "Bob (HiBob)",
@@ -807,6 +807,7 @@
     "Cash-basis values are weighted by allocated payment and require accountant review": "Cash-basis values are weighted by allocated payment and require accountant review",
     "Adapter ready · not connected": "Adapter ready · not connected",
     "Adapter ready · test company needed": "Adapter ready · test company needed",
+    "Documented contract · not live-verified": "Dokumentēts līgums · nav pārbaudīts reālā vidē",
     "Sandbox adapter · filing gated": "Sandbox adapter · filing gated",
     "Export ready · filing gated": "Export ready · filing gated",
     "box1_vat_due_sales": "1 · VAT due on sales",

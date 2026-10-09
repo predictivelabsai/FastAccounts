@@ -258,19 +258,19 @@
       "name": "BambooHR",
       "logo_alt": "BambooHR placeholder mark",
       "category": "HR software",
-      "description": "Use BambooHR employee data as a reviewed source for bureau-payroll setup and inputs.",
-      "capabilities": ["Employee master records", "Employee portal notes", "Time off", "Org chart", "Documents"],
-      "direction": "Import first · export by policy",
-      "ownership": "Configured per object"
+      "description": "Import BambooHR directory records through a documented-contract adapter that has not been verified with vendor credentials; salary still needs a reviewed field mapping or local entry.",
+      "capabilities": ["Employee directory", "Name and email", "Status when exposed", "Custom field passthrough"],
+      "direction": "Import · employee directory",
+      "ownership": "BambooHR remains source"
     },
     "personio": {
       "name": "Personio",
       "logo_alt": "Personio placeholder mark",
       "category": "HR software",
-      "description": "Use the European HR suite as a reviewed source of employee and payroll-input data for bureau payroll.",
-      "capabilities": ["Employee records", "Attendance", "Absences", "Documents", "Payroll inputs"],
-      "direction": "Import first · export by policy",
-      "ownership": "Configured per object"
+      "description": "Import whitelisted Personio employee attributes through a documented-contract adapter that has not been verified with vendor credentials; salary still needs a reviewed attribute mapping or local entry.",
+      "capabilities": ["Employee attributes", "Employment status", "Termination date", "Custom attribute passthrough"],
+      "direction": "Import · employee master data",
+      "ownership": "Personio remains source"
     },
     "hibob": {
       "name": "Bob (HiBob)",
@@ -807,6 +807,7 @@
     "Cash-basis values are weighted by allocated payment and require accountant review": "Cash-basis values are weighted by allocated payment and require accountant review",
     "Adapter ready · not connected": "Adapter ready · not connected",
     "Adapter ready · test company needed": "Adapter ready · test company needed",
+    "Documented contract · not live-verified": "Documented contract · not live-verified",
     "Sandbox adapter · filing gated": "Sandbox adapter · filing gated",
     "Export ready · filing gated": "Export ready · filing gated",
     "box1_vat_due_sales": "1 · VAT due on sales",

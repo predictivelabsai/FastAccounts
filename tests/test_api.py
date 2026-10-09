@@ -98,8 +98,16 @@ def test_integration_catalogue_exposes_registry_fields(integration_api):
         "base_url", "token",
     ]
     assert catalogue["hmrc"]["registry_status"] == "Planning stub"
-    assert catalogue["personio"]["registry_status"] == "Roadmap · adapter not built"
-    assert "Adapter not yet built" in catalogue["personio"]["credential_note"]
+    documented = "Documented contract · not live-verified"
+    assert catalogue["personio"]["registry_status"] == documented
+    assert catalogue["bamboohr"]["registry_status"] == documented
+    assert [field["name"] for field in catalogue["personio"]["credential_fields"]] == [
+        "client_id", "client_secret",
+    ]
+    assert [field["name"] for field in catalogue["bamboohr"]["credential_fields"]] == [
+        "subdomain", "api_key",
+    ]
+    assert "not vendor credentials" in catalogue["personio"]["credential_note"]
 
 
 def test_fasthr_connection_list_and_test_use_registry_status_without_live_network(
@@ -280,11 +288,11 @@ def test_roadmap_test_is_non_live_and_does_not_persist_test_credentials(
     integration_api, db,
 ):
     client, base = integration_api
-    response = client.post(base + "/integrations/personio", json={
+    response = client.post(base + "/integrations/hibob", json={
         "credentials": {"placeholder": "saved-placeholder"}, "config": {},
     })
     assert response.status_code == 200
-    checked = client.post(base + "/integrations/personio/test", json={
+    checked = client.post(base + "/integrations/hibob/test", json={
         "credentials": {"placeholder": "ephemeral-placeholder"},
     })
     assert checked.status_code == 200
@@ -293,7 +301,7 @@ def test_roadmap_test_is_non_live_and_does_not_persist_test_credentials(
     listed = client.get(base + "/integrations").json()
     assert listed[0]["status"] == "Error"
     assert all(item["status"] != "Connected" for item in listed)
-    raw = db.one("SELECT encrypted_credentials FROM integration_connections WHERE provider='personio'")
+    raw = db.one("SELECT encrypted_credentials FROM integration_connections WHERE provider='hibob'")
     assert "saved-placeholder" not in raw["encrypted_credentials"]
     assert "ephemeral-placeholder" not in raw["encrypted_credentials"]
 

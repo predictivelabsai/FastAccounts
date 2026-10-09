@@ -258,19 +258,19 @@
       "name": "BambooHR",
       "logo_alt": "BambooHR-i ajutine märk",
       "category": "Palgatarkvara",
-      "description": "Kasuta BambooHR-i töötajaandmeid büroo palgaarvestuse seadistuse ja sisendite ülevaadatava allikana.",
-      "capabilities": ["Töötajate põhiandmed", "Töötajaportaali märkmed", "Puudumised", "Organisatsiooniskeem", "Dokumendid"],
-      "direction": "Esmalt import · eksport vastavalt reeglitele",
-      "ownership": "Seadistatav objektipõhiselt"
+      "description": "Impordi BambooHR-i töötajate kataloog dokumenteeritud lepingu põhise adapteriga ülevaatamiseks; adapterit ei ole teenusepakkuja pääsuandmetega reaalajas kontrollitud. Töötasu vajab ülevaadatud väljakaardistust või kohalikku sisestust.",
+      "capabilities": ["Töötajate kataloog", "Nimi ja e-post", "Olek, kui see on avaldatud", "Kohandatud väljade säilitamine"],
+      "direction": "Import · töötajate kataloog",
+      "ownership": "BambooHR jääb algallikaks"
     },
     "personio": {
       "name": "Personio",
       "logo_alt": "Personio ajutine märk",
       "category": "Palgatarkvara",
-      "description": "Kasuta Euroopa personalitarkvara töötajaandmete ja palgaarvestuse sisendite ülevaadatava allikana.",
-      "capabilities": ["Töötajaandmed", "Tööaja arvestus", "Puudumised", "Dokumendid", "Palgaarvestuse sisendid"],
-      "direction": "Esmalt import · eksport vastavalt reeglitele",
-      "ownership": "Seadistatav objektipõhiselt"
+      "description": "Impordi lubatud Personio töötajaatribuudid dokumenteeritud lepingu põhise adapteriga ülevaatamiseks; adapterit ei ole teenusepakkuja pääsuandmetega reaalajas kontrollitud. Töötasu vajab ülevaadatud atribuudikaardistust või kohalikku sisestust.",
+      "capabilities": ["Töötajaatribuudid", "Töösuhte olek", "Töösuhte lõppkuupäev", "Kohandatud atribuutide säilitamine"],
+      "direction": "Import · töötajate põhiandmed",
+      "ownership": "Personio jääb algallikaks"
     },
     "hibob": {
       "name": "Bob (HiBob)",
@@ -807,6 +807,7 @@
     "Cash-basis values are weighted by allocated payment and require accountant review": "Kassapõhised summad on arvestatud seotud maksete alusel ja vajavad raamatupidaja ülevaatust",
     "Adapter ready · not connected": "Liidestus valmis · ühendamata",
     "Adapter ready · test company needed": "Liidestus valmis · vaja testettevõtet",
+    "Documented contract · not live-verified": "Dokumenteeritud leping · reaalajas kontrollimata",
     "Sandbox adapter · filing gated": "Testliidestus · esitamine piiratud",
     "Export ready · filing gated": "Eksport valmis · esitamine piiratud",
     "box1_vat_due_sales": "1 · Müügilt arvestatud käibemaks",

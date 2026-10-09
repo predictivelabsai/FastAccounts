@@ -27,6 +27,21 @@ delivered.
   migration changed, so the app version stays 0.3.0; `screenshots/` is excluded
   from the Docker image.
 
+## 2026-10-09 — Personio and BambooHR documented-contract adapters
+
+- Added pull-only Personio and BambooHR employee adapters against their published
+  HTTP contracts, including Personio JSON body token exchange and complete offset
+  pagination, and BambooHR API-key Basic authentication and whole-directory reads.
+- Mapped names, email and source status without inventing payroll data. Gross
+  salary remains absent unless a tenant supplies a reviewed `salary_attribute`
+  or `salary_field_id` alias, so the existing per-row review pipeline reports
+  `Gross salary is required` and continues the batch when no mapping exists.
+- Registered both as `Documented contract · not live-verified`, with encrypted
+  credential metadata, localized catalogue copy and mocked contract, connection,
+  staging and failure-path tests. No vendor credential or live network was used;
+  production import remains gated on customer credential verification and
+  accountant review.
+
 ## 2026-10-09 — Universal employee file import
 
 - Added an offline `file_import` connector for employee CSV and TSV exports from

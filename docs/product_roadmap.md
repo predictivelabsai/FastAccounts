@@ -622,3 +622,43 @@ never retained: only parsed staged records are stored. Native Excel workbooks ar
 out of scope and must first be exported as CSV. No provider API key, migration or
 live network test is required. Section 21 covers the finance-connector health
 checks, which merged before this change.
+
+## 23. Personio and BambooHR documented-contract adapters (2026-10-09)
+
+Personio and BambooHR now have pull-only employee adapters implemented against
+their published contracts. Personio exchanges client credentials in a JSON POST
+body, uses the resulting bearer token, reads every employee page and maps only an
+exact `active` status to active employment, with past or current termination dates
+forcing inactivity. BambooHR uses API-key Basic authentication and reads the
+unpaginated company directory, preserving exposed custom fields for review.
+
+Neither adapter has been exercised with vendor credentials. They are labelled
+`Documented contract · not live-verified`: fixture-tested adapters shipped without
+vendor access use this status, and the first change that verifies one against a
+real permitted tenant may promote it to `Adapter ready`. FastHR keeps its existing
+label in this change to avoid unrelated status churn. Production use remains
+gated on customer credential verification, tenant configuration and accountant
+review; automated tests make no live network calls.
+
+Neither source is treated as authoritative for a FastAccounts gross salary.
+Records omit `gross_salary` unless a tenant explicitly configures a reviewed
+Personio `salary_attribute` or BambooHR `salary_field_id`. Without that mapping,
+staging succeeds but applying the row fails independently with `Gross salary is
+required`, leaving the rest of the batch available for review. Section 22 covers
+the universal file import, which merged before this change.
+
+## 24. Bilingual user guide and regression walk-through (2026-10-09)
+
+FastAccounts now has matching English and Estonian user guides covering every
+workspace area, with accounting-bureau payroll documented in depth. Each edition
+has 40 pages with explanatory text and corresponding screenshots, and is provided
+as PDF, HTML and PowerPoint alongside its Markdown source. Rebuild instructions
+and shared guide styling are kept with the documentation.
+
+The reproducible capture script creates an isolated seeded instance, mocks the
+FastHR API and records 28 screenshots per language while exercising the complete
+workspace with Playwright. The guide commit also passed the full Python 3.12 and
+3.13 test suites, the English and Estonian browser walk-throughs and a read-only
+public-page smoke test. It changes no application behavior or migration and keeps
+the application version at 0.3.0. Section 23 covers the Personio and BambooHR
+documented-contract adapters, which merged before this change.

@@ -7,17 +7,17 @@ import pytest
 from scripts.build_guide_pptx import parse_slides
 
 ROOT = Path(__file__).resolve().parents[1]
-GUIDE_DATE = (ROOT / "VERSION").read_text().split()[1]
+GUIDE_DATE = (ROOT / "VERSION").read_text(encoding="utf-8").split()[1]
 SOURCES = {"en": "USER_GUIDE.md", "et": "USER_GUIDE_et.md"}
 
 
 def _slides(lang):
-    return parse_slides((ROOT / "docs" / SOURCES[lang]).read_text())
+    return parse_slides((ROOT / "docs" / SOURCES[lang]).read_text(encoding="utf-8"))
 
 
 @pytest.mark.parametrize("lang", SOURCES)
 def test_guide_structure_contents_and_screenshots(lang):
-    markdown = (ROOT / "docs" / SOURCES[lang]).read_text()
+    markdown = (ROOT / "docs" / SOURCES[lang]).read_text(encoding="utf-8")
     slides = _slides(lang)
     assert len(slides) == 40 and slides[0]["kind"] == "cover"
     sections = [i + 1 for i, slide in enumerate(slides) if slide["kind"] == "section"]
@@ -47,6 +47,6 @@ def test_editions_match_slide_for_slide():
 @pytest.mark.parametrize("lang,suffix", [("en", ""), ("et", "_et")])
 def test_dated_edition_matches_source(lang, suffix):
     dated = ROOT / "docs" / f"fastaccounts_user_guide_{GUIDE_DATE}{suffix}.md"
-    assert dated.read_text() == (ROOT / "docs" / SOURCES[lang]).read_text()
+    assert dated.read_text(encoding="utf-8") == (ROOT / "docs" / SOURCES[lang]).read_text(encoding="utf-8")
     for ext in (".html", ".pdf", ".pptx"):
         assert dated.with_suffix(ext).is_file()
