@@ -200,7 +200,7 @@ PUBLIC_CSS = """
 .lh-stat-item b::before{flex:none}.lh-stat .fs-btn{margin-top:24px}
 .lh-feat-label{display:block;color:var(--accent-strong);font-size:12px;font-weight:700;margin-bottom:12px}
 .lh-price .amt{color:var(--text)}.lh-price.feature .amt{color:var(--on-accent)}
-.fs-footer-top{grid-template-columns:1.4fr 1fr 1fr}
+.fs-footer-top{grid-template-columns:1.4fr repeat(4,minmax(0,1fr));gap:28px}
 .fs-nav.on-ink .fs-btn-primary,.fs-nav.on-ink .fs-btn-lime{color:var(--on-accent)}
 .fs-nav :focus-visible,.fs-footer :focus-visible,.lh-hero :focus-visible,.lh-ctaband :focus-visible{outline-color:#ddd0ff}
 section[id]{scroll-margin-top:90px}
@@ -209,6 +209,8 @@ section[id]{scroll-margin-top:90px}
 .language-menu.open{display:flex;flex-direction:column}.language-option{display:flex;align-items:center;gap:10px;min-height:44px;padding:8px 12px;text-decoration:none;border-radius:8px}
 .language-option:hover,.language-option.active{background:var(--ink-3)}.language-flag{display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:18px;padding:0 6px;border:1px solid var(--ink-line);border-radius:6px;font-size:11px;font-weight:700;letter-spacing:0.02em;line-height:1;color:var(--on-ink)}
 @media(max-width:1100px){.fs-nav-actions-mobile .language-menu{position:static;margin-top:8px}.fs-nav-actions-mobile{align-items:flex-start}}
+@media(max-width:1100px){.fs-footer-top{grid-template-columns:1.4fr 1fr 1fr}}
+@media(max-width:860px){.fs-footer-top{grid-template-columns:1fr 1fr}}
 @media(max-width:680px){.lh-hero{padding-bottom:56px;margin-bottom:0}.fs-footer-top{grid-template-columns:1fr}}
 .page-hero{max-width:1180px;margin:auto;padding:76px 24px 42px}.page-hero .lede{font-size:18px}.summary{display:flex;gap:10px;flex-wrap:wrap;margin-top:24px}.chip{border:1px solid var(--line);border-radius:999px;padding:8px 13px;font-size:12px;font-weight:700;color:var(--muted)}
 .catalogue{max-width:1180px;margin:auto;padding:14px 24px 74px}.integration-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}.integration{border:1px solid var(--line);border-radius:22px;padding:24px;background:#fff;display:flex;flex-direction:column;min-height:350px}.integration-head{display:flex;align-items:flex-start;justify-content:space-between;gap:20px}.integration-logo-wrap{height:58px;min-width:140px;display:flex;align-items:center}.integration-logo{display:block;max-width:142px;max-height:50px;object-fit:contain}.provider-meta{text-align:right}.markets{display:block;margin-top:8px;color:var(--muted);font-size:11px;font-weight:750}.integration h2{font-size:23px;margin:24px 0 4px}.category{font-size:12px;color:var(--accent-strong);font-weight:750}.integration>p{color:var(--muted);line-height:1.6}.capabilities{display:flex;gap:7px;flex-wrap:wrap;margin:8px 0 18px}.capability{background:var(--paper);border:1px solid var(--line);border-radius:999px;padding:6px 9px;font-size:11px;color:var(--muted)}.ownership{border-top:1px solid var(--line);padding-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:14px;font-size:12px}.ownership span{display:block;color:var(--muted);margin-bottom:3px}.ownership strong{font-size:13px}.docs{color:var(--accent-strong);text-decoration:none;font-size:13px;font-weight:750;margin-top:auto;padding-top:20px}
@@ -265,6 +267,33 @@ section[id]{scroll-margin-top:90px}
   .lh-faq summary{font-size:18px}.auth-card{padding:26px}
 }
 
+/* ---------- first-party trust and release pages ---------- */
+.trust-hero{background:var(--ink);color:var(--on-ink);padding:clamp(72px,10vw,118px) 0 clamp(54px,7vw,84px)}
+.trust-hero-inner{max-width:820px}
+.trust-hero h1{font-size:clamp(40px,6vw,70px);line-height:1.02;letter-spacing:-.04em;text-wrap:balance}
+.trust-hero .lede{color:var(--on-ink-muted);font-size:clamp(17px,2vw,20px);line-height:1.65;margin-top:22px}
+.trust-note{display:inline-flex;margin-top:26px;padding:9px 13px;border:1px solid var(--ink-line);border-radius:999px;color:var(--on-ink);font-size:13px;font-weight:700}
+.trust-content{padding:clamp(58px,8vw,96px) 0}
+.trust-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:clamp(42px,7vw,88px)}
+.trust-section{padding:28px 0;border-top:1px solid var(--line)}
+.trust-section h2{font-size:clamp(22px,2.5vw,30px);line-height:1.2;margin-bottom:12px}
+.trust-section p{max-width:72ch;color:var(--muted);font-size:16px;line-height:1.72}
+.trust-section .fs-btn{margin-top:20px}
+.trust-section-wide{grid-column:1/-1}
+.release-group{padding:34px 0;border-top:1px solid var(--line)}
+.release-head{display:flex;align-items:baseline;justify-content:space-between;gap:20px;margin-bottom:12px}
+.release-head h2{font-size:clamp(24px,3vw,34px)}
+.release-date{color:var(--accent-strong);font-weight:750;font-variant-numeric:tabular-nums;white-space:nowrap}
+.release-group>p{max-width:72ch;color:var(--muted);font-size:16px;line-height:1.72}
+.roadmap-items{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 36px}
+.roadmap-item{padding:24px 0;border-top:1px solid var(--line)}
+.roadmap-item h3{font-size:20px;margin:0 0 8px}
+.roadmap-item p{color:var(--muted);line-height:1.65}
+.market-tag{display:inline-flex;margin-top:14px;border-radius:999px;background:var(--paper-2);padding:6px 10px;color:var(--accent-strong);font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase}
+.trust-source{margin-top:34px;color:var(--muted)}
+.trust-source a{color:var(--accent-strong);font-weight:700;text-underline-offset:.2em}
+@media(max-width:860px){.trust-layout,.roadmap-items{grid-template-columns:1fr}.trust-section-wide{grid-column:auto}.release-head{align-items:flex-start;flex-direction:column;gap:6px}}
+
 """
 
 
@@ -306,9 +335,9 @@ def _nav(lang: str, current: str):
     T = lambda key: i18n.t(key, lang)
     return fs_nav(
         FASTPRODUCT,
-        [(T("nav.pricing"), "/#pricing"), (T("nav.why"), "/#why"),
-         (T("bureau.title"), "/#bureaus"), (T("nav.integrations"), "/integrations"),
-         (T("nav.roadmap"), FASTPRODUCT.github_url)],
+        [(T("nav.product"), "/#why"), (T("nav.for_bureaus"), "/#bureaus"),
+         (T("nav.integrations"), "/integrations"), (T("nav.pricing"), "/#pricing"),
+         (T("nav.security"), "/security"), (T("nav.changelog"), "/changelog")],
         [_language_switcher(lang, current), fs_button(T("nav.sign_in"), "/login", "primary")],
         menu_label=T("nav.open_navigation"),
     )
@@ -318,11 +347,24 @@ def _footer(lang: str):
     T = lambda key: i18n.t(key, lang)
     return fs_footer(
         replace(FASTPRODUCT, tagline=T("footer.tagline")),
-        [(T("footer.product"), [(T("nav.pricing"), "/#pricing"),
-                                (T("footer.integrations"), "/integrations")]),
-         (T("footer.resources"), [(T("footer.github"), FASTPRODUCT.github_url),
-                                  (T("footer.health"), "/healthz")])],
-        T("footer.tagline"), [A(version.label(), href="/healthz", title=version.detail(), data_testid="app-version")],
+        [(T("footer.product"), [(T("nav.product"), "/#why"),
+                                (T("nav.for_bureaus"), "/#bureaus"),
+                                (T("footer.integrations"), "/integrations"),
+                                (T("nav.pricing"), "/#pricing")]),
+         (T("footer.trust"), [(T("footer.security"), "/security"),
+                              (T("footer.privacy"), "/privacy"),
+                              (T("footer.terms"), "/terms")]),
+         (T("footer.company"), [(T("footer.about"), "/about"),
+                                (T("footer.contact"), "/contact"),
+                                (T("footer.roadmap"), "/roadmap"),
+                                (T("footer.changelog"), "/changelog")]),
+         (T("footer.resources"), [(T("footer.status"), "/healthz"),
+                                  (T("footer.documentation"), f"{FASTPRODUCT.github_url}/tree/main/docs"),
+                                  (T("footer.source"), FASTPRODUCT.github_url)])],
+        T("footer.legal_entity"),
+        [A(T("footer.contact_email"), href="mailto:info@predictivelabs.ai?subject=FastAccounts%20enquiry"),
+         A(version.label(), href="/healthz", title=version.detail(), data_testid="app-version")],
+        legal=T("footer.legal_notice"),
     )
 
 
@@ -541,6 +583,104 @@ def integrations_page(lang: str = i18n.DEFAULT_LANG):
         title=T("integrations.title"),
         current="/integrations",
         lang=lang,
+    )
+
+
+CONTACT_EMAIL = "info@predictivelabs.ai"
+
+
+def _public_page_copy(lang: str, page: str) -> dict:
+    fallback = i18n.catalog(i18n.DEFAULT_LANG).get("public_pages", {}).get(page, {})
+    translated = i18n.catalog(lang).get("public_pages", {}).get(page, {})
+    return translated if isinstance(translated, dict) else fallback
+
+
+def _contact_link(section: dict):
+    subject = quote(section["email_subject"], safe="")
+    return A(section["action"], href=f"mailto:{CONTACT_EMAIL}?subject={subject}", cls="fs-btn fs-btn-ink")
+
+
+def _information_page(page: str, lang: str):
+    copy = _public_page_copy(lang, page)
+    sections = []
+    for section in copy["sections"]:
+        sections.append(Article(
+            H2(section["title"]),
+            P(section["body"]),
+            _contact_link(section) if section.get("email_subject") else None,
+            cls="trust-section",
+        ))
+    return public_page(
+        Section(Div(H1(copy["title"]), P(copy["lede"], cls="lede"),
+                    Span(copy["note"], cls="trust-note"), cls="trust-hero-inner fs-wrap"),
+                cls="trust-hero"),
+        Section(Div(*sections, cls="trust-layout fs-wrap"), cls="trust-content"),
+        title=copy["title"], current=f"/{page}", lang=lang,
+    )
+
+
+def security_page(lang: str = i18n.DEFAULT_LANG):
+    return _information_page("security", lang)
+
+
+def privacy_page(lang: str = i18n.DEFAULT_LANG):
+    return _information_page("privacy", lang)
+
+
+def about_page(lang: str = i18n.DEFAULT_LANG):
+    return _information_page("about", lang)
+
+
+def contact_page(lang: str = i18n.DEFAULT_LANG):
+    return _information_page("contact", lang)
+
+
+def terms_page(lang: str = i18n.DEFAULT_LANG):
+    return _information_page("terms", lang)
+
+
+def roadmap_page(lang: str = i18n.DEFAULT_LANG):
+    copy = _public_page_copy(lang, "roadmap")
+    stages = []
+    for stage in copy["stages"]:
+        items = []
+        for item in stage["items"]:
+            heading = item["title"]
+            if item.get("date"):
+                heading = f"{heading} · {item['date']}"
+            items.append(Article(H3(heading), P(item["body"]),
+                                 Span(item["market"], cls="market-tag"), cls="roadmap-item"))
+        stages.append(Section(H2(stage["title"]), P(stage["intro"], cls="lede"),
+                              Div(*items, cls="roadmap-items"), cls="release-group"))
+    return public_page(
+        Section(Div(H1(copy["title"]), P(copy["lede"], cls="lede"),
+                    Span(copy["note"], cls="trust-note"), cls="trust-hero-inner fs-wrap"),
+                cls="trust-hero"),
+        Section(Div(*stages,
+                    P(copy["source_intro"], " ",
+                      A(copy["source_link"], href="/changelog"), cls="trust-source"),
+                    cls="fs-wrap"), cls="trust-content"),
+        title=copy["title"], current="/roadmap", lang=lang,
+    )
+
+
+def changelog_page(lang: str = i18n.DEFAULT_LANG):
+    copy = _public_page_copy(lang, "changelog")
+    releases = []
+    for release in copy["releases"]:
+        releases.append(Article(
+            Div(H2(release["title"]), Time(release["date"], datetime=release["date"], cls="release-date"), cls="release-head"),
+            P(release["body"]), cls="release-group",
+        ))
+    return public_page(
+        Section(Div(H1(copy["title"]), P(copy["lede"], cls="lede"),
+                    Span(copy["note"], cls="trust-note"), cls="trust-hero-inner fs-wrap"),
+                cls="trust-hero"),
+        Section(Div(*releases,
+                    P(copy["source_intro"], " ",
+                      A(copy["source_link"], href=f"{FASTPRODUCT.github_url}/blob/main/docs/change_log.md"),
+                      cls="trust-source"), cls="fs-wrap"), cls="trust-content"),
+        title=copy["title"], current="/changelog", lang=lang,
     )
 
 

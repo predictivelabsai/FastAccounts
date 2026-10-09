@@ -20,7 +20,9 @@ import version
 from api_app import api
 from database import get_database
 from web import google_auth, i18n
-from web.public import integrations_page, landing_page, login_page, workspace_page
+from web.public import (about_page, changelog_page, contact_page,
+                        integrations_page, landing_page, login_page, privacy_page,
+                        roadmap_page, security_page, terms_page, workspace_page)
 
 
 def _page_language(session, request):
@@ -61,6 +63,41 @@ def home(session, request):
 @rt("/integrations")
 def integration_catalogue(session, request):
     return integrations_page(_page_language(session, request))
+
+
+@rt("/security")
+def security(session, request):
+    return security_page(_page_language(session, request))
+
+
+@rt("/privacy")
+def privacy(session, request):
+    return privacy_page(_page_language(session, request))
+
+
+@rt("/about")
+def about(session, request):
+    return about_page(_page_language(session, request))
+
+
+@rt("/contact")
+def contact(session, request):
+    return contact_page(_page_language(session, request))
+
+
+@rt("/terms")
+def terms(session, request):
+    return terms_page(_page_language(session, request))
+
+
+@rt("/roadmap")
+def roadmap(session, request):
+    return roadmap_page(_page_language(session, request))
+
+
+@rt("/changelog")
+def changelog(session, request):
+    return changelog_page(_page_language(session, request))
 
 
 @rt("/login")

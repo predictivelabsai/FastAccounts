@@ -7,8 +7,12 @@
   },
   "nav": {
     "why": "Miks FastAccounts",
+    "product": "Toode",
+    "for_bureaus": "Raamatupidamisbüroodele",
     "integrations": "Liidestused",
     "roadmap": "Tegevuskava",
+    "security": "Turvalisus",
+    "changelog": "Muudatuste logi",
     "sign_in": "Logi sisse",
     "workspace": "Töölaud",
     "bureau": "Büroo / Avaleht",
@@ -34,11 +38,131 @@
   "footer": {
     "tagline": "Avatud lähtekoodiga raamatupidamine Ühendkuningriigis ja Eestis.",
     "integrations": "Integratsioonid",
-    "source": "Lähtekood",
+    "source": "Lähtekood · GitHub",
     "product": "Toode",
+    "trust": "Usaldus",
+    "security": "Turvalisus",
+    "privacy": "Privaatsus",
+    "terms": "Tingimused",
+    "company": "Ettevõte",
+    "about": "Meist",
+    "contact": "Kontakt",
+    "roadmap": "Tegevuskava",
+    "changelog": "Muudatuste logi",
+    "status": "Olek",
+    "documentation": "Dokumentatsioon",
     "resources": "Lisainfo",
     "github": "GitHub",
-    "health": "Teenuse olek"
+    "health": "Teenuse olek",
+    "legal_entity": "Predictive Labs Ltd · registrikood 14857334",
+    "contact_email": "Müük ja tugi: info@predictivelabs.ai",
+    "legal_notice": "FastAccountsi haldab Predictive Labs Ltd, 155 Minories Street, Suite 275, London EC3N 1AD, Ühendkuningriik."
+  },
+  "public_pages": {
+    "security": {
+      "title": "Turvalisus",
+      "lede": "Faktiline ülevaade FastAccountsi praegustest turvameetmetest, isemajutaja vastutusest ja enne tootmiskasutust lõpetamist vajavast tööst.",
+      "note": "Varajase etapi turvaseis · üle vaadatud 9. oktoobril 2026",
+      "sections": [
+        {"title": "Majutusmudel", "body": "FastAccountsi saab ise majutada; sel juhul valib ja turvab taristu selle käitaja. Hallatav pilootteenus kasutab sama Dockeri rakendust koos PostgreSQL-i ja püsiva tõendusmaterjalide hoidlaga FastSME hallatavas taristus. Alusinfrastruktuuri pakkuja sõltub juurutusest ning tuleb tootmiskliendi lepingus nimetada."},
+        {"title": "Krüpteerimine", "body": "Liidestuste kasutustunnused krüpteeritakse puhkeolekus võtmeversiooniga Ferneti varamus ning neid ei lisata brauserivastustesse ega logidesse. Majutatud ühendus kasutab HTTPS-i/TLS-i. FastAccounts ei väida praegu, et iga andmebaasiväli või üles laaditud tõendusfail oleks rakenduse tasemel puhkeolekus krüpteeritud."},
+        {"title": "Varukoopiad ja taaste", "body": "Isemajutaja vastutab andmebaasi, tõendusfailide, krüpteerimise ja taastamise eest. Hallatava majutuse tootmiskriteeriumid hõlmavad krüpteeritud varukoopiaid ja kontrollitud taastamist; hoidlas pole veel lõpetatud taasteproovi kirjet, seega me taastamisaega ei luba."},
+        {"title": "Juurdepääsukontroll", "body": "Rakendus kasutab Google'i sisselogimist, kutsepõhist organisatsiooni liikmesust, allkirjastatud seansse, CSRF-kaitset ning omaniku, administraatori, raamatupidaja, kinnitaja ja vaataja rolle. Äriandmed on organisatsioonipõhised ja organisatsioonidevahelist ligipääsu kontrollivad testid. Hallatava teenuse MFA-poliitika ja võrgupiiri päringupiirangud on veel juurutuskriteeriumid."},
+        {"title": "Turvaintsidendid", "body": "Saada turvaintsidendi kahtlus privaatselt aadressile info@predictivelabs.ai ja lisa teemaks „FastAccountsi turvaintsident“. Meeskond säilitab asjakohased kirjed, hindab ulatust ja koordineerib klienditeavitust. Lepingulist reageerimisaega veel ei pakuta.", "action": "Teata turvaintsidendist", "email_subject": "FastAccountsi turvaintsident"},
+        {"title": "Sõltuvuste teavitused", "body": "Pythoni sõltuvused on kirjas failis requirements.txt. CI kompileerib rakenduse, käivitab testid, kontrollib migratsioone ja otsib lähtekoodist levinud saladuste mustreid. Projekt ei väida, et sõltuvuste turvanõrkusi jälgitakse pidevalt ja automaatselt. Kahtlasest sõltuvusest teata privaatselt turvakontakti kaudu."},
+        {"title": "Vastutustundlik avalikustamine", "body": "Teata turvanõrkusest enne avalikku arutelu privaatselt ning lisa mõjutatud versioonid, kordamise juhis ja mõju. Kinnitame suhtluskanali, uurime heas usus ja lepime teavitajaga kokku avalikustamise aja. Palun anna parandamiseks mõistlik aeg; vastamise või parandamise tähtaega me veel ei garanteeri.", "action": "Saada privaatne turvateade", "email_subject": "FastAccountsi vastutustundlik avalikustamine"}
+      ]
+    },
+    "privacy": {
+      "title": "Privaatsus",
+      "lede": "See pilootteenuse teavitus selgitab praeguses tootes nähtavaid rolle ja andmevooge. Tootmiskokkuleppe peab lõpule viima kliendiga sõlmitav andmetöötlusleping.",
+      "note": "Lihtsas keeles pilootteavitus · üle vaadatud 9. oktoobril 2026",
+      "sections": [
+        {"title": "Vastutava ja volitatud töötleja rollid", "body": "Majutatud teenuses on Predictive Labs Ltd konto-, toe- ja teenusehalduse andmete vastutav töötleja ning organisatsiooni sisestatud ettevõtte-, kliendi-, tarnija- ja töötajaandmete volitatud töötleja. Klient jääb oma organisatsiooni andmete vastutavaks töötlejaks. Isemajutatud juurutuses määrab käitaja enda rollid ja teavitused."},
+        {"title": "Praegused alamtöötlejad", "body": "Praegune kood kasutab sisselogimiseks Google'it ning seadistamise korral arvete ja meeldetuletuste e-kirjadeks Postmarki. Kui Postmarki kasutustunnuseid pole, seda ei kasutata. Hoidla ei nimeta hallatava taristu pakkujat; tootmiskeskkonna majutaja tuleb enne päris kliendiandmete vastuvõtmist andmetöötluslepingus nimetada. Ühendatud raamatupidamis-, personali- või pangateenused on kliendi valitud liidestused, mitte vaikimisi andmesaajad."},
+        {"title": "Säilitamine", "body": "Raamatupidamiskirjeid säilitatakse kliendi poliitika ja kohaldatavate tähtaegade järgi: tegevuskavas on Ühendkuningriigi tavapäraste käibemaksukirjete jaoks kuus aastat ning Eesti raamatupidamiskirjete jaoks seitse aastat majandusaasta lõpust, vajaduse korral kauem. Kustutamistaotlus ei tohi märkamatult eemaldada pearaamatukandeid ega seadusest või õiguslikust hoidest tulenevaid kirjeid. Automaatne säilituse juhtimine on veel tootmiskriteerium."},
+        {"title": "Rahvusvaheline andmeedastus", "body": "Isemajutaja valib andmete asukoha. Majutatud piloodis võivad Google või Postmark töödelda andmeid oma teenusetingimuste ja edastusmeetmete alusel. Tootmise andmetöötlusleping peab kirjeldama majutuskoha, kõik alamtöötlejad ja edastusmehhanismid; see leht ei mõtle välja asukohta, mida hoidla ei dokumenteeri."},
+        {"title": "Analüütika ja logid", "body": "Avalik veebileht ega rakendus ei sisalda analüütika- või reklaamitarkvara. Juurutus võib teenuse käitamiseks ja kaitsmiseks säilitada tehnilisi veebi-, autentimis- ja auditilogisid. Logides ei tohi olla teenusepakkujate kasutustunnuseid ning nende säilitusaeg tuleb tootmiskeskkonnas dokumenteerida."},
+        {"title": "Andmesubjekti taotlused", "body": "Juurdepääsu, parandamise, kustutamise, piiramise või muu andmekaitsetaotluse korral pöördu esmalt organisatsiooni poole, kes vastavaid raamatuid haldab. FastAccountsi konto- või teenuseandmete asjus kirjuta aadressile info@predictivelabs.ai. Võime paluda isikusamasuse kinnitamist ja peame säilitama andmed, mille alleshoidmist seadus nõuab.", "action": "Võta andmekaitse asjus ühendust", "email_subject": "FastAccountsi andmekaitsetaotlus"}
+      ]
+    },
+    "about": {
+      "title": "Ettevõte",
+      "lede": "FastAccounts on varajases etapis avatud lähtekoodiga raamatupidamistoode Ühendkuningriigi ja Eesti väikeettevõtetele ning raamatupidamisbüroodele.",
+      "note": "Avalikult arendatud · riigipõhine valideerimine jätkub",
+      "sections": [
+        {"title": "Juriidiline isik", "body": "FastAccountsi arendab ja haldab Inglismaal ja Walesis registrikoodi 14857334 all registreeritud Predictive Labs Ltd. Ettevõtte registrijärgne aadress on 155 Minories Street, Suite 275, London EC3N 1AD, Ühendkuningriik."},
+        {"title": "Meeskond", "body": "Toodet, dokumentatsiooni ja avalikku väljalaskeajalugu haldab väike Predictive Labsi meeskond; versiooni 0.3.0 väljalaskekirjes on ühendatud tootetöö tegijana nimetatud Joosep Laats. Me ei esita meeskonda, klientide arvu ega nõustajate võrgustikku suuremana, kui tõendid lubavad."},
+        {"title": "Raamatupidamisturgude pädevus", "body": "Tarkvara sisaldab testitud Ühendkuningriigi käibemaksu ja Eesti käibemaksu deklaratsiooni (KMD) tööpabereid, riigipõhiseid arveid, täpseid Decimal-arvutusi ning muutmatuid kahekordseid kandeid. Reeglid viitavad ametlikele allikatele, kuid Ühendkuningriigi ja Eesti raamatupidajate sõltumatu kasutaja vastuvõtutest (UAT) on veel pooleli. FastAccounts on tarkvara, mitte maksu- ega õigusnõu."},
+        {"title": "Toote piirid", "body": "FastAccounts hõlmab raamatupidamist: arveid, ostuarveid, tõendusmaterjale, pangaväljavõtete importi ja vastendamist, pearaamatut, aruandeid ning ülevaadatavaid käibemaksu tööpabereid. Eesti palgaarvestus raamatupidamisbüroo kliendiettevõtetele on näidisjärgus ja ootab tootmiskasutuse UAT-i. See ei ole ERP ega sisalda laohaldust, tellimuste haldust, tootmist, CRM-i või üldist personalihaldust."}
+      ]
+    },
+    "contact": {
+      "title": "Kontakt",
+      "lede": "Üks toimiv postkast ja iga pöördumise jaoks selge teemarida. Me ei avalda seadistamata e-posti aadresse.",
+      "note": "Predictive Labs Ltd · info@predictivelabs.ai",
+      "sections": [
+        {"title": "Müük", "body": "Küsi hallatava piloodi, isemajutuse või raamatupidamisbüroo hindamise kohta. Lisa oma turg, organisatsiooni tüüp ja töövoog, mida soovid proovida.", "action": "Kirjuta müügile", "email_subject": "FastAccountsi müügipäring"},
+        {"title": "Kasutajatugi", "body": "Tooteabi saamiseks lisa FastAccountsi versioon, leht või töövoog, oodatud tulemus ja tegelik tulemus. Ära saada e-postiga paroole, OAuthi pääsuloendeid, panga kasutustunnuseid ega päris raamatupidamise väljavõtteid.", "action": "Kirjuta kasutajatoele", "email_subject": "FastAccountsi kasutajatoe päring"},
+        {"title": "Turvalisus", "body": "Teata võimalikust turvanõrkusest või intsidendist privaatselt. Lisa mõjutatud versioonid ja kordamiseks vajalik teave, kuid ära lisa päris kasutustunnuseid ega ebavajalikke isikuandmeid.", "action": "Kirjuta turvakontaktile", "email_subject": "FastAccountsi turvateade"},
+        {"title": "Andmekaitse", "body": "Konto- või teenuseandmete taotluses nimeta organisatsioon ja asjaomased andmed. Kliendiraamatuid puudutav taotlus tuleb üldjuhul esmalt esitada neid haldavale organisatsioonile.", "action": "Kirjuta andmekaitse kontaktile", "email_subject": "FastAccountsi andmekaitsetaotlus"}
+      ]
+    },
+    "terms": {
+      "title": "Tingimused — mustand",
+      "lede": "Need on varajase etapi teenuse esialgsed tingimused. Need ei ole lõplikud klienditingimused ega loo väiteid teenusetaseme, nõuetele vastavuse või garantiide kohta.",
+      "note": "Ülevaatamiseks mõeldud mustand · mitte tootmistingimused",
+      "sections": [
+        {"title": "Teenuse ulatus", "body": "FastAccounts pakub raamatupidamistarkvara ja valikulist majutatud pilooti. Funktsioon võib olla saadaval, ülevaatamist vajav, pilootjärgus või plaanitud. Otsene maksudeklaratsioonide esitamine ja muud piiratud võimalused ei kuulu teenusesse, kui allkirjastatud leping ei ütle sõnaselgelt teisiti."},
+        {"title": "Kliendi vastutus", "body": "Klient vastutab lähteandmete õigsuse, kasutajate juurdepääsu, raamatupidamise ja palgaarvestuse väljundite kontrolli, kohustuslike deklaratsioonide ning erialase nõu eest. Sünteetilist näidist ei tohi käsitleda tootmisraamatupidamisena."},
+        {"title": "Avatud lähtekoodiga tarkvara", "body": "Lähtekoodihoidla on avaldatud MIT-litsentsi alusel. Isemajutatud kasutust reguleerib see litsents; juurutuse käitamine, turvamine, varundamine ja uuendamine on käitaja vastutus."},
+        {"title": "Majutatud piloot", "body": "Majutatud kasutuse saadavus, tugi, andmetöötlus, tasud, lõpetamine ja teenusetasemed tuleb kokku leppida eraldi kliendilepingus. See mustand ei luba katkematut teenust, reageerimisaega ega tootmiskeskkonna taastamise sihti."},
+        {"title": "Kokkuleppimist vajavad õigustingimused", "body": "Garantiid, vastutuse piirangud, kohaldatav õigus, vaidluste lahendamine ja tootmise andmetöötlusleping vajavad õiguslikku ülevaatust ning neid ei ole siin välja mõeldud. Enne päris raamatupidamise majutamist võta ühendust Predictive Labs Ltd-ga."}
+      ]
+    },
+    "roadmap": {
+      "title": "Tegevuskava",
+      "lede": "Ostjale arusaadav ülevaade sellest, mida praegu valideeritakse, mis tuleb järgmisena ja mis jääb hilisemaks. Allolevad kuupäevad on väljalaskekuupäevad, mitte prognoosid.",
+      "note": "Praegu / Järgmisena / Hiljem · uuendatud 9. oktoobril 2026",
+      "source_intro": "Täielik rakendusajalugu on",
+      "source_link": "muudatuste logis",
+      "stages": [
+        {"title": "Praegu", "intro": "Töö, mis muudab inseneripiloodi tootmisküpseks teenuseks.", "items": [
+          {"title": "Sõltumatu raamatupidajate UAT", "body": "Valideerida Ühendkuningriigi käibemaks, Eesti KMD ja Eesti büroopalgaarvestuse piloot kvalifitseeritud raamatupidajatega enne erialase valideerimise väiteid.", "market": "ÜK + Eesti"},
+          {"title": "Hallatava teenuse toimivustõendid", "body": "Nimetada majutuse alamtöötleja, dokumenteerida andmete asukoht, lõpetada krüpteeritud varukoopia ja taaste proov ning seadistada intsidenditeavitused, võrgupiiri päringupiirangud ja pahavarakontroll.", "market": "Mõlemad turud"},
+          {"title": "Teenusepakkujate kontroll", "body": "Kontrollida dokumenteeritud ja liidestusvalmis ühendusi lubatud kliendi- või testettevõtte kasutustunnustega, hoides impordi ülevaadatava ja organisatsioonipõhisena.", "market": "Mõlemad turud"}
+        ]},
+        {"title": "Järgmisena", "intro": "Plaanitud töö pärast praeguste valideerimis- ja käituskriteeriumide täitmist.", "items": [
+          {"title": "Tootmiskõlblik avatud pangandus", "body": "Lisada taasühendamine, ajastatud kirjutuskaitstud import ja seire pärast õiguslikku, ärilist ja katvuse ülevaatust.", "market": "ÜK + Eesti"},
+          {"title": "Toetatud maksudeklaratsioonide kanalid", "body": "Lõpetada teenusepakkujate kinnitused ning kaitstud HMRC ja e-MTA tootmisteekonnad. Praegune tulemus on tööpaber ja eksport.", "market": "ÜK + Eesti"},
+          {"title": "Büroopalgaarvestuse tootmisülevaatus", "body": "Lõpetada Eesti kliendiraamatute palgaarvestuse UAT, sealhulgas lahendamata TSD, puhkuse- ja haigushüvitise piirid.", "market": "Eesti"}
+        ]},
+        {"title": "Hiljem", "intro": "Kasulikud laiendused, mis ei kuulu praegusesse tootmislubadusse.", "items": [
+          {"title": "Laiem Ühendkuningriigi nõuete tugi", "body": "Kaaluda ettevõtte tulumaksu, Companies House'i aruandeid, CIS-i ja lisakäibemaksuskeeme alles pärast näidisandmeid ja erialast ülevaatust.", "market": "Ühendkuningriik"},
+          {"title": "Laiem Eesti aruandlus", "body": "Kaaluda aastaaruande taksonoomia kaardistamist, registrile esitamist ja toetatud e-MTA otsekanalit siis, kui ligipääsu- ja ülevaatuskriteeriumid on täidetud.", "market": "Eesti"},
+          {"title": "Valikulised soovitused", "body": "Hinnata tehisintellekti abil väljade või vastete soovitamist ainult selge inimese kinnituse taga; ükski soovitus ei tohi pearaamatusse märkamatult kanduda.", "market": "Mõlemad turud"}
+        ]},
+        {"title": "Valmis", "intro": "Kuupäevad pärinevad versioonihalduses olevast muudatuste logist.", "items": [
+          {"title": "Avalik alus", "date": "2026-08-10", "body": "Enne esimest kirjendatud rakenduse väljalaset valmisid avaleht, liidestuste kataloog, tervisekontroll ja kaitstud sisselogimine. Muudatuste logis pole 0.1.x väljalaset, seega me ei mõtle seda välja.", "market": "ÜK + Eesti"},
+          {"title": "Inseneripiloot 0.2.0", "date": "2026-08-10", "body": "Valmisid raamatupidamise põhifunktsioonid, muutmatu kahekordne kirjendamine, ülevaadatavad Ühendkuningriigi käibemaksu ja Eesti KMD tööpaberid, sünteetilised raamatud ning teenusepakkujate piirid.", "market": "ÜK + Eesti"},
+          {"title": "Palgaarvestus 0.2.1", "date": "2026-10-08", "body": "Valmisid osalise tööaja ja tunnitasuga Eesti büroopalgaarvestus, sotsiaalmaksu miinimumkohustus ning laiendatud sünteetiline näidis.", "market": "Eesti"},
+          {"title": "Väljalase 0.3.0", "date": "2026-10-09", "body": "Valmisid kordusarved, meeldetuletused, liidestuste ühenduste haldus ning ülevaadatav töötajate import ilma päris võrgupäringuteta testides.", "market": "ÜK + Eesti"}
+        ]}
+      ]
+    },
+    "changelog": {
+      "title": "Muudatuste logi",
+      "lede": "Lühike väljalaskeajalugu ostjatele ja käitajatele. Üksikasjalikud tehnilised märkmed jäävad lähtekoodihoidlasse.",
+      "note": "Kuupäevastatud ja tõendipõhised väljalasked",
+      "source_intro": "Kõiki valminud muudatusi näeb",
+      "source_link": "tehnilisest muudatuste logist",
+      "releases": [
+        {"title": "0.3.0 · Liidestused ja automaatika", "date": "2026-10-09", "body": "Lisandusid kordusarved ja meeldetuletused, organisatsioonipõhine ühenduste haldus, FastHR-i liidestus, ülevaadatav töötajate import, universaalne CSV/TSV import ning dokumenteeritud Personio ja BambooHR-i liidestused. Teenusepakkujate testid kasutavad imiteeritud võrguühendust; tootmiskontroll jääb selgelt eraldi."},
+        {"title": "0.2.1 · Eesti büroopalgaarvestus", "date": "2026-10-08", "body": "Lisandusid osaline tööaeg, tunnitasu, kogumispensioni määrad, 2026. aasta sotsiaalmaksu miinimumkohustus ja sünteetiline palgaarvestuse näidis. Eesti büroopalgaarvestus jääb näidisjärku, kuni raamatupidajate tootmis-UAT on lõpetatud."},
+        {"title": "0.2.0 · Inseneripiloot", "date": "2026-08-10", "body": "Valmisid raamatupidamise töölaud, porditavad migratsioonid, arved, ostuarved, tõendusmaterjalid, pangaväljavõtete import ja vastendamine, muutmatu tasakaalus pearaamat, finantsaruanded ning ülevaadatavad Ühendkuningriigi ja Eesti käibemaksu tööpaberid."},
+        {"title": "Alus enne versioonitud väljalaskeid", "date": "2026-08-10", "body": "Avaldati esimene avaleht, liidestuste kataloog, tervisekontroll ja kaitstud autentimise alus. Versioonihalduses olevas muudatuste logis ei ole 0.1.x väljalaset."}
+      ]
+    }
   },
   "landing": {
     "float_bank": "Laekunud makse",
@@ -961,7 +1085,7 @@
     "matches_title": "Põhjendatud vasted",
     "matches_body": "Vaata, miks pangatehing dokumendiga sobib. Kontrolli alusandmeid ja kinnita enne kirjendamist.",
     "tax_title": "Ülevaatus enne eksporti",
-    "tax_body": "Koosta KMD ja käibemaksu töölehed, kontrolli summad ning märgi töölehed enne eksporti ülevaadatuks."
+    "tax_body": "Koosta Eesti käibemaksu deklaratsiooni (KMD) ja Ühendkuningriigi käibemaksu tööpaberid, kontrolli summad ning märgi need enne eksporti ülevaadatuks. Eksport on saadaval; otse esitamine ei ole veel saadaval."
   },
   "pricing": {
     "kicker": "Hinnad",

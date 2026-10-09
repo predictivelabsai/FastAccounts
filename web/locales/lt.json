@@ -7,8 +7,12 @@
   },
   "nav": {
     "why": "Kodėl FastAccounts",
+    "product": "Produktas",
+    "for_bureaus": "Apskaitos biurams",
     "integrations": "Integracijos",
     "roadmap": "Plėtros planas",
+    "security": "Saugumas",
+    "changelog": "Pakeitimų žurnalas",
     "sign_in": "Prisijungti",
     "workspace": "Darbo erdvė",
     "bureau": "Biuras / Pradžia",
@@ -34,11 +38,131 @@
   "footer": {
     "tagline": "Atvirojo kodo buhalterinė apskaita Jungtinei Karalystei ir Estijai.",
     "integrations": "Integracijos",
-    "source": "Pirminis kodas",
+    "source": "Pirminis kodas · GitHub",
     "product": "Produktas",
+    "trust": "Patikimumas",
+    "security": "Saugumas",
+    "privacy": "Privatumas",
+    "terms": "Sąlygos",
+    "company": "Įmonė",
+    "about": "Apie mus",
+    "contact": "Kontaktai",
+    "roadmap": "Plėtros planas",
+    "changelog": "Pakeitimų žurnalas",
+    "status": "Būsena",
+    "documentation": "Dokumentacija",
     "resources": "Ištekliai",
     "github": "GitHub",
-    "health": "Sistemos būsena"
+    "health": "Sistemos būsena",
+    "legal_entity": "Predictive Labs Ltd · įmonės numeris 14857334",
+    "contact_email": "Pardavimai ir pagalba: info@predictivelabs.ai",
+    "legal_notice": "FastAccounts valdo Predictive Labs Ltd, 155 Minories Street, Suite 275, London EC3N 1AD, Jungtinė Karalystė."
+  },
+  "public_pages": {
+    "security": {
+      "title": "Saugumas",
+      "lede": "Faktais pagrįsta dabartinių FastAccounts apsaugos priemonių, savarankiškos prieglobos atsakomybės ir iki gamybinio naudojimo likusių darbų apžvalga.",
+      "note": "Ankstyvas etapas · peržiūrėta 2026 m. spalio 9 d.",
+      "sections": [
+        {"title": "Prieglobos modelis", "body": "FastAccounts galima diegti savarankiškai; tuomet infrastruktūrą pasirenka ir saugo jos operatorius. Valdomas bandomasis variantas naudoja tą pačią Docker programą su PostgreSQL ir nuolatine įrodymų saugykla FastSME valdomoje infrastruktūroje. Infrastruktūros teikėjas priklauso nuo diegimo ir turi būti įvardytas gamybinio kliento sutartyje."},
+        {"title": "Šifravimas", "body": "Integracijų prisijungimo duomenys ramybės būsenoje šifruojami versijuotu Fernet raktu ir nepatenka į naršyklės atsakymus ar žurnalus. Priglobtas ryšys naudoja HTTPS/TLS. FastAccounts neteigia, kad kiekvienas duomenų bazės laukas ar įkeltas įrodymų failas yra šifruojamas programos lygmeniu ramybės būsenoje."},
+        {"title": "Atsarginės kopijos ir atkūrimas", "body": "Savarankiškos prieglobos operatorius atsako už duomenų bazės, įrodymų saugyklos, šifravimo ir atkūrimo procesą. Valdomai prieglobai šifruotos kopijos ir išbandytas atkūrimas yra gamybiniai kriterijai; saugykloje dar neužfiksuotas baigtas atkūrimo bandymas, todėl atkūrimo laikas nežadamas."},
+        {"title": "Prieigos kontrolė", "body": "Programa naudoja Google prisijungimą, narystę organizacijoje pagal kvietimą, pasirašytas sesijas, CSRF apsaugą ir savininko, administratoriaus, buhalterio, tvirtintojo bei stebėtojo roles. Verslo duomenys atskirti pagal organizaciją, o tarporganizacinė prieiga testuojama. MFA politika ir užklausų ribojimas tinklo pakraštyje tebėra diegimo kriterijai."},
+        {"title": "Saugumo incidentai", "body": "Apie įtariamą incidentą praneškite privačiai adresu info@predictivelabs.ai, temos eilutėje įrašę „FastAccounts saugumo incidentas“. Komanda išsaugos reikalingus įrašus, ištirs apimtį ir koordinuos ryšį su klientais. Sutartinis reagavimo laikas dar nesiūlomas.", "action": "Pranešti apie incidentą", "email_subject": "FastAccounts saugumo incidentas"},
+        {"title": "Priklausomybių pranešimai", "body": "Python priklausomybės nurodytos requirements.txt; CI kompiliuoja programą, vykdo testus, tikrina migracijas ir ieško dažnų paslapčių šablonų. Projektas neteigia vykdantis nuolatinę automatinę priklausomybių pažeidžiamumų stebėseną. Apie įtartiną priklausomybę praneškite privačiu saugumo kanalu."},
+        {"title": "Atsakingas pažeidžiamumų atskleidimas", "body": "Prieš viešą aptarimą praneškite privačiai ir nurodykite paveiktas versijas, atkūrimo veiksmus bei poveikį. Patvirtinsime ryšio kanalą, sąžiningai ištirsime ir su pranešėju suderinsime atskleidimo datą. Skirkite pagrįstą laiką pataisymui; atsakymo ar pataisymo termino dar negarantuojame.", "action": "Siųsti privatų pranešimą", "email_subject": "FastAccounts atsakingas pažeidžiamumo atskleidimas"}
+      ]
+    },
+    "privacy": {
+      "title": "Privatumas",
+      "lede": "Ši bandomojo etapo informacija paaiškina dabartinio produkto vaidmenis ir duomenų srautus. Gamybinę tvarką turi užbaigti su klientu sudaryta duomenų tvarkymo sutartis.",
+      "note": "Paprasta bandomojo etapo informacija · peržiūrėta 2026 m. spalio 9 d.",
+      "sections": [
+        {"title": "Valdytojo ir tvarkytojo vaidmenys", "body": "Priglobtoje paslaugoje Predictive Labs Ltd yra paskyros, pagalbos ir paslaugos administravimo duomenų valdytojas bei organizacijos įvestų verslo, klientų, tiekėjų ir darbuotojų duomenų tvarkytojas. Klientas išlieka savo organizacijos duomenų valdytoju. Savarankiškame diegime operatorius pats nustato vaidmenis ir pranešimus."},
+        {"title": "Dabartiniai subtvarkytojai", "body": "Dabartinis kodas naudoja Google prisijungimui ir Postmark sąskaitų bei priminimų el. laiškams, kai ši funkcija sukonfigūruota. Be Postmark prisijungimo duomenų jis nenaudojamas. Saugykloje nenurodytas valdomos infrastruktūros teikėjas; jis turi būti įvardytas kliento duomenų tvarkymo sutartyje prieš priimant gamybinius duomenis. Prijungtos apskaitos, personalo ar bankų paslaugos yra kliento pasirinktos integracijos, ne numatytieji gavėjai."},
+        {"title": "Saugojimas", "body": "Apskaitos įrašai saugomi pagal kliento politiką ir taikomus terminus: plane numatyti šešeri metai įprastiems JK PVM įrašams ir septyneri metai nuo finansinių metų pabaigos Estijos apskaitai, prireikus ilgiau. Ištrynimas negali nepastebimai pašalinti registruotų didžiosios knygos įrašų ar teisiškai saugotinų duomenų. Automatinis saugojimo vykdymas dar yra gamybinis kriterijus."},
+        {"title": "Tarptautinis duomenų perdavimas", "body": "Savarankiškos prieglobos operatorius pasirenka duomenų vietą. Priglobtame bandyme Google ar Postmark gali tvarkyti duomenis pagal savo sąlygas ir perdavimo apsaugas. Gamybinėje duomenų tvarkymo sutartyje turi būti nurodyta prieglobos vieta, visi subtvarkytojai ir perdavimo priemonės; šiame puslapyje neišgalvojama saugykloje neužfiksuota vieta."},
+        {"title": "Analitika ir žurnalai", "body": "Viešojoje svetainėje ir programoje nėra analitikos ar reklamos SDK. Diegimas gali saugoti techninius žiniatinklio, autentifikavimo ir audito žurnalus, reikalingus paslaugai veikti ir apsaugoti. Juose negali būti teikėjų prisijungimo duomenų, o saugojimo trukmė turi būti dokumentuota gamyboje."},
+        {"title": "Duomenų subjektų prašymai", "body": "Dėl prieigos, taisymo, ištrynimo, apribojimo ar kitų duomenų teisių pirmiausia kreipkitės į organizaciją, kuri valdo atitinkamą apskaitą. Dėl FastAccounts paskyros ar paslaugos duomenų rašykite info@predictivelabs.ai. Gali reikėti patvirtinti tapatybę ir išsaugoti teisiškai privalomus įrašus.", "action": "Kreiptis dėl duomenų apsaugos", "email_subject": "FastAccounts duomenų apsaugos prašymas"}
+      ]
+    },
+    "about": {
+      "title": "Įmonė",
+      "lede": "FastAccounts yra ankstyvo etapo atvirojo kodo apskaitos produktas Jungtinės Karalystės ir Estijos mažoms įmonėms bei apskaitos biurams.",
+      "note": "Kuriama viešai · šalių patvirtinimas tęsiamas",
+      "sections": [
+        {"title": "Juridinis asmuo", "body": "FastAccounts kuria ir valdo Predictive Labs Ltd, Anglijoje ir Velse registruota įmonė numeriu 14857334. Registruotos buveinės adresas: 155 Minories Street, Suite 275, London EC3N 1AD, Jungtinė Karalystė."},
+        {"title": "Komanda", "body": "Produktą, dokumentaciją ir viešą leidimų istoriją prižiūri nedidelė Predictive Labs komanda; 0.3.0 leidimo įraše Joosep Laats įvardytas už sujungtus produkto darbus. Nerodome didesnės komandos, klientų skaičiaus ar konsultantų tinklo, nei pagrindžia įrodymai."},
+        {"title": "Apskaitos rinkų kompetencija", "body": "Programoje įgyvendinti testuoti Jungtinės Karalystės PVM ir Estijos PVM deklaracijos (KMD) darbo dokumentai, šalių sąskaitų taisyklės, tikslūs Decimal skaičiavimai ir nekintami dvejybiniai apskaitos įrašai. Taisyklės siejamos su oficialiais šaltiniais, tačiau nepriklausomas JK ir Estijos buhalterių UAT dar nebaigtas. FastAccounts yra programinė įranga, ne mokesčių ar teisinė konsultacija."},
+        {"title": "Produkto ribos", "body": "FastAccounts apima sąskaitas, pirkimo sąskaitas, įrodymus, banko išrašų importą ir derinimą, didžiąją knygą, ataskaitas ir peržiūrimus PVM darbo dokumentus. Estijos darbo užmokestis apskaitos biurų klientams yra demonstracinės apimties, o gamybinis UAT dar laukia. Tai nėra ERP ir neapima atsargų, užsakymų, gamybos, CRM ar bendrojo personalo valdymo."}
+      ]
+    },
+    "contact": {
+      "title": "Kontaktai",
+      "lede": "Vienas veikiantis paštas ir aiški temos eilutė kiekvienam kreipimosi keliui. Neskelbiame nesukonfigūruotų adresų.",
+      "note": "Predictive Labs Ltd · info@predictivelabs.ai",
+      "sections": [
+        {"title": "Pardavimai", "body": "Klauskite apie priglobtą bandymą, savarankišką prieglobą ar apskaitos biuro vertinimą. Nurodykite rinką, organizacijos tipą ir norimą išbandyti darbo eigą.", "action": "Rašyti pardavimams", "email_subject": "FastAccounts pardavimo užklausa"},
+        {"title": "Pagalba", "body": "Dėl produkto pagalbos nurodykite FastAccounts versiją, puslapį ar darbo eigą, laukiamą ir faktinį rezultatą. El. paštu nesiųskite slaptažodžių, OAuth prieigos raktų, banko prisijungimų ar tikrų apskaitos eksportų.", "action": "Rašyti pagalbai", "email_subject": "FastAccounts pagalbos užklausa"},
+        {"title": "Saugumas", "body": "Apie galimą pažeidžiamumą ar incidentą praneškite privačiai. Nurodykite paveiktas versijas ir atkuriamą informaciją, bet nepridėkite veikiančių prisijungimo duomenų ar nereikalingų asmens duomenų.", "action": "Rašyti apie saugumą", "email_subject": "FastAccounts saugumo pranešimas"},
+        {"title": "Duomenų apsauga", "body": "Paskyros ar paslaugos duomenų prašyme nurodykite organizaciją ir susijusius duomenis. Prašymus dėl kliento apskaitos paprastai pirmiausia reikia pateikti ją valdančiai organizacijai.", "action": "Rašyti dėl duomenų apsaugos", "email_subject": "FastAccounts duomenų apsaugos prašymas"}
+      ]
+    },
+    "terms": {
+      "title": "Sąlygos — projektas",
+      "lede": "Tai laikinos ankstyvo etapo paslaugos sąlygos. Jos nėra galutinės klientų sąlygos ir nesukuria teiginių apie paslaugos lygį, atitiktį ar garantijas.",
+      "note": "Projektas peržiūrai · ne gamybinės sąlygos",
+      "sections": [
+        {"title": "Paslaugos apimtis", "body": "FastAccounts teikia apskaitos programinę įrangą ir pasirenkamą priglobtą bandymą. Funkcijos gali būti prieinamos, reikalaujančios peržiūros, bandomosios arba planuojamos. Tiesioginis mokesčių pateikimas ir kitos ribotos galimybės neįtrauktos, nebent pasirašytoje sutartyje aiškiai nurodyta kitaip."},
+        {"title": "Kliento atsakomybė", "body": "Klientas atsako už šaltinių duomenų tikslumą, naudotojų prieigą, apskaitos ir darbo užmokesčio rezultatų peržiūrą, privalomus pateikimus ir profesionalias konsultacijas. Sintetinės demonstracijos negalima laikyti gamybine apskaita."},
+        {"title": "Atvirojo kodo programinė įranga", "body": "Pirminio kodo saugykla skelbiama pagal MIT licenciją. Savarankišką naudojimą reglamentuoja ši licencija; diegimo veikimas, saugumas, atsarginės kopijos ir atnaujinimai lieka operatoriaus atsakomybė."},
+        {"title": "Priglobtas bandymas", "body": "Priglobto naudojimo prieinamumas, pagalba, duomenų tvarkymas, mokesčiai, atšaukimas ir paslaugos lygis turi būti nustatyti atskiroje kliento sutartyje. Šis projektas nežada nepertraukiamos paslaugos, atsakymo laiko ar gamybinio atkūrimo tikslo."},
+        {"title": "Dar nesuderintos teisinės sąlygos", "body": "Garantijoms, atsakomybės riboms, taikytinai teisei, ginčų tvarkai ir gamybinei duomenų tvarkymo sutarčiai reikia teisinės peržiūros; jos čia neišgalvotos. Prieš priglobdami tikrą apskaitą susisiekite su Predictive Labs Ltd."}
+      ]
+    },
+    "roadmap": {
+      "title": "Plėtros planas",
+      "lede": "Pirkėjui suprantama apžvalga, kas tikrinama dabar, kas bus toliau ir kas paliekama vėlesniam laikui. Datos yra leidimų datos, o ne prognozės.",
+      "note": "Dabar / Toliau / Vėliau · atnaujinta 2026 m. spalio 9 d.",
+      "source_intro": "Visą įgyvendinimo istoriją rasite",
+      "source_link": "pakeitimų žurnale",
+      "stages": [
+        {"title": "Dabar", "intro": "Darbai, kurie inžinerinį bandymą pavers gamybai paruošta paslauga.", "items": [
+          {"title": "Nepriklausomas buhalterių UAT", "body": "Prieš teigiant profesionalų patvirtinimą su kvalifikuotais buhalteriais patikrinti JK PVM, Estijos KMD ir Estijos biurų darbo užmokesčio bandymą.", "market": "JK + Estija"},
+          {"title": "Valdomų operacijų įrodymai", "body": "Įvardyti prieglobos subtvarkytoją, dokumentuoti duomenų vietą, užbaigti šifruotų kopijų atkūrimo bandymą ir sukonfigūruoti incidentų įspėjimus, užklausų ribojimą bei kenkėjiškų failų tikrinimą.", "market": "Abi rinkos"},
+          {"title": "Teikėjų patikra", "body": "Patikrinti dokumentuotas ir paruoštas integracijas su leistinais kliento ar bandomosios įmonės duomenimis, išlaikant importą peržiūrimą ir atskirtą pagal organizaciją.", "market": "Abi rinkos"}
+        ]},
+        {"title": "Toliau", "intro": "Planuojami darbai įvykdžius dabartinius patvirtinimo ir veiklos kriterijus.", "items": [
+          {"title": "Gamybinė atviroji bankininkystė", "body": "Po teisinės, komercinės ir aprėpties peržiūros pridėti pakartotinį prijungimą, planinius tik skaitymo importus ir stebėseną.", "market": "JK + Estija"},
+          {"title": "Palaikomi mokesčių pateikimo kanalai", "body": "Užbaigti teikėjų patvirtinimus ir apsaugotus HMRC bei e-MTA gamybinius procesus. Dabartinis rezultatas yra darbo dokumentai ir eksportas.", "market": "JK + Estija"},
+          {"title": "Biurų darbo užmokesčio gamybinė peržiūra", "body": "Užbaigti Estijos klientų darbo užmokesčio UAT, įskaitant likusias TSD, atostogų ir ligos išmokų ribas.", "market": "Estija"}
+        ]},
+        {"title": "Vėliau", "intro": "Naudingi plėtiniai, nepatenkantys į dabartinį gamybinį pažadą.", "items": [
+          {"title": "Platesnė JK atitiktis", "body": "Pelno mokestį, Companies House ataskaitas, CIS ir papildomas PVM schemas svarstyti tik po pavyzdžių ir profesionalios peržiūros.", "market": "Jungtinė Karalystė"},
+          {"title": "Platesnės Estijos ataskaitos", "body": "Metinių ataskaitų taksonomiją, registro pateikimą ir tiesioginį e-MTA kanalą svarstyti įvykdžius prieigos ir peržiūros kriterijus.", "market": "Estija"},
+          {"title": "Pasirenkami pasiūlymai", "body": "DI laukų ar atitikmenų pasiūlymus vertinti tik su aiškiu žmogaus patvirtinimu; joks pasiūlymas negali nepastebimai registruoti įrašo.", "market": "Abi rinkos"}
+        ]},
+        {"title": "Išleista", "intro": "Datuoti etapai iš saugykloje esančio pakeitimų žurnalo.", "items": [
+          {"title": "Viešasis pagrindas", "date": "2026-08-10", "body": "Prieš pirmą užfiksuotą programos leidimą išleista svetainė, integracijų katalogas, sveikatos patikra ir apsaugotas prisijungimas. Pakeitimų žurnale nėra 0.1.x leidimo, todėl jis neišgalvojamas.", "market": "JK + Estija"},
+          {"title": "Inžinerinis bandymas 0.2.0", "date": "2026-08-10", "body": "Išleista pagrindinė apskaita, nekintami dvejybiniai įrašai, peržiūrimi JK PVM ir Estijos KMD darbo dokumentai, sintetinės knygos ir integracijų ribos.", "market": "JK + Estija"},
+          {"title": "Darbo užmokestis 0.2.1", "date": "2026-10-08", "body": "Išleistas ne viso etato ir valandinis Estijos biurų darbo užmokestis, socialinio mokesčio minimumas bei išplėsta sintetinė demonstracija.", "market": "Estija"},
+          {"title": "Leidimas 0.3.0", "date": "2026-10-09", "body": "Išleistos periodinės sąskaitos, priminimai, integracijų ryšių kontrolė ir peržiūrimas darbuotojų importas, testuose nenaudojant tikrų tinklo užklausų.", "market": "JK + Estija"}
+        ]}
+      ]
+    },
+    "changelog": {
+      "title": "Pakeitimų žurnalas",
+      "lede": "Trumpa leidimų istorija pirkėjams ir operatoriams. Išsamios techninės pastabos lieka saugykloje.",
+      "note": "Datuoti ir įrodymais pagrįsti leidimai",
+      "source_intro": "Visus išleistus pakeitimus skaitykite",
+      "source_link": "techniniame pakeitimų žurnale",
+      "releases": [
+        {"title": "0.3.0 · Integracijos ir automatizavimas", "date": "2026-10-09", "body": "Pridėtos periodinės sąskaitos ir priminimai, organizacijoms atskirta ryšių kontrolė, FastHR jungtis, peržiūrimas darbuotojų importas, universalus CSV/TSV kelias ir dokumentuotos Personio bei BambooHR sąsajos. Testai naudoja imituotą tinklą; gamybinė patikra lieka atskira."},
+        {"title": "0.2.1 · Estijos biurų darbo užmokestis", "date": "2026-10-08", "body": "Pridėtas ne visas etatas, valandinis atlygis, pensijų tarifai, 2026 m. socialinio mokesčio minimumas ir sintetinė darbo užmokesčio demonstracija. Funkcija lieka demonstracinė, kol nebaigtas buhalterių gamybinis UAT."},
+        {"title": "0.2.0 · Inžinerinis bandymas", "date": "2026-08-10", "body": "Išleista apskaitos darbo erdvė, perkeliamos migracijos, sąskaitos, pirkimo sąskaitos, įrodymai, išrašų importas ir derinimas, nekintama subalansuota didžioji knyga, finansinės ataskaitos ir peržiūrimi JK bei Estijos PVM darbo dokumentai."},
+        {"title": "Pagrindas prieš versijuotus leidimus", "date": "2026-08-10", "body": "Paskelbta pirmoji svetainė, integracijų katalogas, sveikatos patikra ir apsaugoto autentifikavimo pagrindas. Saugyklos pakeitimų žurnale nėra 0.1.x leidimo."}
+      ]
+    }
   },
   "landing": {
     "float_bank": "Gautas mokėjimas",
@@ -961,7 +1085,7 @@
     "matches_title": "Pagrįstas operacijų derinimas",
     "matches_body": "Matykite, kodėl banko operacija atitinka dokumentą. Patikrinkite pagrindimą ir patvirtinkite prieš įtraukdami į apskaitą.",
     "tax_title": "Peržiūra prieš eksportą",
-    "tax_body": "Parenkite KMD ir PVM darbo dokumentus, patikrinkite sumas ir prieš eksportuodami pažymėkite dokumentus kaip peržiūrėtus."
+    "tax_body": "Parenkite Estijos PVM deklaracijos (KMD) ir Jungtinės Karalystės PVM darbo dokumentus, patikrinkite sumas ir prieš eksportuodami pažymėkite juos kaip peržiūrėtus. Eksportas galimas, o tiesioginis pateikimas dar negalimas."
   },
   "pricing": {
     "kicker": "Kainos",

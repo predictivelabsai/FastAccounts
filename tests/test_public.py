@@ -7,7 +7,9 @@ import pytest
 
 import integrations
 from web import i18n
-from web.public import integrations_page, landing_page, login_page, workspace_page
+from web.public import (about_page, changelog_page, contact_page,
+                        integrations_page, landing_page, login_page, privacy_page,
+                        roadmap_page, security_page, terms_page, workspace_page)
 from web_app import app
 
 
@@ -100,6 +102,61 @@ def test_public_pages_share_accessible_localized_shell(render, current, lang):
         assert page.select_one('a[href="/auth/google"]')
     elif current == "/integrations":
         assert len(page.select(".integration")) == len(integrations.CATALOGUE)
+
+
+@pytest.mark.parametrize("route,render,key_strings", [
+    ("/security", security_page, ("Security", "key-versioned Fernet", "Responsible disclosure")),
+    ("/privacy", privacy_page, ("Privacy", "Current subprocessors", "no analytics or advertising SDK")),
+    ("/about", about_page, ("Predictive Labs Ltd", "Joosep Laats", "not an ERP")),
+    ("/contact", contact_page, ("Sales", "Support", "Data protection")),
+    ("/terms", terms_page, ("Terms — draft", "not final customer terms", "MIT License")),
+    ("/roadmap", roadmap_page, ("Now", "Next", "Later", "0.3.0", "2026-10-09")),
+    ("/changelog", changelog_page, ("Changelog", "0.2.1", "0.3.0", "2026-10-09")),
+])
+def test_first_party_trust_and_release_routes(route, render, key_strings):
+    client.get("/set-lang/en?next=/", follow_redirects=False)
+    response = client.get(route)
+    assert response.status_code == 200
+    assert all(value in response.text for value in key_strings)
+
+    page = BeautifulSoup(str(render()), "html.parser")
+    assert [link["href"] for link in page.select(".fs-nav-links > .fs-nav-link")] == [
+        "/#why", "/#bureaus", "/integrations", "/#pricing", "/security", "/changelog",
+    ]
+    footer_links = {link.get("href") for link in page.select(".fs-footer a")}
+    assert {
+        "/security", "/privacy", "/terms", "/about", "/contact", "/roadmap",
+        "/changelog", "/healthz", "https://github.com/predictivelabsai/FastAccounts",
+        "https://github.com/predictivelabsai/FastAccounts/tree/main/docs",
+    } <= footer_links
+    assert "Predictive Labs Ltd" in page.select_one(".fs-footer").get_text()
+    assert "info@predictivelabs.ai" in page.select_one(".fs-footer").get_text()
+    assert page.select_one(f'a[href="/set-lang/et?next={route}"]')
+
+
+@pytest.mark.parametrize("lang,title", [
+    ("en", "Security"), ("et", "Turvalisus"), ("lv", "Drošība"), ("lt", "Saugumas"),
+])
+def test_new_public_pages_render_localized_copy(lang, title):
+    pages = [security_page, privacy_page, about_page, contact_page,
+             terms_page, roadmap_page, changelog_page]
+    for render in pages:
+        page = BeautifulSoup(str(render(lang)), "html.parser")
+        assert page.html["lang"] == lang
+        assert page.select_one("h1").get_text() == i18n.catalog(lang)["public_pages"][render.__name__.removesuffix("_page")]["title"]
+        assert title in str(security_page(lang))
+
+
+def test_bureau_tax_copy_names_both_vat_markets_and_filing_status():
+    expected = {
+        "en": ("Estonian VAT (KMD)", "UK VAT", "direct filing is not yet available"),
+        "et": ("Eesti käibemaksu deklaratsiooni (KMD)", "Ühendkuningriigi käibemaksu", "otse esitamine ei ole veel saadaval"),
+        "lv": ("Igaunijas PVN deklarācijas (KMD)", "Apvienotās Karalistes PVN", "tieša iesniegšana vēl nav pieejama"),
+        "lt": ("Estijos PVM deklaracijos (KMD)", "Jungtinės Karalystės PVM", "tiesioginis pateikimas dar negalimas"),
+    }
+    for lang, phrases in expected.items():
+        copy = i18n.t("bureau.tax_body", lang)
+        assert all(phrase in copy for phrase in phrases)
 
 
 def test_integration_catalogue_lists_platforms_agents_and_bank_plan():
