@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
+import json
 from datetime import datetime, timezone
 from decimal import Decimal
 
@@ -461,9 +462,10 @@ def test_personio_check_exchanges_credentials_in_json_body_and_honours_auth_cool
     assert all(not request.url.query for request in seen)
     assert seen[-1].headers["content-type"] == "application/json"
     assert seen[-1].headers["accept"] == "application/json"
-    assert seen[-1].read().decode() == (
-        '{"client_id":"synthetic-client-id","client_secret":"synthetic-client-secret"}'
-    )
+    assert json.loads(seen[-1].read().decode()) == {
+        "client_id": "synthetic-client-id",
+        "client_secret": "synthetic-client-secret",
+    }
     assert "synthetic-client-secret" not in result.message
 
 
