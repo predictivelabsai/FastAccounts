@@ -78,22 +78,35 @@ def exchange(request, code: str) -> dict | None:
     email = (info.get("email") or "").strip().lower()
     if not email or info.get("email_verified") is False:
         return None
+    if not access_allowed(email):
+        return None
+    return {"email": email, "name": info.get("name") or email}
+
+
+def access_allowed(email: str) -> bool:
+    """Shared sign-in policy for Google and email/password accounts.
+
+    An address may sign in when it is explicitly allowed by configuration, already
+    belongs to an organisation, holds a pending invitation, or when an
+    unconfigured deployment has no organisations yet (first-owner bootstrap).
+    """
+    email = (email or "").strip().lower()
+    if not email or "@" not in email:
+        return False
     domains = {x.strip().lower() for x in os.getenv("GOOGLE_ALLOWED_DOMAINS", "").split(",") if x.strip()}
     emails = {x.strip().lower() for x in os.getenv("GOOGLE_ALLOWED_EMAILS", "").split(",") if x.strip()}
     domain = email.rsplit("@", 1)[-1]
-    configured_match = email in emails or domain in domains
-    if not configured_match:
-        try:
-            from database import get_database
-            db = get_database()
-            known = db.one(
-                "SELECT email FROM memberships WHERE lower(email)=lower(?) "
-                "UNION SELECT email FROM invitations WHERE lower(email)=lower(?) AND status='Pending' LIMIT 1",
-                (email, email),
-            )
-            bootstrap = not (domains or emails) and int(db.scalar("SELECT COUNT(*) FROM organisations") or 0) == 0
-        except Exception:
-            known, bootstrap = None, False
-        if not known and not bootstrap:
-            return None
-    return {"email": email, "name": info.get("name") or email}
+    if email in emails or domain in domains:
+        return True
+    try:
+        from database import get_database
+        db = get_database()
+        known = db.one(
+            "SELECT email FROM memberships WHERE lower(email)=lower(?) "
+            "UNION SELECT email FROM invitations WHERE lower(email)=lower(?) AND status='Pending' LIMIT 1",
+            (email, email),
+        )
+        bootstrap = not (domains or emails) and int(db.scalar("SELECT COUNT(*) FROM organisations") or 0) == 0
+    except Exception:
+        known, bootstrap = None, False
+    return bool(known or bootstrap)

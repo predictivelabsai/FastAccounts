@@ -243,7 +243,7 @@ def test_health_reports_every_connector_as_non_live():
     assert payload["integrations"] == len(integrations.CATALOGUE)
     assert payload["live_integrations"] == 0
     assert payload["database"]["status"] == "ok"
-    assert payload["database"]["migrations"] == 8
+    assert payload["database"]["migrations"] == 9
 
 
 def test_public_violet_tokens_and_new_locale_keys():

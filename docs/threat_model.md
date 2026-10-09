@@ -7,7 +7,11 @@ contact data, audit history, and statutory records under retention.
 
 ## Trust boundaries and controls
 
-- Browser to app: Google sign-in, invite-only membership, secure signed session, CSRF token,
+- Browser to app: Google sign-in or email and password (scrypt hashes, email confirmation
+  that re-asks the chosen password, single-use SHA-256-hashed reset links valid for one hour,
+  per-email lockout and per-address throttles, identical responses whether or not an account
+  exists), invite-only membership, a secure signed session rotated on every sign-in and
+  invalidated everywhere by a password reset, CSRF tokens on every form and API write,
   explicit CORS allowlist, and role checks on every API workflow.
 - Organisation to organisation: `organisation_id` on business tables plus service queries and
   cross-tenant tests. PostgreSQL RLS is planned defense in depth.
@@ -24,5 +28,6 @@ contact data, audit history, and statutory records under retention.
 - UK and Estonian accountant UAT is pending and may change country mappings.
 - e-MTA X-Road access and open-banking regulatory/commercial responsibilities require signed
   agreements. Their production controls remain unavailable until then.
-- Malware scanning, rate limiting at the edge, MFA policy, retention automation, and incident
+- Malware scanning, rate limiting at the edge (application throttles exist for sign-in,
+  sign-up and reset), MFA policy, retention automation, and incident
   alerting must be configured in the managed deployment environment.

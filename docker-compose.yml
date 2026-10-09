@@ -23,6 +23,8 @@ services:
       GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-http://localhost:5012/auth/google/callback}
       GOOGLE_ALLOWED_DOMAINS: ${GOOGLE_ALLOWED_DOMAINS:-}
       GOOGLE_ALLOWED_EMAILS: ${GOOGLE_ALLOWED_EMAILS:-}
+      POSTMARK_API_TOKEN: ${POSTMARK_API_TOKEN:-}
+      FROM_EMAIL: ${FROM_EMAIL:-}
     volumes:
       - fastaccounts-data:/data
 

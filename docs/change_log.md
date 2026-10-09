@@ -4,6 +4,41 @@ Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as
 delivered.
 
+## 2026-10-09 — v0.4.0: email and password sign-in beside Google SSO
+
+- Added sign-up, sign-in and forgot/reset password with email and password on
+  `/login`, next to **Continue with Google**, in English, Estonian, Latvian and
+  Lithuanian. The forms reuse the existing sign-in card, buttons and design
+  tokens; reset and email-confirmation pages use the same card.
+- Ported the shared FastSME local-account pattern (FastHRM and FastClinic
+  `web/account_auth.py`) into `web/account_auth.py`, storing accounts, hashed
+  tokens and throttles in the main database through migration
+  `0009_local_accounts` (SQLite and PostgreSQL).
+- Security: scrypt password hashes (N=2^14, r=8, p=5; sister-format hashes
+  still verify and are upgraded on sign-in); CSRF tokens on every auth form;
+  per-email lockout after 10 failed sign-ins in 15 minutes plus per-address
+  throttles for sign-in, sign-up, reset requests and token forms; identical
+  responses and comparable timing whether or not an address exists; single-use
+  reset links stored as SHA-256 digests and valid for one hour; email
+  confirmation that re-asks the chosen password; session rotation on every
+  sign-in (Google, email and test sign-in); and a password reset that signs the
+  account out of every other session through a per-account session version.
+- Linking: a Google login maps to the same account as the verified email
+  address (and discards any unconfirmed password); Google-only members,
+  including those who signed in before this release, can set a password with
+  **Forgot password?**. Membership and invitation rules are unchanged and shared
+  between both sign-in methods.
+- Email goes through Postmark with the sister products' `POSTMARK_API_TOKEN` and
+  `FROM_EMAIL`; links are built from `FASTACCOUNTS_PUBLIC_URL`, never from the
+  request host. Without mail configuration, requests log a warning and show the
+  generic message.
+- Signing out now keeps the chosen interface language.
+- Tests: unit, integration and security tests for every flow, a PostgreSQL
+  account-flow test, and a Playwright register → confirm → sign out → reset →
+  sign in run in English and Estonian. The user guide gains sign-in, account
+  creation, forgotten-password and new-password pages (43 pages and 31
+  screenshots per language).
+
 ## 2026-10-09 — User guide (English and Estonian) and regression walk-through
 
 - Added a bilingual user guide covering every workspace area, with payroll for

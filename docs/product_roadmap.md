@@ -662,3 +662,24 @@ workspace with Playwright. The guide commit also passed the full Python 3.12 and
 public-page smoke test. It changes no application behavior or migration and keeps
 the application version at 0.3.0. Section 23 covers the Personio and BambooHR
 documented-contract adapters, which merged before this change.
+
+## 25. Email and password accounts beside Google SSO (2026-10-09, v0.4.0)
+
+People can now create an account with their email address and a password, sign
+in with it, and reset a forgotten password, next to the existing Google button.
+Both methods lead to the same account for the same verified address, so a
+Google user can add a password through the reset flow and an email user can
+later continue with Google. Access rules are unchanged: an address still needs
+an organisation membership, a pending invitation or an approved domain or
+address, and invitations are accepted by the signed-in address as before.
+
+Accounts follow the shared FastSME local-account pattern from the sister
+products and are stored in the main database (migration
+`0009_local_accounts`). Sign-up is confirmed by email; the confirmation link also
+asks for the chosen password so nobody can pre-register someone else's address.
+Reset links are single-use, stored only as hashes and valid for one hour. Sign-in
+and reset are throttled, responses never reveal whether an address has an
+account, every sign-in starts a fresh session, and a reset signs the account out
+everywhere else. Email is sent through Postmark with `POSTMARK_API_TOKEN` and
+`FROM_EMAIL`; without them, requests log a warning and show the same message.
+

@@ -264,6 +264,21 @@ section[id]{scroll-margin-top:90px}
   .lh-facts dl{grid-template-columns:1fr 1fr;gap:32px 20px}
   .lh-faq summary{font-size:18px}.auth-card{padding:26px}
 }
+/* ---------- email sign-in (FastSME account pattern, design tokens only) ---------- */
+.auth-divider{display:flex;align-items:center;gap:10px;margin:22px 0 16px;color:var(--muted);font-size:12px}
+.auth-divider::before,.auth-divider::after{content:"";height:1px;background:var(--line);flex:1}
+.auth-tabs{display:flex;border-bottom:1px solid var(--line);margin-bottom:18px}
+.auth-tab{flex:1;text-align:center;padding:10px 8px;color:var(--muted);font-weight:650;font-size:14px;text-decoration:none;border-bottom:2px solid transparent}
+.auth-tab[aria-current="page"]{color:var(--ink);border-bottom-color:var(--accent)}
+.auth-form{display:grid;gap:12px}
+.auth-field-wrap label{display:block;font-size:12px;font-weight:650;color:var(--text);margin:0 0 5px}
+.auth-field{width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid var(--line);border-radius:var(--radius);background:var(--card);color:var(--ink);font:inherit;font-size:14px}
+.auth-field:focus{outline:2px solid color-mix(in srgb,var(--accent) 22%,white);border-color:var(--accent)}
+.auth-submit{width:100%;margin-top:4px}
+.auth-link{color:var(--accent-strong);font-size:13px;font-weight:600;text-decoration:none}.auth-link:hover{color:var(--ink)}
+.auth-forgot{justify-self:end;margin-top:-4px}
+.auth-card .auth-help{font-size:12px;line-height:1.5;margin:14px 0 0}
+.auth-notice{border-radius:12px;background:var(--paper-2);border:1px solid var(--line);color:var(--accent-strong);padding:12px 14px;font-size:13px;margin-top:16px}
 
 """
 
@@ -544,23 +559,112 @@ def integrations_page(lang: str = i18n.DEFAULT_LANG):
     )
 
 
-def login_page(error: str = "", lang: str = i18n.DEFAULT_LANG):
+LOGIN_TABS = ("signin", "register", "forgot")
+
+
+def _auth_field(field_id, name, label, **attrs):
+    return Div(Label(label, **{"for": field_id}), Input(id=field_id, name=name, cls="auth-field", **attrs),
+               cls="auth-field-wrap")
+
+
+def _auth_messages(error: str, notice: str):
+    return (Div(error, cls="error", role="alert") if error else None,
+            Div(notice, cls="auth-notice", role="status") if notice else None)
+
+
+def login_page(error: str = "", lang: str = i18n.DEFAULT_LANG, *, tab: str = "signin", notice: str = "",
+               csrf: str = "", next_path: str = "", email: str = ""):
     T = lambda key: i18n.t(key, lang)
+    A_ = lambda key: i18n.t(f"auth.{key}", lang)
+    tab = tab if tab in LOGIN_TABS else "signin"
     message = error.strip()[:240]
+    hidden = [Input(type="hidden", name="csrf_token", value=csrf)]
+    if next_path:
+        hidden.append(Input(type="hidden", name="next", value=next_path))
+    tab_href = lambda key: "/login" + (f"?tab={key}" if key != "signin" else "") + (
+        ("&" if key != "signin" else "?") + "next=" + quote(next_path, safe="") if next_path else "")
+    tabs = Nav(*[A(A_(f"tab_{key}"), href=tab_href(key), cls="auth-tab",
+                   aria_current="page" if (tab == key or (key == "signin" and tab == "forgot")) else "false")
+                 for key in ("signin", "register")], cls="auth-tabs", aria_label=A_("tabs_label"))
+    if tab == "register":
+        form = Form(*hidden,
+                    _auth_field("auth-register-name", "name", A_("name"), autocomplete="name", required=True, maxlength="120"),
+                    _auth_field("auth-register-email", "email", A_("email"), type="email", autocomplete="email",
+                                required=True, value=email, maxlength="254"),
+                    _auth_field("auth-register-password", "password", A_("password_choose"), type="password",
+                                autocomplete="new-password", required=True, minlength="10", maxlength="1024"),
+                    Button(A_("submit_register"), type="submit", cls="fs-btn fs-btn-ink auth-submit"),
+                    method="post", action="/auth/local/register", cls="auth-form", id="auth-register-form")
+        extra = P(A_("register_help"), cls="auth-help")
+    elif tab == "forgot":
+        form = Form(*hidden,
+                    P(A_("forgot_intro"), cls="auth-help"),
+                    _auth_field("auth-forgot-email", "email", A_("email"), type="email", autocomplete="email",
+                                required=True, value=email, maxlength="254"),
+                    Button(A_("submit_forgot"), type="submit", cls="fs-btn fs-btn-ink auth-submit"),
+                    A(A_("back_to_signin"), href=tab_href("signin"), cls="auth-link"),
+                    method="post", action="/auth/local/forgot", cls="auth-form", id="auth-forgot-form")
+        extra = None
+    else:
+        form = Form(*hidden,
+                    _auth_field("auth-login-email", "email", A_("email"), type="email", autocomplete="email",
+                                required=True, value=email, maxlength="254"),
+                    _auth_field("auth-login-password", "password", A_("password"), type="password",
+                                autocomplete="current-password", required=True, maxlength="1024"),
+                    A(A_("forgot_link"), href=tab_href("forgot"), cls="auth-link auth-forgot"),
+                    Button(A_("submit_signin"), type="submit", cls="fs-btn fs-btn-ink auth-submit"),
+                    method="post", action="/auth/local/login", cls="auth-form", id="auth-login-form")
+        extra = None
     return public_page(
         Section(
             Div(
                 Span(T("login.kicker"), cls="kicker"),
                 H1(T("login.headline")),
                 P(T("login.body")),
-                Div(message, cls="error") if message else None,
+                *_auth_messages(message, notice),
                 A(T("login.continue_google") if google_auth.enabled() else T("login.not_configured"), href="/auth/google", cls="fs-btn fs-btn-ink google"),
                 P(T("login.configuration_hint")) if not google_auth.enabled() else None,
-                cls="auth-card",
+                Div(A_("or"), cls="auth-divider"),
+                tabs,
+                form,
+                extra,
+                cls="auth-card", data_auth_tab=tab,
             ),
             cls="auth-wrap",
         ),
         title=T("login.title"),
+        current="/login",
+        lang=lang,
+    )
+
+
+def password_token_page(purpose: str, token: str, lang: str = i18n.DEFAULT_LANG, *, csrf: str = "",
+                        error: str = ""):
+    """New-password form (reset) or password confirmation (email verification)."""
+    A_ = lambda key: i18n.t(f"auth.{key}", lang)
+    purpose = "verify" if purpose == "verify" else "reset"
+    field = _auth_field(f"auth-{purpose}-password", "password",
+                        A_("password_new") if purpose == "reset" else A_("password"), type="password",
+                        autocomplete="new-password" if purpose == "reset" else "current-password",
+                        required=True, maxlength="1024", **({"minlength": "10"} if purpose == "reset" else {}))
+    return public_page(
+        Section(
+            Div(
+                Span(i18n.t("login.kicker", lang), cls="kicker"),
+                H1(A_(f"{purpose}_title")),
+                P(A_(f"{purpose}_intro")),
+                *_auth_messages(error, ""),
+                Form(Input(type="hidden", name="csrf_token", value=csrf),
+                     Input(type="hidden", name="token", value=token),
+                     field,
+                     Button(A_(f"submit_{purpose}"), type="submit", cls="fs-btn fs-btn-ink auth-submit"),
+                     A(A_("back_to_signin"), href="/login", cls="auth-link"),
+                     method="post", action=f"/auth/local/{purpose}", cls="auth-form", id=f"auth-{purpose}-form"),
+                cls="auth-card", data_auth_tab=purpose,
+            ),
+            cls="auth-wrap",
+        ),
+        title=A_(f"{purpose}_title"),
         current="/login",
         lang=lang,
     )

@@ -227,6 +227,10 @@ async def forbidden(_request: Request, error: AccessDenied):
 def current_user(request: Request, x_test_user: str = Header(default="")) -> User:
     session_user = request.session.get("user") if "session" in request.scope else None
     if session_user and session_user.get("email"):
+        from web.account_auth import session_user_valid
+        if not session_user_valid(session_user):
+            request.session.clear()
+            raise HTTPException(status_code=401, detail="Sign in is required")
         return User(email=session_user["email"].strip().lower(), name=session_user.get("name", ""))
     if os.getenv("FASTACCOUNTS_ALLOW_TEST_AUTH", "").lower() == "true" and x_test_user:
         return User(email=x_test_user.strip().lower(), name="Test user")

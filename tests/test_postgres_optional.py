@@ -13,7 +13,7 @@ from organisations import OrganisationService
 def test_postgres_migrations_and_tenant_bootstrap():
     schema="fast_accounts_test_"+uuid4().hex[:10]
     db=Database(url=os.environ["TEST_POSTGRES_URL"],schema=schema)
-    assert db.migrate()==["0001_accounting_core","0002_integrations","0003_operations","0004_document_immutability", "0005_payroll", "0006_payroll_part_time_hourly", "0007_automation", "0008_import_staging"]
+    assert db.migrate()==["0001_accounting_core","0002_integrations","0003_operations","0004_document_immutability", "0005_payroll", "0006_payroll_part_time_hourly", "0007_automation", "0008_import_staging", "0009_local_accounts"]
     assert db.migrate()==[]
     org=OrganisationService(db).create(name="Postgres Synthetic",country_code="UK",entity_type="UK_COMPANY",owner_email="pg@example.test")
     assert db.scalar("SELECT COUNT(*) FROM accounts WHERE organisation_id=?",(org["id"],))==10
@@ -36,7 +36,7 @@ def test_postgres_payroll_0006_upgrade_and_sample_run(tmp_path, monkeypatch):
     with db.transaction() as tx:
         tx.execute("INSERT INTO employees(id,organisation_id,name,gross_salary,funded_pension_percent,board_member,created_at) VALUES ('pg-board',?,'Old Board',1500,0,1,'2026-01-01')",(org["id"],))
     monkeypatch.setattr(database,"MIGRATIONS",original)
-    assert db.migrate()==["0006_payroll_part_time_hourly", "0007_automation", "0008_import_staging"]
+    assert db.migrate()==["0006_payroll_part_time_hourly", "0007_automation", "0008_import_staging", "0009_local_accounts"]
     service=PayrollService(db)
     assert service.employees(org["id"])[0]["pay_basis"]=="board_fee"
     for employee in SAMPLE_PAYROLL_EMPLOYEES:
@@ -49,3 +49,35 @@ def test_postgres_payroll_0006_upgrade_and_sample_run(tmp_path, monkeypatch):
     with pytest.raises(Exception):
         with db.transaction() as tx:
             tx.execute("UPDATE employees SET pay_basis='hourly' WHERE id='pg-board'")
+
+
+@pytest.mark.skipif(not os.getenv("TEST_POSTGRES_URL"),reason="set TEST_POSTGRES_URL for PostgreSQL integration")
+def test_postgres_local_accounts_flow(monkeypatch):
+    import time
+    from web import account_auth
+    schema="fast_accounts_test_"+uuid4().hex[:10]
+    db=Database(url=os.environ["TEST_POSTGRES_URL"],schema=schema)
+    db.migrate()
+    OrganisationService(db).create(name="Postgres Auth",country_code="EE",entity_type="EE_OU",owner_email="pg@example.test")
+    monkeypatch.setattr(account_auth,"get_database",lambda: db)
+    import web.google_auth as google_auth
+    import database as database_module
+    monkeypatch.setattr(database_module,"get_database",lambda: db)
+    mails=[]
+    monkeypatch.setattr(account_auth,"_send_link",lambda email,name,purpose,token,lang: mails.append((purpose,token)) or True)
+    store=account_auth.AccountStore(db)
+    store.register("PG@example.test","correct horse battery","PG","en")
+    purpose,token=mails[-1]
+    assert purpose=="verify" and store.authenticate("pg@example.test","correct horse battery") is None
+    assert store.confirm_email(token,"correct horse battery")["email_verified"]==1
+    assert store.authenticate("pg@example.test","correct horse battery")["email"]=="pg@example.test"
+    store.request_reset("pg@example.test")
+    _,reset=mails[-1]
+    account=store.reset_password(reset,"brand new password")
+    assert account["session_version"]==2 and store.reset_password(reset,"another password!") is None
+    assert int(db.scalar("SELECT expires_at FROM auth_tokens WHERE purpose='reset'"))<=int(time.time())+3600
+    for _ in range(3):
+        store.hit("pg@example.test","login")
+    assert int(db.scalar("SELECT attempts FROM auth_rate_limits"))==3
+    assert store.link_google("pg@example.test")["id"]==account["id"]
+    assert google_auth.access_allowed("pg@example.test")
