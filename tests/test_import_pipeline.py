@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from decimal import Decimal
 import socket
 from dataclasses import replace
 
@@ -300,7 +301,7 @@ def test_fasthr_sync_apply_and_repeat_are_idempotent(db, ee_org, monkeypatch):
                 "status": "Active",
                 "date_of_joining": "2025-05-06",
                 "gender": "Female",
-                "base_salary": 2100,
+                "base_salary": 25200,  # annual; FastAccounts stores 2100.00/month
             }],
             "meta": {"total": 1, "limit": 200, "offset": 0},
         })
@@ -453,3 +454,61 @@ def test_import_routes_authorise_redact_and_audit_ids(import_api, db, ee_org, mo
     assert "API Employee" not in audit_text
     assert "2000.005" not in audit_text
     assert secret not in audit_text
+
+
+def test_fasthr_import_applies_part_time_and_hourly_and_skips_unpaid(db, ee_org, monkeypatch):
+    from connectors.providers import FASTHR_NO_PAY_AMOUNT
+
+    vault = CredentialVault(Fernet.generate_key().decode())
+    integration = IntegrationService(db, vault)
+    integration.configure(
+        ee_org["id"],
+        "fasthr",
+        credentials={"base_url": "https://fasthr.example.test", "token": "synthetic-token"},
+        config={},
+        actor="owner@example.test",
+    )
+    rows = [
+        {"id": 1, "first_name": "Kadri", "last_name": "Kask", "status": "Active",
+         "base_salary": 30000, "working_time_ratio": 1.0, "personal_code": "49403136526"},
+        {"id": 2, "first_name": "Liis", "last_name": "Kuusk", "status": "Active",
+         "base_salary": 13620, "working_time_ratio": 0.5},
+        {"id": 3, "first_name": "Rasmus", "last_name": "Mets", "status": "Active",
+         "base_salary": 0, "hourly_rate": 8, "working_time_ratio": 1.0},
+        {"id": 4, "first_name": "Tiit", "last_name": "Tamm", "status": "Active",
+         "base_salary": None},
+    ]
+    client = httpx.Client(transport=httpx.MockTransport(lambda request: httpx.Response(
+        200, json={"data": rows, "meta": {"total": len(rows), "limit": 200, "offset": 0}})))
+    monkeypatch.setitem(REGISTRY, "fasthr", replace(REGISTRY["fasthr"], factory=lambda credentials, config:
+        FastHRProvider(base_url=credentials["base_url"], token=credentials["token"], client=client)))
+    service = ImportService(db, integration=integration)
+
+    sync = service.run_sync(ee_org["id"], "fasthr", "employees", actor="owner@example.test")
+    staged = {r["external_id"]: r for r in service.get_staged(ee_org["id"], sync_run_id=sync["id"])["records"]}
+    assert staged["4"]["review_note"] == FASTHR_NO_PAY_AMOUNT
+    assert all(staged[key]["review_note"] is None for key in ("1", "2", "3"))
+
+    result = service.apply_staged(ee_org["id"], "fasthr", sync["id"],
+                                  {r["id"]: "apply" for r in staged.values()}, actor="owner@example.test")
+    assert (result["applied"], result["failed"]) == (3, 1)
+    skipped = next(o for o in result["outcomes"] if o["staged_id"] == staged["4"]["id"])
+    assert skipped["reason"] == FASTHR_NO_PAY_AMOUNT
+
+    employees = {e["name"]: e for e in PayrollService(db).employees(ee_org["id"])}
+    assert set(employees) == {"Kadri Kask", "Liis Kuusk", "Rasmus Mets"}
+    assert employees["Kadri Kask"]["gross_salary"] == "2500.00"
+    assert employees["Kadri Kask"]["personal_id"] == "49403136526"
+    assert employees["Liis Kuusk"]["gross_salary"] == "1135.00" and Decimal(employees["Liis Kuusk"]["fte"]) == Decimal("0.5")
+    assert employees["Rasmus Mets"]["pay_basis"] == "hourly"
+    assert Decimal(employees["Rasmus Mets"]["hourly_rate"]) == Decimal("8") and employees["Rasmus Mets"]["gross_salary"] is None
+
+    # Once linked, an employee whose FastHR salary disappears keeps the local pay terms.
+    rows[0] = dict(rows[0], base_salary=None, designation="Lead")
+    again = service.run_sync(ee_org["id"], "fasthr", "employees", actor="owner@example.test")
+    kadri = next(r for r in service.get_staged(ee_org["id"], sync_run_id=again["id"])["records"]
+                 if r["external_id"] == "1")
+    outcome = service.apply_staged(ee_org["id"], "fasthr", again["id"], {kadri["id"]: "apply"},
+                                   actor="owner@example.test")
+    assert outcome["failed"] == 0
+    assert PayrollService(db).employees(ee_org["id"])[0]["gross_salary"] == "2500.00"

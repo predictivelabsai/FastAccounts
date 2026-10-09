@@ -13,9 +13,15 @@ from urllib.parse import urlencode
 
 import httpx
 
-from core_utils import money
+from core_utils import four_dp, money
 
 from .base import ConnectorResult
+
+
+# Review notes on staged FastHR employees; the exact strings are i18n keys
+# in web/locales/*.json (workspace catalogue).
+FASTHR_NO_PAY_AMOUNT = "FastHR has no salary or hourly rate for this employee; skipped until one is added in FastHR"
+FASTHR_INVALID_WORK_TIME_RATIO = "FastHR work-time ratio must be above 0 and at most 1; check it in FastHR"
 
 
 class ProviderError(RuntimeError):
@@ -197,12 +203,41 @@ class FastHRProvider(HTTPProvider):
             "fasthr_gender": row.get("gender"),
             "fasthr_branch": row.get("branch"),
         }
-        salary = row.get("base_salary")
-        if salary is not None:
-            decimal_salary = Decimal(str(salary))
-            if decimal_salary > 0:
-                record["gross_salary"] = money(decimal_salary)
+        personal_code = str(row.get("personal_code") or "").strip()
+        if personal_code:
+            record["personal_id"] = personal_code
+        warnings: list[str] = []
+        fte = FastHRProvider._positive_decimal(row.get("working_time_ratio"))
+        if row.get("working_time_ratio") in (None, ""):
+            record["fte"] = Decimal("1")
+        elif fte is not None and fte <= 1:
+            record["fte"] = four_dp(fte)
+        else:
+            warnings.append(FASTHR_INVALID_WORK_TIME_RATIO)
+        # FastHR stores base_salary as an annual amount (its UI shows it "/aastas" and its
+        # own payroll divides by 12); FastAccounts keeps a monthly gross salary.
+        annual = FastHRProvider._positive_decimal(row.get("base_salary"))
+        hourly = FastHRProvider._positive_decimal(row.get("hourly_rate"))
+        if hourly is not None and (annual is None or row.get("pay_basis") == "hourly"):
+            record["pay_basis"] = "hourly"
+            record["hourly_rate"] = four_dp(hourly)
+        elif annual is not None:
+            record["gross_salary"] = money(annual / 12)
+        else:
+            warnings.insert(0, FASTHR_NO_PAY_AMOUNT)
+        if warnings:
+            record["import_warning"] = warnings[0]
         return record
+
+    @staticmethod
+    def _positive_decimal(value) -> Decimal | None:
+        if value in (None, "") or isinstance(value, bool):
+            return None
+        try:
+            number = Decimal(str(value))
+        except (ArithmeticError, ValueError):
+            return None
+        return number if number.is_finite() and number > 0 else None
 
     def pull(self, object_type: str, *, cursor: str | None = None) -> ConnectorResult:
         if object_type not in {"employee", "employees"}:
