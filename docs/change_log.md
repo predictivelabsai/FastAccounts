@@ -4,6 +4,12 @@ Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as
 delivered.
 
+## 2026-10-09 — Local account email development links
+
+- The local sign-up verification link is printed to the server log when test
+  auth is enabled and mail is not configured; password-reset links use the same
+  local-only behavior.
+
 ## 2026-10-09 — Website trust pages and roadmap
 
 - Added localized first-party `/security`, `/privacy`, `/about`, `/contact` and
