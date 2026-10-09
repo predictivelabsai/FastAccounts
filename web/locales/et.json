@@ -144,7 +144,7 @@
         ]},
         {"title": "Valmis", "intro": "Kuupäevad pärinevad versioonihalduses olevast muudatuste logist.", "items": [
           {"title": "Avalik alus", "date": "2026-08-10", "body": "Enne esimest kirjendatud rakenduse väljalaset valmisid avaleht, liidestuste kataloog, tervisekontroll ja kaitstud sisselogimine. Muudatuste logis pole 0.1.x väljalaset, seega me ei mõtle seda välja.", "market": "ÜK + Eesti"},
-          {"title": "Inseneripiloot 0.2.0", "date": "2026-08-10", "body": "Valmisid raamatupidamise põhifunktsioonid, muutmatu kahekordne kirjendamine, ülevaadatavad Ühendkuningriigi käibemaksu ja Eesti KMD tööpaberid, sünteetilised raamatud ning teenusepakkujate piirid.", "market": "ÜK + Eesti"},
+          {"title": "Inseneripiloot 0.2.0", "date": "2026-08-10", "body": "Valmisid raamatupidamise põhifunktsioonid, muutumatu kahekordne kirjendamine, ülevaadatavad Ühendkuningriigi käibemaksu ja Eesti KMD tööpabereid, sünteetilised raamatud ning teenusepakkujate piirid.", "market": "ÜK + Eesti"},
           {"title": "Palgaarvestus 0.2.1", "date": "2026-10-08", "body": "Valmisid osalise tööaja ja tunnitasuga Eesti büroopalgaarvestus, sotsiaalmaksu miinimumkohustus ning laiendatud sünteetiline näidis.", "market": "Eesti"},
           {"title": "Väljalase 0.3.0", "date": "2026-10-09", "body": "Valmisid kordusarved, meeldetuletused, liidestuste ühenduste haldus ning ülevaadatav töötajate import ilma päris võrgupäringuteta testides.", "market": "ÜK + Eesti"},
           {"title": "Väljalase 0.4.0", "date": "2026-10-09", "body": "Google SSO kõrvale lisandusid e-posti ja parooliga registreerimine, sisselogimine ning parooli lähtestamine koos scrypt-parooliräside, ühekordsete lingiräside, päringupiirangute ja seansivahetusega.", "market": "ÜK + Eesti"}
@@ -161,7 +161,7 @@
         {"title": "0.4.0 · E-posti ja parooliga kontod", "date": "2026-10-09", "body": "Google SSO kõrvale lisandusid registreerimine, sisselogimine ja parooli lähtestamine. Paroolid räsitakse scryptiga; kinnitus- ja lähtestuslingid on ühekordsed, päringupiiranguga ning saadetakse Postmarki seadistuse kaudu."},
         {"title": "0.3.0 · Liidestused ja automaatika", "date": "2026-10-09", "body": "Lisandusid kordusarved ja meeldetuletused, organisatsioonipõhine ühenduste haldus, FastHR-i liidestus, ülevaadatav töötajate import, universaalne CSV/TSV import ning dokumenteeritud Personio ja BambooHR-i liidestused. Teenusepakkujate testid kasutavad imiteeritud võrguühendust; tootmiskontroll jääb selgelt eraldi."},
         {"title": "0.2.1 · Eesti büroopalgaarvestus", "date": "2026-10-08", "body": "Lisandusid osaline tööaeg, tunnitasu, kogumispensioni määrad, 2026. aasta sotsiaalmaksu miinimumkohustus ja sünteetiline palgaarvestuse näidis. Eesti büroopalgaarvestus jääb näidisjärku, kuni raamatupidajate tootmis-UAT on lõpetatud."},
-        {"title": "0.2.0 · Inseneripiloot", "date": "2026-08-10", "body": "Valmisid raamatupidamise töölaud, porditavad migratsioonid, arved, ostuarved, tõendusmaterjalid, pangaväljavõtete import ja vastendamine, muutmatu tasakaalus pearaamat, finantsaruanded ning ülevaadatavad Ühendkuningriigi ja Eesti käibemaksu tööpaberid."},
+        {"title": "0.2.0 · Inseneripiloot", "date": "2026-08-10", "body": "Valmisid raamatupidamise töölaud, porditavad migratsioonid, arved, ostuarved, tõendusmaterjalid, pangaväljavõtete import ja vastendamine, muutumatu tasakaalus pearaamat, finantsaruanded ning ülevaadatavad Ühendkuningriigi ja Eesti käibemaksu tööpaberid."},
         {"title": "Alus enne versioonitud väljalaskeid", "date": "2026-08-10", "body": "Avaldati esimene avaleht, liidestuste kataloog, tervisekontroll ja kaitstud autentimise alus. Versioonihalduses olevas muudatuste logis ei ole 0.1.x väljalaset."}
       ]
     }
@@ -723,7 +723,7 @@
     "Actions": "Tegevused",
     "Issue": "Väljasta",
     "Issue invoice": "Väljasta müügiarve",
-    "This creates an immutable ledger posting. Corrections require a credit note.": "See loob muutmatu pearaamatukande. Parandamiseks tuleb koostada kreeditarve.",
+    "This creates an immutable ledger posting. Corrections require a credit note.": "See loob muutumatu pearaamatukande. Parandamiseks tuleb koostada kreeditarve.",
     "Invoice issued": "Müügiarve väljastatud",
     "Supplier no.": "Tarnija arve nr",
     "Supplier number": "Tarnija arve number",
