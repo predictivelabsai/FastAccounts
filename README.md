@@ -22,7 +22,8 @@ cp .env.sample .env
 
 Open `http://localhost:5012`. Google OAuth is the normal workspace sign-in. For
 synthetic local UAT only, set `FASTACCOUNTS_ALLOW_TEST_AUTH=true`, run
-`.venv/bin/python seed.py`, then open `/auth/test`.
+`.venv/bin/python seed.py` against a fresh demo database, then open `/auth/test`.
+The seed is safe to rerun, but a fresh database keeps its demo history concise.
 
 Run the tests with:
 
