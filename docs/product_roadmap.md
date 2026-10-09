@@ -576,3 +576,28 @@ HMRC, e-MTA and open banking remain explicit planning stubs. Mocked HTTP coverag
 verifies successful, unauthorized and unavailable providers without live network
 calls. Section 20 is reserved for the integration-workspace change pending on its
 separate branch.
+
+## 23. Personio and BambooHR documented-contract adapters (2026-10-09)
+
+Personio and BambooHR now have pull-only employee adapters implemented against
+their published contracts. Personio exchanges client credentials in a JSON POST
+body, uses the resulting bearer token, reads every employee page and maps only an
+exact `active` status to active employment, with past or current termination dates
+forcing inactivity. BambooHR uses API-key Basic authentication and reads the
+unpaginated company directory, preserving exposed custom fields for review.
+
+Neither adapter has been exercised with vendor credentials. They are labelled
+`Documented contract · not live-verified`: fixture-tested adapters shipped without
+vendor access use this status, and the first change that verifies one against a
+real permitted tenant may promote it to `Adapter ready`. FastHR keeps its existing
+label in this change to avoid unrelated status churn. Production use remains
+gated on customer credential verification, tenant configuration and accountant
+review; automated tests make no live network calls.
+
+Neither source is treated as authoritative for a FastAccounts gross salary.
+Records omit `gross_salary` unless a tenant explicitly configures a reviewed
+Personio `salary_attribute` or BambooHR `salary_field_id`. Without that mapping,
+staging succeeds but applying the row fails independently with `Gross salary is
+required`, leaving the rest of the batch available for review. Sections 20 and 22
+remain reserved for the integration-workspace and universal-file-import changes
+pending on their separate branches.

@@ -7,11 +7,23 @@ from typing import Any, Callable, Literal, Mapping
 import integrations
 
 from .base import Connector
-from .providers import FastHRProvider, MeritProvider, QuickBooksProvider, XeroProvider
+from .providers import (
+    BambooHRProvider,
+    FastHRProvider,
+    MeritProvider,
+    PersonioProvider,
+    QuickBooksProvider,
+    XeroProvider,
+)
 from .stubs import RoadmapStubConnector, StubConnector
 
 
-RegistryStatus = Literal["Adapter ready", "Planning stub", "Roadmap · adapter not built"]
+RegistryStatus = Literal[
+    "Adapter ready",
+    "Documented contract · not live-verified",
+    "Planning stub",
+    "Roadmap · adapter not built",
+]
 ConnectorFactory = Callable[[Mapping[str, Any], Mapping[str, Any]], Connector]
 
 
@@ -54,6 +66,39 @@ _ROADMAP_NOTE = (
 
 
 REGISTRY: dict[str, ConnectorRegistration] = {
+    "personio": ConnectorRegistration(
+        status="Documented contract · not live-verified",
+        factory=lambda credentials, config: PersonioProvider(
+            client_id=credentials.get("client_id", ""),
+            client_secret=credentials.get("client_secret", ""),
+            salary_attribute=config.get("salary_attribute", ""),
+            attributes=config.get("attributes", ()),
+        ),
+        credential_fields=(
+            CredentialField("client_id", "Client ID"),
+            CredentialField("client_secret", "Client secret", "secret"),
+        ),
+        credential_note=(
+            "Pull-only employee contract tested with fixtures, not vendor credentials. "
+            "Salary requires a reviewed salary_attribute config mapping."
+        ),
+    ),
+    "bamboohr": ConnectorRegistration(
+        status="Documented contract · not live-verified",
+        factory=lambda credentials, config: BambooHRProvider(
+            subdomain=credentials.get("subdomain") or config.get("subdomain", ""),
+            api_key=credentials.get("api_key", ""),
+            salary_field_id=config.get("salary_field_id", ""),
+        ),
+        credential_fields=(
+            CredentialField("subdomain", "Company subdomain"),
+            CredentialField("api_key", "API key", "secret"),
+        ),
+        credential_note=(
+            "Pull-only directory contract tested with fixtures, not vendor credentials. "
+            "Salary requires a reviewed salary_field_id config mapping."
+        ),
+    ),
     "fasthr": ConnectorRegistration(
         status="Adapter ready",
         factory=lambda credentials, config: FastHRProvider(

@@ -249,19 +249,19 @@
       "name": "BambooHR",
       "logo_alt": "Laikinas BambooHR ženklas",
       "category": "Personalo programinė įranga",
-      "description": "Naudokite BambooHR darbuotojų duomenis kaip peržiūrimą šaltinį apskaitos biuro darbo užmokesčio nustatymams ir įvesčiai.",
-      "capabilities": ["Darbuotojų pagrindiniai duomenys", "Darbuotojų portalo pastabos", "Neatvykimai", "Organizacijos struktūra", "Dokumentai"],
-      "direction": "Pirmiausia importas · eksportas pagal taisykles",
-      "ownership": "Konfigūruojama kiekvienam objektui"
+      "description": "Importuokite BambooHR darbuotojų katalogo įrašus peržiūrai naudodami dokumentuotos sutarties adapterį, kuris nebuvo patikrintas su tiekėjo prisijungimo duomenimis; atlyginimui vis dar reikia peržiūrėto lauko susiejimo arba vietinės įvesties.",
+      "capabilities": ["Darbuotojų katalogas", "Vardas ir el. paštas", "Būsena, kai pateikiama", "Pasirinktinių laukų išsaugojimas"],
+      "direction": "Importas · darbuotojų katalogas",
+      "ownership": "BambooHR lieka duomenų šaltiniu"
     },
     "personio": {
       "name": "Personio",
       "logo_alt": "Laikinas Personio ženklas",
       "category": "Personalo programinė įranga",
-      "description": "Naudokite Europos personalo sistemą kaip peržiūrimą darbuotojų ir darbo užmokesčio įvesties duomenų šaltinį.",
-      "capabilities": ["Darbuotojų duomenys", "Darbo laiko apskaita", "Neatvykimai", "Dokumentai", "Darbo užmokesčio įvestis"],
-      "direction": "Pirmiausia importas · eksportas pagal taisykles",
-      "ownership": "Konfigūruojama kiekvienam objektui"
+      "description": "Importuokite leidžiamus Personio darbuotojų atributus peržiūrai naudodami dokumentuotos sutarties adapterį, kuris nebuvo patikrintas su tiekėjo prisijungimo duomenimis; atlyginimui vis dar reikia peržiūrėto atributo susiejimo arba vietinės įvesties.",
+      "capabilities": ["Darbuotojų atributai", "Darbo santykių būsena", "Darbo santykių pabaigos data", "Pasirinktinių atributų išsaugojimas"],
+      "direction": "Importas · darbuotojų pagrindiniai duomenys",
+      "ownership": "Personio lieka duomenų šaltiniu"
     },
     "hibob": {
       "name": "Bob (HiBob)",
@@ -708,6 +708,7 @@
     "Cash-basis values are weighted by allocated payment and require accountant review": "Cash-basis values are weighted by allocated payment and require accountant review",
     "Adapter ready · not connected": "Adapter ready · not connected",
     "Adapter ready · test company needed": "Adapter ready · test company needed",
+    "Documented contract · not live-verified": "Dokumentuota sutartis · nepatikrinta realioje aplinkoje",
     "Sandbox adapter · filing gated": "Sandbox adapter · filing gated",
     "Export ready · filing gated": "Export ready · filing gated",
     "box1_vat_due_sales": "1 · VAT due on sales",

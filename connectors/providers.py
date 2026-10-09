@@ -5,8 +5,9 @@ import base64
 import hashlib
 import hmac
 import json
+import re
 import time
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Callable
 from urllib.parse import urlencode
@@ -30,6 +31,7 @@ class HTTPProvider:
         self.retries = retries
 
     def request(self, method: str, url: str, **kwargs) -> httpx.Response:
+        rate_limit_cooldown = kwargs.pop("_rate_limit_cooldown", None)
         for attempt in range(self.retries + 1):
             response = self.client.request(method, url, **kwargs)
             if response.status_code not in {429, 500, 502, 503, 504} or attempt == self.retries:
@@ -39,15 +41,21 @@ class HTTPProvider:
                     request_id = response.headers.get("x-request-id", "")
                     raise ProviderError(f"Provider returned HTTP {response.status_code}; request {request_id}") from error
                 return response
-            delay = float(response.headers.get("Retry-After", min(2 ** attempt, 5)))
-            self.sleep(min(delay, 10))
+            if response.status_code == 429 and rate_limit_cooldown is not None:
+                delay = float(rate_limit_cooldown)
+            else:
+                delay = float(response.headers.get("Retry-After", min(2 ** attempt, 5)))
+                delay = min(delay, 10)
+            self.sleep(delay)
         raise ProviderError("Provider request exhausted retries")
 
     @staticmethod
     def _status_code(error: ProviderError) -> int | None:
         cause = error.__cause__
-        if isinstance(cause, httpx.HTTPStatusError):
-            return cause.response.status_code
+        while cause is not None:
+            if isinstance(cause, httpx.HTTPStatusError):
+                return cause.response.status_code
+            cause = cause.__cause__
         return None
 
 
@@ -299,6 +307,330 @@ class FastHRProvider(HTTPProvider):
             False,
             True,
             "FastHR is a pull-only employee data source; no records were sent",
+        )
+
+
+class PersonioProvider(HTTPProvider):
+    """Documented-contract employee adapter; salary needs an explicit attribute alias.
+
+    Personio's generally available employee payload does not provide a canonical
+    gross-salary field. Records therefore omit ``gross_salary`` unless the
+    connection config supplies a reviewed ``salary_attribute`` API name. The
+    employee pipeline deliberately rejects unsalaried rows at apply time so an
+    accountant must enter salary locally or approve a later mapping.
+    """
+
+    key = "personio"
+    default_base_url = "https://api.personio.de"
+
+    def __init__(self, client_id: str, client_secret: str, *,
+                 base_url: str = default_base_url, salary_attribute: str = "",
+                 attributes: list[str] | tuple[str, ...] | None = None, **kwargs):
+        super().__init__(**kwargs)
+        self.client_id = str(client_id or "").strip()
+        self.client_secret = str(client_secret or "").strip()
+        self.base_url = str(base_url or self.default_base_url).strip().rstrip("/")
+        self.salary_attribute = str(salary_attribute or "").strip()
+        self.attributes = tuple(
+            value for item in (attributes or ()) if (value := str(item).strip())
+        )
+
+    def _token(self) -> str:
+        try:
+            response = self.request(
+                "POST",
+                f"{self.base_url}/v1/auth",
+                json={"client_id": self.client_id, "client_secret": self.client_secret},
+                headers={"Content-Type": "application/json", "Accept": "application/json"},
+                _rate_limit_cooldown=60,
+            )
+        except ProviderError as error:
+            status = self._status_code(error)
+            if status is not None:
+                raise ProviderError(f"Personio token exchange failed (HTTP {status})") from error
+            raise
+        try:
+            payload = response.json(parse_float=Decimal)
+        except ValueError as error:
+            raise ProviderError("Personio token exchange returned invalid JSON") from error
+        data = payload.get("data") if isinstance(payload, dict) else None
+        token = (
+            data.get("token")
+            if isinstance(payload, dict) and payload.get("success") is True and isinstance(data, dict)
+            else None
+        )
+        if not isinstance(token, str) or not token.strip():
+            raise ProviderError("Personio token exchange returned an invalid response")
+        return token.strip()
+
+    def check(self) -> ConnectorResult:
+        try:
+            self._token()
+        except httpx.RequestError:
+            return ConnectorResult(
+                self.key, "check", False, False,
+                "Personio API could not be reached due to a connection error or timeout",
+            )
+        except ProviderError as error:
+            status = self._status_code(error)
+            if status in {401, 403}:
+                message = f"Personio API authentication failed (HTTP {status})"
+            elif status is not None:
+                message = f"Personio API returned unexpected HTTP {status} during token exchange"
+            else:
+                message = str(error)
+            return ConnectorResult(self.key, "check", False, True, message)
+        return ConnectorResult(
+            self.key, "check", True, True,
+            "Personio API reachable; token exchange succeeded",
+        )
+
+    def _employee_page(self, token: str, *, offset: int, updated_since: str = "") -> dict:
+        params: dict[str, object] = {"limit": 100, "offset": offset}
+        if updated_since:
+            params["updated_since"] = updated_since
+        if self.attributes:
+            params["attributes[]"] = self.attributes
+        response = self.request(
+            "GET",
+            f"{self.base_url}/v1/company/employees",
+            params=params,
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+            },
+        )
+        try:
+            payload = response.json(parse_float=Decimal)
+        except ValueError as error:
+            raise ProviderError("Personio returned an invalid JSON response") from error
+        data = payload.get("data") if isinstance(payload, dict) else None
+        metadata = payload.get("metadata") if isinstance(payload, dict) else None
+        if (
+            not isinstance(payload, dict)
+            or payload.get("success") is not True
+            or not isinstance(data, list)
+            or not isinstance(metadata, dict)
+        ):
+            raise ProviderError("Personio returned an invalid employee response")
+        try:
+            total = int(metadata["total_elements"])
+            page_offset = int(payload["offset"])
+            page_limit = int(payload["limit"])
+        except (KeyError, TypeError, ValueError) as error:
+            raise ProviderError("Personio returned invalid employee pagination metadata") from error
+        if total < 0 or page_offset < 0 or page_limit < 1 or any(not isinstance(row, dict) for row in data):
+            raise ProviderError("Personio returned invalid employee data")
+        return {"rows": data, "total": total, "offset": page_offset}
+
+    @staticmethod
+    def _attribute_values(row: dict) -> dict[str, object]:
+        attributes = row.get("attributes")
+        if not isinstance(attributes, dict):
+            raise ProviderError("Personio returned invalid employee attributes")
+        values: dict[str, object] = {}
+        for api_name, attribute in attributes.items():
+            if isinstance(api_name, str) and isinstance(attribute, dict) and "value" in attribute:
+                values[api_name] = attribute["value"]
+        return values
+
+    def _employee_record(self, row: dict) -> dict | None:
+        values = self._attribute_values(row)
+        first_name = str(values.get("first_name") or "").strip()
+        last_name = str(values.get("last_name") or "").strip()
+        name = " ".join(part for part in (first_name, last_name) if part)
+        if not name:
+            return None
+        status = values.get("status")
+        record: dict[str, object] = {
+            "external_id": str(row.get("id")),
+            "name": name,
+            "email": values.get("email"),
+            "active": status == "active",
+            "personio_status": status,
+        }
+        termination = values.get("termination_date")
+        if termination not in (None, ""):
+            record["personio_termination_date"] = termination
+            try:
+                termination_date = date.fromisoformat(str(termination)[:10])
+            except ValueError:
+                termination_date = None
+            if termination_date is not None and termination_date <= date.today():
+                record["active"] = False
+        excluded = {"first_name", "last_name", "email", "status", "termination_date"}
+        if self.salary_attribute:
+            excluded.add(self.salary_attribute)
+            salary = values.get(self.salary_attribute)
+            if salary not in (None, ""):
+                try:
+                    record["gross_salary"] = money(Decimal(str(salary)))
+                except InvalidOperation as error:
+                    raise ProviderError(
+                        f"Personio salary attribute {self.salary_attribute!r} is not numeric"
+                    ) from error
+        for api_name, value in values.items():
+            if api_name not in excluded:
+                record[f"personio_{api_name}"] = value
+        return record
+
+    def pull(self, object_type: str, *, cursor: str | None = None) -> ConnectorResult:
+        if object_type not in {"employee", "employees"}:
+            raise ValueError("Personio supports employee imports only")
+        token = self._token()
+        records: list[dict] = []
+        offset = 0
+        total = 0
+        while True:
+            page = self._employee_page(token, offset=offset, updated_since=cursor or "")
+            rows = page["rows"]
+            total = page["total"]
+            for row in rows:
+                record = self._employee_record(row)
+                if record is not None:
+                    records.append(record)
+            if not rows:
+                break
+            next_offset = page["offset"] + len(rows)
+            if next_offset <= offset:
+                raise ProviderError("Personio employee pagination made no progress")
+            offset = next_offset
+            if offset >= total:
+                break
+        return ConnectorResult(
+            self.key, f"pull:{object_type}", True, True,
+            f"Pulled {len(records)} Personio employee records",
+            tuple(records), cursor,
+        )
+
+    def push(self, object_type: str, records: list[dict]) -> ConnectorResult:
+        del records
+        return ConnectorResult(
+            self.key, f"push:{object_type}", False, True,
+            "Personio is a pull-only employee data source; no records were sent",
+        )
+
+
+class BambooHRProvider(HTTPProvider):
+    """Documented-contract directory adapter; salary needs an explicit field alias.
+
+    Directory records normally contain no gross salary. Without a reviewed
+    ``salary_field_id`` mapping the canonical record omits ``gross_salary`` and
+    the employee pipeline correctly requires local accountant input on apply.
+    """
+
+    key = "bamboohr"
+    _SUBDOMAIN = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$")
+
+    def __init__(self, subdomain: str, api_key: str, *, salary_field_id: str = "", **kwargs):
+        super().__init__(**kwargs)
+        self.subdomain = str(subdomain or "").strip().lower()
+        if not self._SUBDOMAIN.fullmatch(self.subdomain):
+            raise ValueError("BambooHR subdomain is invalid")
+        self.api_key = str(api_key or "").strip()
+        if not self.api_key:
+            raise ValueError("BambooHR API key is required")
+        self.salary_field_id = str(salary_field_id or "").strip()
+        self.base_url = (
+            f"https://{self.subdomain}.bamboohr.com/api/gateway.php/{self.subdomain}"
+        )
+
+    def _directory(self) -> tuple[list[str], list[dict]]:
+        response = self.request(
+            "GET",
+            f"{self.base_url}/v1/employees/directory",
+            headers={"Accept": "application/json", "X-BambooHR-Format": "JSON"},
+            auth=(self.api_key, "x"),
+        )
+        try:
+            payload = response.json(parse_float=Decimal)
+        except ValueError as error:
+            raise ProviderError("BambooHR returned an invalid JSON response") from error
+        fields = payload.get("fields") if isinstance(payload, dict) else None
+        employees = payload.get("employees") if isinstance(payload, dict) else None
+        if not isinstance(fields, list) or not isinstance(employees, list):
+            raise ProviderError("BambooHR returned an invalid employee directory response")
+        field_ids: list[str] = []
+        for field in fields:
+            field_id = field.get("id") if isinstance(field, dict) else None
+            if not isinstance(field_id, str) or not field_id:
+                raise ProviderError("BambooHR returned invalid directory field metadata")
+            field_ids.append(field_id)
+        if any(not isinstance(employee, dict) for employee in employees):
+            raise ProviderError("BambooHR returned invalid employee data")
+        return field_ids, employees
+
+    def check(self) -> ConnectorResult:
+        try:
+            self._directory()
+        except httpx.RequestError:
+            return ConnectorResult(
+                self.key, "check", False, False,
+                "BambooHR API could not be reached due to a connection error or timeout",
+            )
+        except ProviderError as error:
+            status = self._status_code(error)
+            if status in {401, 403}:
+                message = f"BambooHR API authentication failed (HTTP {status})"
+            elif status is not None:
+                message = f"BambooHR API returned unexpected HTTP {status}"
+            else:
+                message = str(error)
+            return ConnectorResult(self.key, "check", False, True, message)
+        return ConnectorResult(
+            self.key, "check", True, True,
+            "BambooHR API reachable; employee directory succeeded",
+        )
+
+    def _employee_record(self, row: dict, field_ids: list[str]) -> dict | None:
+        first_name = str(row.get("firstName") or "").strip()
+        last_name = str(row.get("lastName") or "").strip()
+        name = " ".join(part for part in (first_name, last_name) if part)
+        if not name:
+            return None
+        record: dict[str, object] = {
+            "external_id": str(row.get("id")),
+            "name": name,
+            "email": row.get("workEmail") or row.get("homeEmail"),
+        }
+        if "status" in row:
+            record["active"] = row.get("status") == "Active"
+        excluded = {"id", "firstName", "lastName", "workEmail", "homeEmail", "status"}
+        if self.salary_field_id:
+            excluded.add(self.salary_field_id)
+            salary = row.get(self.salary_field_id)
+            if salary not in (None, ""):
+                try:
+                    record["gross_salary"] = money(Decimal(str(salary)))
+                except InvalidOperation as error:
+                    raise ProviderError(
+                        f"BambooHR salary field {self.salary_field_id!r} is not numeric"
+                    ) from error
+        for field_id in field_ids:
+            if field_id not in excluded and field_id in row:
+                record[f"bamboo_{field_id}"] = row[field_id]
+        return record
+
+    def pull(self, object_type: str, *, cursor: str | None = None) -> ConnectorResult:
+        if object_type not in {"employee", "employees"}:
+            raise ValueError("BambooHR supports employee imports only")
+        del cursor  # The directory contract returns the whole company without a cursor.
+        field_ids, rows = self._directory()
+        records = tuple(
+            record for row in rows
+            if (record := self._employee_record(row, field_ids)) is not None
+        )
+        return ConnectorResult(
+            self.key, f"pull:{object_type}", True, True,
+            f"Pulled {len(records)} BambooHR employee records", records,
+        )
+
+    def push(self, object_type: str, records: list[dict]) -> ConnectorResult:
+        del records
+        return ConnectorResult(
+            self.key, f"push:{object_type}", False, True,
+            "BambooHR is a pull-only employee data source; no records were sent",
         )
 
 

@@ -93,6 +93,25 @@ def test_fasthr_catalogue_copy_exists_in_all_locales():
         assert "FastHR" in str(integrations_page(lang))
 
 
+def test_documented_contract_catalogue_copy_and_status_exist_in_all_locales():
+    status = "Documented contract · not live-verified"
+    expected_status = {
+        "en": status,
+        "et": "Dokumenteeritud leping · reaalajas kontrollimata",
+        "lv": "Dokumentēts līgums · nav pārbaudīts reālā vidē",
+        "lt": "Dokumentuota sutartis · nepatikrinta realioje aplinkoje",
+    }
+    for lang in ("en", "et", "lv", "lt"):
+        assert i18n.catalog(lang)["workspace"][status] == expected_status[lang]
+        for provider in ("personio", "bamboohr"):
+            copy = i18n.integration_copy(lang, provider)
+            assert copy["description"]
+            assert len(copy["capabilities"]) == 4
+            assert copy["direction"]
+            assert copy["ownership"]
+            assert copy["name"] in str(integrations_page(lang))
+
+
 def test_language_selection_persists_in_signed_session():
     with TestClient(app) as client:
         selected = client.get("/set-lang/et?next=/integrations", follow_redirects=False)

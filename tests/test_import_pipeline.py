@@ -12,7 +12,7 @@ import httpx
 
 from api_app import api, current_user, require_csrf
 from connectors.base import ConnectorResult
-from connectors.providers import FastHRProvider
+from connectors.providers import FastHRProvider, PersonioProvider
 from connectors.registry import REGISTRY
 from database import reset_database_cache
 from import_service import ImportService
@@ -259,14 +259,14 @@ def test_sync_requires_connection_and_records_connector_failure(db, ee_org, impo
     key = Fernet.generate_key().decode()
     roadmap_integration = IntegrationService(db, CredentialVault(key))
     roadmap_integration.configure(
-        ee_org["id"], "personio", credentials={}, config={}, actor="owner@example.test"
+        ee_org["id"], "hibob", credentials={}, config={}, actor="owner@example.test"
     )
     with pytest.raises(ValueError, match="Adapter not yet built"):
         ImportService(db, integration=roadmap_integration).run_sync(
-            ee_org["id"], "personio", "employees", actor="owner@example.test"
+            ee_org["id"], "hibob", "employees", actor="owner@example.test"
         )
     roadmap_run = db.one(
-        "SELECT * FROM sync_runs WHERE organisation_id=? AND provider='personio'",
+        "SELECT * FROM sync_runs WHERE organisation_id=? AND provider='hibob'",
         (ee_org["id"],),
     )
     assert roadmap_run["status"] == "Failed" and roadmap_run["read_count"] == 0
@@ -361,6 +361,102 @@ def test_fasthr_sync_apply_and_repeat_are_idempotent(db, ee_org, monkeypatch):
     ) == 1
     assert len(requests) == 2
     assert all(request.headers["authorization"] == "Bearer synthetic-token" for request in requests)
+
+
+def test_personio_sync_stages_missing_salary_and_apply_continues_after_exact_failure(
+    db, ee_org, monkeypatch,
+):
+    secret = "personio-secret-must-not-leak"
+    vault = CredentialVault(Fernet.generate_key().decode())
+    integration = IntegrationService(db, vault)
+    connection = integration.configure(
+        ee_org["id"],
+        "personio",
+        credentials={"client_id": "synthetic-client-id", "client_secret": secret},
+        config={"salary_attribute": "dynamic_12345"},
+        actor="owner@example.test",
+    )
+    assert secret not in json.dumps(connection)
+
+    def attribute(label, value, value_type="standard"):
+        return {"label": label, "value": value, "type": value_type, "universal_id": None}
+
+    def handler(request):
+        if request.url.path == "/v1/auth":
+            return httpx.Response(200, json={
+                "success": True,
+                "data": {"token": "synthetic-token", "expires_in": 86400, "scope": "employees"},
+            })
+        return httpx.Response(200, json={
+            "success": True,
+            "data": [
+                {
+                    "id": 101,
+                    "attributes": {
+                        "first_name": attribute("First name", "Missing"),
+                        "last_name": attribute("Last name", "Salary"),
+                        "email": attribute("Email", "missing.salary@example.test"),
+                        "status": attribute("Status", "active"),
+                    },
+                },
+                {
+                    "id": 102,
+                    "attributes": {
+                        "first_name": attribute("First name", "Mapped"),
+                        "last_name": attribute("Last name", "Salary"),
+                        "email": attribute("Email", "mapped.salary@example.test"),
+                        "status": attribute("Status", "active"),
+                        "dynamic_12345": attribute("Monthly salary", "2100", "decimal"),
+                    },
+                },
+            ],
+            "metadata": {"total_elements": 2, "current_page": 1, "total_pages": 1},
+            "offset": 0,
+            "limit": 100,
+        })
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    captured = {}
+
+    def factory(credentials, config):
+        captured.update(credentials=credentials, config=config)
+        return PersonioProvider(
+            credentials["client_id"],
+            credentials["client_secret"],
+            salary_attribute=config["salary_attribute"],
+            client=client,
+        )
+
+    monkeypatch.setitem(REGISTRY, "personio", replace(REGISTRY["personio"], factory=factory))
+    service = ImportService(db, integration=integration)
+    sync = service.run_sync(
+        ee_org["id"], "personio", "employees", actor="owner@example.test",
+    )
+    staged = service.get_staged(ee_org["id"], sync_run_id=sync["id"])["records"]
+    assert len(staged) == 2
+    staged_by_external = {row["external_id"]: row for row in staged}
+    assert "gross_salary" not in staged_by_external["101"]["external_payload"]
+    assert "pay_basis" not in staged_by_external["101"]["external_payload"]
+    assert captured == {
+        "credentials": {"client_id": "synthetic-client-id", "client_secret": secret},
+        "config": {"salary_attribute": "dynamic_12345"},
+    }
+
+    applied = service.apply_staged(
+        ee_org["id"],
+        "personio",
+        sync["id"],
+        {row["id"]: "apply" for row in staged},
+        actor="owner@example.test",
+    )
+    assert applied["failed"] == 1
+    assert applied["applied"] == 1
+    failed = next(outcome for outcome in applied["outcomes"] if outcome["outcome"] == "failed")
+    assert failed["reason"] == "Gross salary is required"
+    assert db.scalar(
+        "SELECT COUNT(*) FROM employees WHERE organisation_id=?", (ee_org["id"],),
+    ) == 1
+    assert secret not in json.dumps(applied)
 
 
 @pytest.fixture

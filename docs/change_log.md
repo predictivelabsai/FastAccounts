@@ -4,6 +4,21 @@ Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as
 delivered.
 
+## 2026-10-09 — Personio and BambooHR documented-contract adapters
+
+- Added pull-only Personio and BambooHR employee adapters against their published
+  HTTP contracts, including Personio JSON body token exchange and complete offset
+  pagination, and BambooHR API-key Basic authentication and whole-directory reads.
+- Mapped names, email and source status without inventing payroll data. Gross
+  salary remains absent unless a tenant supplies a reviewed `salary_attribute`
+  or `salary_field_id` alias, so the existing per-row review pipeline reports
+  `Gross salary is required` and continues the batch when no mapping exists.
+- Registered both as `Documented contract · not live-verified`, with encrypted
+  credential metadata, localized catalogue copy and mocked contract, connection,
+  staging and failure-path tests. No vendor credential or live network was used;
+  production import remains gated on customer credential verification and
+  accountant review.
+
 ## 2026-10-09 — Finance connector health checks
 
 - Wired the QuickBooks, Xero and Merit registry entries to their real provider
