@@ -469,7 +469,6 @@ def test_import_routes_authorise_redact_and_audit_ids(import_api, db, ee_org, mo
     assert secret not in audit_text
 
 
-<<<<<<< HEAD
 def test_file_import_route_imports_and_refuses_invalid_requests(import_api, db, ee_org):
     client, base = import_api
     content = "Name,Email,Salary\nRoute Mari,route-mari@example.test,2300\n"
