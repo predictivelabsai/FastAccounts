@@ -7,8 +7,12 @@
   },
   "nav": {
     "why": "Why FastAccounts",
+    "product": "Product",
+    "for_bureaus": "For bureaus",
     "integrations": "Integrations",
     "roadmap": "Roadmap",
+    "security": "Security",
+    "changelog": "Changelog",
     "sign_in": "Sign In",
     "workspace": "Workspace",
     "bureau": "Bureau / Home",
@@ -34,11 +38,241 @@
   "footer": {
     "tagline": "Open-source bookkeeping for the UK and Estonia.",
     "integrations": "Integrations",
-    "source": "Source",
+    "source": "Source · GitHub",
     "product": "Product",
+    "trust": "Trust",
+    "security": "Security",
+    "privacy": "Privacy",
+    "terms": "Terms",
+    "company": "Company",
+    "about": "About",
+    "contact": "Contact",
+    "roadmap": "Roadmap",
+    "changelog": "Changelog",
+    "status": "Status",
+    "documentation": "Documentation",
     "resources": "Resources",
     "github": "GitHub",
-    "health": "Health"
+    "health": "Health",
+    "legal_entity": "Predictive Labs Ltd · Company 14857334",
+    "contact_email": "Sales & support: info@predictivelabs.ai",
+    "legal_notice": "FastAccounts is operated by Predictive Labs Ltd, 155 Minories Street, Suite 275, London EC3N 1AD, United Kingdom."
+  },
+  "public_pages": {
+    "security": {
+      "title": "Security",
+      "lede": "A factual view of the controls in FastAccounts today, the choices self-hosters own, and the work that remains before production rollout.",
+      "note": "Early-stage posture · reviewed 9 October 2026",
+      "sections": [
+        {
+          "title": "Hosting model",
+          "body": "FastAccounts can be self-hosted, in which case the operator chooses and secures the infrastructure. The hosted pilot runs the same Docker application with PostgreSQL and persistent evidence storage on FastSME-managed infrastructure. The underlying hosting provider is deployment-specific and must be named in a production customer agreement."
+        },
+        {
+          "title": "Encryption",
+          "body": "Integration credentials are encrypted at rest with a key-versioned Fernet vault and are excluded from browser responses and logs. Hosted traffic uses HTTPS/TLS. FastAccounts does not currently claim that every database field or uploaded evidence file is application-level encrypted at rest."
+        },
+        {
+          "title": "Backups and recovery",
+          "body": "Self-hosters are responsible for their own database, evidence-storage, encryption and restore process. For managed hosting, encrypted backups and tested restores are production gates; the repository does not yet record a completed backup-and-restore drill, so no recovery-time promise is made."
+        },
+        {
+          "title": "Access control",
+          "body": "The application supports local email/password accounts and Google sign-in, invite-only organisation membership, signed sessions, CSRF protection and owner, administrator, accountant, approver and viewer roles. Passwords use scrypt hashes; confirmation and reset tokens are single-use hashes, and repeated sign-in attempts are throttled. Business records are scoped by organisation and cross-tenant access is covered by tests. A managed-service MFA policy and edge rate limiting remain deployment gates."
+        },
+        {
+          "title": "Incidents",
+          "body": "Send a suspected security incident privately to info@predictivelabs.ai with “FastAccounts security incident” in the subject. The team will preserve relevant records, investigate scope and coordinate customer communication. Contractual incident-response times are not yet offered.",
+          "action": "Report an incident",
+          "email_subject": "FastAccounts security incident"
+        },
+        {
+          "title": "Dependency reporting",
+          "body": "Python dependencies are declared in requirements.txt and CI compiles the application, runs tests, verifies migrations and scans committed files for common secret patterns. The project does not claim continuous automated dependency-vulnerability monitoring. Report a suspected vulnerable dependency through the private security contact."
+        },
+        {
+          "title": "Responsible disclosure",
+          "body": "Please report vulnerabilities privately before public discussion and include affected versions, reproduction steps and impact. We will confirm a communication channel, investigate in good faith and coordinate a disclosure date with the reporter. Please allow a reasonable opportunity to remediate; response or fix deadlines are not yet guaranteed.",
+          "action": "Make a private disclosure",
+          "email_subject": "FastAccounts responsible disclosure"
+        }
+      ]
+    },
+    "privacy": {
+      "title": "Privacy",
+      "lede": "This pilot notice explains the roles and data paths visible in the current product. A customer data-processing agreement must complete the production arrangement.",
+      "note": "Plain-language pilot notice · reviewed 9 October 2026",
+      "sections": [
+        {
+          "title": "Controller and processor roles",
+          "body": "For a hosted service, Predictive Labs Ltd acts as controller for account, support and service-administration data, and as processor for business, customer, supplier and employee data entered by an organisation. The customer remains controller of that organisation data. In a self-hosted deployment, the operator determines its own roles and notices."
+        },
+        {
+          "title": "Current subprocessors",
+          "body": "The current code uses Google for optional sign-in and Postmark for account, invoice and reminder email when those features are configured. Postmark is not used when its credentials are absent. The repository does not identify the managed-infrastructure provider; any production hosting provider must be named in the customer DPA before production customer data is accepted. Connected accounting, HR or banking providers are customer-directed integrations, not default recipients."
+        },
+        {
+          "title": "Retention",
+          "body": "Accounting records are retained according to the customer’s policy and applicable statutory periods: the product roadmap records six years for ordinary UK VAT records and seven years from the end of the financial year for Estonian accounting records, with longer holds where required. Deletion requests cannot silently remove posted ledgers or records under a statutory or legal hold. Automated retention execution is still a production gate."
+        },
+        {
+          "title": "International transfers",
+          "body": "A self-hoster chooses its data location. In the hosted pilot, Google or Postmark may process data under their own service terms and transfer safeguards. The production DPA must record the hosting location, every subprocessor and any transfer mechanism; this page does not invent a location that is not documented in the repository."
+        },
+        {
+          "title": "Analytics and logs",
+          "body": "The public site and application contain no analytics or advertising SDK. A deployment may keep operational web, authentication and audit logs needed to run and secure the service. Those logs must not contain provider credentials, and their retention must be documented for production hosting."
+        },
+        {
+          "title": "Data-subject requests",
+          "body": "For access, correction, deletion, restriction or another data-protection request, first contact the organisation that controls the relevant books. For FastAccounts account or service data, email info@predictivelabs.ai. We may need to verify identity and preserve records that must legally remain.",
+          "action": "Contact data protection",
+          "email_subject": "FastAccounts data protection request"
+        }
+      ]
+    },
+    "about": {
+      "title": "Company",
+      "lede": "FastAccounts is an early-stage, open-source bookkeeping product built for UK and Estonian small businesses and accounting bureaus.",
+      "note": "Built in public · country validation still in progress",
+      "sections": [
+        {
+          "title": "Legal entity",
+          "body": "FastAccounts is developed and operated by Predictive Labs Ltd, a company registered in England and Wales under number 14857334. Its registered office is 155 Minories Street, Suite 275, London EC3N 1AD, United Kingdom."
+        },
+        {
+          "title": "Team",
+          "body": "A small Predictive Labs team maintains the product, documentation and public release history; Joosep Laats is named in the 0.3.0 release record for the merged product work. We do not present a larger team, customer count or adviser network than the evidence supports."
+        },
+        {
+          "title": "Accounting-market competence",
+          "body": "The software implements tested UK VAT and Estonian VAT (KMD) workpapers, country-specific invoices, exact Decimal tax calculations and immutable double-entry postings. The rules are documented against official sources, but independent UK and Estonian accountant UAT is still pending. FastAccounts is software, not tax or legal advice."
+        },
+        {
+          "title": "Product boundary",
+          "body": "FastAccounts covers bookkeeping: invoices, bills, evidence, bank-statement import and reconciliation, ledgers, reports and reviewable VAT workpapers. Estonian payroll for accounting-bureau client books is demo scope with production UAT pending. It is not an ERP and does not include inventory, order management, manufacturing, CRM or general HR."
+        }
+      ]
+    },
+    "contact": {
+      "title": "Contact",
+      "lede": "One working inbox, with a clear subject line for each path. We do not publish mailboxes that are not configured.",
+      "note": "Predictive Labs Ltd · info@predictivelabs.ai",
+      "sections": [
+        {
+          "title": "Sales",
+          "body": "Ask about the hosted pilot, self-hosting or an accounting-bureau evaluation. Include your market, organisation type and the workflow you want to test.",
+          "action": "Email sales",
+          "email_subject": "FastAccounts sales enquiry"
+        },
+        {
+          "title": "Support",
+          "body": "For product help, include the FastAccounts version, page or workflow, what you expected and what happened. Never send passwords, OAuth tokens, bank credentials or real accounting exports by email.",
+          "action": "Email support",
+          "email_subject": "FastAccounts support request"
+        },
+        {
+          "title": "Security",
+          "body": "Report a suspected vulnerability or incident privately. Include affected versions and reproducible detail, but do not include live credentials or unnecessary personal data.",
+          "action": "Email security",
+          "email_subject": "FastAccounts security report"
+        },
+        {
+          "title": "Data protection",
+          "body": "For account or service-data requests, state the organisation and data concerned. Requests about a client book should normally go first to the organisation that controls it.",
+          "action": "Email data protection",
+          "email_subject": "FastAccounts data protection request"
+        }
+      ]
+    },
+    "terms": {
+      "title": "Terms — draft",
+      "lede": "These are placeholder terms for an early-stage service. They are not final customer terms and do not create claims about service levels, compliance or warranties.",
+      "note": "Draft for review · not production terms",
+      "sections": [
+        {
+          "title": "Service scope",
+          "body": "FastAccounts provides bookkeeping software and an optional hosted pilot. Features may be labelled available, review required, pilot or planned. Direct tax filing and other gated capabilities are not included unless a signed agreement expressly says otherwise."
+        },
+        {
+          "title": "Customer responsibilities",
+          "body": "Customers remain responsible for accurate source data, user access, review of accounting and payroll outputs, statutory submissions and professional advice. Synthetic demonstrations must not be treated as production books."
+        },
+        {
+          "title": "Open-source software",
+          "body": "The source repository is published under the MIT License. Self-hosted use is governed by that licence; operating, securing, backing up and updating a self-hosted deployment remains the operator’s responsibility."
+        },
+        {
+          "title": "Hosted pilot",
+          "body": "Availability, support, data processing, fees, cancellation and service levels for hosted use must be set in a separate customer agreement. This draft does not promise uninterrupted service, a response time or a production recovery objective."
+        },
+        {
+          "title": "Legal terms still to be agreed",
+          "body": "Warranties, liability limits, governing law, dispute terms and a production data-processing agreement require legal review and are intentionally not fabricated here. Contact Predictive Labs Ltd before relying on the hosted service for live books."
+        }
+      ]
+    },
+    "roadmap": {
+      "title": "Roadmap",
+      "lede": "A buyer-readable view of what is being validated now, what comes next and what remains later. Dates below are release dates, not forecasts.",
+      "note": "Now / Next / Later · updated 9 October 2026",
+      "source_intro": "For the complete implementation record, read the",
+      "source_link": "changelog",
+      "stages": [
+        {
+          "title": "Now",
+          "intro": "Work required to turn the engineering pilot into a production-ready service.",
+          "items": [
+            {"title": "Independent accountant UAT", "body": "Validate UK VAT, Estonian KMD and the Estonian bureau-payroll pilot with qualified accountants before making professional-validation claims.", "market": "UK + Estonia"},
+            {"title": "Hosted operations evidence", "body": "Name the hosting subprocessor, document data location, complete encrypted backup/restore drills and configure incident alerting, edge rate limits and malware scanning.", "market": "Both markets"},
+            {"title": "Provider verification", "body": "Verify documented and adapter-ready integrations with permitted customer or test-company credentials while keeping imports reviewed and tenant-scoped.", "market": "Both markets"}
+          ]
+        },
+        {
+          "title": "Next",
+          "intro": "Planned work after the current validation and operating gates are met.",
+          "items": [
+            {"title": "Production open banking", "body": "Add reconnect, scheduled read-only pulls and monitoring after legal, commercial and coverage review.", "market": "UK + Estonia"},
+            {"title": "Supported tax filing channels", "body": "Complete provider approvals and guarded production journeys for HMRC and e-MTA. Workpapers and exports remain the current deliverable.", "market": "UK + Estonia"},
+            {"title": "Bureau payroll production review", "body": "Complete accountant UAT for Estonian client-book payroll, including remaining TSD, leave and sickness-pay boundaries.", "market": "Estonia"}
+          ]
+        },
+        {
+          "title": "Later",
+          "intro": "Useful extensions that stay outside the current production promise.",
+          "items": [
+            {"title": "Broader UK compliance", "body": "Consider Corporation Tax, Companies House accounts, CIS and additional VAT schemes only after fixtures and professional review.", "market": "UK"},
+            {"title": "Broader Estonian reporting", "body": "Consider annual-report taxonomy mapping, registry filing and supported direct e-MTA submission when access and review gates are met.", "market": "Estonia"},
+            {"title": "Optional suggestions", "body": "Evaluate AI-assisted field or match suggestions only behind explicit human approval; no suggestion may silently post to the ledger.", "market": "Both markets"}
+          ]
+        },
+        {
+          "title": "Shipped",
+          "intro": "Dated milestones taken from the checked-in change log.",
+          "items": [
+            {"title": "Public foundation", "date": "2026-08-10", "body": "Landing page, integrations catalogue, health identity and guarded sign-in shipped before the first recorded application release. The checked-in change log does not record a 0.1.x release, so none is invented here.", "market": "UK + Estonia"},
+            {"title": "Engineering pilot 0.2.0", "date": "2026-08-10", "body": "Core bookkeeping, immutable double-entry accounting, reviewable UK VAT and Estonian KMD workpapers, synthetic books and provider boundaries shipped.", "market": "UK + Estonia"},
+            {"title": "Payroll 0.2.1", "date": "2026-10-08", "body": "Part-time and hourly Estonian bureau payroll, social-tax minimum handling and expanded synthetic demo coverage shipped.", "market": "Estonia"},
+            {"title": "Release 0.3.0", "date": "2026-10-09", "body": "Recurring invoices, reminders, integration connection controls and reviewed employee imports shipped with no-network test coverage.", "market": "UK + Estonia"},
+            {"title": "Release 0.4.0", "date": "2026-10-09", "body": "Email/password registration, sign-in and reset shipped beside Google SSO, with scrypt password hashes, single-use token hashes, throttling and session rotation.", "market": "UK + Estonia"}
+          ]
+        }
+      ]
+    },
+    "changelog": {
+      "title": "Changelog",
+      "lede": "A concise release history for buyers and operators. Detailed engineering notes remain in the repository.",
+      "note": "Dated, evidence-backed releases",
+      "source_intro": "Read every shipped change in the",
+      "source_link": "technical change log",
+      "releases": [
+        {"title": "0.4.0 · Email and password accounts", "date": "2026-10-09", "body": "Added registration, sign-in and password reset beside Google SSO. Passwords use scrypt hashes; confirmation and reset links are single-use, throttled and sent through optional Postmark configuration."},
+        {"title": "0.3.0 · Integrations and automation", "date": "2026-10-09", "body": "Added recurring invoices and reminders, tenant-scoped connection controls, the FastHR connector, reviewed employee imports, a universal CSV/TSV path and documented-contract Personio and BambooHR adapters. Provider tests use mocked transports; production verification remains explicit."},
+        {"title": "0.2.1 · Estonian bureau payroll", "date": "2026-10-08", "body": "Added part-time and hourly pay, pension-rate choices, the 2026 social-tax minimum and a synthetic payroll demonstration. Estonian bureau payroll remains demo scope while production accountant UAT is pending."},
+        {"title": "0.2.0 · Engineering pilot", "date": "2026-08-10", "body": "Delivered the accounting workspace, portable migrations, invoices, bills, evidence, statement import and reconciliation, an immutable balanced ledger, financial reports and reviewable UK and Estonian VAT workpapers."},
+        {"title": "Foundation before versioned releases", "date": "2026-08-10", "body": "Published the first-party landing page, integrations catalogue, health endpoint and guarded authentication foundation. No 0.1.x release is recorded in the checked-in change log."}
+      ]
+    }
   },
   "landing": {
     "float_bank": "Incoming payment",
@@ -1005,7 +1239,7 @@
     "matches_title": "Matches you can explain",
     "matches_body": "See why a bank transaction matches a document, review the evidence, and confirm before posting.",
     "tax_title": "Review before export",
-    "tax_body": "Prepare KMD and VAT workpapers, check the figures, and mark them reviewed before exporting."
+    "tax_body": "Prepare Estonian VAT (KMD) and UK VAT workpapers, check the figures, and mark them reviewed before export. Export is available; direct filing is not yet available."
   },
   "pricing": {
     "kicker": "Pricing",

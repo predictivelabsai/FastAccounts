@@ -663,7 +663,40 @@ public-page smoke test. It changes no application behavior or migration and keep
 the application version at 0.3.0. Section 23 covers the Personio and BambooHR
 documented-contract adapters, which merged before this change.
 
-## 25. Email and password accounts beside Google SSO (2026-10-09, v0.4.0)
+## 25. Website trust pages and roadmap (2026-10-09)
+
+The public site now has first-party Security, Privacy, Company, Contact and
+draft Terms pages, plus buyer-readable Roadmap and Changelog pages. The trust
+copy distinguishes controls present in the repository from production gates:
+integration credentials use key-versioned Fernet encryption at rest, while
+managed backup/restore drills, incident operations, the hosting-subprocessor
+schedule and independent country-accountant UAT remain explicitly unfinished.
+The privacy page records optional Google sign-in and Postmark account, invoice
+and reminder email as the current code-evidenced subprocessors and does not
+claim an analytics service or an undocumented hosting location.
+
+The public navigation now leads to Product, For bureaus, Integrations, Pricing,
+Security and Changelog before the language control and sign-in action. The
+footer exposes Security, Privacy, Terms, Company, Contact, Roadmap, Changelog,
+Status, Documentation and Source, identifies Predictive Labs Ltd and publishes
+the working `info@predictivelabs.ai` sales/support path. GitHub remains a
+secondary source destination rather than the Roadmap destination.
+
+The public roadmap uses Now / Next / Later / Shipped sections and market tags.
+Shipped dates come from the checked-in change log: the public foundation and
+engineering pilot 0.2.0 on 2026-08-10, payroll 0.2.1 on 2026-10-08 and release
+0.3.0 plus email/password release 0.4.0 on 2026-10-09. The change log does not
+record a 0.1.x application release, so the page labels the earlier foundation as
+pre-versioned rather than inventing a release number. Bureau tax copy now names
+Estonian VAT (KMD) and UK VAT separately and states that export is available
+while direct filing is not.
+
+All new and changed public copy is maintained in English, Estonian, Latvian and
+Lithuanian. Route coverage verifies every new page, substantive page markers,
+the required navigation/footer destinations, locale rendering and the clarified
+KMD filing boundary. No accounting workflow, migration, credential or production
+data changes in this section.
+## 26. Email and password accounts beside Google SSO (2026-10-09, v0.4.0)
 
 People can now create an account with their email address and a password, sign
 in with it, and reset a forgotten password, next to the existing Google button.
@@ -682,4 +715,3 @@ and reset are throttled, responses never reveal whether an address has an
 account, every sign-in starts a fresh session, and a reset signs the account out
 everywhere else. Email is sent through Postmark with `POSTMARK_API_TOKEN` and
 `FROM_EMAIL`; without them, requests log a warning and show the same message.
-

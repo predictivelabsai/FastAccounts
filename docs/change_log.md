@@ -4,6 +4,26 @@ Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as
 delivered.
 
+## 2026-10-09 — Website trust pages and roadmap
+
+- Added localized first-party `/security`, `/privacy`, `/about`, `/contact` and
+  draft `/terms` pages with evidence-based hosting, encryption, backup, access,
+  incident, disclosure, controller/processor, subprocessor, retention, transfer,
+  analytics, company, team, product-boundary and contact copy. The pages name
+  unfinished production controls instead of implying unsupported assurance.
+- Added localized `/roadmap` and `/changelog` pages with Now / Next / Later /
+  Shipped sections, UK/Estonia market tags and release dates taken from this
+  change log. The public history states that no 0.1.x release is recorded rather
+  than manufacturing one; it lists the 0.2.0, 0.2.1, 0.3.0 and merged 0.4.0
+  milestones.
+- Reworked the public navigation and footer around Product, bureaus, trust and
+  release-history destinations. Roadmap is now first-party; GitHub moved to the
+  footer as Source. The footer identifies Predictive Labs Ltd and the working
+  `info@predictivelabs.ai` sales/support contact.
+- Clarified the bureau tax copy in English, Estonian, Latvian and Lithuanian to
+  distinguish Estonian VAT (KMD) from UK VAT and state that export is available
+  while direct filing is not. Added route, localized-copy and shared-shell tests
+  for the complete change; no live network calls or accounting behavior changed.
 ## 2026-10-09 — v0.4.0: email and password sign-in beside Google SSO
 
 - Added sign-up, sign-in and forgot/reset password with email and password on
@@ -38,7 +58,6 @@ delivered.
   sign in run in English and Estonian. The user guide gains sign-in, account
   creation, forgotten-password and new-password pages (43 pages and 31
   screenshots per language).
-
 ## 2026-10-09 — User guide (English and Estonian) and regression walk-through
 
 - Added a bilingual user guide covering every workspace area, with payroll for
