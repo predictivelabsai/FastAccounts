@@ -560,6 +560,23 @@ repeat sync/apply cycle are covered with mocked HTTP transport; automated tests
 make no live FastHR requests. Production bureau use still requires customer
 configuration and accountant UAT.
 
+## 20. Integration workspace (2026-10-09)
+
+The signed-in workspace now makes the connector lifecycle usable without curl.
+Adapter-ready providers are shown first with tenant-scoped connection status and
+registry-driven configure, test and disconnect controls; secret values are never
+returned or prefilled. Planning stubs and roadmap entries stay collapsed and do
+not compete with usable adapters.
+
+FastHR adds an employee-import action and a reviewed staging workspace. Owners
+and administrators can inspect source payloads, suggested local matches and
+review notes; approve, reject or retry failed rows; apply selected decisions; and
+review outcome counts, failure reasons and recent runs. Empty pulls, unknown
+links and completed queues have explicit non-destructive states. The interface is
+localized in English, Estonian, Latvian and Lithuanian. This adds no migration,
+does not enable unattended imports, and does not change the pending production
+accountant UAT gate.
+
 ## 21. Finance connector health checks (2026-10-09)
 
 QuickBooks, Xero and Merit connection tests now construct the existing real
@@ -574,8 +591,8 @@ This work changes connection health checks only. It does not add finance-provide
 pulls to the reviewed import pipeline or change invoice/query submission behavior.
 HMRC, e-MTA and open banking remain explicit planning stubs. Mocked HTTP coverage
 verifies successful, unauthorized and unavailable providers without live network
-calls. Section 20 is reserved for the integration-workspace change pending on its
-separate branch.
+calls. Section 20 covers the integration workspace, which merged before this
+change.
 
 ## 23. Personio and BambooHR documented-contract adapters (2026-10-09)
 
@@ -598,6 +615,5 @@ Neither source is treated as authoritative for a FastAccounts gross salary.
 Records omit `gross_salary` unless a tenant explicitly configures a reviewed
 Personio `salary_attribute` or BambooHR `salary_field_id`. Without that mapping,
 staging succeeds but applying the row fails independently with `Gross salary is
-required`, leaving the rest of the batch available for review. Sections 20 and 22
-remain reserved for the integration-workspace and universal-file-import changes
-pending on their separate branches.
+required`, leaving the rest of the batch available for review. Section 22 covers
+the universal file import, currently pending on its separate branch.

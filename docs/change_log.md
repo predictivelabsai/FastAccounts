@@ -32,6 +32,20 @@ delivered.
   redaction and tenant connection status transitions using mocked HTTP transports;
   automated tests make no live provider calls.
 
+## 2026-10-09 — Integration workspace
+
+- Added the signed-in Integrations workspace for owner/administrator connection
+  setup without command-line calls: adapter-ready providers are prioritised,
+  credential fields come from the connector registry, secret inputs are never
+  prefilled, and users can configure, test and disconnect each client connection.
+- Added the FastHR employee-import workflow from sync through tenant-scoped staged
+  review. Reviewers can approve, reject or retry failed rows, inspect source data
+  and local employee matches, apply a mixed batch, see per-outcome counts and
+  reasons, and return to recent import runs.
+- Localized the complete workspace flow in English, Estonian, Latvian and
+  Lithuanian and covered the server-rendered workspace entry and locale-key
+  parity. No migration or live provider test was added.
+
 ## 2026-10-09 — FastHR employee connector
 
 - Added the first live HR adapter: a pull-only FastHR employee-master import for
