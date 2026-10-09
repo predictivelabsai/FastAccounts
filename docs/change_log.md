@@ -22,6 +22,16 @@ delivered.
   page tests cover audience links, product-card differentiation, status mapping
   and CTA hierarchy.
 
+## 2026-10-09 — Demo integration connections and employee imports
+
+- Fresh local demo data now includes encrypted, synthetic Connected fixtures for
+  QuickBooks and Xero on Northstar Studio Ltd, plus Merit and FastHR on
+  Põhjatäht Teenused OÜ. Seed setup uses the normal connection and status
+  services without making provider health checks or live network calls.
+- The Põhjatäht integration workspace now includes a completed three-employee
+  offline file import and a second import left at Review Required with pending
+  rows, ready for the review-and-apply demo flow.
+
 ## 2026-10-09 — Local account email development links
 
 - The local sign-up verification link is printed to the server log when test
