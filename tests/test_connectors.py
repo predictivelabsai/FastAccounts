@@ -3,14 +3,20 @@ from __future__ import annotations
 
 import pytest
 
-from connectors import FastHRProvider, connector_for
+from connectors import (
+    FastHRProvider,
+    MeritProvider,
+    QuickBooksProvider,
+    XeroProvider,
+    connector_for,
+)
 from connectors.registry import PROVIDERS, REGISTRY, provider_metadata
 from integrations import CATALOGUE
 
 
 @pytest.mark.parametrize(
     "provider",
-    ["quickbooks", "xero", "merit", "hmrc", "emta", "open_banking"],
+    ["hmrc", "emta", "open_banking"],
 )
 def test_connector_stubs_are_explicitly_non_live(provider):
     connector = connector_for(provider)
@@ -78,3 +84,41 @@ def test_fasthr_registration_is_explicit_and_not_overwritten_by_roadmap_loop():
     assert isinstance(connector, FastHRProvider)
     assert connector.base_url == "https://hr.example.test"
     assert REGISTRY["fasthr"].status == "Adapter ready"
+
+
+def test_finance_registrations_build_real_providers_from_credentials():
+    quickbooks = connector_for(
+        "quickbooks",
+        credentials={
+            "access_token": "synthetic-qbo-token",
+            "realm_id": "synthetic-realm",
+            "sandbox": False,
+        },
+    )
+    assert isinstance(quickbooks, QuickBooksProvider)
+    assert quickbooks.access_token == "synthetic-qbo-token"
+    assert quickbooks.realm_id == "synthetic-realm"
+    assert quickbooks.base_url == "https://quickbooks.api.intuit.com/v3/company/synthetic-realm"
+
+    default_sandbox = connector_for(
+        "quickbooks",
+        credentials={"access_token": "synthetic-qbo-token", "realm_id": "synthetic-realm"},
+    )
+    assert isinstance(default_sandbox, QuickBooksProvider)
+    assert default_sandbox.base_url.startswith("https://sandbox-quickbooks.api.intuit.com/")
+
+    xero = connector_for(
+        "xero",
+        credentials={"access_token": "synthetic-xero-token", "tenant_id": "synthetic-tenant"},
+    )
+    assert isinstance(xero, XeroProvider)
+    assert xero.headers["Authorization"] == "Bearer synthetic-xero-token"
+    assert xero.headers["Xero-tenant-id"] == "synthetic-tenant"
+
+    merit = connector_for(
+        "merit",
+        credentials={"api_id": "synthetic-api-id", "api_key": "synthetic-api-key"},
+    )
+    assert isinstance(merit, MeritProvider)
+    assert merit.api_id == "synthetic-api-id"
+    assert merit.api_key == "synthetic-api-key"

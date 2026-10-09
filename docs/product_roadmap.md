@@ -576,3 +576,20 @@ links and completed queues have explicit non-destructive states. The interface i
 localized in English, Estonian, Latvian and Lithuanian. This adds no migration,
 does not enable unattended imports, and does not change the pending production
 accountant UAT gate.
+
+## 21. Finance connector health checks (2026-10-09)
+
+QuickBooks, Xero and Merit connection tests now construct the existing real
+provider adapters from tenant-supplied credentials and perform a lightweight,
+company-scoped health request. Results distinguish a reachable provider that
+rejects credentials from a connection failure or timeout, while response and
+audit messages never include credential values. QuickBooks checks respect the
+sandbox setting; Xero validates the selected tenant; Merit signs the probe with
+the existing HMAC convention.
+
+This work changes connection health checks only. It does not add finance-provider
+pulls to the reviewed import pipeline or change invoice/query submission behavior.
+HMRC, e-MTA and open banking remain explicit planning stubs. Mocked HTTP coverage
+verifies successful, unauthorized and unavailable providers without live network
+calls. Section 20 covers the integration workspace, which merged before this
+change.

@@ -14,6 +14,7 @@ from fastapi.testclient import TestClient
 import automation
 from api_app import api, current_user, require_csrf
 from connectors.base import ConnectorResult
+from connectors.providers import QuickBooksProvider
 from connectors.registry import REGISTRY
 from database import reset_database_cache
 from documents import DocumentService
@@ -210,6 +211,67 @@ def test_integration_test_success_failure_disconnect_and_redaction(
         (configured.json()["id"],),
     )
     assert [item["action"] for item in actions].count("integration.status_changed") == 3
+
+
+def test_finance_connection_check_uses_mocked_http_and_updates_status(
+    integration_api, monkeypatch,
+):
+    client, base = integration_api
+    saved_secret = "saved-qbo-secret-do-not-return"
+    configured = client.post(base + "/integrations/quickbooks", json={
+        "credentials": {
+            "access_token": saved_secret,
+            "realm_id": "saved-synthetic-realm",
+            "sandbox": True,
+        },
+        "config": {},
+    })
+    assert configured.status_code == 200
+    assert saved_secret not in configured.text
+
+    response_status = {"code": 200}
+
+    def handler(_request):
+        return httpx.Response(response_status["code"], json={"QueryResponse": {}})
+
+    def factory(credentials, config):
+        return QuickBooksProvider(
+            access_token=credentials.get("access_token", ""),
+            realm_id=credentials.get("realm_id") or config.get("realm_id", ""),
+            sandbox=credentials.get("sandbox", config.get("sandbox", True)),
+            client=httpx.Client(transport=httpx.MockTransport(handler)),
+        )
+
+    monkeypatch.setitem(
+        REGISTRY, "quickbooks", replace(REGISTRY["quickbooks"], factory=factory),
+    )
+    ephemeral_secret = "ephemeral-qbo-secret-do-not-return"
+    payload = {
+        "credentials": {
+            "access_token": ephemeral_secret,
+            "realm_id": "ephemeral-synthetic-realm",
+            "sandbox": True,
+        },
+        "config": {},
+    }
+
+    succeeded = client.post(base + "/integrations/quickbooks/test", json=payload)
+    assert succeeded.status_code == 200
+    assert succeeded.json()["ok"] is True and succeeded.json()["live"] is True
+    listed = client.get(base + "/integrations")
+    assert listed.json()[0]["status"] == "Connected"
+
+    response_status["code"] = 401
+    failed = client.post(base + "/integrations/quickbooks/test", json=payload)
+    assert failed.status_code == 200
+    assert failed.json()["ok"] is False and failed.json()["live"] is True
+    assert "HTTP 401" in failed.json()["message"]
+    listed = client.get(base + "/integrations")
+    assert listed.json()[0]["status"] == "Error"
+
+    combined_responses = succeeded.text + failed.text + listed.text
+    assert saved_secret not in combined_responses
+    assert ephemeral_secret not in combined_responses
 
 
 def test_roadmap_test_is_non_live_and_does_not_persist_test_credentials(

@@ -49,8 +49,16 @@ class HTTPProvider:
             self.sleep(min(delay, 10))
         raise ProviderError("Provider request exhausted retries")
 
+    @staticmethod
+    def _status_code(error: ProviderError) -> int | None:
+        cause = error.__cause__
+        if isinstance(cause, httpx.HTTPStatusError):
+            return cause.response.status_code
+        return None
+
 
 class QuickBooksProvider(HTTPProvider):
+    key = "quickbooks"
     auth_url = "https://appcenter.intuit.com/connect/oauth2"
     token_url = "https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer"
 
@@ -76,8 +84,37 @@ class QuickBooksProvider(HTTPProvider):
                             headers={"Authorization": f"Bearer {self.access_token}", "Accept": "application/json",
                                      "Request-Id": idempotency_key}).json()
 
+    def check(self) -> ConnectorResult:
+        try:
+            self.query("select * from Account maxresults 1")
+        except httpx.RequestError:
+            return ConnectorResult(
+                self.key,
+                "check",
+                False,
+                False,
+                "QuickBooks API could not be reached due to a connection error or timeout",
+            )
+        except ProviderError as error:
+            status = self._status_code(error)
+            if status == 401:
+                message = "QuickBooks API authentication failed (HTTP 401)"
+            elif status is not None:
+                message = f"QuickBooks API returned unexpected HTTP {status}"
+            else:
+                message = "QuickBooks API check failed"
+            return ConnectorResult(self.key, "check", False, True, message)
+        return ConnectorResult(
+            self.key,
+            "check",
+            True,
+            True,
+            "QuickBooks API reachable; company context valid",
+        )
+
 
 class XeroProvider(HTTPProvider):
+    key = "xero"
     auth_url = "https://login.xero.com/identity/connect/authorize"
     token_url = "https://identity.xero.com/connect/token"
     base_url = "https://api.xero.com/api.xro/2.0"
@@ -105,6 +142,35 @@ class XeroProvider(HTTPProvider):
         headers = dict(self.headers, **{"Idempotency-Key": idempotency_key})
         return self.request("POST", f"{self.base_url}/Invoices", json={"Invoices": [payload]}, headers=headers).json()
 
+    def check(self) -> ConnectorResult:
+        try:
+            # Xero's tenant-authorized identity resource is singular: GET /Organisation.
+            self.request("GET", f"{self.base_url}/Organisation", headers=self.headers)
+        except httpx.RequestError:
+            return ConnectorResult(
+                self.key,
+                "check",
+                False,
+                False,
+                "Xero API could not be reached due to a connection error or timeout",
+            )
+        except ProviderError as error:
+            status = self._status_code(error)
+            if status in {401, 403}:
+                message = f"Xero API authentication failed (HTTP {status})"
+            elif status is not None:
+                message = f"Xero API returned unexpected HTTP {status}"
+            else:
+                message = "Xero API check failed"
+            return ConnectorResult(self.key, "check", False, True, message)
+        return ConnectorResult(
+            self.key,
+            "check",
+            True,
+            True,
+            "Xero API reachable; tenant context valid",
+        )
+
 
 class FastHRProvider(HTTPProvider):
     """Pull-only employee master-data adapter for FastHR."""
@@ -122,13 +188,6 @@ class FastHRProvider(HTTPProvider):
             "Authorization": f"Bearer {token}",
             "Accept": "application/json",
         }
-
-    @staticmethod
-    def _status_code(error: ProviderError) -> int | None:
-        cause = error.__cause__
-        if isinstance(cause, httpx.HTTPStatusError):
-            return cause.response.status_code
-        return None
 
     def _employee_page(self, *, limit: int, offset: int | None = None) -> tuple[list[dict], int]:
         params = {"limit": limit}
@@ -279,6 +338,7 @@ class FastHRProvider(HTTPProvider):
 
 
 class MeritProvider(HTTPProvider):
+    key = "merit"
     base_url = "https://aktiva.merit.ee/api/v2"
 
     def __init__(self, api_id: str, api_key: str, *, clock=None, **kwargs):
@@ -303,6 +363,40 @@ class MeritProvider(HTTPProvider):
     def payments(self, period_start: str, period_end: str) -> dict:
         return self.post("getpayments", {"PeriodStart": period_start.replace("-", ""),
                                          "PeriodEnd": period_end.replace("-", ""), "DateType": 0})
+
+    def check(self) -> ConnectorResult:
+        try:
+            # Reuse the existing V2 getpayments resource with an empty signed probe body.
+            self.request(
+                "GET",
+                f"{self.base_url}/getpayments",
+                params=self.signed_params(b""),
+                headers={"Accept": "application/json"},
+            )
+        except httpx.RequestError:
+            return ConnectorResult(
+                self.key,
+                "check",
+                False,
+                False,
+                "Merit API could not be reached due to a connection error or timeout",
+            )
+        except ProviderError as error:
+            status = self._status_code(error)
+            if status in {401, 403}:
+                message = f"Merit API authentication failed (HTTP {status})"
+            elif status is not None:
+                message = f"Merit API returned unexpected HTTP {status}"
+            else:
+                message = "Merit API check failed"
+            return ConnectorResult(self.key, "check", False, True, message)
+        return ConnectorResult(
+            self.key,
+            "check",
+            True,
+            True,
+            "Merit API reachable; company context valid",
+        )
 
 
 class HMRCProvider(HTTPProvider):
