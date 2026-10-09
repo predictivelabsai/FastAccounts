@@ -1,0 +1,2 @@
+weasyprint>=62
+python-pptx>=1.0
