@@ -25,6 +25,8 @@ def env(tmp_path, monkeypatch):
     monkeypatch.setenv("FASTACCOUNTS_DB", str(tmp_path / "auth.sqlite"))
     monkeypatch.delenv("DB_URL", raising=False)
     monkeypatch.setenv("FASTACCOUNTS_PUBLIC_URL", "https://books.example.test")
+    monkeypatch.setenv("POSTMARK_API_TOKEN", "synthetic-server-token")
+    monkeypatch.setenv("FROM_EMAIL", "accounts@example.test")
     for key in ("GOOGLE_ALLOWED_DOMAINS", "GOOGLE_ALLOWED_EMAILS"):
         monkeypatch.delenv(key, raising=False)
     database.reset_database_cache()
@@ -72,6 +74,15 @@ def register_and_verify(c, env, email=OWNER, password=PASSWORD):
 def notice(text):
     match = re.search(r'class="(?:auth-notice|error)"[^>]*>([^<]+)<', text)
     return match.group(1) if match else ""
+
+
+def use_real_unconfigured_mail(env, monkeypatch):
+    monkeypatch.undo()
+    monkeypatch.setenv("FASTACCOUNTS_DB", str(env["db"].path))
+    monkeypatch.delenv("DB_URL", raising=False)
+    monkeypatch.setenv("FASTACCOUNTS_PUBLIC_URL", "https://books.example.test")
+    monkeypatch.delenv("POSTMARK_API_TOKEN", raising=False)
+    monkeypatch.delenv("FROM_EMAIL", raising=False)
 
 
 # ---------------------------------------------------------------- unit
@@ -393,16 +404,48 @@ def test_sessions_from_before_this_release_stay_valid_until_a_reset(env):
 
 
 # ---------------------------------------------------------------- mail
-def test_without_mail_configuration_requests_log_and_show_generic_message(env, monkeypatch, caplog):
-    monkeypatch.undo()  # restore the real sender, then re-apply the isolated database
-    monkeypatch.setenv("FASTACCOUNTS_DB", str(env["db"].path))
-    monkeypatch.setenv("FASTACCOUNTS_PUBLIC_URL", "https://books.example.test")
-    monkeypatch.delenv("POSTMARK_API_TOKEN", raising=False)
-    monkeypatch.delenv("FROM_EMAIL", raising=False)
+def test_register_without_mail_logs_local_link_when_test_auth_enabled(env, monkeypatch, caplog):
+    use_real_unconfigured_mail(env, monkeypatch)
+    monkeypatch.setenv("FASTACCOUNTS_ALLOW_TEST_AUTH", "TRUE")
+    caplog.set_level(logging.WARNING, logger="fastaccounts.auth")
+    response = post(client(), "/auth/local/register", {"name": "Owner", "email": OWNER, "password": PASSWORD})
+    assert response.status_code == 200 and "confirmation link" in notice(response.text)
+    match = LINK.search(caplog.text)
+    assert match and match.group(1) == "verify"
+    assert f"Local dev link (sign-up verification): {match.group(0)}" in caplog.messages
+    assert "Account email not sent: POSTMARK_API_TOKEN and FROM_EMAIL are not configured" in caplog.messages
+
+
+def test_reset_without_mail_logs_local_link_when_test_auth_enabled(env, monkeypatch, caplog):
+    use_real_unconfigured_mail(env, monkeypatch)
+    monkeypatch.setenv("FASTACCOUNTS_ALLOW_TEST_AUTH", "true")
     caplog.set_level(logging.WARNING, logger="fastaccounts.auth")
     response = post(client(), "/auth/local/forgot", {"email": OWNER})
     assert response.status_code == 200 and "reset link" in notice(response.text)
-    assert "POSTMARK_API_TOKEN and FROM_EMAIL are not configured" in caplog.text
+    match = LINK.search(caplog.text)
+    assert match and match.group(1) == "reset"
+    assert f"Local dev link (password reset): {match.group(0)}" in caplog.messages
+    assert "Account email not sent: POSTMARK_API_TOKEN and FROM_EMAIL are not configured" in caplog.messages
+
+
+def test_without_mail_does_not_log_link_when_test_auth_is_unset(env, monkeypatch, caplog):
+    use_real_unconfigured_mail(env, monkeypatch)
+    monkeypatch.delenv("FASTACCOUNTS_ALLOW_TEST_AUTH", raising=False)
+    issued = []
+    original_issue = account_auth.AccountStore._issue
+
+    def capture_issue(self, tx, account_id, purpose, ttl):
+        token = original_issue(self, tx, account_id, purpose, ttl)
+        issued.append(token)
+        return token
+
+    monkeypatch.setattr(account_auth.AccountStore, "_issue", capture_issue)
+    caplog.set_level(logging.WARNING, logger="fastaccounts.auth")
+    response = post(client(), "/auth/local/register", {"name": "Owner", "email": OWNER, "password": PASSWORD})
+    assert response.status_code == 200 and "confirmation link" in notice(response.text)
+    assert "Account email not sent: POSTMARK_API_TOKEN and FROM_EMAIL are not configured" in caplog.messages
+    assert "Local dev link" not in caplog.text and "https://" not in caplog.text
+    assert len(issued) == 1 and issued[0] not in caplog.text
 
 
 def test_links_are_built_from_configuration_not_the_host_header(env, monkeypatch, caplog):

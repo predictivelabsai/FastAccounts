@@ -174,6 +174,10 @@ def _send_link(email: str, name: str, purpose: str, token: str, lang: str) -> bo
         return False
     T = lambda key: i18n.t(f"auth.{key}", lang)
     link = f"{base}/auth/local/{purpose}/{token}"
+    if (os.getenv("FASTACCOUNTS_ALLOW_TEST_AUTH", "").lower() == "true"
+            and not mail_configured()):
+        label = "sign-up verification" if purpose == "verify" else "password reset"
+        log.warning("Local dev link (%s): %s", label, link)
     subject = T(f"mail_{purpose}_subject")
     lines = [T("mail_greeting").format(name=name or email), T(f"mail_{purpose}_body"),
              T(f"mail_{purpose}_expiry"), T("mail_ignore")]
