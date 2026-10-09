@@ -14,6 +14,12 @@ delivered.
   offline file import and a second import left at Review Required with pending
   rows, ready for the review-and-apply demo flow.
 
+## 2026-10-09 — Local account email development links
+
+- The local sign-up verification link is printed to the server log when test
+  auth is enabled and mail is not configured; password-reset links use the same
+  local-only behavior.
+
 ## 2026-10-09 — Website trust pages and roadmap
 
 - Added localized first-party `/security`, `/privacy`, `/about`, `/contact` and
