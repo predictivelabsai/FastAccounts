@@ -58,11 +58,17 @@
     "contact_email": "Sales & support: info@predictivelabs.ai",
     "legal_notice": "FastAccounts is operated by Predictive Labs Ltd, 155 Minories Street, Suite 275, London EC3N 1AD, United Kingdom."
   },
+  "availability": {
+    "available": "Available",
+    "review_required": "Review required",
+    "pilot": "Pilot",
+    "planned": "Planned"
+  },
   "public_pages": {
     "security": {
       "title": "Security",
-      "lede": "A factual view of the controls in FastAccounts today, the choices self-hosters own, and the work that remains before production rollout.",
-      "note": "Early-stage posture · reviewed 9 October 2026",
+      "lede": "A factual view of the controls available in FastAccounts, the choices self-hosters own, and the review and planned work before production rollout.",
+      "note": "Review required · assessed 9 October 2026",
       "sections": [
         {
           "title": "Hosting model",
@@ -74,15 +80,15 @@
         },
         {
           "title": "Backups and recovery",
-          "body": "Self-hosters are responsible for their own database, evidence-storage, encryption and restore process. For managed hosting, encrypted backups and tested restores are production gates; the repository does not yet record a completed backup-and-restore drill, so no recovery-time promise is made."
+          "body": "Self-hosters are responsible for their own database, evidence-storage, encryption and restore process. Planned: encrypted managed-hosting backups and tested restores. The repository does not record a completed backup-and-restore drill, so no recovery-time promise is made."
         },
         {
           "title": "Access control",
-          "body": "The application supports local email/password accounts and Google sign-in, invite-only organisation membership, signed sessions, CSRF protection and owner, administrator, accountant, approver and viewer roles. Passwords use scrypt hashes; confirmation and reset tokens are single-use hashes, and repeated sign-in attempts are throttled. Business records are scoped by organisation and cross-tenant access is covered by tests. A managed-service MFA policy and edge rate limiting remain deployment gates."
+          "body": "Available: local email/password accounts and Google sign-in, invite-only organisation membership, signed sessions, CSRF protection and owner, administrator, accountant, approver and viewer roles. Passwords use scrypt hashes; confirmation and reset tokens are single-use hashes, and repeated sign-in attempts are throttled. Business records are scoped by organisation and cross-tenant access is covered by tests. Planned: a managed-service MFA policy and edge rate limiting."
         },
         {
           "title": "Incidents",
-          "body": "Send a suspected security incident privately to info@predictivelabs.ai with “FastAccounts security incident” in the subject. The team will preserve relevant records, investigate scope and coordinate customer communication. Contractual incident-response times are not yet offered.",
+          "body": "Send a suspected security incident privately to info@predictivelabs.ai with “FastAccounts security incident” in the subject. The team will preserve relevant records, investigate scope and coordinate customer communication. Planned: contractual incident-response times; none are currently offered.",
           "action": "Report an incident",
           "email_subject": "FastAccounts security incident"
         },
@@ -100,8 +106,8 @@
     },
     "privacy": {
       "title": "Privacy",
-      "lede": "This pilot notice explains the roles and data paths visible in the current product. A customer data-processing agreement must complete the production arrangement.",
-      "note": "Plain-language pilot notice · reviewed 9 October 2026",
+      "lede": "This Pilot notice explains the roles and data paths visible in the current product. A customer data-processing agreement must complete the production arrangement.",
+      "note": "Pilot · plain-language notice assessed 9 October 2026",
       "sections": [
         {
           "title": "Controller and processor roles",
@@ -113,7 +119,7 @@
         },
         {
           "title": "Retention",
-          "body": "Accounting records are retained according to the customer’s policy and applicable statutory periods: the product roadmap records six years for ordinary UK VAT records and seven years from the end of the financial year for Estonian accounting records, with longer holds where required. Deletion requests cannot silently remove posted ledgers or records under a statutory or legal hold. Automated retention execution is still a production gate."
+          "body": "Accounting records are retained according to the customer’s policy and applicable statutory periods: the product roadmap records six years for ordinary UK VAT records and seven years from the end of the financial year for Estonian accounting records, with longer holds where required. Deletion requests cannot silently remove posted ledgers or records under a statutory or legal hold. Planned: automated retention execution for managed hosting."
         },
         {
           "title": "International transfers",
@@ -133,8 +139,8 @@
     },
     "about": {
       "title": "Company",
-      "lede": "FastAccounts is an early-stage, open-source bookkeeping product built for UK and Estonian small businesses and accounting bureaus.",
-      "note": "Built in public · country validation still in progress",
+      "lede": "FastAccounts is an open-source bookkeeping product built for UK and Estonian small businesses and accounting bureaus.",
+      "note": "Review required · independent country validation",
       "sections": [
         {
           "title": "Legal entity",
@@ -146,22 +152,22 @@
         },
         {
           "title": "Accounting-market competence",
-          "body": "The software implements tested UK VAT and Estonian VAT (KMD) workpapers, country-specific invoices, exact Decimal tax calculations and immutable double-entry postings. The rules are documented against official sources, but independent UK and Estonian accountant UAT is still pending. FastAccounts is software, not tax or legal advice."
+          "body": "Available: tested UK VAT and Estonian VAT (KMD) workpapers, country-specific invoices, exact Decimal tax calculations and immutable double-entry postings. Review required: independent UK and Estonian accountant UAT. FastAccounts is software, not tax or legal advice."
         },
         {
           "title": "Product boundary",
-          "body": "FastAccounts covers bookkeeping: invoices, bills, evidence, bank-statement import and reconciliation, ledgers, reports and reviewable VAT workpapers. Estonian payroll for accounting-bureau client books is demo scope with production UAT pending. It is not an ERP and does not include inventory, order management, manufacturing, CRM or general HR."
+          "body": "Available: invoices, bills, evidence, bank-statement import and reconciliation, ledgers, reports and reviewable VAT workpapers. Review required: Estonian payroll for accounting-bureau client books must complete production UAT. FastAccounts is not an ERP and does not include inventory, order management, manufacturing, CRM or general HR."
         }
       ]
     },
     "contact": {
       "title": "Contact",
       "lede": "One working inbox, with a clear subject line for each path. We do not publish mailboxes that are not configured.",
-      "note": "Predictive Labs Ltd · info@predictivelabs.ai",
+      "note": "Available · info@predictivelabs.ai",
       "sections": [
         {
           "title": "Sales",
-          "body": "Ask about the hosted pilot, self-hosting or an accounting-bureau evaluation. Include your market, organisation type and the workflow you want to test.",
+          "body": "Ask about the hosted Pilot, self-hosting or an accounting-bureau evaluation. Include your market, organisation type and the workflow you want to test.",
           "action": "Email sales",
           "email_subject": "FastAccounts sales enquiry"
         },
@@ -187,12 +193,12 @@
     },
     "terms": {
       "title": "Terms — draft",
-      "lede": "These are placeholder terms for an early-stage service. They are not final customer terms and do not create claims about service levels, compliance or warranties.",
-      "note": "Draft for review · not production terms",
+      "lede": "These Pilot terms are placeholders, not final customer terms, and do not create claims about service levels, compliance or warranties.",
+      "note": "Pilot · legal review required",
       "sections": [
         {
           "title": "Service scope",
-          "body": "FastAccounts provides bookkeeping software and an optional hosted pilot. Features may be labelled available, review required, pilot or planned. Direct tax filing and other gated capabilities are not included unless a signed agreement expressly says otherwise."
+          "body": "FastAccounts provides bookkeeping software and an optional hosted Pilot. Availability uses four labels: Available, Review required, Pilot and Planned. Direct tax filing is Planned and is not included unless a signed agreement expressly says otherwise."
         },
         {
           "title": "Customer responsibilities",
@@ -203,8 +209,8 @@
           "body": "The source repository is published under the MIT License. Self-hosted use is governed by that licence; operating, securing, backing up and updating a self-hosted deployment remains the operator’s responsibility."
         },
         {
-          "title": "Hosted pilot",
-          "body": "Availability, support, data processing, fees, cancellation and service levels for hosted use must be set in a separate customer agreement. This draft does not promise uninterrupted service, a response time or a production recovery objective."
+          "title": "Hosted Pilot",
+          "body": "Pilot: availability, support, data processing, fees, cancellation and service levels for hosted use must be set in a separate customer agreement. This draft does not promise uninterrupted service, a response time or a production recovery objective."
         },
         {
           "title": "Legal terms still to be agreed",
@@ -214,47 +220,45 @@
     },
     "roadmap": {
       "title": "Roadmap",
-      "lede": "A buyer-readable view of what is being validated now, what comes next and what remains later. Dates below are release dates, not forecasts.",
-      "note": "Now / Next / Later · updated 9 October 2026",
+      "lede": "A buyer-readable view using the same four availability labels across the public site. Dates below are release dates, not forecasts.",
+      "note": "Available / Review required / Pilot / Planned · updated 9 October 2026",
       "source_intro": "For the complete implementation record, read the",
       "source_link": "changelog",
       "stages": [
         {
-          "title": "Now",
-          "intro": "Work required to turn the engineering pilot into a production-ready service.",
+          "title": "Available",
+          "intro": "Implemented product paths that can be used within the boundaries stated here.",
           "items": [
-            {"title": "Independent accountant UAT", "body": "Validate UK VAT, Estonian KMD and the Estonian bureau-payroll pilot with qualified accountants before making professional-validation claims.", "market": "UK + Estonia"},
-            {"title": "Hosted operations evidence", "body": "Name the hosting subprocessor, document data location, complete encrypted backup/restore drills and configure incident alerting, edge rate limits and malware scanning.", "market": "Both markets"},
-            {"title": "Provider verification", "body": "Verify documented and adapter-ready integrations with permitted customer or test-company credentials while keeping imports reviewed and tenant-scoped.", "market": "Both markets"}
+            {"title": "Public foundation", "date": "2026-08-10", "body": "Landing page, integrations catalogue, health identity and guarded sign-in were released before the first recorded application version.", "market": "UK + Estonia"},
+            {"title": "Core bookkeeping 0.2.0", "date": "2026-08-10", "body": "Invoices, bills, evidence, statement import and reconciliation, immutable double-entry accounting, reports and reviewable VAT workpapers are implemented.", "market": "UK + Estonia"},
+            {"title": "Accounts and workflows 0.3.0–0.4.0", "date": "2026-10-09", "body": "Recurring invoices, reminders, reviewed employee file and FastHR imports, and email/password accounts are implemented with no-network test coverage.", "market": "UK + Estonia"}
           ]
         },
         {
-          "title": "Next",
-          "intro": "Planned work after the current validation and operating gates are met.",
+          "title": "Review required",
+          "intro": "Implemented work that awaits external verification or production UAT.",
           "items": [
-            {"title": "Production open banking", "body": "Add reconnect, scheduled read-only pulls and monitoring after legal, commercial and coverage review.", "market": "UK + Estonia"},
-            {"title": "Supported tax filing channels", "body": "Complete provider approvals and guarded production journeys for HMRC and e-MTA. Workpapers and exports remain the current deliverable.", "market": "UK + Estonia"},
-            {"title": "Bureau payroll production review", "body": "Complete accountant UAT for Estonian client-book payroll, including remaining TSD, leave and sickness-pay boundaries.", "market": "Estonia"}
+            {"title": "Independent accountant UAT", "body": "Validate UK VAT, Estonian KMD and Estonian bureau payroll with qualified accountants before making professional-validation claims.", "market": "UK + Estonia"},
+            {"title": "Provider verification", "body": "Verify QuickBooks, Xero, Merit Aktiva, BambooHR and Personio with permitted customer or test-company credentials while keeping imports reviewed and tenant-scoped.", "market": "Both markets"}
           ]
         },
         {
-          "title": "Later",
-          "intro": "Useful extensions that stay outside the current production promise.",
+          "title": "Pilot",
+          "intro": "Limited journeys available for evaluation, with explicit production boundaries.",
           "items": [
-            {"title": "Broader UK compliance", "body": "Consider Corporation Tax, Companies House accounts, CIS and additional VAT schemes only after fixtures and professional review.", "market": "UK"},
-            {"title": "Broader Estonian reporting", "body": "Consider annual-report taxonomy mapping, registry filing and supported direct e-MTA submission when access and review gates are met.", "market": "Estonia"},
-            {"title": "Optional suggestions", "body": "Evaluate AI-assisted field or match suggestions only behind explicit human approval; no suggestion may silently post to the ledger.", "market": "Both markets"}
+            {"title": "Hosted service", "body": "The managed hosting journey is offered only under a separate customer agreement while operational evidence is completed.", "market": "Both markets"},
+            {"title": "Estonian bureau payroll 0.2.1", "date": "2026-10-08", "body": "Part-time and hourly payroll, social-tax minimum handling and synthetic demonstrations are implemented; production use remains Review required.", "market": "Estonia"},
+            {"title": "Tax workpaper and export paths", "body": "UK VAT and Estonian KMD workpapers and exports are available for evaluation. Direct filing is Planned.", "market": "UK + Estonia"}
           ]
         },
         {
-          "title": "Shipped",
-          "intro": "Dated milestones taken from the checked-in change log.",
+          "title": "Planned",
+          "intro": "Capabilities that are not yet implemented or included in the current service promise.",
           "items": [
-            {"title": "Public foundation", "date": "2026-08-10", "body": "Landing page, integrations catalogue, health identity and guarded sign-in shipped before the first recorded application release. The checked-in change log does not record a 0.1.x release, so none is invented here.", "market": "UK + Estonia"},
-            {"title": "Engineering pilot 0.2.0", "date": "2026-08-10", "body": "Core bookkeeping, immutable double-entry accounting, reviewable UK VAT and Estonian KMD workpapers, synthetic books and provider boundaries shipped.", "market": "UK + Estonia"},
-            {"title": "Payroll 0.2.1", "date": "2026-10-08", "body": "Part-time and hourly Estonian bureau payroll, social-tax minimum handling and expanded synthetic demo coverage shipped.", "market": "Estonia"},
-            {"title": "Release 0.3.0", "date": "2026-10-09", "body": "Recurring invoices, reminders, integration connection controls and reviewed employee imports shipped with no-network test coverage.", "market": "UK + Estonia"},
-            {"title": "Release 0.4.0", "date": "2026-10-09", "body": "Email/password registration, sign-in and reset shipped beside Google SSO, with scrypt password hashes, single-use token hashes, throttling and session rotation.", "market": "UK + Estonia"}
+            {"title": "Managed-service operations", "body": "Name the hosting subprocessor and data location, complete encrypted backup/restore drills and add incident alerting, edge rate limits and malware scanning.", "market": "Both markets"},
+            {"title": "Read-only open banking", "body": "Add provider selection, reconnect, scheduled pulls and monitoring after legal, commercial and bank-coverage review.", "market": "UK + Estonia"},
+            {"title": "Direct tax filing", "body": "Complete provider approvals and guarded submission journeys for HMRC and e-MTA. Workpapers and exports remain the current deliverable.", "market": "UK + Estonia"},
+            {"title": "Broader statutory reporting", "body": "Consider UK Corporation Tax and Companies House accounts plus Estonian annual-report mapping only after fixtures and professional review.", "market": "UK + Estonia"}
           ]
         }
       ]
@@ -263,12 +267,12 @@
       "title": "Changelog",
       "lede": "A concise release history for buyers and operators. Detailed engineering notes remain in the repository.",
       "note": "Dated, evidence-backed releases",
-      "source_intro": "Read every shipped change in the",
+      "source_intro": "Read every recorded change in the",
       "source_link": "technical change log",
       "releases": [
         {"title": "0.4.0 · Email and password accounts", "date": "2026-10-09", "body": "Added registration, sign-in and password reset beside Google SSO. Passwords use scrypt hashes; confirmation and reset links are single-use, throttled and sent through optional Postmark configuration."},
-        {"title": "0.3.0 · Integrations and automation", "date": "2026-10-09", "body": "Added recurring invoices and reminders, tenant-scoped connection controls, the FastHR connector, reviewed employee imports, a universal CSV/TSV path and documented-contract Personio and BambooHR adapters. Provider tests use mocked transports; production verification remains explicit."},
-        {"title": "0.2.1 · Estonian bureau payroll", "date": "2026-10-08", "body": "Added part-time and hourly pay, pension-rate choices, the 2026 social-tax minimum and a synthetic payroll demonstration. Estonian bureau payroll remains demo scope while production accountant UAT is pending."},
+        {"title": "0.3.0 · Integrations and automation", "date": "2026-10-09", "body": "Added recurring invoices and reminders, tenant-scoped connection controls, the FastHR connector, reviewed employee imports, a universal CSV/TSV path and documented-contract Personio and BambooHR adapters. Review required: provider tests use mocked transports and await production verification."},
+        {"title": "0.2.1 · Estonian bureau payroll", "date": "2026-10-08", "body": "Added part-time and hourly pay, pension-rate choices, the 2026 social-tax minimum and a synthetic payroll demonstration. Review required: production accountant UAT is incomplete."},
         {"title": "0.2.0 · Engineering pilot", "date": "2026-08-10", "body": "Delivered the accounting workspace, portable migrations, invoices, bills, evidence, statement import and reconciliation, an immutable balanced ledger, financial reports and reviewable UK and Estonian VAT workpapers."},
         {"title": "Foundation before versioned releases", "date": "2026-08-10", "body": "Published the first-party landing page, integrations catalogue, health endpoint and guarded authentication foundation. No 0.1.x release is recorded in the checked-in change log."}
       ]
@@ -281,13 +285,13 @@
     "process_title": "From bank statement to reviewed returns.",
     "process_body": "A repeatable workflow for each client’s books. Explore it with synthetic data in the bureau demo.",
     "step1_title": "Connect the bank",
-    "step1_body": "Start with statement imports. Open banking remains a read-only candidate; no provider is connected by default.",
+    "step1_body": "Start with statement imports. Planned: read-only open banking; no provider is connected by default.",
     "step2_title": "Book the documents",
     "step2_body": "Keep invoices, bills and evidence together in each client’s books.",
     "step3_title": "Reconcile",
     "step3_body": "Review suggested matches and supporting evidence before confirming a posting.",
-    "step4_title": "File the returns",
-    "step4_body": "Prepare and review VAT workpapers for export. Direct tax submission remains gated.",
+    "step4_title": "Prepare the returns",
+    "step4_body": "Available: VAT workpapers and export. Planned: direct tax submission.",
     "comparison_title": "Less spreadsheet work. More clarity.",
     "old_title": "The old way",
     "new_title": "The FastAccounts way",
@@ -306,8 +310,8 @@
     "stats_label": "Product facts",
     "title": "Open bookkeeping",
     "kicker": "Books built for two markets",
-    "headline": "Bookkeeping that stays clear. For every client.",
-    "lede": "Run the books and payroll for your UK and Estonian clients in one calm workspace. Review documents, reconcile payments and prepare UK and Estonian VAT workpapers with confidence.",
+    "headline": "Bookkeeping that stays clear, whoever keeps the books.",
+    "lede": "Run your own books or manage separate client books in one calm workspace. Review documents, reconcile payments and prepare UK and Estonian VAT workpapers with confidence.",
     "explore_integrations": "Explore integrations",
     "view_source": "View the source",
     "invoice_label": "INVOICING",
@@ -321,11 +325,40 @@
     "review_body": "VAT workpapers, ledgers, reports, evidence, audit history, and explicit filing-agent plans.",
     "hero_eyebrow": "Open-source books. Two markets.",
     "hero_h1": "Bookkeeping that stays clear.",
-    "hero_highlight": "For every client.",
-    "hero_sub": "Review invoices, reconcile payments and prepare UK and Estonian VAT workpapers in one workspace.",
+    "hero_highlight": "For your business or your clients.",
+    "hero_sub": "A focused path for small businesses keeping their own books, and another for accounting bureaus managing many client books.",
     "hero_cta": "Get started",
     "hero_trust": "Open source · UK and Estonia · Your books, your control",
-    "suite_label": "One suite. The same simple pricing.",
+    "audience_title": "Choose the way you keep the books.",
+    "audience_body": "FastAccounts serves two distinct working models. Start with the one that matches your day-to-day responsibility.",
+    "audience_bureau_title": "I run an accounting bureau",
+    "audience_bureau_body": "Manage payroll, payables and bookkeeping across separate client organisations, with a clear review trail for each book.",
+    "audience_bureau_cta": "See bureau workflows",
+    "audience_business_title": "I run my own business books",
+    "audience_business_body": "Issue invoices, record bills, reconcile bank activity and prepare VAT workpapers for one organisation.",
+    "audience_business_cta": "See small-business features",
+    "small_business_title": "For small businesses running their own books",
+    "small_business_body": "Keep the everyday path focused: sell, record costs, reconcile cash and hand over reviewed records when you need professional help.",
+    "suite_title": "The wider FastSME suite",
+    "suite_label": "Each product has one job, with the same straightforward hosting choices.",
+    "suite_fastmail_name": "FastMail",
+    "suite_fastmail_body": "Business email for teams and client communication.",
+    "suite_fastmail_cta": "Explore FastMail",
+    "suite_fastoffice_name": "FastOffice",
+    "suite_fastoffice_body": "Documents and spreadsheets for everyday work.",
+    "suite_fastoffice_cta": "Explore FastOffice",
+    "suite_fastdrive_name": "FastDrive",
+    "suite_fastdrive_body": "Company file storage and sharing.",
+    "suite_fastdrive_cta": "Explore FastDrive",
+    "suite_fastmeet_name": "FastMeet",
+    "suite_fastmeet_body": "Video meetings for teams and clients.",
+    "suite_fastmeet_cta": "Explore FastMeet",
+    "suite_fasthr_name": "FastHR",
+    "suite_fasthr_body": "Employee records, leave and people operations.",
+    "suite_fasthr_cta": "Explore FastHR",
+    "suite_fastbooks_name": "FastBooks",
+    "suite_fastbooks_body": "A lightweight financial overview for smaller teams.",
+    "suite_fastbooks_cta": "Explore FastBooks",
     "faq_eyebrow": "Good to know",
     "faq_title": "Your questions, answered.",
     "faq1_q": "What is FastAccounts?",
@@ -333,11 +366,11 @@
     "faq2_q": "What is the difference between BYOC and hosted?",
     "faq2_a": "Bring Your Own Cloud (BYOC) is free: you run FastAccounts on your own infrastructure and manage updates. Hosting with us costs €1 per product per month on FastSME-managed infrastructure.",
     "faq3_q": "Which countries are supported?",
-    "faq3_a": "FastAccounts covers UK and Estonian bookkeeping and VAT workpapers. Estonian payroll for accounting bureaus is in demo scope; production user acceptance testing is still pending. Direct tax submission remains gated.",
+    "faq3_a": "Available: UK and Estonian bookkeeping plus VAT workpapers and export. Review required: Estonian payroll for accounting bureaus awaits production UAT. Planned: direct tax submission.",
     "faq4_q": "Can I inspect the code and self-host?",
     "faq4_a": "Yes. FastAccounts is available on GitHub under the MIT license. You can use, modify and self-host it under that license, retaining its copyright and permission notice.",
     "faq5_q": "Which integrations are available?",
-    "faq5_a": "The catalogue includes tested adapters for QuickBooks Online, Xero and Merit Aktiva. No provider is connected by default. HMRC and Estonian tax submission remain gated, and open banking is a read-only candidate. Employee master data and payroll inputs from client HR systems are on the roadmap; no HR adapter is built yet. See the integrations page for scope and review requirements.",
+    "faq5_a": "Available: employee file import and FastHR. Review required: QuickBooks Online, Xero, Merit Aktiva, BambooHR and Personio. Pilot: HMRC workpapers and Estonian KMD/VD export. Planned: direct tax filing, open banking and the remaining catalogue. No provider is connected by default.",
     "cta_title": "Give every client's books a clear home.",
     "cta_body": "Start with your workspace, or explore the source and host FastAccounts yourself.",
     "mock_browser": "FastAccounts / Workspace",
@@ -373,15 +406,15 @@
     "title": "Integrations",
     "kicker": "Coexist by design",
     "headline": "Connect the tools your accountant already uses.",
-    "lede": "FastAccounts can exchange data through tested provider adapters while making direction, ownership, review, and conflicts visible. No provider below is connected by default, and tax submission remains gated.",
-    "accounting_adapters": "3 accounting adapters",
-    "filing_gates": "2 filing gates",
-    "banking_candidate": "Read-only banking candidate",
+    "lede": "Every connector uses one of four status labels: Available, Review required, Pilot or Planned. No provider is connected by default, and direct tax filing is Planned.",
+    "accounting_adapters": "Review required",
+    "filing_gates": "Pilot",
+    "banking_candidate": "Planned",
     "direction": "Direction",
     "ownership": "Record ownership",
     "docs": "Read provider documentation ↗",
-    "review_gate": "Review gate: ",
-    "review_notice": "Imports and exports produce reconciliation records. Direct tax submission stays disabled until provider approval, accountant UAT, and explicit finalisation controls are complete.",
+    "review_gate": "Review required: ",
+    "review_notice": "Imports and exports produce reconciliation records. Direct tax filing is Planned; current VAT capability is limited to workpapers and export.",
     "items": {
       "quickbooks": {
         "name": "QuickBooks Online",
@@ -432,7 +465,7 @@
         "name": "HMRC Making Tax Digital",
         "logo_alt": "HMRC service mark",
         "category": "Filing agent",
-        "description": "Prepare accountant-reviewed VAT workpapers now; add sandbox obligations and submission flows before production approval.",
+        "description": "Pilot: prepare accountant-reviewed VAT workpapers and test sandbox obligations. Planned: direct filing.",
         "capabilities": [
           "VAT obligations",
           "Nine-box workpaper",
@@ -446,7 +479,7 @@
         "name": "Estonian Tax and Customs Board",
         "logo_alt": "Estonian Tax and Customs Board service mark",
         "category": "Filing agent",
-        "description": "Generate accountant-reviewed KMD and VD workpapers and retain a stub for a future supported filing channel.",
+        "description": "Pilot: generate accountant-reviewed KMD and VD workpapers and export them. Planned: direct filing.",
         "capabilities": [
           "KMD workpaper",
           "VD preparation",
@@ -460,7 +493,7 @@
         "name": "Open banking",
         "logo_alt": "Open banking icon",
         "category": "Bank data",
-        "description": "Read booked transactions through a selected AISP after GB/EE business-bank coverage and legal review.",
+        "description": "Planned: read booked transactions through a selected AISP after GB/EE business-bank coverage and legal review.",
         "capabilities": [
           "Consent lifecycle",
           "Accounts and balances",
@@ -492,7 +525,7 @@
       "name": "BambooHR",
       "logo_alt": "BambooHR placeholder mark",
       "category": "HR software",
-      "description": "Import BambooHR directory records through a documented-contract adapter that has not been verified with vendor credentials; salary still needs a reviewed field mapping or local entry.",
+      "description": "Review required: the documented-contract adapter has not been verified with vendor credentials, and salary needs a reviewed field mapping or local entry.",
       "capabilities": ["Employee directory", "Name and email", "Status when exposed", "Custom field passthrough"],
       "direction": "Import · employee directory",
       "ownership": "BambooHR remains source"
@@ -501,7 +534,7 @@
       "name": "Personio",
       "logo_alt": "Personio placeholder mark",
       "category": "HR software",
-      "description": "Import whitelisted Personio employee attributes through a documented-contract adapter that has not been verified with vendor credentials; salary still needs a reviewed attribute mapping or local entry.",
+      "description": "Review required: the documented-contract adapter has not been verified with vendor credentials, and salary needs a reviewed attribute mapping or local entry.",
       "capabilities": ["Employee attributes", "Employment status", "Termination date", "Custom attribute passthrough"],
       "direction": "Import · employee master data",
       "ownership": "Personio remains source"
@@ -1234,12 +1267,12 @@
     "cta": "Open your workspace",
     "clients_title": "All your client books",
     "clients_body": "Switch between client companies in one workspace, with separate books and a clear overview for each.",
-    "payroll_title": "Monthly payroll, ready to review",
+    "payroll_title": "Monthly payroll for review",
     "payroll_body": "Create a payroll draft for each client organisation in one click, then review and approve payslips and ledger postings.",
     "matches_title": "Matches you can explain",
     "matches_body": "See why a bank transaction matches a document, review the evidence, and confirm before posting.",
     "tax_title": "Review before export",
-    "tax_body": "Prepare Estonian VAT (KMD) and UK VAT workpapers, check the figures, and mark them reviewed before export. Export is available; direct filing is not yet available."
+    "tax_body": "Available: Estonian VAT (KMD) and UK VAT workpapers and export. Review the figures before export. Planned: direct filing."
   },
   "pricing": {
     "kicker": "Pricing",

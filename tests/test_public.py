@@ -21,7 +21,7 @@ def test_landing_has_primary_product_and_sign_in_routes():
     assert "Bookkeeping that stays clear" in rendered
     assert 'href="/integrations"' in rendered
     assert 'href="/login"' in rendered
-    assert "UK and Estonian VAT" in rendered
+    assert "For your business or your clients" in rendered
 
 
 @pytest.mark.parametrize("lang", ["en", "et", "lv", "lt"])
@@ -30,7 +30,7 @@ def test_landing_template_sections_and_translated_content(lang):
     main = page.select_one("main")
     sections = main.find_all("section", recursive=False)
     assert [section.get("id") for section in sections] == [
-        "hero", "dashboard", None, "why", "process", "comparison",
+        "hero", "dashboard", "audiences", "suite", "why", "process", "comparison",
         "bureaus", "pricing", "product-facts", "faq", "get-started",
     ]
     hero = page.select_one("#hero")
@@ -46,6 +46,20 @@ def test_landing_template_sections_and_translated_content(lang):
     for card, kind in zip(glass, ("bank", "invoice", "tax")):
         assert card.has_attr("inert") and card["aria-hidden"] == "true"
         assert card.small.get_text() == i18n.t(f"landing.float_{kind}", lang)
+    audience_cards = page.select("#audiences .lh-audience")
+    assert len(audience_cards) == 2
+    assert [card.h3.get_text() for card in audience_cards] == [
+        i18n.t("landing.audience_bureau_title", lang),
+        i18n.t("landing.audience_business_title", lang),
+    ]
+    assert [card.a["href"] for card in audience_cards] == ["#bureaus", "#why"]
+    suite_cards = page.select("#suite .lh-suite-product")
+    assert len(suite_cards) == 6
+    assert len({card.h3.get_text() for card in suite_cards}) == 6
+    assert len({card.p.get_text() for card in suite_cards}) == 6
+    assert all(len(card.select("a")) == 1 for card in suite_cards)
+    assert all(card.a["href"] == "https://fastsme.com/products" for card in suite_cards)
+    assert page.select_one("#why h2").get_text() == i18n.t("landing.small_business_title", lang)
     steps = page.select("#process ol > li")
     assert len(steps) == 4
     for n, step in enumerate(steps, 1):
@@ -110,7 +124,7 @@ def test_public_pages_share_accessible_localized_shell(render, current, lang):
     ("/about", about_page, ("Predictive Labs Ltd", "Joosep Laats", "not an ERP")),
     ("/contact", contact_page, ("Sales", "Support", "Data protection")),
     ("/terms", terms_page, ("Terms — draft", "not final customer terms", "MIT License")),
-    ("/roadmap", roadmap_page, ("Now", "Next", "Later", "0.3.0", "0.4.0", "2026-10-09")),
+    ("/roadmap", roadmap_page, ("Available", "Review required", "Pilot", "Planned", "0.3.0–0.4.0", "2026-10-09")),
     ("/changelog", changelog_page, ("Changelog", "0.2.1", "0.3.0", "0.4.0", "2026-10-09")),
 ])
 def test_first_party_trust_and_release_routes(route, render, key_strings):
@@ -149,10 +163,10 @@ def test_new_public_pages_render_localized_copy(lang, title):
 
 def test_bureau_tax_copy_names_both_vat_markets_and_filing_status():
     expected = {
-        "en": ("Estonian VAT (KMD)", "UK VAT", "direct filing is not yet available"),
-        "et": ("Eesti käibemaksu deklaratsiooni (KMD)", "Ühendkuningriigi käibemaksu", "otse esitamine ei ole veel saadaval"),
-        "lv": ("Igaunijas PVN deklarācijas (KMD)", "Apvienotās Karalistes PVN", "tieša iesniegšana vēl nav pieejama"),
-        "lt": ("Estijos PVM deklaracijos (KMD)", "Jungtinės Karalystės PVM", "tiesioginis pateikimas dar negalimas"),
+        "en": ("Estonian VAT (KMD)", "UK VAT", "Available", "Planned: direct filing"),
+        "et": ("Eesti käibemaksu deklaratsiooni (KMD)", "Ühendkuningriigi käibemaksu", "Saadaval", "Kavandatud: otse esitamine"),
+        "lv": ("Igaunijas PVN deklarācijas (KMD)", "AK PVN", "Pieejams", "Plānots: tieša iesniegšana"),
+        "lt": ("Estijos PVM deklaracijos (KMD)", "JK PVM", "Prieinama", "Planuojama: tiesioginis pateikimas"),
     }
     for lang, phrases in expected.items():
         copy = i18n.t("bureau.tax_body", lang)
@@ -172,8 +186,44 @@ def test_integration_catalogue_lists_platforms_agents_and_bank_plan():
         assert name in rendered
     for item in integrations.CATALOGUE:
         assert item.status not in rendered
-    assert "No provider below is connected by default" in rendered
+    assert "No provider is connected by default" in rendered
     assert "Configured per object" in rendered
+
+
+@pytest.mark.parametrize("lang", ["en", "et", "lv", "lt"])
+def test_public_availability_vocabulary_is_consistent(lang):
+    labels = i18n.catalog(lang)["availability"]
+    assert list(labels) == ["available", "review_required", "pilot", "planned"]
+
+    catalogue = BeautifulSoup(str(integrations_page(lang)), "html.parser")
+    assert [chip.get_text() for chip in catalogue.select(".page-hero .chip")] == list(labels.values())
+    expected_statuses = {
+        "file_import": "available", "fasthr": "available",
+        "quickbooks": "review_required", "xero": "review_required",
+        "merit": "review_required", "bamboohr": "review_required",
+        "personio": "review_required", "hmrc": "pilot", "emta": "pilot",
+        "open_banking": "planned",
+    }
+    for key, status in expected_statuses.items():
+        assert catalogue.select_one(f"#{key} .availability").get_text() == labels[status]
+
+    roadmap = BeautifulSoup(str(roadmap_page(lang)), "html.parser")
+    assert [heading.get_text() for heading in roadmap.select(".release-group > h2")] == list(labels.values())
+
+
+@pytest.mark.parametrize("render", [security_page, privacy_page, about_page,
+                                     contact_page, terms_page])
+def test_trust_pages_have_one_primary_and_one_secondary_cta_at_most(render):
+    page = BeautifulSoup(str(render()), "html.parser")
+    assert len(page.select("main .fs-btn-ink")) <= 1
+    assert len(page.select("main .fs-btn-outline")) <= 1
+    assert len(page.select("main .fs-btn")) <= 2
+
+
+def test_contact_keeps_extra_paths_as_quiet_text_links():
+    page = BeautifulSoup(str(contact_page()), "html.parser")
+    assert len(page.select("main .fs-btn")) == 2
+    assert len(page.select("main .trust-text-link")) == 2
 
 
 def test_hr_software_catalogue_is_complete_and_renders_in_every_locale():

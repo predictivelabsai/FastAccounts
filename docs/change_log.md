@@ -4,6 +4,24 @@ Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as
 delivered.
 
+## 2026-10-09 — Public-site audience and availability polish
+
+- Split the landing into explicit paths for accounting bureaus managing payroll,
+  payables and separate client books, and small businesses keeping their own
+  books. Both paths now deep-link to their corresponding feature sections.
+- Replaced the undifferentiated Fast* name strip with six localized product
+  summaries, each with a distinct purpose and one link to the FastSME product
+  catalogue.
+- Standardized public availability language on **Available**, **Review
+  required**, **Pilot** and **Planned** in English, Estonian, Latvian and
+  Lithuanian. The public roadmap and integration cards use the same labels;
+  VAT capability remains workpapers plus export, with direct filing Planned,
+  and Estonian bureau payroll remains Review required pending production UAT.
+- Reduced trust-page button competition to one primary and one secondary action
+  at most, with any further contact paths rendered as quieter text links. Public
+  page tests cover audience links, product-card differentiation, status mapping
+  and CTA hierarchy.
+
 ## 2026-10-09 — Demo integration connections and employee imports
 
 - Fresh local demo data now includes encrypted, synthetic Connected fixtures for
