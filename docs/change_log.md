@@ -4,6 +4,31 @@ Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as
 delivered.
 
+## 2026-10-09 — Release 0.3.0: recurring invoices, integrations and FastHR import
+
+Release 0.3.0 bundles Joosep Laats' (jeeqe) merged work since 0.2.1, detailed in
+the entries below, plus one connector fix:
+
+- #5 recurring invoices and the payment-reminder ladder (migration
+  `0007_automation`, renumbered after payroll's `0006`).
+- #7 integration connection lifecycle: encrypted per-client credentials,
+  configure/test/disconnect.
+- #8 reviewed employee-import pipeline (migration `0008_import_staging`).
+- #9 FastHR employee connector (pull-only).
+- #10 integrations workspace UI with staged employee review.
+- Fix: FastHR `base_salary` is an annual amount (FastHR shows it "/aastas" and
+  its own payroll divides by 12). The connector now imports monthly gross =
+  base_salary / 12, rounded half-up to cents (30,000 → 2,500.00); previously
+  the annual figure was stored as monthly pay. FastHR `working_time_ratio` maps
+  to the work-time fraction (FTE, default 1) and `personal_code` (isikukood)
+  to the personal ID, which also improves employee matching. Staff with no
+  salary but an hourly rate import as hourly pay. A record with neither, or
+  with a work-time ratio outside 0–1, is staged with a translated review note
+  and skipped on apply instead of failing the sync; an already linked employee
+  keeps its local pay terms. No migration and no UI change.
+- Version chip `v0.3.0 · 2026-10-09`; the public footer version link carries
+  `data-testid="app-version"` again (attribute only, no markup or style change).
+
 ## 2026-10-09 — Integration workspace
 
 - Added the signed-in Integrations workspace for owner/administrator connection
