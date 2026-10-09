@@ -355,7 +355,7 @@ def test_fasthr_pull_paginates_and_normalizes_employee_records():
             "status": "Active" if index == 1 else "Inactive",
             "gender": "Female" if index == 1 else None,
             "branch": "Tallinn",
-            "base_salary": 2400.125 if index == 1 else 0,
+            "base_salary": 28801.5 if index == 1 else 0,  # FastHR stores an annual salary
             "password_hash": "must-not-survive",
         }
         for index in range(1, 201)
@@ -406,6 +406,7 @@ def test_fasthr_pull_paginates_and_normalizes_employee_records():
         "name": "Ada Lovelace",
         "email": "ada@example.test",
         "gross_salary": Decimal("2400.13"),
+        "fte": Decimal("1"),
         "active": True,
         "fasthr_code": "EMP-1",
         "fasthr_designation": "Engineer",
@@ -689,3 +690,36 @@ def test_bamboohr_without_salary_alias_keeps_custom_salary_as_prefixed_source_fi
 
     assert "gross_salary" not in result.records[0]
     assert result.records[0]["bamboo_customSalary"] == "2400.125"
+
+
+def test_fasthr_maps_annual_salary_work_time_ratio_personal_code_and_hourly():
+    from connectors.providers import FASTHR_INVALID_WORK_TIME_RATIO, FASTHR_NO_PAY_AMOUNT
+
+    base = {"first_name": "Mari", "last_name": "Maasik", "status": "Active"}
+    record = FastHRProvider._employee_record
+
+    yearly = record(dict(base, id=1, base_salary=30000, working_time_ratio=None,
+                         personal_code=" 49403136526 "))
+    assert yearly["gross_salary"] == Decimal("2500.00")
+    assert yearly["fte"] == Decimal("1")
+    assert yearly["personal_id"] == "49403136526"
+    assert "pay_basis" not in yearly and "import_warning" not in yearly
+    # Annual / 12 is rounded half-up to cents like every other amount in the app.
+    assert record(dict(base, id=2, base_salary="20000.06"))["gross_salary"] == Decimal("1666.67")
+
+    part_time = record(dict(base, id=3, base_salary=13620, working_time_ratio=0.5))
+    assert part_time["gross_salary"] == Decimal("1135.00")
+    assert part_time["fte"] == Decimal("0.5000")
+
+    hourly = record(dict(base, id=4, base_salary=0, hourly_rate=8, working_time_ratio=1.0))
+    assert hourly["pay_basis"] == "hourly" and hourly["hourly_rate"] == Decimal("8.0000")
+    assert "gross_salary" not in hourly and "import_warning" not in hourly
+    explicit = record(dict(base, id=5, base_salary=24000, hourly_rate="9.5", pay_basis="hourly"))
+    assert explicit["pay_basis"] == "hourly" and "gross_salary" not in explicit
+
+    unpaid = record(dict(base, id=6, base_salary=None))
+    assert unpaid["import_warning"] == FASTHR_NO_PAY_AMOUNT
+    assert not {"gross_salary", "hourly_rate", "pay_basis"} & set(unpaid)
+
+    bad_ratio = record(dict(base, id=7, base_salary=12000, working_time_ratio=1.5))
+    assert bad_ratio["import_warning"] == FASTHR_INVALID_WORK_TIME_RATIO and "fte" not in bad_ratio
