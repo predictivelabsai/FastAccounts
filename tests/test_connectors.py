@@ -5,6 +5,7 @@ import pytest
 
 from connectors import (
     FastHRProvider,
+    FileImportConnector,
     MeritProvider,
     QuickBooksProvider,
     XeroProvider,
@@ -85,6 +86,16 @@ def test_fasthr_registration_is_explicit_and_not_overwritten_by_roadmap_loop():
     assert connector.base_url == "https://hr.example.test"
     assert REGISTRY["fasthr"].status == "Adapter ready"
 
+
+def test_file_import_registration_is_ready_without_credentials():
+    metadata = provider_metadata("file_import")
+    assert metadata["registry_status"] == "Adapter ready"
+    assert metadata["credential_fields"] == []
+    connector = connector_for(
+        "file_import", credentials={"csv_content": "Name\nMari Maasik\n"}
+    )
+    assert isinstance(connector, FileImportConnector)
+    assert connector.pull("employee").records[0]["name"] == "Mari Maasik"
 
 def test_finance_registrations_build_real_providers_from_credentials():
     quickbooks = connector_for(

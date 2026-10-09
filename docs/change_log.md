@@ -4,6 +4,19 @@ Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as
 delivered.
 
+## 2026-10-09 — Universal employee file import
+
+- Added an offline `file_import` connector for employee CSV and TSV exports from
+  any payroll or HR system, with English and Estonian header aliases, delimiter
+  detection, exact Decimal salary parsing and deterministic row identifiers.
+- Added a connection-free owner/administrator import endpoint and workspace file
+  picker with paste fallback. Parsed records enter the existing tenant-scoped
+  review/apply pipeline; raw upload contents are not stored or written to audit
+  payloads.
+- Added four-locale catalogue and workspace copy plus parser, deduplication,
+  idempotent apply, refusal, tenant workflow and browser coverage. Native Excel
+  workbooks remain out of scope and must be exported as CSV first.
+
 ## 2026-10-09 — Release 0.3.0: recurring invoices, integrations and FastHR import
 
 Release 0.3.0 bundles Joosep Laats' (jeeqe) merged work since 0.2.1, detailed in

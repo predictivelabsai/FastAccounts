@@ -1135,6 +1135,35 @@ details[open] > summary {
 .integration-dialog-intro {
   margin-bottom: 20px;
 }
+.file-import-intro {
+  margin-bottom: 20px;
+}
+.file-import-intro p {
+  max-width: 68ch;
+  margin: 6px 0 0;
+  color: var(--neutral-700);
+}
+.file-import-form {
+  grid-template-columns: 1fr;
+}
+.file-import-form textarea {
+  min-height: 180px;
+  resize: vertical;
+}
+.file-import-form input[type="file"] {
+  min-height: 44px;
+  padding: 7px;
+}
+.file-import-form input[type="file"]::file-selector-button {
+  min-height: 28px;
+  margin-right: 10px;
+  padding: 4px 10px;
+  border: 1px solid var(--neutral-300);
+  border-radius: var(--radius-sm);
+  background: var(--neutral-50);
+  color: var(--neutral-800);
+  cursor: pointer;
+}
 .integration-dialog-intro > p:not(.notice) {
   color: var(--muted);
   margin: 6px 0 0;
