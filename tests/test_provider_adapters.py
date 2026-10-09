@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import base64
+import hashlib
+import hmac
 from datetime import datetime, timezone
 from decimal import Decimal
 
@@ -85,6 +87,124 @@ def test_quickbooks_xero_and_open_banking_request_shapes():
     assert requests[2].url.params["country"]=="GB"
 
 
+@pytest.mark.parametrize(
+    ("provider_factory", "expected_path"),
+    [
+        (
+            lambda client: QuickBooksProvider(
+                "synthetic-qbo-token", "synthetic-realm", client=client,
+            ),
+            "/v3/company/synthetic-realm/query",
+        ),
+        (
+            lambda client: XeroProvider(
+                "synthetic-xero-token", "synthetic-tenant", client=client,
+            ),
+            "/api.xro/2.0/Organisation",
+        ),
+        (
+            lambda client: MeritProvider(
+                "synthetic-api-id",
+                "synthetic-api-key",
+                clock=lambda: datetime(2026, 10, 9, 12, 30, 0, tzinfo=timezone.utc),
+                client=client,
+            ),
+            "/api/v2/getpayments",
+        ),
+    ],
+)
+def test_finance_provider_checks_succeed_with_expected_request(provider_factory, expected_path):
+    seen = []
+
+    def handler(request):
+        seen.append(request)
+        return httpx.Response(200, json={"ok": True})
+
+    provider = provider_factory(httpx.Client(transport=httpx.MockTransport(handler)))
+    result = provider.check()
+
+    assert result.ok and result.live
+    assert result.provider == provider.key and result.operation == "check"
+    assert seen[0].method == "GET"
+    assert seen[0].url.path == expected_path
+    assert all(secret not in result.message for secret in (
+        "synthetic-qbo-token",
+        "synthetic-xero-token",
+        "synthetic-tenant",
+        "synthetic-api-id",
+        "synthetic-api-key",
+    ))
+
+    if provider.key == "quickbooks":
+        assert seen[0].url.host == "sandbox-quickbooks.api.intuit.com"
+        assert seen[0].url.params["query"] == "select * from Account maxresults 1"
+        assert seen[0].headers["authorization"] == "Bearer synthetic-qbo-token"
+    elif provider.key == "xero":
+        assert seen[0].headers["authorization"] == "Bearer synthetic-xero-token"
+        assert seen[0].headers["xero-tenant-id"] == "synthetic-tenant"
+    else:
+        assert seen[0].url.host == "aktiva.merit.ee"
+        assert seen[0].url.params["apiId"] == "synthetic-api-id"
+        assert seen[0].url.params["timestamp"] == "20261009123000"
+        expected_signature = base64.b64encode(hmac.new(
+            b"synthetic-api-key",
+            b"synthetic-api-id20261009123000",
+            hashlib.sha256,
+        ).digest()).decode()
+        assert seen[0].url.params["signature"] == expected_signature
+
+
+@pytest.mark.parametrize(
+    "provider_factory",
+    [
+        lambda client: QuickBooksProvider(
+            "do-not-leak-qbo-token", "do-not-leak-realm", client=client,
+        ),
+        lambda client: XeroProvider(
+            "do-not-leak-xero-token", "do-not-leak-tenant", client=client,
+        ),
+        lambda client: MeritProvider(
+            "do-not-leak-api-id", "do-not-leak-api-key", client=client,
+        ),
+    ],
+)
+def test_finance_provider_checks_report_401_without_credentials(provider_factory):
+    client = httpx.Client(transport=httpx.MockTransport(
+        lambda _request: httpx.Response(401),
+    ))
+    result = provider_factory(client).check()
+
+    assert not result.ok and result.live
+    assert "HTTP 401" in result.message
+    assert "do-not-leak" not in result.message
+
+
+@pytest.mark.parametrize(
+    "provider_factory",
+    [
+        lambda client: QuickBooksProvider(
+            "do-not-leak-qbo-token", "do-not-leak-realm", client=client,
+        ),
+        lambda client: XeroProvider(
+            "do-not-leak-xero-token", "do-not-leak-tenant", client=client,
+        ),
+        lambda client: MeritProvider(
+            "do-not-leak-api-id", "do-not-leak-api-key", client=client,
+        ),
+    ],
+)
+def test_finance_provider_checks_report_timeout_without_credentials(provider_factory):
+    def timeout(request):
+        raise httpx.ReadTimeout("synthetic timeout with no credentials", request=request)
+
+    client = httpx.Client(transport=httpx.MockTransport(timeout))
+    result = provider_factory(client).check()
+
+    assert not result.ok and not result.live
+    assert "connection error or timeout" in result.message
+    assert "do-not-leak" not in result.message
+
+
 def test_direct_tax_submission_gates_have_no_network_calls():
     provider=HMRCProvider("token",client=httpx.Client(transport=httpx.MockTransport(lambda _r: (_ for _ in ()).throw(AssertionError("network")))))
     with pytest.raises(PermissionError,match="disabled"):
@@ -145,7 +265,7 @@ def test_fasthr_pull_paginates_and_normalizes_employee_records():
             "status": "Active" if index == 1 else "Inactive",
             "gender": "Female" if index == 1 else None,
             "branch": "Tallinn",
-            "base_salary": 2400.125 if index == 1 else 0,
+            "base_salary": 28801.5 if index == 1 else 0,  # FastHR stores an annual salary
             "password_hash": "must-not-survive",
         }
         for index in range(1, 201)
@@ -196,6 +316,7 @@ def test_fasthr_pull_paginates_and_normalizes_employee_records():
         "name": "Ada Lovelace",
         "email": "ada@example.test",
         "gross_salary": Decimal("2400.13"),
+        "fte": Decimal("1"),
         "active": True,
         "fasthr_code": "EMP-1",
         "fasthr_designation": "Engineer",
@@ -226,3 +347,36 @@ def test_fasthr_pull_empty_list_and_authentication_error():
     )
     with pytest.raises(ProviderError, match="HTTP 401"):
         unauthorized.pull("employee")
+
+
+def test_fasthr_maps_annual_salary_work_time_ratio_personal_code_and_hourly():
+    from connectors.providers import FASTHR_INVALID_WORK_TIME_RATIO, FASTHR_NO_PAY_AMOUNT
+
+    base = {"first_name": "Mari", "last_name": "Maasik", "status": "Active"}
+    record = FastHRProvider._employee_record
+
+    yearly = record(dict(base, id=1, base_salary=30000, working_time_ratio=None,
+                         personal_code=" 49403136526 "))
+    assert yearly["gross_salary"] == Decimal("2500.00")
+    assert yearly["fte"] == Decimal("1")
+    assert yearly["personal_id"] == "49403136526"
+    assert "pay_basis" not in yearly and "import_warning" not in yearly
+    # Annual / 12 is rounded half-up to cents like every other amount in the app.
+    assert record(dict(base, id=2, base_salary="20000.06"))["gross_salary"] == Decimal("1666.67")
+
+    part_time = record(dict(base, id=3, base_salary=13620, working_time_ratio=0.5))
+    assert part_time["gross_salary"] == Decimal("1135.00")
+    assert part_time["fte"] == Decimal("0.5000")
+
+    hourly = record(dict(base, id=4, base_salary=0, hourly_rate=8, working_time_ratio=1.0))
+    assert hourly["pay_basis"] == "hourly" and hourly["hourly_rate"] == Decimal("8.0000")
+    assert "gross_salary" not in hourly and "import_warning" not in hourly
+    explicit = record(dict(base, id=5, base_salary=24000, hourly_rate="9.5", pay_basis="hourly"))
+    assert explicit["pay_basis"] == "hourly" and "gross_salary" not in explicit
+
+    unpaid = record(dict(base, id=6, base_salary=None))
+    assert unpaid["import_warning"] == FASTHR_NO_PAY_AMOUNT
+    assert not {"gross_salary", "hourly_rate", "pay_basis"} & set(unpaid)
+
+    bad_ratio = record(dict(base, id=7, base_salary=12000, working_time_ratio=1.5))
+    assert bad_ratio["import_warning"] == FASTHR_INVALID_WORK_TIME_RATIO and "fte" not in bad_ratio

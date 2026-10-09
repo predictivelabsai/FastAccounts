@@ -447,6 +447,9 @@
   },
   "nav.pricing": "Hinnad",
   "workspace": {
+    "FastHR has no salary or hourly rate for this employee; skipped until one is added in FastHR": "FastHR-is puudub selle töötaja töötasu ja tunnitasu; töötaja jäetakse vahele, kuni see FastHR-is lisatakse",
+    "FastHR work-time ratio must be above 0 and at most 1; check it in FastHR": "FastHR-i tööaja osakaal peab olema suurem kui 0 ja kuni 1; kontrolli seda FastHR-is",
+    "Gross salary is required": "Brutotöötasu on kohustuslik",
     "Unmatched": "Vastendamata",
     "Payroll is currently available for Estonian books.": "Palgaarvestus on praegu saadaval ainult Eesti ettevõtetele.",
     "Available for Estonian EUR books": "Saadaval Eesti eurodes raamatupidamisele",

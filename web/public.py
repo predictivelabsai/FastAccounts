@@ -322,7 +322,7 @@ def _footer(lang: str):
                                 (T("footer.integrations"), "/integrations")]),
          (T("footer.resources"), [(T("footer.github"), FASTPRODUCT.github_url),
                                   (T("footer.health"), "/healthz")])],
-        T("footer.tagline"), [A(version.label(), href="/healthz", title=version.detail())],
+        T("footer.tagline"), [A(version.label(), href="/healthz", title=version.detail(), data_testid="app-version")],
     )
 
 

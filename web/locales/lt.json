@@ -447,6 +447,9 @@
   },
   "nav.pricing": "Kainos",
   "workspace": {
+    "FastHR has no salary or hourly rate for this employee; skipped until one is added in FastHR": "FastHR has no salary or hourly rate for this employee; skipped until one is added in FastHR",
+    "FastHR work-time ratio must be above 0 and at most 1; check it in FastHR": "FastHR work-time ratio must be above 0 and at most 1; check it in FastHR",
+    "Gross salary is required": "Gross salary is required",
     "Unmatched": "Nesulygintas",
     "Payroll is currently available for Estonian books.": "Payroll is currently available for Estonian books.",
     "Available for Estonian EUR books": "Available for Estonian EUR books",

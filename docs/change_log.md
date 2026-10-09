@@ -17,6 +17,31 @@ delivered.
   idempotent apply, refusal, tenant workflow and browser coverage. Native Excel
   workbooks remain out of scope and must be exported as CSV first.
 
+## 2026-10-09 — Release 0.3.0: recurring invoices, integrations and FastHR import
+
+Release 0.3.0 bundles Joosep Laats' (jeeqe) merged work since 0.2.1, detailed in
+the entries below, plus one connector fix:
+
+- #5 recurring invoices and the payment-reminder ladder (migration
+  `0007_automation`, renumbered after payroll's `0006`).
+- #7 integration connection lifecycle: encrypted per-client credentials,
+  configure/test/disconnect.
+- #8 reviewed employee-import pipeline (migration `0008_import_staging`).
+- #9 FastHR employee connector (pull-only).
+- #10 integrations workspace UI with staged employee review.
+- Fix: FastHR `base_salary` is an annual amount (FastHR shows it "/aastas" and
+  its own payroll divides by 12). The connector now imports monthly gross =
+  base_salary / 12, rounded half-up to cents (30,000 → 2,500.00); previously
+  the annual figure was stored as monthly pay. FastHR `working_time_ratio` maps
+  to the work-time fraction (FTE, default 1) and `personal_code` (isikukood)
+  to the personal ID, which also improves employee matching. Staff with no
+  salary but an hourly rate import as hourly pay. A record with neither, or
+  with a work-time ratio outside 0–1, is staged with a translated review note
+  and skipped on apply instead of failing the sync; an already linked employee
+  keeps its local pay terms. No migration and no UI change.
+- Version chip `v0.3.0 · 2026-10-09`; the public footer version link carries
+  `data-testid="app-version"` again (attribute only, no markup or style change).
+
 ## 2026-10-09 — Integration workspace
 
 - Added the signed-in Integrations workspace for owner/administrator connection
@@ -30,6 +55,19 @@ delivered.
 - Localized the complete workspace flow in English, Estonian, Latvian and
   Lithuanian and covered the server-rendered workspace entry and locale-key
   parity. No migration or live provider test was added.
+
+## 2026-10-09 — Finance connector health checks
+
+- Wired the QuickBooks, Xero and Merit registry entries to their real provider
+  classes so adapter-ready connection tests now make credentialed, company-scoped
+  health requests instead of returning no-network planning-stub results.
+- Added redacted success, authentication-failure and timeout handling for all three
+  providers, including QuickBooks sandbox selection, Xero tenant authorization and
+  Merit HMAC signing. HMRC, e-MTA and open banking remain planning stubs, and no
+  finance connector was added to the reviewed import pipeline.
+- Verified request shapes, real-provider registry construction, credential
+  redaction and tenant connection status transitions using mocked HTTP transports;
+  automated tests make no live provider calls.
 
 ## 2026-10-09 — FastHR employee connector
 

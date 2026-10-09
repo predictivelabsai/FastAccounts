@@ -8,7 +8,12 @@ import integrations
 
 from .base import Connector
 from .file_import import FileImportConnector
-from .providers import FastHRProvider
+from .providers import (
+    FastHRProvider,
+    MeritProvider,
+    QuickBooksProvider,
+    XeroProvider,
+)
 from .stubs import RoadmapStubConnector, StubConnector
 
 
@@ -76,7 +81,11 @@ REGISTRY: dict[str, ConnectorRegistration] = {
     ),
     "quickbooks": ConnectorRegistration(
         status="Adapter ready",
-        factory=_planning_stub("quickbooks"),
+        factory=lambda credentials, config: QuickBooksProvider(
+            access_token=credentials.get("access_token", ""),
+            realm_id=credentials.get("realm_id") or config.get("realm_id", ""),
+            sandbox=credentials.get("sandbox", config.get("sandbox", True)),
+        ),
         credential_fields=(
             CredentialField("access_token", "Access token", "secret"),
             CredentialField("realm_id", "Company realm ID"),
@@ -85,7 +94,10 @@ REGISTRY: dict[str, ConnectorRegistration] = {
     ),
     "xero": ConnectorRegistration(
         status="Adapter ready",
-        factory=_planning_stub("xero"),
+        factory=lambda credentials, config: XeroProvider(
+            access_token=credentials.get("access_token", ""),
+            tenant_id=credentials.get("tenant_id") or config.get("tenant_id", ""),
+        ),
         credential_fields=(
             CredentialField("access_token", "Access token", "secret"),
             CredentialField("tenant_id", "Tenant ID"),
@@ -93,7 +105,10 @@ REGISTRY: dict[str, ConnectorRegistration] = {
     ),
     "merit": ConnectorRegistration(
         status="Adapter ready",
-        factory=_planning_stub("merit"),
+        factory=lambda credentials, config: MeritProvider(
+            api_id=credentials.get("api_id") or config.get("api_id", ""),
+            api_key=credentials.get("api_key", ""),
+        ),
         credential_fields=(
             CredentialField("api_id", "API ID"),
             CredentialField("api_key", "API key", "secret"),

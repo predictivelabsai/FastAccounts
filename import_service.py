@@ -12,6 +12,7 @@ from psycopg.errors import UniqueViolation
 import connectors.registry as connector_registry
 from core_utils import audit, canonical_json, new_id, utc_now
 from database import Database, get_database
+from connectors.providers import FASTHR_NO_PAY_AMOUNT
 from integration_service import IntegrationService
 from payroll import PayrollConflict, PayrollService
 
@@ -189,6 +190,9 @@ class ImportService:
             for payload in records:
                 external_id = self._external_id(payload)
                 matched_id, review_note = self._employee_match(tx, organisation_id, payload)
+                warning = payload.get("import_warning")
+                if not review_note and isinstance(warning, str) and warning:
+                    review_note = warning
                 existing = None
                 if external_id:
                     existing = tx.one(
@@ -465,8 +469,7 @@ class ImportService:
         changes = {field: payload[field] for field in EMPLOYEE_FIELDS if field in payload}
         if not isinstance(changes.get("name"), str) or not changes["name"].strip():
             raise ValueError("Employee name is required")
-        if "gross_salary" not in changes and changes.get("pay_basis", "monthly") != "hourly":
-            raise ValueError("Gross salary is required")
+        warning = payload.get("import_warning")
         with self.db.transaction() as tx:
             mapping = tx.one(
                 "SELECT * FROM external_mappings WHERE organisation_id=? AND provider=? "
@@ -482,6 +485,18 @@ class ImportService:
                 )
                 if not existing:
                     raise ValueError("Mapped employee no longer exists")
+            # A connector warning (e.g. FastHR without any pay amount) skips the record
+            # instead of guessing; an already-linked employee keeps its local pay terms.
+            if isinstance(warning, str) and warning and (
+                not existing or warning != FASTHR_NO_PAY_AMOUNT
+            ):
+                raise ValueError(warning)
+            if (
+                not existing
+                and "gross_salary" not in changes
+                and changes.get("pay_basis", "monthly") != "hourly"
+            ):
+                raise ValueError("Gross salary is required")
             self._assert_name_available(tx, organisation_id, changes["name"].strip(), employee_id)
             outcome = "applied"
             if existing and self._employee_unchanged(existing, changes):

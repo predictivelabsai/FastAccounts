@@ -577,6 +577,23 @@ localized in English, Estonian, Latvian and Lithuanian. This adds no migration,
 does not enable unattended imports, and does not change the pending production
 accountant UAT gate.
 
+## 21. Finance connector health checks (2026-10-09)
+
+QuickBooks, Xero and Merit connection tests now construct the existing real
+provider adapters from tenant-supplied credentials and perform a lightweight,
+company-scoped health request. Results distinguish a reachable provider that
+rejects credentials from a connection failure or timeout, while response and
+audit messages never include credential values. QuickBooks checks respect the
+sandbox setting; Xero validates the selected tenant; Merit signs the probe with
+the existing HMAC convention.
+
+This work changes connection health checks only. It does not add finance-provider
+pulls to the reviewed import pipeline or change invoice/query submission behavior.
+HMRC, e-MTA and open banking remain explicit planning stubs. Mocked HTTP coverage
+verifies successful, unauthorized and unavailable providers without live network
+calls. Section 20 covers the integration workspace, which merged before this
+change.
+
 ## 22. Universal file import (2026-10-09)
 
 The connection-free `file_import` adapter accepts employee CSV and TSV exports
@@ -603,5 +620,5 @@ inactive. Unmapped columns remain visible in review with a `file_` prefix. The
 browser can read a selected file or accept pasted content, but the raw CSV/TSV is
 never retained: only parsed staged records are stored. Native Excel workbooks are
 out of scope and must first be exported as CSV. No provider API key, migration or
-live network test is required. Section 21 belongs to the pending finance-connector
-health-check change, so this stacked work uses section 22.
+live network test is required. Section 21 covers the finance-connector health
+checks, which merged before this change.
