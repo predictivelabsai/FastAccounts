@@ -715,3 +715,21 @@ and reset are throttled, responses never reveal whether an address has an
 account, every sign-in starts a fresh session, and a reset signs the account out
 everywhere else. Email is sent through Postmark with `POSTMARK_API_TOKEN` and
 `FROM_EMAIL`; without them, requests log a warning and show the same message.
+
+## 27. Public-site audience and availability polish (2026-10-09)
+
+The landing now separates accounting bureaus from small businesses before the
+feature detail. Bureau copy focuses on payroll, payables and separate client
+books; small-business copy focuses on invoices, bills, bank reconciliation and
+VAT workpapers for one organisation. The sibling-product strip now gives each
+FastSME product a distinct purpose and one catalogue link.
+
+All public pages use four availability labels: **Available**, **Review
+required**, **Pilot** and **Planned**, with localized equivalents in Estonian,
+Latvian and Lithuanian. Integration cards and the public roadmap use the same
+labels. UK VAT and Estonian KMD capability remains workpapers plus export;
+direct filing is Planned. Estonian accounting-bureau payroll remains Review
+required until production UAT is complete. Trust pages expose no more than one
+primary and one secondary button, with additional contact routes kept as text
+links. This section changes public presentation only; no accounting workflow,
+migration or provider connection changed.

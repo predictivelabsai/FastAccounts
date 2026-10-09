@@ -11,7 +11,7 @@ import integrations
 import version
 from . import google_auth, i18n
 from .design import (DESIGN_CSS, FONT_LINKS, FASTPRODUCT, MOBILE_NAV_JS,
-                     accent_style, fs_button, fs_eyebrow, fs_nav, fs_footer, fs_logo_strip)
+                     accent_style, fs_button, fs_eyebrow, fs_nav, fs_footer)
 
 
 PUBLIC_CSS = """
@@ -88,11 +88,21 @@ PUBLIC_CSS = """
 .lh-real-demo-frame .lh-mock-bar{padding:12px 16px}
 .lh-real-demo-body{padding:10px;background:var(--paper-2);border-top:1px solid var(--line)}
 .lh-real-demo-body img{width:100%;height:auto;border:1px solid var(--line);border-radius:var(--radius);background:var(--card)}
-.lh-suite{background:var(--paper-2);border-block:1px solid var(--line);padding:27px 0}
-.lh-suite-inner{display:flex;align-items:center;justify-content:space-between;gap:24px}
-.lh-suite-label{color:var(--muted);font-size:12px;font-weight:800;letter-spacing:normal;max-width:34ch;text-align:center}
-.lh-suite-logos{display:flex;align-items:center;justify-content:flex-end;gap:10px 18px;flex-wrap:wrap;color:var(--muted);font-family:var(--font-display);font-size:15px;font-weight:700;letter-spacing:-.02em}
-.lh-suite-logos span{font-size:15px}
+.lh-audience-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.lh-audience{display:flex;flex-direction:column;align-items:flex-start;min-height:250px;padding:30px;
+  border-top:3px solid var(--accent);background:var(--card)}
+.lh-audience h3{font-size:clamp(24px,3vw,32px);margin-bottom:12px}
+.lh-audience p{color:var(--muted);font-size:16px;max-width:54ch;margin-bottom:24px}
+.lh-audience .fs-btn{margin-top:auto}
+.lh-suite{background:var(--paper-2);border-block:1px solid var(--line);padding:clamp(54px,7vw,78px) 0}
+.lh-suite-head{max-width:680px;margin-bottom:30px}
+.lh-suite-head h2{font-size:clamp(26px,3.6vw,38px);margin-bottom:10px}
+.lh-suite-head p{color:var(--muted)}
+.lh-suite-products{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line)}
+.lh-suite-product{display:flex;flex-direction:column;align-items:flex-start;min-height:190px;padding:24px;background:var(--card)}
+.lh-suite-product h3{font-size:20px;margin-bottom:8px}
+.lh-suite-product p{color:var(--muted);font-size:14px;margin-bottom:18px}
+.lh-suite-product a{margin-top:auto;color:var(--accent-strong);font-weight:700;text-underline-offset:.22em}
 
 .lh-feats{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
 .lh-feat{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:26px 24px;
@@ -148,14 +158,12 @@ PUBLIC_CSS = """
 @media(max-width:900px){
   .lh-feats{grid-template-columns:1fr 1fr}
   .lh-stat,.lh-cmp,.lh-features-head{grid-template-columns:1fr}
-  .lh-suite-inner{flex-direction:column;align-items:center;gap:14px;text-align:center}
-  .lh-suite-label{max-width:none;text-align:center}
-  .lh-suite-logos{justify-content:center}
+  .lh-suite-products{grid-template-columns:repeat(2,minmax(0,1fr))}
   .lh-mock-body{grid-template-columns:190px minmax(0,1fr)}
   .lh-ai{display:none}
 }
 @media(max-width:680px){
-  .lh-feats,.lh-prices,.lh-stat-list{grid-template-columns:1fr}
+  .lh-feats,.lh-prices,.lh-stat-list,.lh-audience-grid,.lh-suite-products{grid-template-columns:1fr}
 
   .lh-mock-wrap{display:none}
 }
@@ -166,7 +174,7 @@ PUBLIC_CSS = """
 }
 @media(max-width:760px){
 .lh-hero-inner .fs-eyebrow,.lh-head .fs-eyebrow{font-size:12px}
-  .lh-trust,.lh-suite-label,.ct-foot{font-size:14px}
+  .lh-trust,.ct-foot{font-size:14px}
   .lh-mock-wrap{padding-inline:12px}
   .lh-mock-bar{padding:10px 12px}
   .lh-mock-url{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -213,7 +221,7 @@ section[id]{scroll-margin-top:90px}
 @media(max-width:860px){.fs-footer-top{grid-template-columns:1fr 1fr}}
 @media(max-width:680px){.lh-hero{padding-bottom:56px;margin-bottom:0}.fs-footer-top{grid-template-columns:1fr}}
 .page-hero{max-width:1180px;margin:auto;padding:76px 24px 42px}.page-hero .lede{font-size:18px}.summary{display:flex;gap:10px;flex-wrap:wrap;margin-top:24px}.chip{border:1px solid var(--line);border-radius:999px;padding:8px 13px;font-size:12px;font-weight:700;color:var(--muted)}
-.catalogue{max-width:1180px;margin:auto;padding:14px 24px 74px}.integration-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}.integration{border:1px solid var(--line);border-radius:22px;padding:24px;background:#fff;display:flex;flex-direction:column;min-height:350px}.integration-head{display:flex;align-items:flex-start;justify-content:space-between;gap:20px}.integration-logo-wrap{height:58px;min-width:140px;display:flex;align-items:center}.integration-logo{display:block;max-width:142px;max-height:50px;object-fit:contain}.provider-meta{text-align:right}.markets{display:block;margin-top:8px;color:var(--muted);font-size:11px;font-weight:750}.integration h2{font-size:23px;margin:24px 0 4px}.category{font-size:12px;color:var(--accent-strong);font-weight:750}.integration>p{color:var(--muted);line-height:1.6}.capabilities{display:flex;gap:7px;flex-wrap:wrap;margin:8px 0 18px}.capability{background:var(--paper);border:1px solid var(--line);border-radius:999px;padding:6px 9px;font-size:11px;color:var(--muted)}.ownership{border-top:1px solid var(--line);padding-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:14px;font-size:12px}.ownership span{display:block;color:var(--muted);margin-bottom:3px}.ownership strong{font-size:13px}.docs{color:var(--accent-strong);text-decoration:none;font-size:13px;font-weight:750;margin-top:auto;padding-top:20px}
+.catalogue{max-width:1180px;margin:auto;padding:14px 24px 74px}.integration-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}.integration{border:1px solid var(--line);border-radius:22px;padding:24px;background:#fff;display:flex;flex-direction:column;min-height:350px}.integration-head{display:flex;align-items:flex-start;justify-content:space-between;gap:20px}.integration-logo-wrap{height:58px;min-width:140px;display:flex;align-items:center}.integration-logo{display:block;max-width:142px;max-height:50px;object-fit:contain}.provider-meta{text-align:right}.availability{display:inline-flex;border-radius:999px;padding:5px 9px;background:var(--paper-2);color:var(--accent-strong);font-size:11px;font-weight:800}.markets{display:block;margin-top:8px;color:var(--muted);font-size:11px;font-weight:750}.integration h2{font-size:23px;margin:24px 0 4px}.category{font-size:12px;color:var(--accent-strong);font-weight:750}.integration>p{color:var(--muted);line-height:1.6}.capabilities{display:flex;gap:7px;flex-wrap:wrap;margin:8px 0 18px}.capability{background:var(--paper);border:1px solid var(--line);border-radius:999px;padding:6px 9px;font-size:11px;color:var(--muted)}.ownership{border-top:1px solid var(--line);padding-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:14px;font-size:12px}.ownership span{display:block;color:var(--muted);margin-bottom:3px}.ownership strong{font-size:13px}.docs{color:var(--accent-strong);text-decoration:none;font-size:13px;font-weight:750;margin-top:auto;padding-top:20px}
 .notice{max-width:1180px;margin:0 auto 70px;padding:0 24px}.notice>div{border:1px solid var(--line);background:var(--paper-2);border-radius:18px;padding:22px;color:var(--muted);line-height:1.6}.notice strong{color:var(--ink)}
 .auth-wrap{min-height:calc(100vh - 150px);display:grid;place-items:center;padding:60px 24px}.auth-card{width:min(470px,100%);border:1px solid var(--line);border-radius:24px;padding:34px;box-shadow:0 22px 70px rgba(20,6,43,.08)}.auth-card h1{font-size:32px;letter-spacing:-.035em;margin:8px 0}.auth-card p{color:var(--muted);line-height:1.6}.google{width:100%;margin-top:18px}.error{border-radius:12px;background:#fff1f0;color:#a61b1b;padding:12px 14px;font-size:13px}.workspace{max-width:900px;margin:auto;padding:80px 24px}.workspace h1{font-size:44px;letter-spacing:-.04em}.workspace p{color:var(--muted);line-height:1.65}
 
@@ -294,6 +302,7 @@ section[id]{scroll-margin-top:90px}
 .trust-section h2{font-size:clamp(22px,2.5vw,30px);line-height:1.2;margin-bottom:12px}
 .trust-section p{max-width:72ch;color:var(--muted);font-size:16px;line-height:1.72}
 .trust-section .fs-btn{margin-top:20px}
+.trust-text-link{display:inline-flex;margin-top:18px;color:var(--accent-strong);font-weight:700;text-underline-offset:.22em}
 .trust-section-wide{grid-column:1/-1}
 .release-group{padding:34px 0;border-top:1px solid var(--line)}
 .release-head{display:flex;align-items:baseline;justify-content:space-between;gap:20px;margin-bottom:12px}
@@ -494,6 +503,7 @@ def _dashboard_mock(lang: str):
 
 def landing_page(lang: str = i18n.DEFAULT_LANG):
     T = lambda key: i18n.t(key, lang)
+    suite_products = ("fastmail", "fastoffice", "fastdrive", "fastmeet", "fasthr", "fastbooks")
 
     def actions(variant="primary"):
         return Div(fs_button(T("landing.hero_cta"), "/login", variant, "lg"),
@@ -508,15 +518,34 @@ def landing_page(lang: str = i18n.DEFAULT_LANG):
                 P(T("landing.hero_trust"), cls="lh-trust"), cls="lh-hero-inner fs-wrap"),
             id="hero", cls="lh-hero"),
         Section(_dashboard_mock(lang), id="dashboard", cls="lh-demo", aria_hidden="true", inert=True),
-        Section(fs_logo_strip(T("landing.suite_label"),
-                             ["FastMail", "FastOffice", "FastDrive", "FastMeet", "FastHR", "FastBooks"]),
-                cls="lh-suite"),
-        Section(Div(Div(*[Article(
-            I(f"{index:02d}", aria_hidden="true"),
-            Span(T(f"landing.{key}_label"), cls="lh-feat-label"),
-            H3(T(f"landing.{key}_title")), P(T(f"landing.{key}_body")), cls="lh-feat")
-            for index, key in enumerate(("invoice", "reconcile", "review"), 1)],
-            cls="lh-feats"), cls="fs-wrap"), id="why", cls="lh-sec"),
+        Section(Div(
+            Div(H2(T("landing.audience_title")), P(T("landing.audience_body")), cls="lh-head"),
+            Div(
+                Article(H3(T("landing.audience_bureau_title")), P(T("landing.audience_bureau_body")),
+                        fs_button(T("landing.audience_bureau_cta"), "#bureaus", "outline"),
+                        cls="lh-audience"),
+                Article(H3(T("landing.audience_business_title")), P(T("landing.audience_business_body")),
+                        fs_button(T("landing.audience_business_cta"), "#why", "outline"),
+                        cls="lh-audience"),
+                cls="lh-audience-grid"),
+            cls="fs-wrap"), id="audiences", cls="lh-sec"),
+        Section(Div(
+            Div(H2(T("landing.suite_title")), P(T("landing.suite_label")), cls="lh-suite-head"),
+            Div(*[Article(
+                H3(T(f"landing.suite_{key}_name")),
+                P(T(f"landing.suite_{key}_body")),
+                A(T(f"landing.suite_{key}_cta"), href=FASTPRODUCT.suite_url),
+                cls="lh-suite-product") for key in suite_products], cls="lh-suite-products"),
+            cls="fs-wrap"), id="suite", cls="lh-suite"),
+        Section(Div(
+            Div(Div(H2(T("landing.small_business_title")), cls="lh-head"),
+                P(T("landing.small_business_body")), cls="lh-features-head"),
+            Div(*[Article(
+                I(f"{index:02d}", aria_hidden="true"),
+                Span(T(f"landing.{key}_label"), cls="lh-feat-label"),
+                H3(T(f"landing.{key}_title")), P(T(f"landing.{key}_body")), cls="lh-feat")
+                for index, key in enumerate(("invoice", "reconcile", "review"), 1)],
+                cls="lh-feats"), cls="fs-wrap"), id="why", cls="lh-sec"),
         Section(Div(
             Div(H2(T("landing.process_title")), P(T("landing.process_body")), cls="lh-head"),
             Ol(*[Li(Span(f"{n:02d}", cls="lh-step-number", aria_hidden="true"),
@@ -554,13 +583,24 @@ def landing_page(lang: str = i18n.DEFAULT_LANG):
     )
 
 
+def _integration_availability(item: integrations.Integration) -> str:
+    if item.key in {"file_import", "fasthr"}:
+        return "available"
+    if item.key in {"quickbooks", "xero", "merit", "bamboohr", "personio"}:
+        return "review_required"
+    if item.key in {"hmrc", "emta"}:
+        return "pilot"
+    return "planned"
+
+
 def _integration_card(item: integrations.Integration, lang: str):
     T = lambda key: i18n.t(key, lang)
     copy = i18n.integration_copy(lang, item.key)
     return Article(
         Div(
             Div(Img(src=item.logo, alt=copy.get("logo_alt", item.logo_alt), loading="lazy", cls="integration-logo"), cls="integration-logo-wrap"),
-            Div(Span(" · ".join(item.markets), cls="markets"), cls="provider-meta"),
+            Div(Span(T(f"availability.{_integration_availability(item)}"), cls="availability"),
+                Span(" · ".join(item.markets), cls="markets"), cls="provider-meta"),
             cls="integration-head",
         ),
         H2(copy.get("name", item.name)),
@@ -586,9 +626,8 @@ def integrations_page(lang: str = i18n.DEFAULT_LANG):
             H1(T("integrations.headline")),
             P(T("integrations.lede"), cls="lede"),
             Div(
-                Span(T("integrations.accounting_adapters"), cls="chip"),
-                Span(T("integrations.filing_gates"), cls="chip"),
-                Span(T("integrations.banking_candidate"), cls="chip"),
+                *[Span(T(f"availability.{status}"), cls="chip")
+                  for status in ("available", "review_required", "pilot", "planned")],
                 cls="summary",
             ),
             cls="page-hero",
@@ -610,19 +649,26 @@ def _public_page_copy(lang: str, page: str) -> dict:
     return translated if isinstance(translated, dict) else fallback
 
 
-def _contact_link(section: dict):
+def _contact_link(section: dict, rank: int):
     subject = quote(section["email_subject"], safe="")
-    return A(section["action"], href=f"mailto:{CONTACT_EMAIL}?subject={subject}", cls="fs-btn fs-btn-ink")
+    classes = ("fs-btn fs-btn-ink" if rank == 0 else
+               "fs-btn fs-btn-outline" if rank == 1 else "trust-text-link")
+    return A(section["action"], href=f"mailto:{CONTACT_EMAIL}?subject={subject}", cls=classes)
 
 
 def _information_page(page: str, lang: str):
     copy = _public_page_copy(lang, page)
     sections = []
+    action_count = 0
     for section in copy["sections"]:
+        action = None
+        if section.get("email_subject"):
+            action = _contact_link(section, action_count)
+            action_count += 1
         sections.append(Article(
             H2(section["title"]),
             P(section["body"]),
-            _contact_link(section) if section.get("email_subject") else None,
+            action,
             cls="trust-section",
         ))
     return public_page(

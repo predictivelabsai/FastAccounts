@@ -58,16 +58,22 @@
     "contact_email": "Pārdošana un atbalsts: info@predictivelabs.ai",
     "legal_notice": "FastAccounts pārvalda Predictive Labs Ltd, 155 Minories Street, Suite 275, London EC3N 1AD, Apvienotā Karaliste."
   },
+  "availability": {
+    "available": "Pieejams",
+    "review_required": "Nepieciešama pārskatīšana",
+    "pilot": "Pilotprojekts",
+    "planned": "Plānots"
+  },
   "public_pages": {
     "security": {
       "title": "Drošība",
-      "lede": "Faktos balstīts pārskats par FastAccounts pašreizējiem drošības līdzekļiem, pašmitināšanas atbildību un darbu, kas vēl jāpabeidz pirms ražošanas lietojuma.",
-      "note": "Agrīna stadija · pārskatīts 2026. gada 9. oktobrī",
+      "lede": "Faktos balstīts pārskats par FastAccounts pieejamajiem drošības līdzekļiem, pašmitināšanas atbildību un darbu, kas jāpārskata vai ir plānots pirms ražošanas lietojuma.",
+      "note": "Nepieciešama pārskatīšana · novērtēts 2026. gada 9. oktobrī",
       "sections": [
         {"title": "Mitināšanas modelis", "body": "FastAccounts var mitināt patstāvīgi; tad operators izvēlas un aizsargā infrastruktūru. Pārvaldītais pilots izmanto to pašu Docker lietotni ar PostgreSQL un pastāvīgu pierādījumu glabātuvi FastSME pārvaldītā infrastruktūrā. Infrastruktūras nodrošinātājs ir atkarīgs no izvietojuma un jānorāda ražošanas klienta līgumā."},
         {"title": "Šifrēšana", "body": "Integrāciju piekļuves dati miera stāvoklī tiek šifrēti ar versijotu Fernet atslēgu un netiek atgriezti pārlūkā vai ierakstīti žurnālos. Mitinātā datplūsma izmanto HTTPS/TLS. FastAccounts neapgalvo, ka visi datubāzes lauki vai augšupielādētie pierādījumi ir šifrēti lietotnes līmenī miera stāvoklī."},
-        {"title": "Rezerves kopijas un atjaunošana", "body": "Pašmitinātājs atbild par datubāzes, pierādījumu krātuves, šifrēšanas un atjaunošanas procesu. Pārvaldītajai mitināšanai šifrētas kopijas un pārbaudīta atjaunošana ir ražošanas nosacījumi; repozitorijā vēl nav pabeigta atjaunošanas izmēģinājuma, tāpēc atjaunošanas laiks netiek solīts."},
-        {"title": "Piekļuves kontrole", "body": "Lietotne atbalsta vietējos e-pasta un paroles kontus un Google pierakstīšanos, dalību organizācijā ar ielūgumu, parakstītas sesijas, CSRF aizsardzību un īpašnieka, administratora, grāmatveža, apstiprinātāja un skatītāja lomas. Paroles izmanto scrypt jaucējvērtības, apstiprināšanas un atiestatīšanas marķieri ir vienreizējas jaucējvērtības, un atkārtoti pierakstīšanās mēģinājumi tiek ierobežoti. Uzņēmuma dati ir nodalīti pa organizācijām, un starporganizāciju piekļuve ir testēta. MFA politika un malas pieprasījumu ierobežošana vēl ir izvietošanas nosacījumi."},
+        {"title": "Rezerves kopijas un atjaunošana", "body": "Pašmitinātājs atbild par datubāzes, pierādījumu krātuves, šifrēšanas un atjaunošanas procesu. Plānots: šifrētas pārvaldītās mitināšanas kopijas un pārbaudīta atjaunošana. Repozitorijā nav pabeigta atjaunošanas izmēģinājuma, tāpēc atjaunošanas laiks netiek solīts."},
+        {"title": "Piekļuves kontrole", "body": "Pieejams: vietējie e-pasta un paroles konti un Google pierakstīšanās, dalība organizācijā ar ielūgumu, parakstītas sesijas, CSRF aizsardzība un īpašnieka, administratora, grāmatveža, apstiprinātāja un skatītāja lomas. Paroles izmanto scrypt jaucējvērtības, apstiprināšanas un atiestatīšanas marķieri ir vienreizējas jaucējvērtības, un atkārtoti pierakstīšanās mēģinājumi tiek ierobežoti. Uzņēmuma dati ir nodalīti pa organizācijām, un starporganizāciju piekļuve ir testēta. Plānots: pārvaldītā pakalpojuma MFA politika un pieprasījumu ierobežošana tīkla malā."},
         {"title": "Drošības incidenti", "body": "Par aizdomīgu incidentu ziņojiet privāti uz info@predictivelabs.ai ar tematu “FastAccounts drošības incidents”. Komanda saglabās vajadzīgos ierakstus, izpētīs apjomu un koordinēs saziņu ar klientiem. Līgumisks reaģēšanas laiks vēl netiek piedāvāts.", "action": "Ziņot par incidentu", "email_subject": "FastAccounts drošības incidents"},
         {"title": "Atkarību ziņošana", "body": "Python atkarības ir norādītas requirements.txt; CI kompilē lietotni, izpilda testus, pārbauda migrācijas un meklē biežus noslēpumu paraugus. Projekts neapgalvo, ka ievainojamības tiek nepārtraukti automātiski uzraudzītas. Par aizdomīgu atkarību ziņojiet privātajam drošības kontaktam."},
         {"title": "Atbildīga ievainojamību atklāšana", "body": "Pirms publiskas apspriešanas ziņojiet privāti un norādiet skartās versijas, atkārtošanas soļus un ietekmi. Mēs apstiprināsim saziņas kanālu, godprātīgi izmeklēsim un saskaņosim atklāšanas datumu ar ziņotāju. Lūdzu, dodiet saprātīgu laiku labošanai; atbildes vai labojuma termiņš vēl netiek garantēts.", "action": "Nosūtīt privātu ziņojumu", "email_subject": "FastAccounts atbildīga ievainojamības atklāšana"}
@@ -76,11 +82,11 @@
     "privacy": {
       "title": "Privātums",
       "lede": "Šis pilota paziņojums izskaidro pašreizējā produkta lomas un datu plūsmas. Ražošanas kārtība jāpabeidz klienta datu apstrādes līgumā.",
-      "note": "Vienkāršs pilota paziņojums · pārskatīts 2026. gada 9. oktobrī",
+      "note": "Pilotprojekts · vienkāršs paziņojums, novērtēts 2026. gada 9. oktobrī",
       "sections": [
         {"title": "Pārziņa un apstrādātāja lomas", "body": "Mitinātā pakalpojumā Predictive Labs Ltd ir konta, atbalsta un pakalpojuma administrēšanas datu pārzinis un organizācijas ievadīto uzņēmuma, klientu, piegādātāju un darbinieku datu apstrādātājs. Klients paliek savas organizācijas datu pārzinis. Pašmitinātā izvietojumā operators nosaka savas lomas un paziņojumus."},
         {"title": "Pašreizējie apakšapstrādātāji", "body": "Pašreizējais kods izmanto Google izvēles pierakstīšanai un Postmark konta, rēķinu un atgādinājumu e-pastiem, ja tas ir konfigurēts. Bez Postmark piekļuves datiem tas netiek izmantots. Repozitorijs nenosauc pārvaldītās infrastruktūras nodrošinātāju; tas jānorāda klienta datu apstrādes līgumā pirms ražošanas datu pieņemšanas. Pieslēgtie grāmatvedības, personāla vai banku pakalpojumi ir klienta izvēlētas integrācijas, nevis noklusējuma saņēmēji."},
-        {"title": "Glabāšana", "body": "Grāmatvedības ieraksti tiek glabāti pēc klienta politikas un piemērojamajiem termiņiem: plānā paredzēti seši gadi parastiem Apvienotās Karalistes PVN ierakstiem un septiņi gadi no finanšu gada beigām Igaunijas uzskaitei, vajadzības gadījumā ilgāk. Dzēšana nedrīkst nemanāmi noņemt iegrāmatotus virsgrāmatas ierakstus vai datus ar juridisku glabāšanas pienākumu. Automātiska glabāšanas izpilde vēl ir ražošanas nosacījums."},
+        {"title": "Glabāšana", "body": "Grāmatvedības ieraksti tiek glabāti pēc klienta politikas un piemērojamajiem termiņiem: plānā paredzēti seši gadi parastiem AK PVN ierakstiem un septiņi gadi no finanšu gada beigām Igaunijas uzskaitei, vajadzības gadījumā ilgāk. Dzēšana nedrīkst nemanāmi noņemt iegrāmatotus virsgrāmatas ierakstus vai datus ar juridisku glabāšanas pienākumu. Plānots: automātiska glabāšanas izpilde pārvaldītajā mitināšanā."},
         {"title": "Starptautiska datu pārsūtīšana", "body": "Pašmitinātājs izvēlas datu atrašanās vietu. Mitinātajā pilotā Google vai Postmark var apstrādāt datus saskaņā ar saviem noteikumiem un pārsūtīšanas garantijām. Ražošanas datu apstrādes līgumā jānorāda mitināšanas vieta, visi apakšapstrādātāji un pārsūtīšanas mehānismi; šī lapa neizdomā repozitorijā nedokumentētu vietu."},
         {"title": "Analītika un žurnāli", "body": "Publiskajā vietnē un lietotnē nav analītikas vai reklāmas SDK. Izvietojums var glabāt tehniskos tīmekļa, autentifikācijas un audita žurnālus, kas vajadzīgi pakalpojuma darbībai un drošībai. Tajos nedrīkst būt pakalpojumu sniedzēju piekļuves dati, un glabāšanas laiks ražošanā jādokumentē."},
         {"title": "Datu subjekta pieprasījumi", "body": "Lai pieprasītu piekļuvi, labošanu, dzēšanu, ierobežošanu vai citas datu tiesības, vispirms sazinieties ar organizāciju, kas pārvalda attiecīgo uzskaiti. Par FastAccounts konta vai pakalpojuma datiem rakstiet uz info@predictivelabs.ai. Var būt jāpārbauda identitāte un jāsaglabā juridiski obligātie ieraksti.", "action": "Sazināties par datu aizsardzību", "email_subject": "FastAccounts datu aizsardzības pieprasījums"}
@@ -88,19 +94,19 @@
     },
     "about": {
       "title": "Uzņēmums",
-      "lede": "FastAccounts ir agrīnas stadijas atvērtā pirmkoda grāmatvedības produkts Apvienotās Karalistes un Igaunijas mazajiem uzņēmumiem un grāmatvedības birojiem.",
-      "note": "Izstrādāts publiski · valstu validācija turpinās",
+      "lede": "FastAccounts ir atvērtā pirmkoda grāmatvedības produkts Apvienotās Karalistes un Igaunijas mazajiem uzņēmumiem un grāmatvedības birojiem.",
+      "note": "Nepieciešama pārskatīšana · neatkarīga valstu validācija",
       "sections": [
         {"title": "Juridiskā persona", "body": "FastAccounts izstrādā un pārvalda Predictive Labs Ltd, Anglijā un Velsā reģistrēts uzņēmums ar numuru 14857334. Reģistrētā adrese: 155 Minories Street, Suite 275, London EC3N 1AD, Apvienotā Karaliste."},
         {"title": "Komanda", "body": "Produktu, dokumentāciju un publisko laidienu vēsturi uztur neliela Predictive Labs komanda; 0.3.0 laidiena ierakstā Joosep Laats ir nosaukts saistībā ar apvienoto produkta darbu. Mēs neuzrādām lielāku komandu, klientu skaitu vai konsultantu tīklu, nekā apliecina pierādījumi."},
-        {"title": "Grāmatvedības tirgu kompetence", "body": "Programmatūra īsteno testētus Apvienotās Karalistes PVN un Igaunijas PVN deklarācijas (KMD) darba dokumentus, valstu rēķinu noteikumus, precīzus Decimal aprēķinus un nemaināmus divkāršos ierakstus. Noteikumi balstīti oficiālos avotos, taču neatkarīga Apvienotās Karalistes un Igaunijas grāmatvežu UAT vēl nav pabeigta. FastAccounts ir programmatūra, nevis nodokļu vai juridisks padoms."},
-        {"title": "Produkta robežas", "body": "FastAccounts aptver rēķinus, pirkumu rēķinus, pierādījumus, bankas izrakstu importu un saskaņošanu, virsgrāmatu, pārskatus un pārskatāmus PVN darba dokumentus. Igaunijas algu aprēķins grāmatvedības biroju klientiem ir demonstrācijas apjomā ar nepabeigtu ražošanas UAT. Tas nav ERP un neietver krājumus, pasūtījumus, ražošanu, CRM vai vispārēju personāla vadību."}
+        {"title": "Grāmatvedības tirgu kompetence", "body": "Pieejams: testēti AK PVN un Igaunijas PVN deklarācijas (KMD) darba dokumenti, valstu rēķinu noteikumi, precīzi Decimal aprēķini un nemaināmi divkāršie ieraksti. Nepieciešama pārskatīšana: neatkarīga AK un Igaunijas grāmatvežu UAT. FastAccounts ir programmatūra, nevis nodokļu vai juridisks padoms."},
+        {"title": "Produkta robežas", "body": "Pieejams: rēķini, pirkumu rēķini, pierādījumi, bankas izrakstu imports un saskaņošana, virsgrāmata, pārskati un pārskatāmi PVN darba dokumenti. Nepieciešama pārskatīšana: Igaunijas algu aprēķinam grāmatvedības biroju klientiem jāpabeidz ražošanas UAT. FastAccounts nav ERP un neietver krājumus, pasūtījumus, ražošanu, CRM vai vispārēju personāla vadību."}
       ]
     },
     "contact": {
       "title": "Kontakti",
       "lede": "Viena darbīga pastkaste ar skaidru tematu katram saziņas ceļam. Mēs nepublicējam nekonfigurētas adreses.",
-      "note": "Predictive Labs Ltd · info@predictivelabs.ai",
+      "note": "Pieejams · info@predictivelabs.ai",
       "sections": [
         {"title": "Pārdošana", "body": "Jautājiet par mitināto pilotu, pašmitināšanu vai grāmatvedības biroja izvērtējumu. Norādiet tirgu, organizācijas veidu un darbplūsmu, ko vēlaties pārbaudīt.", "action": "Rakstīt pārdošanai", "email_subject": "FastAccounts pārdošanas pieprasījums"},
         {"title": "Atbalsts", "body": "Produkta palīdzībai norādiet FastAccounts versiju, lapu vai darbplūsmu, gaidīto un faktisko rezultātu. Nesūtiet e-pastā paroles, OAuth marķierus, bankas piekļuves datus vai īstus grāmatvedības eksportus.", "action": "Rakstīt atbalstam", "email_subject": "FastAccounts atbalsta pieprasījums"},
@@ -110,10 +116,10 @@
     },
     "terms": {
       "title": "Noteikumi — projekts",
-      "lede": "Šie ir agrīnas stadijas pakalpojuma pagaidu noteikumi. Tie nav galīgie klienta noteikumi un nerada apgalvojumus par pakalpojuma līmeni, atbilstību vai garantijām.",
-      "note": "Projekts pārskatīšanai · nav ražošanas noteikumi",
+      "lede": "Šie pilotprojekta noteikumi ir pagaidu noteikumi, nevis galīgie klienta noteikumi, un nerada apgalvojumus par pakalpojuma līmeni, atbilstību vai garantijām.",
+      "note": "Pilotprojekts · nepieciešama juridiska pārskatīšana",
       "sections": [
-        {"title": "Pakalpojuma apjoms", "body": "FastAccounts nodrošina grāmatvedības programmatūru un izvēles mitināto pilotu. Iespējas var būt pieejamas, pārskatāmas, pilota stadijā vai plānotas. Tieša nodokļu iesniegšana un citas ierobežotas iespējas nav iekļautas, ja vien parakstīts līgums skaidri nenosaka citādi."},
+        {"title": "Pakalpojuma apjoms", "body": "FastAccounts nodrošina grāmatvedības programmatūru un izvēles mitināto pilotprojektu. Pieejamību raksturo četri statusi: Pieejams, Nepieciešama pārskatīšana, Pilotprojekts un Plānots. Tieša nodokļu iesniegšana ir Plānota un nav iekļauta, ja vien parakstīts līgums skaidri nenosaka citādi."},
         {"title": "Klienta atbildība", "body": "Klients atbild par avota datu pareizību, lietotāju piekļuvi, grāmatvedības un algu rezultātu pārbaudi, obligātajām deklarācijām un profesionālu padomu. Sintētisku demonstrāciju nedrīkst uzskatīt par ražošanas uzskaiti."},
         {"title": "Atvērtā pirmkoda programmatūra", "body": "Pirmkoda repozitorijs ir publicēts ar MIT licenci. Pašmitināto lietojumu regulē šī licence; izvietojuma darbība, drošība, rezerves kopijas un atjauninājumi ir operatora atbildība."},
         {"title": "Mitinātais pilots", "body": "Mitināta lietojuma pieejamība, atbalsts, datu apstrāde, maksa, atcelšana un pakalpojuma līmenis jānosaka atsevišķā klienta līgumā. Šis projekts nesola nepārtrauktu pakalpojumu, atbildes laiku vai ražošanas atjaunošanas mērķi."},
@@ -122,32 +128,30 @@
     },
     "roadmap": {
       "title": "Attīstības plāns",
-      "lede": "Pircējam saprotams pārskats par to, kas tiek pārbaudīts tagad, kas sekos un kas paliek vēlākam laikam. Datumi ir laidienu datumi, nevis prognozes.",
-      "note": "Tagad / Tālāk / Vēlāk · atjaunināts 2026. gada 9. oktobrī",
+      "lede": "Pircējam saprotams pārskats, kas visā publiskajā vietnē izmanto tos pašus četrus pieejamības statusus. Datumi ir laidienu datumi, nevis prognozes.",
+      "note": "Pieejams / Nepieciešama pārskatīšana / Pilotprojekts / Plānots · atjaunināts 2026. gada 9. oktobrī",
       "source_intro": "Pilns ieviešanas ieraksts ir",
       "source_link": "izmaiņu žurnālā",
       "stages": [
-        {"title": "Tagad", "intro": "Darbs, kas inženierijas pilotu pārvērš ražošanai gatavā pakalpojumā.", "items": [
-          {"title": "Neatkarīga grāmatvežu UAT", "body": "Pirms profesionālas validācijas apgalvojumiem pārbaudīt Apvienotās Karalistes PVN, Igaunijas KMD un Igaunijas biroju algu pilotu ar kvalificētiem grāmatvežiem.", "market": "AK + Igaunija"},
-          {"title": "Pārvaldītas darbības pierādījumi", "body": "Nosaukt mitināšanas apakšapstrādātāju, dokumentēt datu atrašanās vietu, pabeigt šifrētu kopiju atjaunošanas izmēģinājumu un konfigurēt incidentu brīdinājumus, pieprasījumu ierobežošanu un ļaunprogrammatūras pārbaudi.", "market": "Abi tirgi"},
-          {"title": "Pakalpojumu sniedzēju pārbaude", "body": "Pārbaudīt dokumentētās un gatavās integrācijas ar atļautiem klienta vai testa uzņēmuma datiem, saglabājot importu pārskatāmu un organizācijai nodalītu.", "market": "Abi tirgi"}
+        {"title": "Pieejams", "intro": "Ieviestas produkta plūsmas, ko var izmantot šeit norādītajās robežās.", "items": [
+          {"title": "Publiskais pamats", "date": "2026-08-10", "body": "Sākumlapa, integrāciju katalogs, veselības pārbaude un aizsargāta pierakstīšanās tika izlaista pirms pirmās reģistrētās lietotnes versijas.", "market": "AK + Igaunija"},
+          {"title": "Pamata grāmatvedība 0.2.0", "date": "2026-08-10", "body": "Rēķini, pirkumu rēķini, pierādījumi, izrakstu imports un saskaņošana, nemaināmi divkāršie ieraksti, pārskati un pārskatāmi PVN darba dokumenti ir ieviesti.", "market": "AK + Igaunija"},
+          {"title": "Konti un darbplūsmas 0.3.0–0.4.0", "date": "2026-10-09", "body": "Periodiskie rēķini, atgādinājumi, pārskatāms failu un FastHR darbinieku imports, kā arī e-pasta un paroles konti ir ieviesti ar testiem bez tīkla savienojuma.", "market": "AK + Igaunija"}
         ]},
-        {"title": "Tālāk", "intro": "Plānotais darbs pēc pašreizējo validācijas un darbības nosacījumu izpildes.", "items": [
-          {"title": "Ražošanas atvērtā banku darbība", "body": "Pēc juridiskās, komerciālās un pārklājuma pārbaudes pievienot atkārtotu savienošanu, plānotu tikai lasāmu importu un uzraudzību.", "market": "AK + Igaunija"},
-          {"title": "Atbalstīti nodokļu iesniegšanas kanāli", "body": "Pabeigt pakalpojumu sniedzēju apstiprinājumus un aizsargātas HMRC un e-MTA ražošanas plūsmas. Pašreizējais rezultāts ir darba dokumenti un eksports.", "market": "AK + Igaunija"},
-          {"title": "Biroju algu ražošanas pārskats", "body": "Pabeigt Igaunijas klientu algu UAT, tostarp atlikušās TSD, atvaļinājuma un slimības naudas robežas.", "market": "Igaunija"}
+        {"title": "Nepieciešama pārskatīšana", "intro": "Ieviests darbs, kam vajadzīga ārēja pārbaude vai ražošanas UAT.", "items": [
+          {"title": "Neatkarīga grāmatvežu UAT", "body": "Pirms profesionālas validācijas apgalvojumiem pārbaudīt AK PVN, Igaunijas KMD un Igaunijas biroju algu aprēķinu ar kvalificētiem grāmatvežiem.", "market": "AK + Igaunija"},
+          {"title": "Pakalpojumu sniedzēju pārbaude", "body": "Pārbaudīt QuickBooks, Xero, Merit Aktiva, BambooHR un Personio ar atļautiem klienta vai testa uzņēmuma piekļuves datiem, saglabājot importu pārskatāmu un organizācijai nodalītu.", "market": "Abi tirgi"}
         ]},
-        {"title": "Vēlāk", "intro": "Noderīgi paplašinājumi ārpus pašreizējā ražošanas solījuma.", "items": [
-          {"title": "Plašāka AK atbilstība", "body": "Uzņēmumu nodokli, Companies House pārskatus, CIS un papildu PVN shēmas apsvērt tikai pēc piemēriem un profesionālas pārbaudes.", "market": "Apvienotā Karaliste"},
-          {"title": "Plašāka Igaunijas pārskatu sniegšana", "body": "Gada pārskata taksonomiju, reģistra iesniegšanu un tiešu e-MTA kanālu apsvērt pēc piekļuves un pārbaudes nosacījumu izpildes.", "market": "Igaunija"},
-          {"title": "Izvēles ieteikumi", "body": "AI lauku vai atbilstību ieteikumus vērtēt tikai ar skaidru cilvēka apstiprinājumu; neviens ieteikums nedrīkst nemanāmi iegrāmatot darījumu.", "market": "Abi tirgi"}
+        {"title": "Pilotprojekts", "intro": "Ierobežotas plūsmas izvērtēšanai ar skaidri norādītām ražošanas robežām.", "items": [
+          {"title": "Mitinātais pakalpojums", "body": "Pārvaldītā mitināšana tiek piedāvāta tikai ar atsevišķu klienta līgumu, kamēr tiek pabeigti darbības pierādījumi.", "market": "Abi tirgi"},
+          {"title": "Igaunijas biroju algas 0.2.1", "date": "2026-10-08", "body": "Nepilna laika un stundas algu aprēķins, sociālā nodokļa minimums un sintētiskas demonstrācijas ir ieviestas; ražošanas lietojumam Nepieciešama pārskatīšana.", "market": "Igaunija"},
+          {"title": "Nodokļu darba dokumenti un eksports", "body": "AK PVN un Igaunijas KMD darba dokumenti un eksports ir pieejami izvērtēšanai. Tieša iesniegšana ir Plānota.", "market": "AK + Igaunija"}
         ]},
-        {"title": "Piegādāts", "intro": "Datēti posmi no repozitorija izmaiņu žurnāla.", "items": [
-          {"title": "Publiskais pamats", "date": "2026-08-10", "body": "Pirms pirmā reģistrētā lietotnes laidiena tika piegādāta sākumlapa, integrāciju katalogs, veselības pārbaude un aizsargāta pierakstīšanās. Izmaiņu žurnālā nav 0.1.x laidiena, tāpēc tāds netiek izdomāts.", "market": "AK + Igaunija"},
-          {"title": "Inženierijas pilots 0.2.0", "date": "2026-08-10", "body": "Piegādāta pamata grāmatvedība, nemaināmi divkāršie ieraksti, pārskatāmi AK PVN un Igaunijas KMD darba dokumenti, sintētiskas uzskaites un integrāciju robežas.", "market": "AK + Igaunija"},
-          {"title": "Algu aprēķins 0.2.1", "date": "2026-10-08", "body": "Piegādāts nepilna laika un stundas Igaunijas biroju algu aprēķins, sociālā nodokļa minimums un paplašināta sintētiska demonstrācija.", "market": "Igaunija"},
-          {"title": "Laidiens 0.3.0", "date": "2026-10-09", "body": "Piegādāti periodiskie rēķini, atgādinājumi, integrāciju savienojumu kontrole un pārskatāms darbinieku imports ar testiem bez reāliem tīkla zvaniem.", "market": "AK + Igaunija"},
-          {"title": "Laidiens 0.4.0", "date": "2026-10-09", "body": "Blakus Google SSO piegādāta reģistrācija, pierakstīšanās un paroles atiestatīšana ar scrypt paroļu jaucējvērtībām, vienreizējiem marķieru jaucējumiem, pieprasījumu ierobežošanu un sesijas nomaiņu.", "market": "AK + Igaunija"}
+        {"title": "Plānots", "intro": "Iespējas, kas vēl nav ieviestas vai iekļautas pašreizējā pakalpojuma solījumā.", "items": [
+          {"title": "Pārvaldītā pakalpojuma darbība", "body": "Nosaukt mitināšanas apakšapstrādātāju un datu atrašanās vietu, pabeigt šifrētu kopiju atjaunošanas izmēģinājumu un pievienot incidentu brīdinājumus, pieprasījumu ierobežošanu un ļaunprogrammatūras pārbaudi.", "market": "Abi tirgi"},
+          {"title": "Tikai lasāma atvērtā banku darbība", "body": "Pēc juridiskās, komerciālās un banku pārklājuma pārbaudes pievienot pakalpojuma sniedzēja izvēli, atkārtotu savienošanu, plānotu importu un uzraudzību.", "market": "AK + Igaunija"},
+          {"title": "Tieša nodokļu iesniegšana", "body": "Pabeigt pakalpojumu sniedzēju apstiprinājumus un aizsargātas HMRC un e-MTA iesniegšanas plūsmas. Pašreizējais rezultāts ir darba dokumenti un eksports.", "market": "AK + Igaunija"},
+          {"title": "Plašāki obligātie pārskati", "body": "AK uzņēmumu nodokli un Companies House pārskatus, kā arī Igaunijas gada pārskata kartēšanu apsvērt tikai pēc piemēriem un profesionālas pārbaudes.", "market": "AK + Igaunija"}
         ]}
       ]
     },
@@ -155,12 +159,12 @@
       "title": "Izmaiņu žurnāls",
       "lede": "Īsa laidienu vēsture pircējiem un operatoriem. Detalizētas tehniskās piezīmes paliek repozitorijā.",
       "note": "Datēti un pierādāmi laidieni",
-      "source_intro": "Visas piegādātās izmaiņas lasiet",
+      "source_intro": "Visas reģistrētās izmaiņas lasiet",
       "source_link": "tehniskajā izmaiņu žurnālā",
       "releases": [
         {"title": "0.4.0 · E-pasta un paroles konti", "date": "2026-10-09", "body": "Blakus Google SSO pievienota reģistrācija, pierakstīšanās un paroles atiestatīšana. Paroles izmanto scrypt jaucējvērtības; apstiprināšanas un atiestatīšanas saites ir vienreizējas, ierobežotas un tiek sūtītas ar izvēles Postmark konfigurāciju."},
-        {"title": "0.3.0 · Integrācijas un automatizācija", "date": "2026-10-09", "body": "Pievienoti periodiskie rēķini un atgādinājumi, organizācijai nodalīta savienojumu kontrole, FastHR savienotājs, pārskatāms darbinieku imports, universāls CSV/TSV ceļš un dokumentēti Personio un BambooHR adapteri. Testi izmanto imitētu datplūsmu; ražošanas pārbaude paliek atsevišķa."},
-        {"title": "0.2.1 · Igaunijas biroju algu aprēķins", "date": "2026-10-08", "body": "Pievienots nepilns darba laiks, stundas samaksa, pensiju likmes, 2026. gada sociālā nodokļa minimums un sintētiska algu demonstrācija. Funkcija paliek demonstrācijas apjomā, kamēr nav pabeigta grāmatvežu ražošanas UAT."},
+        {"title": "0.3.0 · Integrācijas un automatizācija", "date": "2026-10-09", "body": "Pievienoti periodiskie rēķini un atgādinājumi, organizācijai nodalīta savienojumu kontrole, FastHR savienotājs, pārskatāms darbinieku imports, universāls CSV/TSV ceļš un dokumentēti Personio un BambooHR adapteri. Nepieciešama pārskatīšana: testi izmanto imitētu datplūsmu, un ražošanas pārbaude nav pabeigta."},
+        {"title": "0.2.1 · Igaunijas biroju algu aprēķins", "date": "2026-10-08", "body": "Pievienots nepilns darba laiks, stundas samaksa, pensiju likmes, 2026. gada sociālā nodokļa minimums un sintētiska algu demonstrācija. Nepieciešama pārskatīšana: grāmatvežu ražošanas UAT nav pabeigta."},
         {"title": "0.2.0 · Inženierijas pilots", "date": "2026-08-10", "body": "Piegādāta grāmatvedības darbvieta, pārnesamas migrācijas, rēķini, pirkumu rēķini, pierādījumi, izrakstu imports un saskaņošana, nemaināma līdzsvarota virsgrāmata, finanšu pārskati un pārskatāmi AK un Igaunijas PVN darba dokumenti."},
         {"title": "Pamats pirms versiju laidieniem", "date": "2026-08-10", "body": "Publicēta pirmā sākumlapa, integrāciju katalogs, veselības pārbaude un aizsargātas autentifikācijas pamats. Repozitorija izmaiņu žurnālā nav 0.1.x laidiena."}
       ]
@@ -173,13 +177,13 @@
     "process_title": "No bankas izraksta līdz pārbaudītām deklarācijām.",
     "process_body": "Vienota darbplūsma katra klienta grāmatvedībai. Izmēģiniet to biroja demonstrācijā ar sintētiskiem datiem.",
     "step1_title": "Pievienojiet banku",
-    "step1_body": "Sāciet ar bankas izrakstu importu. Atvērtā banku pakalpojumu saskarne vēl ir tikai plānota lasīšanai; neviens pakalpojumu sniedzējs nav pievienots pēc noklusējuma.",
+    "step1_body": "Sāciet ar bankas izrakstu importu. Plānots: tikai lasāma atvērtā banku darbība; neviens pakalpojumu sniedzējs nav pievienots pēc noklusējuma.",
     "step2_title": "Iegrāmatojiet dokumentus",
     "step2_body": "Glabājiet rēķinus, piegādātāju rēķinus un apliecinošos dokumentus kopā katra klienta grāmatvedībā.",
     "step3_title": "Saskaņojiet",
     "step3_body": "Pārskatiet ieteiktās atbilstības un apliecinošos dokumentus pirms grāmatojuma apstiprināšanas.",
-    "step4_title": "Iesniedziet deklarācijas",
-    "step4_body": "Sagatavojiet un pārbaudiet PVN darba lapas eksportam. Tieša nodokļu deklarāciju iesniegšana joprojām ir ierobežota.",
+    "step4_title": "Sagatavojiet deklarācijas",
+    "step4_body": "Pieejams: PVN darba dokumenti un eksports. Plānots: tieša nodokļu deklarāciju iesniegšana.",
     "comparison_title": "Mazāk darba izklājlapās. Vairāk skaidrības.",
     "old_title": "Līdzšinējā pieeja",
     "new_title": "FastAccounts pieeja",
@@ -198,8 +202,8 @@
     "stats_label": "Produkta fakti",
     "title": "Atvērta grāmatvedība",
     "kicker": "Grāmatvedība, kas veidota diviem tirgiem",
-    "headline": "Grāmatvedība, kas paliek skaidra, pārnesama un gatava grāmatveža pārbaudei.",
-    "lede": "Izrakstiet rēķinus, reģistrējiet saņemtos rēķinus, saskaņojiet naudas plūsmu, uzturiet nemaināmu divkāršā ieraksta virsgrāmatu un sagatavojiet pārbaudītus Apvienotās Karalistes un Igaunijas PVN darba dokumentus — neieviešot pilnu ERP sistēmu.",
+    "headline": "Grāmatvedība, kas paliek skaidra neatkarīgi no tā, kas kārto uzskaiti.",
+    "lede": "Kārtojiet sava uzņēmuma uzskaiti vai pārvaldiet atsevišķu klientu uzskaiti vienā mierīgā darbvietā. Pārskatiet dokumentus, saskaņojiet maksājumus un sagatavojiet AK un Igaunijas PVN darba dokumentus.",
     "explore_integrations": "Izpētīt integrācijas",
     "view_source": "Skatīt pirmkodu",
     "invoice_label": "01 · IZRAKSTI RĒĶINUS",
@@ -213,11 +217,40 @@
     "review_body": "PVN darba dokumenti, virsgrāmatas, pārskati, pierādījumi, audita vēsture un skaidri nodokļu iesniegšanas aģenta plāni.",
     "hero_eyebrow": "Atvērtais pirmkods. Divi tirgi.",
     "hero_h1": "Grāmatvedība, kas paliek skaidra.",
-    "hero_highlight": "Katram klientam.",
-    "hero_sub": "Pārskatiet rēķinus, saskaņojiet maksājumus un sagatavojiet Apvienotās Karalistes un Igaunijas PVN darba dokumentus vienā darbvietā.",
+    "hero_highlight": "Jūsu uzņēmumam vai klientiem.",
+    "hero_sub": "Viens skaidrs ceļš mazam uzņēmumam, kas kārto savu uzskaiti, un otrs grāmatvedības birojam ar daudzu klientu uzskaiti.",
     "hero_cta": "Sākt",
     "hero_trust": "Atvērtais pirmkods · Apvienotā Karaliste un Igaunija · Jūsu grāmatvedība, jūsu kontrole",
-    "suite_label": "Viens programmu komplekts. Vienādi vienkāršas cenas.",
+    "audience_title": "Izvēlieties, kā kārtojat uzskaiti.",
+    "audience_body": "FastAccounts atbalsta divus atšķirīgus darba modeļus. Sāciet ar to, kas atbilst jūsu ikdienas atbildībai.",
+    "audience_bureau_title": "Es vadu grāmatvedības biroju",
+    "audience_bureau_body": "Pārvaldiet algu aprēķinu, pirkumu rēķinus un grāmatvedību atsevišķās klientu organizācijās ar skaidru pārskatīšanas vēsturi katrai uzskaitei.",
+    "audience_bureau_cta": "Skatīt biroja darbplūsmas",
+    "audience_business_title": "Es kārtoju sava uzņēmuma uzskaiti",
+    "audience_business_body": "Izrakstiet rēķinus, reģistrējiet pirkumu rēķinus, saskaņojiet bankas darījumus un sagatavojiet vienas organizācijas PVN darba dokumentus.",
+    "audience_business_cta": "Skatīt mazā uzņēmuma iespējas",
+    "small_business_title": "Maziem uzņēmumiem, kas kārto savu uzskaiti",
+    "small_business_body": "Saglabājiet ikdienas ceļu vienkāršu: pārdodiet, reģistrējiet izmaksas, saskaņojiet naudu un vajadzības gadījumā nododiet pārskatītus ierakstus.",
+    "suite_title": "Plašākais FastSME komplekts",
+    "suite_label": "Katram produktam ir viens skaidrs uzdevums un tās pašas vienkāršās mitināšanas izvēles.",
+    "suite_fastmail_name": "FastMail",
+    "suite_fastmail_body": "Uzņēmuma e-pasts komandai un saziņai ar klientiem.",
+    "suite_fastmail_cta": "Izpētīt FastMail",
+    "suite_fastoffice_name": "FastOffice",
+    "suite_fastoffice_body": "Dokumenti un izklājlapas ikdienas darbam.",
+    "suite_fastoffice_cta": "Izpētīt FastOffice",
+    "suite_fastdrive_name": "FastDrive",
+    "suite_fastdrive_body": "Uzņēmuma failu glabāšana un koplietošana.",
+    "suite_fastdrive_cta": "Izpētīt FastDrive",
+    "suite_fastmeet_name": "FastMeet",
+    "suite_fastmeet_body": "Video sapulces komandām un klientiem.",
+    "suite_fastmeet_cta": "Izpētīt FastMeet",
+    "suite_fasthr_name": "FastHR",
+    "suite_fasthr_body": "Darbinieku dati, atvaļinājumi un personāla darbs.",
+    "suite_fasthr_cta": "Izpētīt FastHR",
+    "suite_fastbooks_name": "FastBooks",
+    "suite_fastbooks_body": "Vienkāršs finanšu pārskats mazākām komandām.",
+    "suite_fastbooks_cta": "Izpētīt FastBooks",
     "faq_eyebrow": "Noderīgi zināt",
     "faq_title": "Atbildes uz jūsu jautājumiem.",
     "faq1_q": "Kas ir FastAccounts?",
@@ -225,11 +258,11 @@
     "faq2_q": "Kāda ir atšķirība starp BYOC un mitināšanu pie mums?",
     "faq2_a": "Mitināšana savā mākonī (BYOC) ir bez maksas: jūs darbināt FastAccounts savā infrastruktūrā un paši pārvaldāt atjauninājumus. Mitināšana pie mums FastSME pārvaldītā infrastruktūrā maksā 1 € par produktu mēnesī.",
     "faq3_q": "Kuras valstis tiek atbalstītas?",
-    "faq3_a": "FastAccounts atbalsta Apvienotās Karalistes un Igaunijas grāmatvedību un PVN darba dokumentus. Igaunijas algu aprēķins grāmatvedības birojiem ir pieejams demonstrācijas versijā; lietotāju pieņemšanas pārbaudes pirms lietošanas reālā darbā vēl nav pabeigtas. Nodokļu deklarāciju tieša iesniegšana joprojām ir ierobežota.",
+    "faq3_a": "Pieejams: AK un Igaunijas grāmatvedība, PVN darba dokumenti un eksports. Nepieciešama pārskatīšana: Igaunijas algu aprēķinam grāmatvedības birojiem nav pabeigta ražošanas UAT. Plānots: tieša nodokļu iesniegšana.",
     "faq4_q": "Vai varu apskatīt kodu un mitināt programmatūru pats?",
     "faq4_a": "Jā. FastAccounts ir pieejams GitHub ar MIT licenci. Varat izmantot, mainīt un paši mitināt programmatūru saskaņā ar licences noteikumiem, saglabājot autortiesību paziņojumu un licences tekstu.",
     "faq5_q": "Kādas integrācijas ir pieejamas?",
-    "faq5_a": "Katalogā ir pārbaudīti adapteri QuickBooks Online, Xero un Merit Aktiva. Neviens pakalpojumu sniedzējs nav pieslēgts pēc noklusējuma. Tieša iesniegšana HMRC un Igaunijas nodokļu iestādei joprojām ir ierobežota; atvērtās banku darbības integrācija tikai datu lasīšanai vēl tiek apsvērta. Darbinieku pamatdatu un algu aprēķina ievaddatu saņemšana no klientu personāla sistēmām ir ceļa kartē; neviens personāla sistēmas adapteris vēl nav izveidots. Tvērumu un pārskatīšanas prasības skatiet integrāciju lapā.",
+    "faq5_a": "Pieejams: darbinieku failu imports un FastHR. Nepieciešama pārskatīšana: QuickBooks Online, Xero, Merit Aktiva, BambooHR un Personio. Pilotprojekts: HMRC darba dokumenti un Igaunijas KMD/VD eksports. Plānots: tieša nodokļu iesniegšana, atvērtā banku darbība un pārējais katalogs. Neviens pakalpojumu sniedzējs nav savienots pēc noklusējuma.",
     "cta_title": "Katra klienta grāmatvedība vienuviet.",
     "cta_body": "Atveriet darbvietu vai izpētiet pirmkodu un mitiniet FastAccounts paši.",
     "mock_browser": "FastAccounts / Darbvieta",
@@ -265,15 +298,15 @@
     "title": "Integrācijas",
     "kicker": "Savietojamība jau pēc būtības",
     "headline": "Savienojiet rīkus, kurus jūsu grāmatvedis jau izmanto.",
-    "lede": "FastAccounts var apmainīties ar datiem, izmantojot pārbaudītus pakalpojumu sniedzēju adapterus, vienlaikus skaidri parādot datu virzienu, īpašumtiesības, pārbaudi un konfliktus. Neviens no tālāk norādītajiem pakalpojumu sniedzējiem pēc noklusējuma nav savienots, un nodokļu deklarāciju iesniegšana joprojām ir ierobežota.",
-    "accounting_adapters": "3 grāmatvedības adapteri",
-    "filing_gates": "2 iesniegšanas kontroles posmi",
-    "banking_candidate": "Tikai lasāmas banku integrācijas kandidāts",
+    "lede": "Katrai integrācijai ir viens no četriem statusiem: Pieejams, Nepieciešama pārskatīšana, Pilotprojekts vai Plānots. Neviens pakalpojumu sniedzējs nav savienots pēc noklusējuma, un tieša nodokļu iesniegšana ir Plānota.",
+    "accounting_adapters": "Nepieciešama pārskatīšana",
+    "filing_gates": "Pilotprojekts",
+    "banking_candidate": "Plānots",
     "direction": "Datu virziens",
     "ownership": "Datu īpašumtiesības",
     "docs": "Lasīt pakalpojumu sniedzēja dokumentāciju ↗",
-    "review_gate": "Pārbaudes kontrole: ",
-    "review_notice": "Imports un eksports izveido saskaņošanas ierakstus. Tieša nodokļu deklarāciju iesniegšana paliek atspējota, līdz ir saņemts pakalpojumu sniedzēja apstiprinājums, pabeigta grāmatveža lietotāju pieņemšanas testēšana un ieviesta nepārprotama galīgā apstiprināšana.",
+    "review_gate": "Nepieciešama pārskatīšana: ",
+    "review_notice": "Imports un eksports izveido saskaņošanas ierakstus. Tieša nodokļu iesniegšana ir Plānota; pašreizējā PVN iespēja aprobežojas ar darba dokumentiem un eksportu.",
     "items": {
       "quickbooks": {
         "name": "QuickBooks Online",
@@ -324,7 +357,7 @@
         "name": "HMRC Making Tax Digital",
         "logo_alt": "HMRC pakalpojuma zīme",
         "category": "Deklarāciju iesniegšanas aģents",
-        "description": "Sagatavojiet grāmatveža pārbaudītus PVN darba dokumentus jau tagad; pirms produkcijas apstiprinājuma pievienojiet testa vides saistības un iesniegšanas darbplūsmas.",
+        "description": "Pilotprojekts: sagatavojiet grāmatveža pārbaudītus PVN darba dokumentus un testējiet testa vides saistības. Plānots: tieša iesniegšana.",
         "capabilities": [
           "PVN saistības",
           "Deviņu lauku darba dokuments",
@@ -338,7 +371,7 @@
         "name": "Igaunijas Nodokļu un muitas pārvalde",
         "logo_alt": "Igaunijas Nodokļu un muitas pārvaldes pakalpojuma zīme",
         "category": "Deklarāciju iesniegšanas aģents",
-        "description": "Izveidojiet grāmatveža pārbaudītus KMD un VD darba dokumentus un saglabājiet saskarnes sagatavi nākotnē atbalstītam iesniegšanas kanālam.",
+        "description": "Pilotprojekts: izveidojiet grāmatveža pārbaudītus KMD un VD darba dokumentus un eksportējiet tos. Plānots: tieša iesniegšana.",
         "capabilities": [
           "KMD darba dokuments",
           "VD sagatavošana",
@@ -352,7 +385,7 @@
         "name": "Atvērtā banku darbība",
         "logo_alt": "Atvērtās banku darbības ikona",
         "category": "Bankas dati",
-        "description": "Lasiet iegrāmatotos darījumus ar izvēlēta kontu informācijas pakalpojumu sniedzēja starpniecību pēc Apvienotās Karalistes un Igaunijas uzņēmumu banku pārklājuma un juridiskās pārbaudes.",
+        "description": "Plānots: lasiet iegrāmatotos darījumus ar izvēlēta kontu informācijas pakalpojumu sniedzēja starpniecību pēc AK un Igaunijas uzņēmumu banku pārklājuma un juridiskās pārbaudes.",
         "capabilities": [
           "Piekrišanas dzīves cikls",
           "Konti un atlikumi",
@@ -384,7 +417,7 @@
       "name": "BambooHR",
       "logo_alt": "BambooHR pagaidu zīme",
       "category": "Personāla programmatūra",
-      "description": "Importējiet BambooHR darbinieku kataloga ierakstus pārskatīšanai ar dokumentēta līguma adapteri, kas nav pārbaudīts ar pakalpojuma sniedzēja piekļuves datiem; algai joprojām vajadzīga pārskatīta lauka kartēšana vai vietēja ievade.",
+      "description": "Nepieciešama pārskatīšana: dokumentētā līguma adapteris nav pārbaudīts ar pakalpojuma sniedzēja piekļuves datiem, un algai vajadzīga pārskatīta lauka kartēšana vai vietēja ievade.",
       "capabilities": ["Darbinieku katalogs", "Vārds un e-pasts", "Statuss, ja tas ir pieejams", "Pielāgoto lauku saglabāšana"],
       "direction": "Imports · darbinieku katalogs",
       "ownership": "BambooHR paliek datu avots"
@@ -393,7 +426,7 @@
       "name": "Personio",
       "logo_alt": "Personio pagaidu zīme",
       "category": "Personāla programmatūra",
-      "description": "Importējiet atļautos Personio darbinieku atribūtus pārskatīšanai ar dokumentēta līguma adapteri, kas nav pārbaudīts ar pakalpojuma sniedzēja piekļuves datiem; algai joprojām vajadzīga pārskatīta atribūta kartēšana vai vietēja ievade.",
+      "description": "Nepieciešama pārskatīšana: dokumentētā līguma adapteris nav pārbaudīts ar pakalpojuma sniedzēja piekļuves datiem, un algai vajadzīga pārskatīta atribūta kartēšana vai vietēja ievade.",
       "capabilities": ["Darbinieku atribūti", "Nodarbinātības statuss", "Darba attiecību beigu datums", "Pielāgoto atribūtu saglabāšana"],
       "direction": "Imports · darbinieku pamatdati",
       "ownership": "Personio paliek datu avots"
@@ -1131,7 +1164,7 @@
     "matches_title": "Pamatota saskaņošana",
     "matches_body": "Skatiet, kāpēc bankas darījums atbilst dokumentam. Pārbaudiet pamatojumu un apstipriniet pirms iegrāmatošanas.",
     "tax_title": "Pārskatīšana pirms eksporta",
-    "tax_body": "Sagatavojiet Igaunijas PVN deklarācijas (KMD) un Apvienotās Karalistes PVN darba dokumentus, pārbaudiet summas un pirms eksporta atzīmējiet tos kā pārskatītus. Eksports ir pieejams, bet tieša iesniegšana vēl nav pieejama."
+    "tax_body": "Pieejams: Igaunijas PVN deklarācijas (KMD) un AK PVN darba dokumenti un eksports. Pirms eksporta pārbaudiet summas. Plānots: tieša iesniegšana."
   },
   "pricing": {
     "kicker": "Cenas",
