@@ -576,3 +576,32 @@ links and completed queues have explicit non-destructive states. The interface i
 localized in English, Estonian, Latvian and Lithuanian. This adds no migration,
 does not enable unattended imports, and does not change the pending production
 accountant UAT gate.
+
+## 22. Universal file import (2026-10-09)
+
+The connection-free `file_import` adapter accepts employee CSV and TSV exports
+from any payroll or HR system and feeds them into the same tenant-scoped review
+and apply workflow as provider adapters. It detects comma, semicolon and tab
+delimiters; supports UTF-8 with or without a BOM, quoted fields and CRLF or LF;
+uses exact Decimal salary parsing; and assigns a stable short hash when no source
+employee ID exists. Empty rows are ignored and duplicate employee IDs within one
+run resolve to one staged record.
+
+The supported header aliases are explicit:
+
+| Canonical field | Accepted source headers |
+| --- | --- |
+| `external_id` | `ID`, `Employee ID`, `Töötaja ID` |
+| `name` | `Name`, `Nimi`, `Full name` |
+| `email` | `Email`, `E-post`, `e-mail` |
+| `gross_salary` | `Salary`, `Base salary`, `Palk`, `Baaspalk`, `Gross salary` |
+| `personal_id` | `Personal ID`, `Isikukood`, `Personal code`, `ID code` |
+| `status` | `Status`, `Staatus` |
+
+Blank, `active`, `aktiivne` and `tööl` status values are active; other values are
+inactive. Unmapped columns remain visible in review with a `file_` prefix. The
+browser can read a selected file or accept pasted content, but the raw CSV/TSV is
+never retained: only parsed staged records are stored. Native Excel workbooks are
+out of scope and must first be exported as CSV. No provider API key, migration or
+live network test is required. Section 21 belongs to the pending finance-connector
+health-check change, so this stacked work uses section 22.

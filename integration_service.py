@@ -54,6 +54,10 @@ class IntegrationService:
             registration_for(key)
         except KeyError as error:
             raise ValueError("Unknown integration provider") from error
+        if key == "file_import":
+            raise ValueError(
+                "File import does not use stored connections; use the file import endpoint"
+            )
         connection_id, now = new_id(), utc_now()
         encrypted = self.vault.encrypt(credentials)
         with self.db.transaction() as tx:

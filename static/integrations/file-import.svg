@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">Employee file import</title>
+  <rect width="64" height="64" rx="14" fill="#f3e8ff"/>
+  <path d="M18 13h20l9 9v29H18z" fill="#fff" stroke="#7c3aed" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M38 13v10h9" fill="none" stroke="#7c3aed" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M32 26v15m0 0-6-6m6 6 6-6M24 47h16" fill="none" stroke="#5b21b6" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

@@ -91,6 +91,8 @@ def test_integration_catalogue_exposes_registry_fields(integration_api):
     ]
     assert catalogue["quickbooks"]["registry_status"] == "Adapter ready"
     assert catalogue["fasthr"]["registry_status"] == "Adapter ready"
+    assert catalogue["file_import"]["registry_status"] == "Adapter ready"
+    assert catalogue["file_import"]["credential_fields"] == []
     assert [field["name"] for field in catalogue["fasthr"]["credential_fields"]] == [
         "base_url", "token",
     ]

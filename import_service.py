@@ -35,6 +35,8 @@ EMPLOYEE_FIELDS = {
 EMPLOYEE_COMPARE_FIELDS = tuple(sorted(EMPLOYEE_FIELDS))
 DECIMAL_EMPLOYEE_FIELDS = {"gross_salary", "funded_pension_percent", "fte", "hourly_rate"}
 STAGED_STATUSES = ("Pending", "Approved", "Rejected", "Applied", "Failed")
+FILE_IMPORT_PROVIDER = "file_import"
+MAX_FILE_IMPORT_CHARS = 2_000_000
 
 
 class ImportService:
@@ -55,6 +57,16 @@ class ImportService:
             connector_registry.registration_for(key)
         except KeyError as error:
             raise ValueError("Unknown integration provider") from error
+        if key == FILE_IMPORT_PROVIDER:
+            resolved_credentials = dict(credentials or {})
+            csv_content = resolved_credentials.get("csv_content", "")
+            if not isinstance(csv_content, str):
+                raise ValueError("CSV content must be text")
+            if len(csv_content) > MAX_FILE_IMPORT_CHARS:
+                raise ValueError(
+                    f"CSV content exceeds the {MAX_FILE_IMPORT_CHARS} character limit"
+                )
+            return key, resolved_credentials, dict(config or {})
         row = self.db.one(
             "SELECT encrypted_credentials,config_json FROM integration_connections "
             "WHERE organisation_id=? AND provider=?",
@@ -98,7 +110,13 @@ class ImportService:
         key, resolved_credentials, resolved_config = self._connection_material(
             organisation_id, provider, credentials, config
         )
-        cursor_before = self._last_cursor(organisation_id, key, object_type)
+        if key == FILE_IMPORT_PROVIDER:
+            object_type = "employee"
+        cursor_before = (
+            None
+            if key == FILE_IMPORT_PROVIDER
+            else self._last_cursor(organisation_id, key, object_type)
+        )
         sync = self.integration.start_sync(
             organisation_id,
             provider=key,

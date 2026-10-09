@@ -58,6 +58,30 @@ def test_workspace_integration_connection_and_review_flow(monkeypatch):
         },
         "started_at": "2026-10-09T10:00:00Z",
     }
+    file_summary = {
+        **summary,
+        "id": "file-run-1",
+        "provider": "file_import",
+        "read_count": 1,
+        "staged_counts": {
+            "Pending": 1,
+            "Applied": 0,
+            "Rejected": 0,
+            "Failed": 0,
+        },
+    }
+    file_records = [{
+        "id": "file-staged-1",
+        "external_id": "file-employee-1",
+        "status": "Pending",
+        "matched_local_employee_name": None,
+        "review_note": None,
+        "external_payload": {
+            "name": "CSV Mari",
+            "email": "csv-mari@example.test",
+            "gross_salary": "2200.00",
+        },
+    }]
     calls = []
 
     with playwright.sync_playwright() as runtime:
@@ -130,6 +154,14 @@ def test_workspace_integration_connection_and_review_flow(monkeypatch):
                     return route.fulfill(json=connection)
                 if path.endswith("/integrations/fasthr/sync") and method == "POST":
                     return route.fulfill(json=summary)
+                if path.endswith("/integrations/file_import/import") and method == "POST":
+                    return route.fulfill(json=file_summary)
+                if path.endswith("/integrations/file_import/sync/file-run-1"):
+                    return route.fulfill(
+                        json={"summary": file_summary, "records": file_records}
+                    )
+                if path.endswith("/integrations/file_import/syncs"):
+                    return route.fulfill(json=[file_summary])
                 if path.endswith("/integrations/fasthr/sync/run-1/apply"):
                     records[0]["status"] = "Applied"
                     records[1]["status"] = "Rejected"
@@ -179,7 +211,7 @@ def test_workspace_integration_connection_and_review_flow(monkeypatch):
         page.route("**/*", respond)
         page.goto("http://workspace.test/app#integrations")
         page.wait_for_timeout(500)
-        assert page.locator(".integration-provider").count() == 4, (
+        assert page.locator(".integration-provider").count() == 5, (
             page_errors,
             page.locator("#app-content").inner_text(),
             calls,
@@ -191,12 +223,39 @@ def test_workspace_integration_connection_and_review_flow(monkeypatch):
         page.wait_for_timeout(300)
         playwright.expect(page.locator(".integration-provider").first).to_be_visible()
         playwright.expect(
-            page.locator('[data-action="integrationRuns"]')
+            page.locator('[data-action="integrationRuns"]').first
         ).to_be_visible()
         assert page.evaluate(
             "document.documentElement.scrollWidth <= document.documentElement.clientWidth"
         )
         page.set_viewport_size({"width": 1440, "height": 1000})
+        file_import = page.locator('.integration-provider[data-provider="file_import"]')
+        playwright.expect(file_import).to_contain_text("No connection needed")
+        playwright.expect(
+            file_import.locator('[data-action="configureIntegration"]')
+        ).to_have_count(0)
+        file_import.locator('[data-action="importEmployeeFile"]').click()
+        page.locator('.dialog input[name="employee_file"]').set_input_files({
+            "name": "employees.csv",
+            "mimeType": "text/csv",
+            "buffer": b"Name,Email,Salary\nCSV Mari,csv-mari@example.test,2200\n",
+        })
+        page.locator('.dialog [type="submit"]').click()
+        playwright.expect(page.locator("#app-content h1")).to_have_text(
+            "Review employee import"
+        )
+        playwright.expect(page.locator("#app-content")).to_contain_text("CSV Mari")
+        file_call = next(
+            payload
+            for path, method, payload in calls
+            if path.endswith("/integrations/file_import/import") and method == "POST"
+        )
+        assert file_call == {
+            "object_type": "employee",
+            "csv_content": "Name,Email,Salary\nCSV Mari,csv-mari@example.test,2200\n",
+        }
+        page.evaluate("location.hash = 'integrations'")
+        playwright.expect(page.locator("#app-content h1")).to_have_text("Integrations")
         fasthr = page.locator('.integration-provider[data-provider="fasthr"]')
         playwright.expect(fasthr).to_contain_text("Not configured")
 

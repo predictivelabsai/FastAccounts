@@ -7,6 +7,7 @@ from typing import Any, Callable, Literal, Mapping
 import integrations
 
 from .base import Connector
+from .file_import import FileImportConnector
 from .providers import FastHRProvider
 from .stubs import RoadmapStubConnector, StubConnector
 
@@ -54,6 +55,13 @@ _ROADMAP_NOTE = (
 
 
 REGISTRY: dict[str, ConnectorRegistration] = {
+    "file_import": ConnectorRegistration(
+        status="Adapter ready",
+        factory=lambda credentials, config: FileImportConnector(
+            credentials.get("csv_content", ""), config
+        ),
+        credential_note="Offline CSV or TSV employee import; no provider credentials required.",
+    ),
     "fasthr": ConnectorRegistration(
         status="Adapter ready",
         factory=lambda credentials, config: FastHRProvider(
