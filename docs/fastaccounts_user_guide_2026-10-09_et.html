@@ -34,7 +34,7 @@ id="kasutusjuhend-klientide-raamatupidamine-ja-palgaarvestus-raamatupidamisbüro
 ühes büroo töölauas.</strong></p>
 <p>Näidisettevõtted: Põhjatäht Teenused OÜ, Northstar Studio Ltd ja Demo
 OÜ (sample payroll)</p>
-<p>v0.3.0 · 9. oktoober 2026 · Kohalik näidisväljaanne</p>
+<p>v0.4.0 · 9. oktoober 2026 · Kohalik näidisväljaanne</p>
 </section>
 <hr />
 <h2 id="sisukord">Sisukord</h2>
@@ -54,36 +54,36 @@ OÜ (sample payroll)</p>
 <tbody>
 <tr class="odd">
 <td><strong>01 · Alustamine</strong></td>
-<td style="text-align: right;">3–8</td>
-<td>Logite sisse, loete büroo ülevaadet, vahetate klientide
-raamatupidamist</td>
+<td style="text-align: right;">3–11</td>
+<td>Logite sisse Google’i või e-postiga, loote konto, lähtestate
+parooli, vahetate klientide raamatupidamist</td>
 </tr>
 <tr class="even">
 <td><strong>02 · Müük, ost ja automatiseerimine</strong></td>
-<td style="text-align: right;">9–15</td>
+<td style="text-align: right;">12–18</td>
 <td>Müügiarved, ostuarved, kontaktid, korduvad arved ja
 meeldetuletused</td>
 </tr>
 <tr class="odd">
 <td><strong>03 · Pangandus, raamatupidamine ja maksud</strong></td>
-<td style="text-align: right;">16–19</td>
+<td style="text-align: right;">19–22</td>
 <td>Pangatehingute sidumine, aruanded, KMD töölehed</td>
 </tr>
 <tr class="even">
 <td><strong>04 · Palgaarvestus raamatupidamisbüroole</strong></td>
-<td style="text-align: right;">20–29</td>
+<td style="text-align: right;">23–32</td>
 <td>Osakoormus, tunnitasu, juhatuse liikme tasu, sotsiaalmaksu
 miinimumkohustus, palgaarvestused, palgalehed</td>
 </tr>
 <tr class="odd">
 <td><strong>05 · Liidestused ja töötajate import</strong></td>
-<td style="text-align: right;">30–37</td>
+<td style="text-align: right;">33–40</td>
 <td>FastHR-i ühendamine või CSV-import ja töötajate ülevaatus enne
 palgaandmete muutmist</td>
 </tr>
 <tr class="even">
 <td><strong>06 · Viited</strong></td>
-<td style="text-align: right;">38–40</td>
+<td style="text-align: right;">41–43</td>
 <td>2026. aasta määrad, erandid ja piirangud</td>
 </tr>
 </tbody>
@@ -123,13 +123,56 @@ näitab töötavat versiooni ja andmebaasi olekut.</p>
 alt="Sisselogimise leht" /></p>
 <ol type="1">
 <li>Avage <strong>Logi sisse</strong> ja valige <strong>Jätka
-Google’iga</strong>.</li>
-<li>Kasutage büroo poolt lubatud Google’i kontot.</li>
+Google’iga</strong> või sisestage <strong>E-post</strong> ja
+<strong>Parool</strong> ning valige <strong>Logi sisse
+e-postiga</strong>.</li>
+<li>Kasutage aadressi, mille büroo kutsus või lubas; mõlemad viisid
+avavad sama konto, nii et Google’i kasutaja saab määrata ka
+parooli.</li>
 <li>Töölaud avaneb <strong>Ülevaate</strong> vaatega.</li>
 </ol>
-<p>Avatud registreerimine on teadlikult välja lülitatud. Selles
-kohalikus näidiskeskkonnas pole Google’i sisselogimist seadistatud ja
-nupp ütleb seda; tootmiskeskkonnas kasutatakse Google’i kontot.</p>
+<p>Selles kohalikus näidiskeskkonnas pole Google’i sisselogimist
+seadistatud ja nupp ütleb seda; tootmiskeskkonnas on mõlemad võimalused
+olemas.</p>
+<hr />
+<h2 id="konto-loomine">Konto loomine</h2>
+<p><img src="../screenshots/et/29-create-account.png"
+alt="Konto loomise vorm" /></p>
+<ol type="1">
+<li>Avage sisselogimislehel vahekaart <strong>Loo konto</strong>.</li>
+<li>Sisestage <strong>Nimi</strong>, <strong>E-post</strong> ja
+<strong>Parool (vähemalt 10 märki)</strong>.</li>
+<li>Valige <strong>Loo konto</strong> ja avage e-kirjaga saadetud
+kinnituslink.</li>
+<li>Sisestage sama parool ja valige <strong>Kinnita e-post</strong>;
+töölaud avaneb.</li>
+</ol>
+<p>Ligipääsuks on endiselt vaja kutset või lubatud aadressi. Teade
+pärast registreerimist on sama sõltumata sellest, kas aadressi saab
+registreerida.</p>
+<hr />
+<h2 id="unustatud-parool">Unustatud parool</h2>
+<p><img src="../screenshots/et/30-forgot-password.png"
+alt="Unustatud parooli vorm" /></p>
+<ol type="1">
+<li>Valige paroolivälja all <strong>Unustasid parooli?</strong>.</li>
+<li>Sisestage <strong>E-post</strong> ja valige <strong>Saada
+lähtestamise link</strong>.</li>
+<li>Avage e-kirjas olev link ühe tunni jooksul; see töötab ühe
+korra.</li>
+</ol>
+<p>Nii saab ka Google’i kasutaja endale parooli lisada. Korduvad katsed
+peatatakse kontode kaitseks mõneks ajaks.</p>
+<hr />
+<h2 id="uue-parooli-valimine">Uue parooli valimine</h2>
+<p><img src="../screenshots/et/31-reset-password.png"
+alt="Uue parooli vorm" /></p>
+<ol type="1">
+<li>Sisestage <strong>Uus parool (vähemalt 10 märki)</strong>.</li>
+<li>Valige <strong>Määra uus parool</strong>.</li>
+<li>Logige uue parooliga uuesti sisse.</li>
+</ol>
+<p>Parooli muutmine logib konto välja kõigist teistest brauseritest.</p>
 <hr />
 <h2 id="büroo-ülevaade">Büroo ülevaade</h2>
 <p><img src="../screenshots/et/03-overview.png"
@@ -172,7 +215,7 @@ alt="Töölaua ülevaade" /></p>
 <li><strong>English / Eesti</strong> ülemisel ribal vahetab kõik sildid,
 teated ja veateated. Valik jääb järgmiseks korraks meelde. Eesti
 palgalehed on alati eesti keeles.</li>
-<li>Logo all olev versioonimärk (<code>v0.3.0 · 2026-10-09</code>)
+<li>Logo all olev versioonimärk (<code>v0.4.0 · 2026-10-09</code>)
 näitab kasutatavat versiooni; klõps avab seisukontrolli.</li>
 <li><strong>Avalik veebileht</strong> ja <strong>Logi välja</strong>
 asuvad külgmenüü allosas.</li>

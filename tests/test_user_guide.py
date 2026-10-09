@@ -19,14 +19,14 @@ def _slides(lang):
 def test_guide_structure_contents_and_screenshots(lang):
     markdown = (ROOT / "docs" / SOURCES[lang]).read_text(encoding="utf-8")
     slides = _slides(lang)
-    assert len(slides) == 40 and slides[0]["kind"] == "cover"
+    assert len(slides) == 43 and slides[0]["kind"] == "cover"
     sections = [i + 1 for i, slide in enumerate(slides) if slide["kind"] == "section"]
-    assert sections == [3, 9, 16, 20, 30, 38]
+    assert sections == [3, 12, 19, 23, 33, 41]
     # The contents table's page ranges start at each section divider.
     starts = [int(m) for m in re.findall(r"^\| \*\*0\d · .+?\*\* \| (\d+)–\d+ \|", markdown, re.M)]
     assert starts == sections
     images = [slide["image"] for slide in slides if slide["image"]]
-    assert len(images) == 29
+    assert len(images) == 32
     for image in images:
         assert image.startswith(f"../screenshots/{lang}/"), image
         assert (ROOT / "docs" / image).is_file(), image
@@ -41,7 +41,7 @@ def test_editions_match_slide_for_slide():
     assert [s["image"] and s["image"].replace("/en/", "/") for s in en] == [
         s["image"] and s["image"].replace("/et/", "/") for s in et]
     captured = {lang: sorted(p.name for p in (ROOT / "screenshots" / lang).glob("*.png")) for lang in SOURCES}
-    assert captured["en"] == captured["et"] and len(captured["en"]) == 28
+    assert captured["en"] == captured["et"] and len(captured["en"]) == 31
 
 
 @pytest.mark.parametrize("lang,suffix", [("en", ""), ("et", "_et")])

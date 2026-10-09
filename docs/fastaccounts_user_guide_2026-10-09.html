@@ -33,7 +33,7 @@ Guide — Client Books and Payroll for Accounting Bureaus</h4>
 bureau workspace.</strong></p>
 <p>Worked example: Põhjatäht Teenused OÜ, Northstar Studio Ltd and Demo
 OÜ (sample payroll)</p>
-<p>v0.3.0 · 9 October 2026 · Local demonstration edition</p>
+<p>v0.4.0 · 9 October 2026 · Local demonstration edition</p>
 </section>
 <hr />
 <h2 id="contents">Contents</h2>
@@ -53,35 +53,36 @@ OÜ (sample payroll)</p>
 <tbody>
 <tr class="odd">
 <td><strong>01 · Get started</strong></td>
-<td style="text-align: right;">3–8</td>
-<td>Sign in, read the bureau overview, switch between client books</td>
+<td style="text-align: right;">3–11</td>
+<td>Sign in with Google or email, create an account, reset a password,
+switch client books</td>
 </tr>
 <tr class="even">
 <td><strong>02 · Sales, purchases and automation</strong></td>
-<td style="text-align: right;">9–15</td>
+<td style="text-align: right;">12–18</td>
 <td>Invoices, bills, contacts, recurring invoices and reminders</td>
 </tr>
 <tr class="odd">
 <td><strong>03 · Banking, accounting and tax</strong></td>
-<td style="text-align: right;">16–19</td>
+<td style="text-align: right;">19–22</td>
 <td>Reconcile the bank, read reports, prepare Estonian KMD
 workpapers</td>
 </tr>
 <tr class="even">
 <td><strong>04 · Payroll for accounting bureaus</strong></td>
-<td style="text-align: right;">20–29</td>
+<td style="text-align: right;">23–32</td>
 <td>Part-time, hourly and board pay, social tax minimum, pay runs,
 payslips</td>
 </tr>
 <tr class="odd">
 <td><strong>05 · Integrations and HR import</strong></td>
-<td style="text-align: right;">30–37</td>
+<td style="text-align: right;">33–40</td>
 <td>Connect FastHR or import a CSV, and review employees before payroll
 changes</td>
 </tr>
 <tr class="even">
 <td><strong>06 · Reference</strong></td>
-<td style="text-align: right;">38–40</td>
+<td style="text-align: right;">41–43</td>
 <td>2026 Estonian rates, exemptions, languages and limits</td>
 </tr>
 </tbody>
@@ -120,13 +121,57 @@ shows the running release and database status.</p>
 <p><img src="../screenshots/en/02-sign-in.png" alt="Sign-in page" /></p>
 <ol type="1">
 <li>Open <strong>Sign in</strong> and choose <strong>Continue with
-Google</strong>.</li>
-<li>Use the Google account your bureau has approved.</li>
+Google</strong>, or enter your <strong>Email</strong> and
+<strong>Password</strong> and choose <strong>Sign in with
+email</strong>.</li>
+<li>Use the address your bureau invited or approved; both methods open
+the same account, so a Google user can also set a password.</li>
 <li>The workspace opens on the <strong>Overview</strong>.</li>
 </ol>
-<p>Open self-registration is intentionally disabled. The local
-demonstration shown here has no Google credentials configured, so the
-button reports that; production uses Google sign-in.</p>
+<p>The local demonstration shown here has no Google credentials
+configured, so the Google button reports that; production offers both
+options.</p>
+<hr />
+<h2 id="create-an-account">Create an account</h2>
+<p><img src="../screenshots/en/29-create-account.png"
+alt="Create account form" /></p>
+<ol type="1">
+<li>On <strong>Sign in</strong>, open the <strong>Create
+account</strong> tab.</li>
+<li>Enter your <strong>Name</strong>, <strong>Email</strong> and a
+<strong>Password (at least 10 characters)</strong>.</li>
+<li>Choose <strong>Create account</strong> and open the confirmation
+link we email you.</li>
+<li>Enter the same password to <strong>Confirm email</strong>; the
+workspace opens.</li>
+</ol>
+<p>Access still requires an invitation or an approved address. The
+message after sign-up is the same whether or not the address can
+register.</p>
+<hr />
+<h2 id="forgot-your-password">Forgot your password</h2>
+<p><img src="../screenshots/en/30-forgot-password.png"
+alt="Forgot password form" /></p>
+<ol type="1">
+<li>Choose <strong>Forgot password?</strong> under the password
+field.</li>
+<li>Enter your <strong>Email</strong> and choose <strong>Send reset
+link</strong>.</li>
+<li>Open the link in the email within one hour; it works once.</li>
+</ol>
+<p>This is also how a Google user adds a password. Repeated attempts are
+paused for a while to protect accounts.</p>
+<hr />
+<h2 id="choose-a-new-password">Choose a new password</h2>
+<p><img src="../screenshots/en/31-reset-password.png"
+alt="New password form" /></p>
+<ol type="1">
+<li>Enter a <strong>New password (at least 10 characters)</strong>.</li>
+<li>Choose <strong>Set new password</strong>.</li>
+<li>Sign in again with the new password.</li>
+</ol>
+<p>Changing the password signs out every other browser where the account
+was signed in.</p>
 <hr />
 <h2 id="bureau-overview">Bureau overview</h2>
 <p><img src="../screenshots/en/03-overview.png"
@@ -167,7 +212,7 @@ alt="Overview in the workspace" /></p>
 <li><strong>English / Eesti</strong> in the top bar switches every
 label, message and error. Your choice is kept for the next visit.
 Estonian payslips are always in Estonian.</li>
-<li>The version chip under the logo (<code>v0.3.0 · 2026-10-09</code>)
+<li>The version chip under the logo (<code>v0.4.0 · 2026-10-09</code>)
 shows the release you are using; click it to open the health check.</li>
 <li><strong>Public site</strong> and <strong>Sign out</strong> are at
 the bottom of the sidebar.</li>

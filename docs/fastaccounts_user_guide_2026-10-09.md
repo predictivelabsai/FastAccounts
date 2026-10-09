@@ -8,7 +8,7 @@
 
 Worked example: Põhjatäht Teenused OÜ, Northstar Studio Ltd and Demo OÜ (sample payroll)
 
-v0.3.0 · 9 October 2026 · Local demonstration edition
+v0.4.0 · 9 October 2026 · Local demonstration edition
 
 :::
 
@@ -18,12 +18,12 @@ v0.3.0 · 9 October 2026 · Local demonstration edition
 
 | Section | Pages / slides | What you will do |
 |---|---:|---|
-| **01 · Get started** | 3–8 | Sign in, read the bureau overview, switch between client books |
-| **02 · Sales, purchases and automation** | 9–15 | Invoices, bills, contacts, recurring invoices and reminders |
-| **03 · Banking, accounting and tax** | 16–19 | Reconcile the bank, read reports, prepare Estonian KMD workpapers |
-| **04 · Payroll for accounting bureaus** | 20–29 | Part-time, hourly and board pay, social tax minimum, pay runs, payslips |
-| **05 · Integrations and HR import** | 30–37 | Connect FastHR or import a CSV, and review employees before payroll changes |
-| **06 · Reference** | 38–40 | 2026 Estonian rates, exemptions, languages and limits |
+| **01 · Get started** | 3–11 | Sign in with Google or email, create an account, reset a password, switch client books |
+| **02 · Sales, purchases and automation** | 12–18 | Invoices, bills, contacts, recurring invoices and reminders |
+| **03 · Banking, accounting and tax** | 19–22 | Reconcile the bank, read reports, prepare Estonian KMD workpapers |
+| **04 · Payroll for accounting bureaus** | 23–32 | Part-time, hourly and board pay, social tax minimum, pay runs, payslips |
+| **05 · Integrations and HR import** | 33–40 | Connect FastHR or import a CSV, and review employees before payroll changes |
+| **06 · Reference** | 41–43 | 2026 Estonian rates, exemptions, languages and limits |
 
 Screenshots come from a local instance seeded with synthetic demo books. Names,
 personal codes, IBANs and e-mail addresses are test data, not real people or
@@ -62,13 +62,54 @@ release and database status.
 
 ![Sign-in page](../screenshots/en/02-sign-in.png)
 
-1. Open **Sign in** and choose **Continue with Google**.
-2. Use the Google account your bureau has approved.
+1. Open **Sign in** and choose **Continue with Google**, or enter your
+   **Email** and **Password** and choose **Sign in with email**.
+2. Use the address your bureau invited or approved; both methods open the same
+   account, so a Google user can also set a password.
 3. The workspace opens on the **Overview**.
 
-Open self-registration is intentionally disabled. The local demonstration
-shown here has no Google credentials configured, so the button reports that;
-production uses Google sign-in.
+The local demonstration shown here has no Google credentials configured, so
+the Google button reports that; production offers both options.
+
+---
+
+## Create an account
+
+![Create account form](../screenshots/en/29-create-account.png)
+
+1. On **Sign in**, open the **Create account** tab.
+2. Enter your **Name**, **Email** and a **Password (at least 10 characters)**.
+3. Choose **Create account** and open the confirmation link we email you.
+4. Enter the same password to **Confirm email**; the workspace opens.
+
+Access still requires an invitation or an approved address. The message after
+sign-up is the same whether or not the address can register.
+
+---
+
+## Forgot your password
+
+![Forgot password form](../screenshots/en/30-forgot-password.png)
+
+1. Choose **Forgot password?** under the password field.
+2. Enter your **Email** and choose **Send reset link**.
+3. Open the link in the email within one hour; it works once.
+
+This is also how a Google user adds a password. Repeated attempts are paused
+for a while to protect accounts.
+
+---
+
+## Choose a new password
+
+![New password form](../screenshots/en/31-reset-password.png)
+
+1. Enter a **New password (at least 10 characters)**.
+2. Choose **Set new password**.
+3. Sign in again with the new password.
+
+Changing the password signs out every other browser where the account was
+signed in.
 
 ---
 
@@ -110,7 +151,7 @@ clients the **Payroll** menu item is greyed out with an explanation.
 
 - **English / Eesti** in the top bar switches every label, message and error.
   Your choice is kept for the next visit. Estonian payslips are always in Estonian.
-- The version chip under the logo (`v0.3.0 · 2026-10-09`) shows the release you
+- The version chip under the logo (`v0.4.0 · 2026-10-09`) shows the release you
   are using; click it to open the health check.
 - **Public site** and **Sign out** are at the bottom of the sidebar.
 

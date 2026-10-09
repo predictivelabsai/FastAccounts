@@ -8,7 +8,7 @@
 
 Näidisettevõtted: Põhjatäht Teenused OÜ, Northstar Studio Ltd ja Demo OÜ (sample payroll)
 
-v0.3.0 · 9. oktoober 2026 · Kohalik näidisväljaanne
+v0.4.0 · 9. oktoober 2026 · Kohalik näidisväljaanne
 
 :::
 
@@ -18,12 +18,12 @@ v0.3.0 · 9. oktoober 2026 · Kohalik näidisväljaanne
 
 | Peatükk | Lehed / slaidid | Mida teete |
 |---|---:|---|
-| **01 · Alustamine** | 3–8 | Logite sisse, loete büroo ülevaadet, vahetate klientide raamatupidamist |
-| **02 · Müük, ost ja automatiseerimine** | 9–15 | Müügiarved, ostuarved, kontaktid, korduvad arved ja meeldetuletused |
-| **03 · Pangandus, raamatupidamine ja maksud** | 16–19 | Pangatehingute sidumine, aruanded, KMD töölehed |
-| **04 · Palgaarvestus raamatupidamisbüroole** | 20–29 | Osakoormus, tunnitasu, juhatuse liikme tasu, sotsiaalmaksu miinimumkohustus, palgaarvestused, palgalehed |
-| **05 · Liidestused ja töötajate import** | 30–37 | FastHR-i ühendamine või CSV-import ja töötajate ülevaatus enne palgaandmete muutmist |
-| **06 · Viited** | 38–40 | 2026. aasta määrad, erandid ja piirangud |
+| **01 · Alustamine** | 3–11 | Logite sisse Google'i või e-postiga, loote konto, lähtestate parooli, vahetate klientide raamatupidamist |
+| **02 · Müük, ost ja automatiseerimine** | 12–18 | Müügiarved, ostuarved, kontaktid, korduvad arved ja meeldetuletused |
+| **03 · Pangandus, raamatupidamine ja maksud** | 19–22 | Pangatehingute sidumine, aruanded, KMD töölehed |
+| **04 · Palgaarvestus raamatupidamisbüroole** | 23–32 | Osakoormus, tunnitasu, juhatuse liikme tasu, sotsiaalmaksu miinimumkohustus, palgaarvestused, palgalehed |
+| **05 · Liidestused ja töötajate import** | 33–40 | FastHR-i ühendamine või CSV-import ja töötajate ülevaatus enne palgaandmete muutmist |
+| **06 · Viited** | 41–43 | 2026. aasta määrad, erandid ja piirangud |
 
 Ekraanipildid on tehtud kohalikus keskkonnas sünteetiliste näidisandmetega. Nimed,
 isikukoodid, IBAN-id ja e-posti aadressid on testandmed, mitte päris inimesed
@@ -62,13 +62,53 @@ versiooni ja andmebaasi olekut.
 
 ![Sisselogimise leht](../screenshots/et/02-sign-in.png)
 
-1. Avage **Logi sisse** ja valige **Jätka Google'iga**.
-2. Kasutage büroo poolt lubatud Google'i kontot.
+1. Avage **Logi sisse** ja valige **Jätka Google'iga** või sisestage
+   **E-post** ja **Parool** ning valige **Logi sisse e-postiga**.
+2. Kasutage aadressi, mille büroo kutsus või lubas; mõlemad viisid avavad sama
+   konto, nii et Google'i kasutaja saab määrata ka parooli.
 3. Töölaud avaneb **Ülevaate** vaatega.
 
-Avatud registreerimine on teadlikult välja lülitatud. Selles kohalikus
-näidiskeskkonnas pole Google'i sisselogimist seadistatud ja nupp ütleb seda;
-tootmiskeskkonnas kasutatakse Google'i kontot.
+Selles kohalikus näidiskeskkonnas pole Google'i sisselogimist seadistatud ja
+nupp ütleb seda; tootmiskeskkonnas on mõlemad võimalused olemas.
+
+---
+
+## Konto loomine
+
+![Konto loomise vorm](../screenshots/et/29-create-account.png)
+
+1. Avage sisselogimislehel vahekaart **Loo konto**.
+2. Sisestage **Nimi**, **E-post** ja **Parool (vähemalt 10 märki)**.
+3. Valige **Loo konto** ja avage e-kirjaga saadetud kinnituslink.
+4. Sisestage sama parool ja valige **Kinnita e-post**; töölaud avaneb.
+
+Ligipääsuks on endiselt vaja kutset või lubatud aadressi. Teade pärast
+registreerimist on sama sõltumata sellest, kas aadressi saab registreerida.
+
+---
+
+## Unustatud parool
+
+![Unustatud parooli vorm](../screenshots/et/30-forgot-password.png)
+
+1. Valige paroolivälja all **Unustasid parooli?**.
+2. Sisestage **E-post** ja valige **Saada lähtestamise link**.
+3. Avage e-kirjas olev link ühe tunni jooksul; see töötab ühe korra.
+
+Nii saab ka Google'i kasutaja endale parooli lisada. Korduvad katsed
+peatatakse kontode kaitseks mõneks ajaks.
+
+---
+
+## Uue parooli valimine
+
+![Uue parooli vorm](../screenshots/et/31-reset-password.png)
+
+1. Sisestage **Uus parool (vähemalt 10 märki)**.
+2. Valige **Määra uus parool**.
+3. Logige uue parooliga uuesti sisse.
+
+Parooli muutmine logib konto välja kõigist teistest brauseritest.
 
 ---
 
@@ -111,7 +151,7 @@ selgitusega.
 
 - **English / Eesti** ülemisel ribal vahetab kõik sildid, teated ja veateated.
   Valik jääb järgmiseks korraks meelde. Eesti palgalehed on alati eesti keeles.
-- Logo all olev versioonimärk (`v0.3.0 · 2026-10-09`) näitab kasutatavat
+- Logo all olev versioonimärk (`v0.4.0 · 2026-10-09`) näitab kasutatavat
   versiooni; klõps avab seisukontrolli.
 - **Avalik veebileht** ja **Logi välja** asuvad külgmenüü allosas.
 

@@ -59,7 +59,7 @@ def _guard() -> None:
     if os.getenv("DB_URL") or not db.startswith("/tmp/fastaccounts-guide-"):
         raise SystemExit("Use an isolated FASTACCOUNTS_DB=/tmp/fastaccounts-guide-*/… and an empty DB_URL.")
     os.environ.update(FASTACCOUNTS_ALLOW_TEST_AUTH="true", FASTACCOUNTS_ENV="development",
-                      FASTACCOUNTS_DEFAULT_LANG="en")
+                      FASTACCOUNTS_DEFAULT_LANG="en", FASTACCOUNTS_PUBLIC_URL=BASE)
     if not os.getenv("FASTACCOUNTS_ENCRYPTION_KEY"):
         from cryptography.fernet import Fernet
         os.environ["FASTACCOUNTS_ENCRYPTION_KEY"] = Fernet.generate_key().decode()  # in-memory only
@@ -97,9 +97,15 @@ def _seed() -> dict:
     return {"uk": uk["id"], "ee": ee["id"], "sample": sample["id"]}
 
 
+MAILS: list[str] = []
+
+
 def _serve():
     import uvicorn
+    from web import account_auth
     from web_app import app
+    # Account emails (reset links) are kept in memory; nothing is sent.
+    account_auth.send_email = lambda to, subject, html, text: MAILS.append(text) or True
     server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=PORT, log_level="error", access_log=False))
     thread = threading.Thread(target=server.run, daemon=True)
     thread.start()
@@ -295,6 +301,22 @@ def capture_language(browser, lang: str, orgs: dict) -> list[str]:
     view("payroll")
     expect(page.locator("#app-content")).to_contain_text("Eva Näidis")
     capture("payroll-after-import")
+
+    # Email and password accounts beside Google sign-in; reset links stay in memory.
+    page.goto(f"{BASE}/logout")
+    page.goto(f"{BASE}/login?tab=register")
+    page.fill("#auth-register-name", "Mari Näidis")
+    page.fill("#auth-register-email", "mari.naidis@example.test")
+    capture("create-account")
+    page.goto(f"{BASE}/login?tab=forgot")
+    page.fill("#auth-forgot-email", "demo@fastaccounts.local")
+    page.locator('#auth-forgot-form button[type="submit"]').click()
+    expect(page.locator(".auth-notice")).to_be_visible()
+    capture("forgot-password")
+    link = re.findall(rf"{re.escape(BASE)}/auth/local/reset/[A-Za-z0-9_\-]+", MAILS[-1])[-1]
+    page.goto(link)
+    expect(page.locator("#auth-reset-form")).to_be_visible()
+    capture("reset-password")
 
     context.close()
     if errors:

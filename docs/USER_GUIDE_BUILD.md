@@ -13,11 +13,11 @@ the workspace design (`static/app.css`); no application styles were changed.
 ## Sources and outputs
 
 - Editable sources: `docs/USER_GUIDE.md` (English) and `docs/USER_GUIDE_et.md` (Estonian).
-- Screenshots: `screenshots/en/` and `screenshots/et/`, 28 each, 1440×1000.
+- Screenshots: `screenshots/en/` and `screenshots/et/`, 31 each, 1440×1000.
 - Dated editions: `docs/fastaccounts_user_guide_<date>.{md,html,pdf,pptx}` and
   `docs/fastaccounts_user_guide_<date>_et.{md,html,pdf,pptx}`; the date and
   version come from `VERSION`.
-- Structure: 40 pages/slides, six sections, 29 screenshot slides per language.
+- Structure: 43 pages/slides, six sections, 32 screenshot slides per language.
 
 ## Refresh screenshots
 
@@ -36,8 +36,9 @@ The walk-through also works as a click-through regression of every workspace
 area (overview, client switching, invoices, bills, contacts, recurring invoices
 and reminders, banking, accounting reports, KMD, payroll employees, part-time
 and hourly pay, pay-run wizard, approval, payslip PDF, general ledger,
-integrations, the FastHR import review and the employee file import). It fails on any browser error or
-any `/api` response of 400 or above.
+integrations, the FastHR import review, the employee file import, and email
+sign-up and password reset). Reset links stay in memory; no email is sent. It
+fails on any browser error or any `/api` response of 400 or above.
 
 ## Build both editions
 
