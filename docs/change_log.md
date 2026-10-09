@@ -4,6 +4,29 @@ Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as
 delivered.
 
+## 2026-10-09 — User guide (English and Estonian) and regression walk-through
+
+- Added a bilingual user guide covering every workspace area, with payroll for
+  accounting bureaus in depth: part-time, hourly and board-member pay, the
+  social tax minimum, pay runs, payslips, ledger postings, the reviewed FastHR
+  import and the employee file import. 40 pages per language, text left and
+  screenshot right, as PDF, HTML and PowerPoint
+  (`docs/fastaccounts_user_guide_2026-10-09*.{pdf,html,pptx}`; sources
+  `docs/USER_GUIDE.md` and `docs/USER_GUIDE_et.md`).
+- Added `scripts/capture_user_guide.py`: 28 screenshots per language from an
+  isolated, seeded local instance with a mocked FastHR API, doubling as a
+  Playwright click-through of the whole workspace. Added
+  `scripts/build_user_guide.py`, `scripts/build_guide_pptx.py` and
+  `docs/assets/guide.css`, copied from FastShop's guide tooling (FastClinic
+  pattern; bilingual editions as in FastERP). Rebuild steps are in
+  `docs/USER_GUIDE_BUILD.md`.
+- Regression pass on 0.3.0 (after #11 and #12): full suite on Python 3.13
+  (PostgreSQL and Playwright) and 3.12, the workspace walk-through in English
+  and Estonian, and a read-only smoke test of the public pages on
+  fastaccounts.org found no regressions. No application code, design or
+  migration changed, so the app version stays 0.3.0; `screenshots/` is excluded
+  from the Docker image.
+
 ## 2026-10-09 — Personio and BambooHR documented-contract adapters
 
 - Added pull-only Personio and BambooHR employee adapters against their published

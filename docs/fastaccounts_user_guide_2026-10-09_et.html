@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="et" xml:lang="et">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>FastAccounts — kasutusjuhend</title>
+  <style>
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+  <link rel="stylesheet" href="assets/guide.css" />
+</head>
+<body>
+<section id="fastaccounts" class="cover">
+<h1>FastAccounts</h1>
+<h4
+id="kasutusjuhend-klientide-raamatupidamine-ja-palgaarvestus-raamatupidamisbüroole">Kasutusjuhend
+— klientide raamatupidamine ja palgaarvestus raamatupidamisbüroole</h4>
+<p><strong>Arved, pangandus, pearaamat, käibemaks ja Eesti palgaarvestus
+ühes büroo töölauas.</strong></p>
+<p>Näidisettevõtted: Põhjatäht Teenused OÜ, Northstar Studio Ltd ja Demo
+OÜ (sample payroll)</p>
+<p>v0.3.0 · 9. oktoober 2026 · Kohalik näidisväljaanne</p>
+</section>
+<hr />
+<h2 id="sisukord">Sisukord</h2>
+<table>
+<colgroup>
+<col style="width: 30%" />
+<col style="width: 40%" />
+<col style="width: 30%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Peatükk</th>
+<th style="text-align: right;">Lehed / slaidid</th>
+<th>Mida teete</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>01 · Alustamine</strong></td>
+<td style="text-align: right;">3–8</td>
+<td>Logite sisse, loete büroo ülevaadet, vahetate klientide
+raamatupidamist</td>
+</tr>
+<tr class="even">
+<td><strong>02 · Müük, ost ja automatiseerimine</strong></td>
+<td style="text-align: right;">9–15</td>
+<td>Müügiarved, ostuarved, kontaktid, korduvad arved ja
+meeldetuletused</td>
+</tr>
+<tr class="odd">
+<td><strong>03 · Pangandus, raamatupidamine ja maksud</strong></td>
+<td style="text-align: right;">16–19</td>
+<td>Pangatehingute sidumine, aruanded, KMD töölehed</td>
+</tr>
+<tr class="even">
+<td><strong>04 · Palgaarvestus raamatupidamisbüroole</strong></td>
+<td style="text-align: right;">20–29</td>
+<td>Osakoormus, tunnitasu, juhatuse liikme tasu, sotsiaalmaksu
+miinimumkohustus, palgaarvestused, palgalehed</td>
+</tr>
+<tr class="odd">
+<td><strong>05 · Liidestused ja töötajate import</strong></td>
+<td style="text-align: right;">30–37</td>
+<td>FastHR-i ühendamine või CSV-import ja töötajate ülevaatus enne
+palgaandmete muutmist</td>
+</tr>
+<tr class="even">
+<td><strong>06 · Viited</strong></td>
+<td style="text-align: right;">38–40</td>
+<td>2026. aasta määrad, erandid ja piirangud</td>
+</tr>
+</tbody>
+</table>
+<p>Ekraanipildid on tehtud kohalikus keskkonnas sünteetiliste
+näidisandmetega. Nimed, isikukoodid, IBAN-id ja e-posti aadressid on
+testandmed, mitte päris inimesed ega ettevõtted. FastHR-i import kasutab
+FastHR-i API simulatsiooni.</p>
+<hr />
+<section id="alustamine" class="divider">
+<h2>Alustamine</h2>
+<p>Üks töölaud kõigile klientidele: vahetage klienti külgmenüüst, hoidke
+iga kliendi pearaamat eraldi ning töötage eesti või inglise keeles.</p>
+</section>
+<hr />
+<h2 id="avalik-veebileht">Avalik veebileht</h2>
+<p><img src="../screenshots/et/01-public-home.png"
+alt="FastAccountsi avaleht" /></p>
+<p><strong>fastaccounts.org</strong> tutvustab toodet Eesti ja
+Ühendkuningriigi ettevõtetele.</p>
+<ul>
+<li>Nupud <strong>Alusta</strong> ja <strong>Logi sisse</strong> viivad
+töölauale.</li>
+<li><strong>Liidestused</strong> näitab iga liidestust koos selle
+tegeliku olekuga.</li>
+<li><strong>Hinnad</strong>, <strong>Miks FastAccounts</strong>,
+<strong>Raamatupidajatele</strong> ja <strong>Tegevuskava</strong>
+kirjeldavad pakkumist.</li>
+<li>Keele saab valida ülemise riba keelenupust (EE / GB); valik jäetakse
+meelde.</li>
+</ul>
+<p>Jaluses olev versiooni link avab lehe <code>/healthz</code>, mis
+näitab töötavat versiooni ja andmebaasi olekut.</p>
+<hr />
+<h2 id="sisselogimine">Sisselogimine</h2>
+<p><img src="../screenshots/et/02-sign-in.png"
+alt="Sisselogimise leht" /></p>
+<ol type="1">
+<li>Avage <strong>Logi sisse</strong> ja valige <strong>Jätka
+Google’iga</strong>.</li>
+<li>Kasutage büroo poolt lubatud Google’i kontot.</li>
+<li>Töölaud avaneb <strong>Ülevaate</strong> vaatega.</li>
+</ol>
+<p>Avatud registreerimine on teadlikult välja lülitatud. Selles
+kohalikus näidiskeskkonnas pole Google’i sisselogimist seadistatud ja
+nupp ütleb seda; tootmiskeskkonnas kasutatakse Google’i kontot.</p>
+<hr />
+<h2 id="büroo-ülevaade">Büroo ülevaade</h2>
+<p><img src="../screenshots/et/03-overview.png"
+alt="Ülevaate töölaud" /></p>
+<p><strong>Ülevaade</strong> koondab valitud kliendi
+raamatupidamise:</p>
+<ul>
+<li><strong>Nõuded</strong> ja <strong>Kohustused</strong> — tasumata
+müügiarved ja kinnitatud ostuarved.</li>
+<li><strong>Pangatehingute ülevaatus</strong> — sidumist ootavad
+pangaread.</li>
+<li><strong>Selle kuu palgaarvestus</strong> — kavandatud ja kinnitatud
+palgaarvestuste tööandja kulu.</li>
+</ul>
+<p><strong>Klientide raamatupidamine</strong> loetleb kõik teile
+kättesaadavad ettevõtted ja nende nõuded. Graafik võrdleb viimase kuue
+kuu arveldatud tulu ja panga netoliikumist. <strong>Uus
+müügiarve</strong> alustab kohe uut arvet.</p>
+<hr />
+<h2 id="klientide-vahetamine">Klientide vahetamine</h2>
+<p><img src="../screenshots/et/04-organisation-switcher.png"
+alt="Ettevõtte valik" /></p>
+<p>Iga klient on eraldi ettevõte oma kontoplaani, dokumentide,
+pangakontode, palgaarvestuse ja liidestustega.</p>
+<ol type="1">
+<li>Klõpsake külgmenüü ülaosas ettevõtte kaarti.</li>
+<li>Valige klient; riigitähis (EE / UK) näitab rakenduvaid
+reegleid.</li>
+<li><strong>Lisa ettevõte</strong> loob uue kliendi
+raamatupidamise.</li>
+</ol>
+<p>Palgaarvestus on saadaval ainult eurodes peetava raamatupidamisega
+Eesti ettevõtetele; teiste klientide puhul on menüüpunkt
+<strong>Palgaarvestus</strong> hall ja selgitusega.</p>
+<hr />
+<h2 id="töölaua-keel-ja-versioon">Töölaua keel ja versioon</h2>
+<p><img src="../screenshots/et/03-overview.png"
+alt="Töölaua ülevaade" /></p>
+<ul>
+<li><strong>English / Eesti</strong> ülemisel ribal vahetab kõik sildid,
+teated ja veateated. Valik jääb järgmiseks korraks meelde. Eesti
+palgalehed on alati eesti keeles.</li>
+<li>Logo all olev versioonimärk (<code>v0.3.0 · 2026-10-09</code>)
+näitab kasutatavat versiooni; klõps avab seisukontrolli.</li>
+<li><strong>Avalik veebileht</strong> ja <strong>Logi välja</strong>
+asuvad külgmenüü allosas.</li>
+</ul>
+<p>Kitsal ekraanil peitub külgmenüü nupu <strong>☰</strong> taha.</p>
+<hr />
+<section id="müük-ost-ja-automatiseerimine" class="divider">
+<h2>Müük, ost ja automatiseerimine</h2>
+<p>Koostage müügiarveid, vaadake üle ostuarved ning laske korduvatel
+arvetel ja meeldetuletustel rutiinne töö ära teha.</p>
+</section>
+<hr />
+<h2 id="müügiarved">Müügiarved</h2>
+<p><img src="../screenshots/et/05-invoices.png"
+alt="Müügiarvete nimekiri" /></p>
+<p><strong>Müügiarved</strong> näitab iga arvet koos olekuga:
+<strong>Kavand</strong>, <strong>Väljastatud</strong>, <strong>Osaliselt
+makstud</strong>, <strong>Makstud</strong> või <strong>Tähtaja
+ületanud</strong>. Filtreerige nimekirja kohal olevate sakkidega.</p>
+<ul>
+<li><strong>PDF</strong> laadib arve alla; <strong>XML</strong> laadib
+selle struktureeritud XML-failina.</li>
+<li>Kavandit saab muuta, väljastada või kustutada. Väljastatud arvet
+muuta ei saa ja see kirjendatakse pearaamatusse.</li>
+<li>Nupuga <strong>Uus kontakt</strong> lisate kliendi lehelt
+lahkumata.</li>
+</ul>
+<hr />
+<h2 id="arve-koostamine">Arve koostamine</h2>
+<p><img src="../screenshots/et/06-new-invoice.png"
+alt="Uue müügiarve aken" /></p>
+<ol type="1">
+<li>Klõpsake <strong>Uus müügiarve</strong>.</li>
+<li>Valige <strong>Klient</strong>, <strong>Arve kuupäev</strong> ja
+<strong>Maksetähtaeg</strong>.</li>
+<li>Sisestage <strong>Kirjeldus</strong>, <strong>Kogus</strong> ja
+<strong>Ühikuhind</strong>.</li>
+<li>Valige <strong>Tulukonto</strong> ja <strong>Maksukood</strong>
+(näiteks EE24 – 24%).</li>
+<li><strong>Loo kavand</strong>, kontrollige seda ja seejärel
+<strong>Väljasta</strong>.</li>
+</ol>
+<p>Käibemaks arvutatakse iga rea kohta täpsete kümnendarvudega ja
+kirjendatakse arve väljastamisel kliendi käibemaksukontodele.</p>
+<hr />
+<h2 id="ostuarved">Ostuarved</h2>
+<p><img src="../screenshots/et/07-bills.png"
+alt="Ostuarvete nimekiri" /></p>
+<p><strong>Ostuarved</strong> hoiab tarnijate dokumente enne
+pearaamatusse jõudmist.</p>
+<ul>
+<li>Olekud: <strong>Ülevaatamisel → Kinnitatud → Osaliselt makstud →
+Makstud</strong>.</li>
+<li><strong>Kinnita</strong> kirjendab arve; ülevaatusel olev arve
+pearaamatusse ei jõua.</li>
+<li><strong>Uus ostuarve</strong> ja <strong>Uus tarnija</strong>
+lisavad dokumente ja tehingupartnereid.</li>
+</ul>
+<p>Kasutage ülevaatust kõige jaoks, mida raamatupidaja peab enne
+kontrollima, näiteks pöördmaksustamine või mahaarvamisele mittekuuluv
+käibemaks.</p>
+<hr />
+<h2 id="kontaktid">Kontaktid</h2>
+<p><img src="../screenshots/et/08-contacts.png"
+alt="Kontaktide nimekiri" /></p>
+<p><strong>Kontaktid</strong> hoiab iga kliendi ostjaid ja tarnijaid
+koos liigi, e-posti, riigi ja KMKR-numbriga. Filtreerige liigi järgi:
+ostja, tarnija või mõlemad.</p>
+<p>Kontakte kasutavad müügi- ja ostuarved, pangatehingute sidumine ja
+korduvad arved, seega hoidke e-posti aadressid ajakohased:
+meeldetuletused saadetakse sinna.</p>
+<hr />
+<h2 id="korduvad-arved-ja-meeldetuletused">Korduvad arved ja
+meeldetuletused</h2>
+<p><img src="../screenshots/et/09-recurring-reminders.png"
+alt="Korduvad arved ja meeldetuletused" /></p>
+<p><strong>Korduvad ja meeldetuletused</strong> näitab korduvate arvete
+graafikuid ja meeldetuletuste astmeid.</p>
+<ul>
+<li>Graafik kopeerib aluseks võetud arve <strong>igal nädalal</strong>,
+<strong>igal kuul</strong>, <strong>igas kvartalis</strong> või
+<em>n</em> päeva järel. <strong>Koosta arve kohe</strong> muutub
+aktiivseks järgmise koostamise kuupäeval; <strong>Peata</strong> ja
+<strong>Ajalugu</strong> haldavad graafikut.</li>
+<li><strong>Saatmist ootavad meeldetuletused</strong>: 3 päeva enne
+tähtaega, 7 ja 14 päeva pärast tähtaega. Valige <strong>Saada
+meeldetuletus</strong> või <strong>Jäta vahele</strong>.</li>
+</ul>
+<p>E-kirjade saatmiseks on vaja seadistusi
+<code>POSTMARK_API_TOKEN</code> ja <code>FROM_EMAIL</code>; seni teatab
+leht sellest ja midagi ei saadeta.</p>
+<hr />
+<h2 id="korduva-arve-loomine">Korduva arve loomine</h2>
+<p><img src="../screenshots/et/10-new-schedule.png"
+alt="Uue korduva arve aken" /></p>
+<ol type="1">
+<li>Koostage ja salvestage arvekavand, mida kasutada väljal
+<strong>Aluseks võetav arve</strong>.</li>
+<li>Klõpsake <strong>Uus korduv arve</strong> ja sisestage
+<strong>Nimi</strong>.</li>
+<li>Valige <strong>Kordumise sagedus</strong>, <strong>Järgmine
+arve</strong> ja soovi korral <strong>Lõppkuupäev</strong>.</li>
+<li>Märkige <strong>Saada automaatselt e-postiga</strong>, et iga uus
+arve saadetaks kohe.</li>
+<li><strong>Loo korduv arve</strong>.</li>
+</ol>
+<p>Iga koostamine loob mallist tavalise arve, nii et numeratsioon,
+käibemaks ja kirjendamine järgivad samu reegleid nagu käsitsi koostatud
+arvetel.</p>
+<hr />
+<section id="pangandus-raamatupidamine-ja-maksud" class="divider">
+<h2>Pangandus, raamatupidamine ja maksud</h2>
+<p>Siduge pangaread dokumentidega, lugege pearaamatut ja koostage
+käibemaksu töölehed raamatupidaja ülevaatuseks.</p>
+</section>
+<hr />
+<h2 id="pangandus-ja-sidumine">Pangandus ja sidumine</h2>
+<p><img src="../screenshots/et/11-banking.png"
+alt="Panganduse vaade" /></p>
+<p><strong>Pangandus</strong> näitab iga pangakontot ja selle imporditud
+tehinguid.</p>
+<ol type="1">
+<li><strong>Impordi väljavõte</strong> (CSV või CAMT.053 XML).</li>
+<li>Iga sidumata rea juures on põhjendatud vastete soovitused; klõpsake
+<strong>Vaata üle</strong>.</li>
+<li><strong>Kinnita vaste</strong>, et jaotada makse müügi- või
+ostuarvetele.</li>
+</ol>
+<p><strong>Lisa konto</strong> registreerib kliendile uue pangakonto.
+Kinnitatud vaste kirjendab makse ja uuendab arvete olekuid.</p>
+<hr />
+<h2 id="raamatupidamise-aruanded">Raamatupidamise aruanded</h2>
+<p><img src="../screenshots/et/12-accounting-trial-balance.png"
+alt="Proovibilanss" /></p>
+<p><strong>Raamatupidamine</strong> koostab aruanded muutumatust ja
+tasakaalus pearaamatust:</p>
+<ul>
+<li><strong>Proovibilanss</strong>, <strong>Kasumiaruanne</strong>,
+<strong>Bilanss</strong></li>
+<li><strong>Pearaamat</strong> kõigi kannete ja viidetega</li>
+<li><strong>Nõuete vanusanalüüs</strong>, <strong>Kohustuste
+vanusanalüüs</strong> ja <strong>Rahavoolu kokkuvõte</strong></li>
+</ul>
+<p>Valige <strong>Alates</strong> ja <strong>Kuni</strong>, klõpsake
+<strong>Rakenda</strong> ning kasutage kliendi toimiku jaoks nuppu
+<strong>Prindi / salvesta PDF</strong>. Kandeid ei muudeta; parandused
+tehakse uute kannetena.</p>
+<hr />
+<h2 id="käibedeklaratsiooni-kmd-töölehed">Käibedeklaratsiooni (KMD)
+töölehed</h2>
+<p><img src="../screenshots/et/13-tax-kmd.png" alt="KMD vaade" /></p>
+<p><strong>Maksud</strong> koostab Eesti <strong>KMD</strong>
+(Ühendkuningriigi ettevõtetele VAT-deklaratsiooni).</p>
+<ol type="1">
+<li><strong>Koosta tööleht</strong> valitud perioodi kohta.</li>
+<li>Kontrollige lahtreid loetletud maksukoodide järgi.</li>
+<li>Enne eksporti <strong>Märgi raamatupidaja poolt
+ülevaadatuks</strong>.</li>
+</ol>
+<p><strong>Koosta VD</strong> koostab ühendusesisese käibe aruande.
+Eksport nõuab raamatupidaja ülevaatust; FastAccounts ei esita
+deklaratsioone otse EMTA-le ega HMRC-le.</p>
+<hr />
+<section id="palgaarvestus-raamatupidamisbüroole" class="divider">
+<h2>Palgaarvestus raamatupidamisbüroole</h2>
+<p>Eesti 2026. aasta palgaarvestus iga kliendi kohta: kuupalk,
+osakoormus, tunnitasu ja juhatuse liikme tasu, sotsiaalmaksu
+miinimumkohustus, palgalehed ja automaatsed kanded.</p>
+</section>
+<hr />
+<h2 id="töötajad">Töötajad</h2>
+<p><img src="../screenshots/et/14-payroll-employees.png"
+alt="Töötajate nimekiri" /></p>
+<p>Avage eurodes peetava raamatupidamisega Eesti kliendi (siin
+<strong>Demo OÜ (sample payroll)</strong>)
+<strong>Palgaarvestus</strong>.</p>
+<ul>
+<li>Brutotöötasu veerg näitab kuupalka või <strong>tunnitasu tunni
+kohta</strong>.</li>
+<li>Osakoormusega töötajal on märge (<strong>Osakoormus 0.5</strong>);
+juhatuse liikmel silt <strong>Juhatuse liige</strong>.</li>
+<li><strong>Kogumispensioni määr</strong> on II samba määr (0, 2, 4 või
+6%).</li>
+<li>Maksuvaba tulu veerg näitab, kes rakendab siin 700-eurost maksuvaba
+tulu.</li>
+</ul>
+<p>Paremal üleval on <strong>Lisa töötaja</strong> ja <strong>Koosta kuu
+palgaarvestus</strong>.</p>
+<hr />
+<h2 id="osakoormusega-töötaja">Osakoormusega töötaja</h2>
+<p><img src="../screenshots/et/15-employee-part-time.png"
+alt="Töötaja muutmine: osakoormus" /></p>
+<ol type="1">
+<li><strong>Tasu alus</strong>: <strong>Kuupalk</strong>.</li>
+<li><strong>Kuupalk või juhatuse liikme tasu</strong>: lepingujärgne kuu
+brutotasu (700 €).</li>
+<li><strong>Töökoormus (FTE)</strong>: poole kohaga 0,5.</li>
+<li><strong>Kogumispensioni määr</strong>: 0% on lubatud kõigile, kes II
+sambaga ei liitunud.</li>
+</ol>
+<p>Alampalga kontroll arvestab koormust: 946 € × 0,5 = 473 € alates 1.
+aprillist 2026 (enne seda 886 €). Märkige <strong>Töösuhte
+algus</strong> ja <strong>Töösuhte lõpp</strong>, et palgaarvestus
+jätaks välja väljaspool töösuhet olevad kuud.</p>
+<hr />
+<h2 id="tunnitasuga-töötaja">Tunnitasuga töötaja</h2>
+<p><img src="../screenshots/et/16-employee-hourly.png"
+alt="Töötaja muutmine: tunnitasu" /></p>
+<ol type="1">
+<li><strong>Tasu alus</strong>: <strong>Tunnitasu</strong>.</li>
+<li><strong>Tunnitasu määr</strong>: siin 8,00 €; alammäär on 5,67 €/h
+alates 1. aprillist 2026 (enne seda 5,31 €).</li>
+<li>Tunnid sisestatakse iga kuu palgaarvestuses.</li>
+</ol>
+<p>Kolmas tasu alus on <strong>Juhatuse liikme tasu</strong>:
+töötuskindlustusmakset ja sotsiaalmaksu miinimumkohustust ei rakendu.
+<strong>Sotsiaalmaksu miinimumkohustuse erand</strong> näitab, miks
+miinimumkohustus inimesele ei kehti (vt viiteid).</p>
+<hr />
+<h2 id="palgaarvestuse-kavandi-ülevaatus">Palgaarvestuse kavandi
+ülevaatus</h2>
+<p><img src="../screenshots/et/17-pay-run-draft-breakdown.png"
+alt="Palgaarvestuse kavand töötajate kaupa" /></p>
+<p>Oktoobri 2026 kavand näitab kliendi bruto-, neto- ja tööandja kulu
+(bruto 16 254,00 €, tööandja kulu 21 797,23 €). <strong>Arvestus
+töötajate kaupa</strong>:</p>
+<ul>
+<li><strong>Peeter Oja</strong>: 8,00 € × 176 tundi = 1408,00 €
+brutot.</li>
+<li><strong>Liis Kuusk</strong> (0,5 kohta, 700 €): sotsiaalmaks 292,38
+€, sh <strong>sotsiaalmaksu miinimumkohustuse lisamakse</strong> 61,38
+€, mille maksab tööandja.</li>
+<li>Tulumaks, II sammas, netopalk ja tööandja kulu iga töötaja
+kohta.</li>
+</ul>
+<hr />
+<h2 id="kuu-palgaarvestuse-koostamine">Kuu palgaarvestuse
+koostamine</h2>
+<p><img src="../screenshots/et/18-pay-run-wizard.png"
+alt="Kuu palgaarvestuse aken" /></p>
+<ol type="1">
+<li>Klõpsake <strong>Koosta kuu palgaarvestus</strong> ja valige
+<strong>Kuu</strong>.</li>
+<li>Kontrollige <strong>arvestusse kaasatud töötajaid</strong>
+(aktiivsed ja sel kuul töösuhtes).</li>
+<li>Sisestage tunnitasuga töötajate <strong>Töötatud
+tunnid</strong>.</li>
+<li><strong>Loo kavand</strong> ja kinnitage.</li>
+</ol>
+<p>Töötaja andmed külmutatakse kavandisse, nii et hilisemad muudatused
+seda ei muuda. Alampalga kontrolli tõrge nimetab töötaja ja summa.</p>
+<hr />
+<h2 id="kinnitamine-ja-kirjendamine">Kinnitamine ja kirjendamine</h2>
+<p><img src="../screenshots/et/19-pay-run-approve.png"
+alt="Kinnita ja kirjenda" /></p>
+<p><strong>Kinnita ja kirjenda</strong> näitab tööandja kulu ja küsib
+kinnitust. Kinnitamisel:</p>
+<ul>
+<li>kirjendatakse kliendi pearaamatusse üks tasakaalus palgakanne;</li>
+<li>arvestus lukustub (muuta või kustutada saab ainult kavandit);</li>
+<li>muutuvad kättesaadavaks <strong>Palgalehed PDF</strong>.</li>
+</ul>
+<p>Vale kavandi saab kustutada nupuga <strong>Kustuta kavand</strong> ja
+uuesti koostada.</p>
+<hr />
+<h2 id="palgalehed">Palgalehed</h2>
+<p><img src="../screenshots/et/20-payslip-pdf.png"
+alt="Palgalehe PDF" /></p>
+<p><strong>Palgalehed PDF</strong> koostab iga töötaja kohta ühe
+lehe:</p>
+<ul>
+<li>brutopalk või tunnitasu × tunnid ning töökoormus;</li>
+<li>II sammas, töötaja töötuskindlustusmakse, kasutatud maksuvaba tulu,
+tulumaks;</li>
+<li>netopalk, sotsiaalmaks koos arvestusaluse ja võimaliku
+<strong>miinimumkohustuse lisamaksega</strong>, tööandja
+töötuskindlustusmakse ja tööandja kulu kokku.</li>
+</ul>
+<p>TSD esitamine EMTA-le ei ole automatiseeritud; selle esitab
+raamatupidaja.</p>
+<hr />
+<h2 id="palgaarvestus-pearaamatus">Palgaarvestus pearaamatus</h2>
+<p><img src="../screenshots/et/21-payroll-general-ledger.png"
+alt="Palgakanded pearaamatus" /></p>
+<p>Iga kinnitatud arvestus kirjendatakse kliendi palgakontodele,
+näiteks:</p>
+<ul>
+<li><strong>6110</strong> palgakulu, <strong>6120</strong> sotsiaalmaksu
+kulu, <strong>6130</strong> tööandja töötuskindlustusmakse kulu;</li>
+<li><strong>2210</strong> palgavõlg töötajatele, <strong>2220</strong>
+kinnipeetud tulumaks, <strong>2230</strong> pensioni- ja
+töötuskindlustusmaksed, <strong>2240</strong> sotsiaalmaksu võlg.</li>
+</ul>
+<p>Miinimumkohustuse lisamakse on eraldi rida oma kirjeldusega, nii et
+seda on kliendile lihtne selgitada. Kanded on dateeritud perioodi
+lõpuga.</p>
+<hr />
+<h2 id="sotsiaalmaksu-miinimumkohustus">Sotsiaalmaksu
+miinimumkohustus</h2>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Reegel</th>
+<th>2026</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Kuu minimaalne arvestusalus</td>
+<td>886 € → minimaalne sotsiaalmaks 292,38 € töötaja kohta</td>
+</tr>
+<tr class="even">
+<td>Kes maksab puudujäägi</td>
+<td>Tööandja, täiendava tööandja kuluna</td>
+</tr>
+<tr class="odd">
+<td>Kuu keskel algav või lõppev töösuhe</td>
+<td>Alus arvestatakse töösuhte kalendripäevade järgi</td>
+</tr>
+<tr class="even">
+<td>Juhatuse liikme tasu</td>
+<td>Miinimumkohustus ei kehti</td>
+</tr>
+<tr class="odd">
+<td>Töötaja juures märgitav erand</td>
+<td>Pensionär, osaline või puuduv töövõime, lapse kasvatamine, õpilane,
+varem töötu, lühendatud tööaeg, volikogu liige, laevapere liige,
+välisteenistuja abikaasa, pikaajaline haigusleht, terve kuu eemal,
+maksuvaba tulu arvestab teine tööandja</td>
+</tr>
+</tbody>
+</table>
+<p>Allikad: sotsiaalmaksuseadus § 2 lg 2–4; rahandusministri määrus nr
+17; EMTA „Sotsiaalmaks“. Valige töötaja juures sobiv
+<strong>sotsiaalmaksu miinimumkohustuse erand</strong>; see trükitakse
+palgalehele.</p>
+<hr />
+<section id="liidestused-ja-töötajate-import" class="divider">
+<h2>Liidestused ja töötajate import</h2>
+<p>Ühendage iga kliendi personalitarkvara üks kord ja vaadake iga
+imporditud töötaja üle enne, kui palgaandmed muutuvad.</p>
+</section>
+<hr />
+<h2 id="liidestused">Liidestused</h2>
+<p><img src="../screenshots/et/22-integrations.png"
+alt="Liidestuste töölaud" /></p>
+<p><strong>Liidestused</strong> (menüüs <strong>Seaded</strong>) näitab
+esmalt kasutusvalmis liidestusi:</p>
+<ul>
+<li><strong>Registri olek</strong> — mida liidestus täna toetab;</li>
+<li><strong>Ühenduse olek</strong> — selle kliendi ühendus.</li>
+</ul>
+<p><strong>Töötajate failiimport</strong> ei vaja ühendust;
+<strong>FastHR</strong>, <strong>QuickBooks Online</strong>,
+<strong>Xero</strong> ja <strong>Merit Aktiva</strong> on ühendamiseks
+valmis. Kavandatud liidestused on all; <strong>Avalik liidestuste
+kataloog</strong> avab täieliku nimekirja avalikul veebilehel.</p>
+<hr />
+<h2 id="fasthr-i-ühendamine">FastHR-i ühendamine</h2>
+<p><img src="../screenshots/et/23-fasthr-configure.png"
+alt="FastHR-i seadistamine" /></p>
+<ol type="1">
+<li>Klõpsake FastHR-i kaardil <strong>Seadista</strong>.</li>
+<li>Sisestage <strong>Baas-URL</strong> ja kliendi
+<strong>API-tõend</strong>.</li>
+<li><strong>Salvesta seadistus</strong> ja seejärel <strong>Testi
+ühendust</strong>.</li>
+</ol>
+<p>Saladused krüpteeritakse kliendi kaupa ja neid ei näidata enam
+kunagi; tõendi vahetamiseks sisestage uus. <strong>Katkesta
+ühendus</strong> eemaldab ühenduse; FastHR-i ainult loetakse, sinna ei
+kirjutata midagi tagasi.</p>
+<hr />
+<h2 id="töötajate-impordi-käivitamine">Töötajate impordi
+käivitamine</h2>
+<p><img src="../screenshots/et/24-fasthr-import-review.png"
+alt="Töötajate impordi ülevaatus" /></p>
+<p><strong>Käivita töötajate import</strong> lisab FastHR-i töötajad
+ülevaatusele; midagi ei muutu veel.</p>
+<ul>
+<li><strong>Vastendatud töötaja</strong> seob kirje olemasoleva
+töötajaga e-posti või isikukoodi järgi.</li>
+<li>FastHR-i aasta põhitöötasu muutub kuupalgaks (÷ 12), tööaja osakaal
+töökoormuseks (FTE) ja tunnitasuga töötajad saavad tunnitasu.</li>
+<li><strong>Ülevaatuse märkus</strong> hoiatab, kui FastHR-is puudub
+töötasu ja tunnitasu.</li>
+</ul>
+<hr />
+<h2 id="otsuste-rakendamine">Otsuste rakendamine</h2>
+<p><img src="../screenshots/et/25-fasthr-import-applied.png"
+alt="Impordi tulemused" /></p>
+<ol type="1">
+<li>Märkige iga kirje juures <strong>Kinnita</strong> või <strong>Lükka
+tagasi</strong>.</li>
+<li><strong>Rakenda otsused</strong>.</li>
+</ol>
+<p><strong>Impordi tulemused</strong> loendab rakendatud, uuendatud,
+muutmata, tagasi lükatud ja ebaõnnestunud kirjed ning näitab põhjuseid.
+Töötasuta kirje jäetakse vahele, mitte ei arvata; parandage see
+FastHR-is ja valige <strong>Proovi rakendamist uuesti</strong>.
+<strong>Hiljutised impordid</strong> säilitab ajaloo.</p>
+<hr />
+<h2 id="töötajate-faili-importimine">Töötajate faili importimine</h2>
+<p><img src="../screenshots/et/26-file-import-dialog.png"
+alt="Töötajate faili impordi aken" /></p>
+<p>Kui kliendi palga- või personalisüsteemil liidestust pole, kasutage
+faili eksporti.</p>
+<ol type="1">
+<li>Klõpsake kaardil <strong>Töötajate failiimport</strong> nuppu
+<strong>Impordi fail</strong>.</li>
+<li>Valige <strong>CSV- või TSV-fail</strong> või kleepige selle
+sisu.</li>
+<li><strong>Lisa töötajad ülevaatusse</strong>.</li>
+</ol>
+<p>Tuntud veerupealkirjad on näiteks <em>Töötaja ID</em>, <em>Nimi</em>,
+<em>E-post</em>, <em>Palk</em> (kuupalk), <em>Isikukood</em> ja
+<em>Staatus</em>, samuti ingliskeelsed vasted. Exceli töövihik
+eksportige enne CSV-vormingusse. Algfaili ei salvestata.</p>
+<hr />
+<h2 id="failiimpordi-ülevaatus">Failiimpordi ülevaatus</h2>
+<p><img src="../screenshots/et/27-file-import-review.png"
+alt="Failiimpordi ülevaatus" /></p>
+<p>Failiimport kasutab sama ülevaatust nagu FastHR: iga rida lisatakse
+olekuga <strong>Ootel</strong>, vastendatakse olemasolevate töötajatega
+e-posti või isikukoodi järgi ja midagi ei muutu enne, kui valite
+<strong>Kinnita</strong> ja <strong>Rakenda otsused</strong>.</p>
+<p>Sama faili uuesti importimine on ohutu: muutmata read märgitakse
+olekuga <strong>Muutmata</strong> ja duplikaate ei teki.
+<strong>Hiljutised impordid</strong> näitab selle kliendi varasemaid
+failiimporte.</p>
+<hr />
+<h2 id="imporditud-töötajad-palgaarvestuses">Imporditud töötajad
+palgaarvestuses</h2>
+<p><img src="../screenshots/et/28-payroll-after-import.png"
+alt="Palgaarvestus pärast importi" /></p>
+<p>Kinnitatud kirjed on <strong>Palgaarvestuses</strong> nagu teised
+töötajad: siin <strong>Eva Näidis</strong> (osakoormus 0,6, kuupalk
+1200,00 € aastatasust 14 400 €) ja <strong>Rein Proov</strong>
+(tunnitasu 7,50 €).</p>
+<p>Enne järgmist palgaarvestust täiendage, mida FastHR ei hoia: II samba
+määr, maksuvaba tulu avaldus ja võimalik sotsiaalmaksu miinimumkohustuse
+erand.</p>
+<hr />
+<section id="viited" class="divider">
+<h2>Viited</h2>
+<p>Eesti 2026. aasta palgaarvestuse määrad, mida FastAccounts ei tee ja
+kust abi leida.</p>
+</section>
+<hr />
+<h2 id="eesti-palgaarvestuse-määrad-2026">Eesti palgaarvestuse määrad
+2026</h2>
+<table>
+<thead>
+<tr class="header">
+<th>Kirje</th>
+<th>Määr või summa</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Tulumaks</td>
+<td>22%</td>
+</tr>
+<tr class="even">
+<td>Maksuvaba tulu (kirjaliku avalduse alusel)</td>
+<td>700 € kuus</td>
+</tr>
+<tr class="odd">
+<td>Sotsiaalmaks (tööandja)</td>
+<td>33%, minimaalne arvestusalus 886 € kuus</td>
+</tr>
+<tr class="even">
+<td>Töötuskindlustusmakse</td>
+<td>töötaja 1,6%, tööandja 0,8%</td>
+</tr>
+<tr class="odd">
+<td>Kogumispension (II sammas)</td>
+<td>0%, 2%, 4% või 6%</td>
+</tr>
+<tr class="even">
+<td>Alampalk kuni 31.03.2026</td>
+<td>886 € kuus, 5,31 € tunnis</td>
+</tr>
+<tr class="odd">
+<td>Alampalk alates 01.04.2026</td>
+<td>946 € kuus, 5,67 € tunnis</td>
+</tr>
+</tbody>
+</table>
+<p>Allikad: EMTA „Maksumäärad“; Vabariigi Valitsuse 23.03.2026 määrus nr
+36. Summad arvutatakse täpsete kümnendarvudega ja ümardatakse sentideni
+(pooled üles).</p>
+<hr />
+<h2 id="piirangud-ja-järgmised-sammud">Piirangud ja järgmised
+sammud</h2>
+<ul>
+<li><strong>Deklaratsioonid</strong>: KMD ja VD töölehed koostatakse
+raamatupidaja ülevaatuseks ja eksporditakse; EMTA-le ega HMRC-le ei
+esitata midagi automaatselt.</li>
+<li><strong>E-kirjad</strong>: meeldetuletused ja automaatselt
+saadetavad arved vajavad Postmarki seadistust.</li>
+<li><strong>Palgaarvestus</strong>: ainult eurodes peetava
+raamatupidamisega Eesti ettevõtted ja
+<ol start="2026" type="1">
+<li>aasta perioodid. Puhkused, haigused, hüvitised, mitteresidendid, TSD
+esitamine ja palga väljamaksmine jäävad arvestusest välja; raamatupidaja
+vastuvõtutestimine on pooleli (<code>docs/payroll_rules.md</code>).</li>
+</ol></li>
+<li><strong>Import</strong>: FastHR-ist imporditakse töötajate
+põhiandmed, mitte tunde ega puhkusi.</li>
+</ul>
+<p>Muudatuste logi on failis <code>docs/change_log.md</code>; juhendi
+uuesti koostamise kirjeldus on failis
+<code>docs/USER_GUIDE_BUILD.md</code>.</p>
+</body>
+</html>

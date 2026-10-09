@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>FastAccounts — User Guide</title>
+  <style>
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+  <link rel="stylesheet" href="assets/guide.css" />
+</head>
+<body>
+<section id="fastaccounts" class="cover">
+<h1>FastAccounts</h1>
+<h4 id="user-guide-client-books-and-payroll-for-accounting-bureaus">User
+Guide — Client Books and Payroll for Accounting Bureaus</h4>
+<p><strong>Invoices, banking, ledger, VAT and Estonian payroll in one
+bureau workspace.</strong></p>
+<p>Worked example: Põhjatäht Teenused OÜ, Northstar Studio Ltd and Demo
+OÜ (sample payroll)</p>
+<p>v0.3.0 · 9 October 2026 · Local demonstration edition</p>
+</section>
+<hr />
+<h2 id="contents">Contents</h2>
+<table>
+<colgroup>
+<col style="width: 30%" />
+<col style="width: 40%" />
+<col style="width: 30%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Section</th>
+<th style="text-align: right;">Pages / slides</th>
+<th>What you will do</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>01 · Get started</strong></td>
+<td style="text-align: right;">3–8</td>
+<td>Sign in, read the bureau overview, switch between client books</td>
+</tr>
+<tr class="even">
+<td><strong>02 · Sales, purchases and automation</strong></td>
+<td style="text-align: right;">9–15</td>
+<td>Invoices, bills, contacts, recurring invoices and reminders</td>
+</tr>
+<tr class="odd">
+<td><strong>03 · Banking, accounting and tax</strong></td>
+<td style="text-align: right;">16–19</td>
+<td>Reconcile the bank, read reports, prepare Estonian KMD
+workpapers</td>
+</tr>
+<tr class="even">
+<td><strong>04 · Payroll for accounting bureaus</strong></td>
+<td style="text-align: right;">20–29</td>
+<td>Part-time, hourly and board pay, social tax minimum, pay runs,
+payslips</td>
+</tr>
+<tr class="odd">
+<td><strong>05 · Integrations and HR import</strong></td>
+<td style="text-align: right;">30–37</td>
+<td>Connect FastHR or import a CSV, and review employees before payroll
+changes</td>
+</tr>
+<tr class="even">
+<td><strong>06 · Reference</strong></td>
+<td style="text-align: right;">38–40</td>
+<td>2026 Estonian rates, exemptions, languages and limits</td>
+</tr>
+</tbody>
+</table>
+<p>Screenshots come from a local instance seeded with synthetic demo
+books. Names, personal codes, IBANs and e-mail addresses are test data,
+not real people or companies. The FastHR import uses a mocked FastHR
+API.</p>
+<hr />
+<section id="get-started" class="divider">
+<h2>Get started</h2>
+<p>One workspace for every client: switch books from the sidebar, keep
+each client’s ledger separate, and work in English or Estonian.</p>
+</section>
+<hr />
+<h2 id="the-public-site">The public site</h2>
+<p><img src="../screenshots/en/01-public-home.png"
+alt="FastAccounts public home page" /></p>
+<p><strong>fastaccounts.org</strong> introduces the product for UK and
+Estonian books.</p>
+<ul>
+<li><strong>Get started</strong> and <strong>Sign in</strong> lead to
+the workspace.</li>
+<li><strong>Integrations</strong> lists every connector with its real
+status.</li>
+<li><strong>Pricing</strong>, <strong>Why FastAccounts</strong>,
+<strong>For accounting bureaus</strong> and <strong>Roadmap</strong>
+explain the offer.</li>
+<li>Switch the language with the language button (GB / EE) in the top
+bar; the choice is remembered.</li>
+</ul>
+<p>The version link in the footer opens <code>/healthz</code>, which
+shows the running release and database status.</p>
+<hr />
+<h2 id="sign-in">Sign in</h2>
+<p><img src="../screenshots/en/02-sign-in.png" alt="Sign-in page" /></p>
+<ol type="1">
+<li>Open <strong>Sign in</strong> and choose <strong>Continue with
+Google</strong>.</li>
+<li>Use the Google account your bureau has approved.</li>
+<li>The workspace opens on the <strong>Overview</strong>.</li>
+</ol>
+<p>Open self-registration is intentionally disabled. The local
+demonstration shown here has no Google credentials configured, so the
+button reports that; production uses Google sign-in.</p>
+<hr />
+<h2 id="bureau-overview">Bureau overview</h2>
+<p><img src="../screenshots/en/03-overview.png"
+alt="Overview dashboard" /></p>
+<p><strong>Overview</strong> summarises the selected client’s books:</p>
+<ul>
+<li><strong>Receivables</strong> and <strong>Payables</strong> — open
+customer invoices and approved bills.</li>
+<li><strong>Bank review</strong> — bank lines still waiting for a
+match.</li>
+<li><strong>Payroll this month</strong> — employer cost of draft and
+approved pay runs.</li>
+</ul>
+<p><strong>Client books</strong> lists every organisation you can
+access, with receivables per client. The chart compares invoiced revenue
+with net bank movement for the last six months. <strong>New
+invoice</strong> starts a sales invoice straight away.</p>
+<hr />
+<h2 id="switch-between-clients">Switch between clients</h2>
+<p><img src="../screenshots/en/04-organisation-switcher.png"
+alt="Organisation switcher" /></p>
+<p>Each client is a separate organisation with its own chart of
+accounts, documents, bank accounts, payroll and integrations.</p>
+<ol type="1">
+<li>Click the organisation card at the top of the sidebar.</li>
+<li>Pick a client; the country badge (EE / UK) shows its rule set.</li>
+<li><strong>Create organisation</strong> adds a new client’s books.</li>
+</ol>
+<p>Payroll is enabled only for Estonian organisations with EUR books;
+for other clients the <strong>Payroll</strong> menu item is greyed out
+with an explanation.</p>
+<hr />
+<h2 id="workspace-language-and-version">Workspace language and
+version</h2>
+<p><img src="../screenshots/en/03-overview.png"
+alt="Overview in the workspace" /></p>
+<ul>
+<li><strong>English / Eesti</strong> in the top bar switches every
+label, message and error. Your choice is kept for the next visit.
+Estonian payslips are always in Estonian.</li>
+<li>The version chip under the logo (<code>v0.3.0 · 2026-10-09</code>)
+shows the release you are using; click it to open the health check.</li>
+<li><strong>Public site</strong> and <strong>Sign out</strong> are at
+the bottom of the sidebar.</li>
+</ul>
+<p>On narrow screens the sidebar folds into the <strong>☰</strong>
+menu.</p>
+<hr />
+<section id="sales-purchases-and-automation" class="divider">
+<h2>Sales, purchases and automation</h2>
+<p>Issue invoices, review supplier bills and let recurring invoices and
+the reminder ladder do the routine work.</p>
+</section>
+<hr />
+<h2 id="sales-invoices">Sales invoices</h2>
+<p><img src="../screenshots/en/05-invoices.png"
+alt="Invoices list" /></p>
+<p><strong>Invoices</strong> shows every sales invoice with its status:
+<strong>Draft</strong>, <strong>Issued</strong>, <strong>Part
+paid</strong>, <strong>Paid</strong> or <strong>Overdue</strong>. Filter
+with the tabs above the list.</p>
+<ul>
+<li><strong>PDF</strong> downloads the invoice; <strong>XML</strong>
+downloads it as structured XML.</li>
+<li>Open a draft to edit, issue or delete it. Issued invoices are
+immutable and are posted to the ledger.</li>
+<li><strong>New contact</strong> adds a customer without leaving the
+page.</li>
+</ul>
+<hr />
+<h2 id="create-an-invoice">Create an invoice</h2>
+<p><img src="../screenshots/en/06-new-invoice.png"
+alt="New invoice dialog" /></p>
+<ol type="1">
+<li>Click <strong>New invoice</strong>.</li>
+<li>Choose the <strong>Customer</strong>, <strong>Issue date</strong>
+and <strong>Due date</strong>.</li>
+<li>Enter the <strong>Description</strong>, <strong>Quantity</strong>
+and <strong>Unit price</strong>.</li>
+<li>Pick the <strong>Income account</strong> and <strong>Tax
+code</strong> (for example EE24 – 24%).</li>
+<li><strong>Create draft</strong>, review it, then
+<strong>Issue</strong>.</li>
+</ol>
+<p>VAT is calculated per line with exact decimals and posted to the
+client’s VAT accounts when the invoice is issued.</p>
+<hr />
+<h2 id="supplier-bills">Supplier bills</h2>
+<p><img src="../screenshots/en/07-bills.png" alt="Bills list" /></p>
+<p><strong>Bills</strong> holds supplier documents before they reach the
+ledger.</p>
+<ul>
+<li>Statuses run <strong>In review → Approved → Part paid →
+Paid</strong>.</li>
+<li><strong>Approve</strong> posts the bill; nothing is posted while it
+is in review.</li>
+<li><strong>New bill</strong> and <strong>New supplier</strong> add
+documents and counterparties.</li>
+</ul>
+<p>Use the review step for anything an accountant must check first, such
+as reverse-charge or non-deductible VAT.</p>
+<hr />
+<h2 id="contacts">Contacts</h2>
+<p><img src="../screenshots/en/08-contacts.png"
+alt="Contacts list" /></p>
+<p><strong>Contacts</strong> keeps customers and suppliers per client,
+with type, e-mail, country and VAT number. Filter by
+<strong>customer</strong>, <strong>supplier</strong> or
+<strong>both</strong>.</p>
+<p>Contacts are reused by invoices, bills, bank matching and recurring
+schedules, so keep e-mail addresses current: payment reminders go
+there.</p>
+<hr />
+<h2 id="recurring-invoices-and-reminders">Recurring invoices and
+reminders</h2>
+<p><img src="../screenshots/en/09-recurring-reminders.png"
+alt="Recurring invoices and reminders due" /></p>
+<p><strong>Recurring &amp; reminders</strong> lists invoice schedules
+and the reminder ladder.</p>
+<ul>
+<li>A schedule copies a template invoice <strong>weekly</strong>,
+<strong>monthly</strong>, <strong>quarterly</strong> or every <em>n</em>
+days. <strong>Run now</strong> is enabled once the next run date is due;
+<strong>Pause</strong> and <strong>History</strong> manage the
+schedule.</li>
+<li><strong>Reminders due</strong> lists overdue invoices at each step:
+3 days before due, 7 days overdue and 14 days overdue. <strong>Send
+reminder</strong> or <strong>Skip</strong> each one.</li>
+</ul>
+<p>E-mail delivery needs <code>POSTMARK_API_TOKEN</code> and
+<code>FROM_EMAIL</code>; until then the page says so and nothing is
+sent.</p>
+<hr />
+<h2 id="create-a-recurring-schedule">Create a recurring schedule</h2>
+<p><img src="../screenshots/en/10-new-schedule.png"
+alt="New schedule dialog" /></p>
+<ol type="1">
+<li>Create and save a draft invoice to use as the <strong>Template
+invoice</strong>.</li>
+<li>Click <strong>New schedule</strong> and give it a
+<strong>Name</strong>.</li>
+<li>Choose the <strong>Interval</strong>, the <strong>Next run</strong>
+date and an optional <strong>End date</strong>.</li>
+<li>Tick <strong>Auto-email</strong> to send each new invoice
+automatically.</li>
+<li><strong>Create schedule</strong>.</li>
+</ol>
+<p>Each run creates a normal invoice from the template, so numbering,
+VAT and posting follow the same rules as invoices you create by
+hand.</p>
+<hr />
+<section id="banking-accounting-and-tax" class="divider">
+<h2>Banking, accounting and tax</h2>
+<p>Match bank lines to documents, read the ledger and prepare VAT
+workpapers for accountant review.</p>
+</section>
+<hr />
+<h2 id="banking-and-reconciliation">Banking and reconciliation</h2>
+<p><img src="../screenshots/en/11-banking.png" alt="Banking view" /></p>
+<p><strong>Banking</strong> shows each bank account and its imported
+transactions.</p>
+<ol type="1">
+<li><strong>Import statement</strong> (CSV or CAMT.053 XML).</li>
+<li>Each unmatched line offers explainable match suggestions; click
+<strong>Review</strong>.</li>
+<li><strong>Confirm match</strong> to allocate the payment to invoices
+or bills.</li>
+</ol>
+<p><strong>Add account</strong> registers another bank account for the
+client. Confirmed matches post the payment and update invoice and bill
+statuses.</p>
+<hr />
+<h2 id="accounting-reports">Accounting reports</h2>
+<p><img src="../screenshots/en/12-accounting-trial-balance.png"
+alt="Trial balance" /></p>
+<p><strong>Accounting</strong> builds reports from the immutable,
+balanced ledger:</p>
+<ul>
+<li><strong>Trial balance</strong>, <strong>Profit &amp; loss</strong>,
+<strong>Balance sheet</strong></li>
+<li><strong>General ledger</strong> with every posting and its
+reference</li>
+<li><strong>Receivables aging</strong>, <strong>Payables aging</strong>
+and <strong>Cash summary</strong></li>
+</ul>
+<p>Choose <strong>From</strong> and <strong>To</strong>, click
+<strong>Apply</strong>, and use <strong>Print / save PDF</strong> for
+the client file. Postings are never edited; corrections are new
+entries.</p>
+<hr />
+<h2 id="estonian-vat-kmd-workpapers">Estonian VAT (KMD) workpapers</h2>
+<p><img src="../screenshots/en/13-tax-kmd.png"
+alt="Estonian KMD view" /></p>
+<p><strong>Tax</strong> prepares the Estonian <strong>KMD</strong> (and
+the UK nine-box VAT return for UK books).</p>
+<ol type="1">
+<li><strong>Prepare workpaper</strong> for the period.</li>
+<li>Check the boxes against the listed tax codes.</li>
+<li><strong>Mark accountant reviewed</strong> before exporting.</li>
+</ol>
+<p><strong>Prepare VD</strong> builds the EU sales listing. Exports
+require accountant review; FastAccounts does not file directly with EMTA
+or HMRC.</p>
+<hr />
+<section id="payroll-for-accounting-bureaus" class="divider">
+<h2>Payroll for accounting bureaus</h2>
+<p>Estonian 2026 payroll per client: monthly, part-time, hourly and
+board-member pay, the social tax minimum, payslips and automatic ledger
+postings.</p>
+</section>
+<hr />
+<h2 id="employees">Employees</h2>
+<p><img src="../screenshots/en/14-payroll-employees.png"
+alt="Payroll employees list" /></p>
+<p>Open <strong>Payroll</strong> in an Estonian EUR client (here
+<strong>Demo OÜ (sample payroll)</strong>).</p>
+<ul>
+<li><strong>Gross salary</strong> shows monthly pay, or the
+<strong>hourly rate per hour</strong>.</li>
+<li>Part-time staff show their fraction (<strong>Part-time
+0.5</strong>); board members carry a <strong>Board member</strong>
+badge.</li>
+<li><strong>Pension %</strong> is the II pillar rate (0, 2, 4 or
+6%).</li>
+<li><strong>Tax-free minimum</strong> shows who applies the €700 basic
+exemption here.</li>
+</ul>
+<p><strong>Add employee</strong> and <strong>Run payroll for
+month</strong> are at the top right.</p>
+<hr />
+<h2 id="part-time-employee">Part-time employee</h2>
+<p><img src="../screenshots/en/15-employee-part-time.png"
+alt="Edit employee: part-time" /></p>
+<ol type="1">
+<li><strong>Pay basis</strong>: <strong>Monthly salary</strong>.</li>
+<li><strong>Monthly salary or board fee</strong>: the contractual
+monthly gross (€700).</li>
+<li><strong>Work-time fraction (FTE)</strong>: 0.5 for half time.</li>
+<li><strong>Pension %</strong>: 0% is allowed for anyone not in the II
+pillar.</li>
+</ol>
+<p>The minimum-wage check is pro-rated: €946 × 0.5 = €473 from 1 April
+2026 (€886 before). Set <strong>Employment start date</strong> and
+<strong>end date</strong> so pay runs skip people outside their
+employment.</p>
+<hr />
+<h2 id="hourly-employee">Hourly employee</h2>
+<p><img src="../screenshots/en/16-employee-hourly.png"
+alt="Edit employee: hourly" /></p>
+<ol type="1">
+<li><strong>Pay basis</strong>: <strong>Hourly pay</strong>.</li>
+<li><strong>Hourly rate</strong>: €8.00 here; the minimum is €5.67/h
+from 1 April 2026 (€5.31 before).</li>
+<li>Hours are entered in each month’s pay run.</li>
+</ol>
+<p><strong>Board member fee</strong> is the third pay basis: no
+unemployment insurance and no social tax minimum. <strong>Social tax
+minimum exemption</strong> records why the minimum does not apply to a
+person (see the reference section).</p>
+<hr />
+<h2 id="review-a-draft-pay-run">Review a draft pay run</h2>
+<p><img src="../screenshots/en/17-pay-run-draft-breakdown.png"
+alt="Draft pay run with employee breakdown" /></p>
+<p>The October 2026 draft lists gross, net and employer cost for the
+client (€16,254.00 gross, €21,797.23 employer cost). <strong>Employee
+breakdown</strong> shows:</p>
+<ul>
+<li><strong>Peeter Oja</strong>: €8.00 × 176 hours = €1,408.00
+gross.</li>
+<li><strong>Liis Kuusk</strong> (0.5 FTE, €700): social tax €292.38,
+including a <strong>Social tax minimum top-up</strong> of €61.38 paid by
+the employer.</li>
+<li>Income tax, II pillar, net pay and employer cost per person.</li>
+</ul>
+<hr />
+<h2 id="run-payroll-for-a-month">Run payroll for a month</h2>
+<p><img src="../screenshots/en/18-pay-run-wizard.png"
+alt="Run payroll for month wizard" /></p>
+<ol type="1">
+<li>Click <strong>Run payroll for month</strong> and choose the
+<strong>Month</strong>.</li>
+<li>Check the <strong>Included employees</strong> (active and employed
+in that month).</li>
+<li>Enter <strong>Hours worked</strong> for each hourly employee.</li>
+<li><strong>Create draft</strong> and confirm.</li>
+</ol>
+<p>Employee details are frozen in the draft, so later edits do not
+change it. A failed minimum-wage check names the employee and the
+amount.</p>
+<hr />
+<h2 id="approve-and-post">Approve and post</h2>
+<p><img src="../screenshots/en/19-pay-run-approve.png"
+alt="Approve &amp; post confirmation" /></p>
+<p><strong>Approve &amp; post</strong> shows the employer cost and asks
+for confirmation. Approval:</p>
+<ul>
+<li>posts one balanced payroll entry to the client’s ledger;</li>
+<li>locks the run (delete or edit only while it is a draft);</li>
+<li>makes the <strong>Payslips PDF</strong> available.</li>
+</ul>
+<p>Delete a wrong draft with <strong>Delete draft</strong> and create it
+again.</p>
+<hr />
+<h2 id="payslips">Payslips</h2>
+<p><img src="../screenshots/en/20-payslip-pdf.png"
+alt="Payslip PDF page" /></p>
+<p><strong>Payslips PDF</strong> produces one page per employee
+(Estonian <em>palgaleht</em>):</p>
+<ul>
+<li>gross pay, or hourly rate × hours, and the work-time fraction;</li>
+<li>II pillar, employee unemployment insurance, tax-free minimum used,
+income tax;</li>
+<li>net pay, social tax with its base and any <strong>minimum
+top-up</strong>, employer unemployment insurance and total employer
+cost.</li>
+</ul>
+<p>Submitting the TSD return to EMTA is not automated; the accountant
+files it.</p>
+<hr />
+<h2 id="payroll-in-the-ledger">Payroll in the ledger</h2>
+<p><img src="../screenshots/en/21-payroll-general-ledger.png"
+alt="General ledger with payroll postings" /></p>
+<p>Each approved run posts to the client’s payroll accounts, for
+example:</p>
+<ul>
+<li><strong>6110</strong> salaries, <strong>6120</strong> social tax,
+<strong>6130</strong> employer unemployment insurance;</li>
+<li><strong>2210</strong> net pay owed, <strong>2220</strong> income tax
+withheld, <strong>2230</strong> pension and unemployment insurance,
+<strong>2240</strong> social tax payable.</li>
+</ul>
+<p>The social tax minimum top-up is a separate line with its own
+description, so it is easy to explain to the client. Postings appear
+under their period end.</p>
+<hr />
+<h2 id="social-tax-minimum">Social tax minimum</h2>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Rule</th>
+<th>2026</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Monthly minimum base</td>
+<td>€886 → minimum social tax €292.38 per employee</td>
+</tr>
+<tr class="even">
+<td>Who pays the shortfall</td>
+<td>Employer, as an extra employer cost</td>
+</tr>
+<tr class="odd">
+<td>Part-month employment</td>
+<td>Base pro-rated by calendar days employed</td>
+</tr>
+<tr class="even">
+<td>Board-member fees</td>
+<td>Outside the obligation</td>
+</tr>
+<tr class="odd">
+<td>Exemption recorded per employee</td>
+<td>Pensioners, reduced work ability, child care, students, previously
+unemployed, shortened working time, council members, ship crew,
+foreign-service spouses, long-term sick leave, absent all month, another
+employer applies the exemption</td>
+</tr>
+</tbody>
+</table>
+<p>Sources: Sotsiaalmaksuseadus § 2 lg 2–4; Rahandusministri määrus nr
+17; EMTA “Sotsiaalmaks”. Choose the matching <strong>Social tax minimum
+exemption</strong> on the employee; it is printed on the payslip.</p>
+<hr />
+<section id="integrations-and-hr-import" class="divider">
+<h2>Integrations and HR import</h2>
+<p>Connect each client’s HR system once, then review every imported
+employee before payroll data changes.</p>
+</section>
+<hr />
+<h2 id="integrations">Integrations</h2>
+<p><img src="../screenshots/en/22-integrations.png"
+alt="Integrations workspace" /></p>
+<p><strong>Integrations</strong> (under <strong>Settings</strong>) lists
+ready connectors first, with:</p>
+<ul>
+<li><strong>Registry status</strong> — what the adapter supports
+today;</li>
+<li><strong>Connection status</strong> — this client’s connection.</li>
+</ul>
+<p><strong>Employee file import</strong> needs no connection;
+<strong>FastHR</strong>, <strong>QuickBooks Online</strong>,
+<strong>Xero</strong> and <strong>Merit Aktiva</strong> are ready to
+connect. Planned integrations are listed below; <strong>Public
+catalogue</strong> opens the full list on the public site.</p>
+<hr />
+<h2 id="connect-fasthr">Connect FastHR</h2>
+<p><img src="../screenshots/en/23-fasthr-configure.png"
+alt="Configure FastHR integration" /></p>
+<ol type="1">
+<li>Click <strong>Configure</strong> on the FastHR card.</li>
+<li>Enter the <strong>Base URL</strong> and the client’s <strong>API
+token</strong>.</li>
+<li><strong>Save configuration</strong>, then <strong>Test
+connection</strong>.</li>
+</ol>
+<p>Secrets are encrypted per client and never shown again; enter a new
+token to replace one. <strong>Disconnect</strong> removes the
+connection; FastHR is read-only, so nothing is ever written back.</p>
+<hr />
+<h2 id="run-an-employee-import">Run an employee import</h2>
+<p><img src="../screenshots/en/24-fasthr-import-review.png"
+alt="Review employee import" /></p>
+<p><strong>Run employee import</strong> stages FastHR employees for
+review; nothing changes yet.</p>
+<ul>
+<li><strong>Matched employee</strong> links a record to an existing
+employee by e-mail or personal code.</li>
+<li>FastHR’s annual base salary becomes the monthly gross (÷ 12); its
+work-time ratio becomes the FTE; hourly staff become hourly pay.</li>
+<li>A <strong>Review note</strong> warns when FastHR has no salary or
+hourly rate.</li>
+</ul>
+<hr />
+<h2 id="apply-decisions">Apply decisions</h2>
+<p><img src="../screenshots/en/25-fasthr-import-applied.png"
+alt="Import outcomes" /></p>
+<ol type="1">
+<li>Tick <strong>Approve</strong> or <strong>Reject</strong> for each
+record.</li>
+<li><strong>Apply decisions</strong>.</li>
+</ol>
+<p><strong>Import outcomes</strong> counts applied, updated, unchanged,
+rejected and failed records and lists the reasons. A record without pay
+is skipped, not guessed; fix it in FastHR and use <strong>Retry
+apply</strong>. <strong>Recent runs</strong> keeps the history.</p>
+<hr />
+<h2 id="import-an-employee-file">Import an employee file</h2>
+<p><img src="../screenshots/en/26-file-import-dialog.png"
+alt="Import employee file dialog" /></p>
+<p>For clients whose payroll or HR system has no connector, use a file
+export.</p>
+<ol type="1">
+<li>On the <strong>Employee file import</strong> card, click
+<strong>Import file</strong>.</li>
+<li>Choose a <strong>CSV or TSV file</strong>, or paste its
+contents.</li>
+<li><strong>Stage employees</strong>.</li>
+</ol>
+<p>Recognised headers include <em>Employee ID</em>, <em>Name</em>,
+<em>Email</em>, <em>Salary</em> (monthly), <em>Personal ID</em> and
+<em>Status</em>, also in Estonian (<em>Nimi</em>, <em>E-post</em>,
+<em>Palk</em>, <em>Isikukood</em>). Export Excel workbooks as CSV first.
+The raw file is not stored.</p>
+<hr />
+<h2 id="review-a-file-import">Review a file import</h2>
+<p><img src="../screenshots/en/27-file-import-review.png"
+alt="File import review" /></p>
+<p>A file import uses the same review as FastHR: each row is staged as
+<strong>Pending</strong>, matched to existing employees by e-mail or
+personal ID, and changes nothing until you <strong>Approve</strong> it
+and <strong>Apply decisions</strong>.</p>
+<p>Re-importing the same file is safe: unchanged rows are reported as
+<strong>Unchanged</strong> instead of creating duplicates.
+<strong>Recent runs</strong> lists earlier file imports for this
+client.</p>
+<hr />
+<h2 id="imported-employees-in-payroll">Imported employees in
+payroll</h2>
+<p><img src="../screenshots/en/28-payroll-after-import.png"
+alt="Payroll after import" /></p>
+<p>Approved records appear in <strong>Payroll</strong> like any other
+employee: here <strong>Eva Näidis</strong> (part-time 0.6, €1,200.00 a
+month from €14,400 a year) and <strong>Rein Proov</strong> (hourly,
+€7.50).</p>
+<p>Before the next pay run, complete what FastHR does not hold: II
+pillar rate, basic exemption application and any social tax minimum
+exemption.</p>
+<hr />
+<section id="reference" class="divider">
+<h2>Reference</h2>
+<p>2026 Estonian payroll rates, what FastAccounts does not do, and where
+to find help.</p>
+</section>
+<hr />
+<h2 id="estonian-payroll-rates-2026">Estonian payroll rates 2026</h2>
+<table>
+<thead>
+<tr class="header">
+<th>Item</th>
+<th>Rate or amount</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Income tax</td>
+<td>22%</td>
+</tr>
+<tr class="even">
+<td>Basic exemption (on written application)</td>
+<td>€700 per month</td>
+</tr>
+<tr class="odd">
+<td>Social tax (employer)</td>
+<td>33%, minimum base €886 per month</td>
+</tr>
+<tr class="even">
+<td>Unemployment insurance</td>
+<td>employee 1.6%, employer 0.8%</td>
+</tr>
+<tr class="odd">
+<td>Funded pension (II pillar)</td>
+<td>0%, 2%, 4% or 6%</td>
+</tr>
+<tr class="even">
+<td>Minimum wage until 31.03.2026</td>
+<td>€886 per month, €5.31 per hour</td>
+</tr>
+<tr class="odd">
+<td>Minimum wage from 01.04.2026</td>
+<td>€946 per month, €5.67 per hour</td>
+</tr>
+</tbody>
+</table>
+<p>Sources: EMTA “Maksumäärad”; Vabariigi Valitsuse määrus nr 36
+(23.03.2026). Money is calculated with exact decimals and rounded
+half-up to cents.</p>
+<hr />
+<h2 id="limits-and-next-steps">Limits and next steps</h2>
+<ul>
+<li><strong>Filing</strong>: KMD and VD workpapers are prepared for
+accountant review and exported; nothing is filed with EMTA or HMRC
+automatically.</li>
+<li><strong>E-mail</strong>: reminders and auto-e-mailed invoices need
+Postmark settings.</li>
+<li><strong>Payroll</strong>: Estonian EUR books and 2026 periods only.
+Leave, sickness, benefits, non-resident cases, TSD submission and salary
+payments are outside the calculation; accountant UAT is pending
+(<code>docs/payroll_rules.md</code>).</li>
+<li><strong>Imports</strong>: FastHR imports employee master data, not
+hours or leave.</li>
+</ul>
+<p>Release notes are in <code>docs/change_log.md</code>; rebuild this
+guide with <code>docs/USER_GUIDE_BUILD.md</code>.</p>
+</body>
+</html>

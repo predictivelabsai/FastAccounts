@@ -1,0 +1,136 @@
+/* FastAccounts user guide — landscape slide deck (pandoc HTML -> WeasyPrint PDF).
+   Copied from FastShop docs/assets/guide.css (FastClinic pattern): text on the
+   left, screenshot on the right, one slide per "---". Palette follows the
+   workspace design (static/app.css): violet #5b21b6 / #7c3aed, dark #14062b. */
+
+@page {
+  size: 13.333in 7.5in;
+  margin: .48in .58in .52in .58in;
+  @bottom-left  { content: string(guide-footer); font-size: 8pt; color: #9aa6b2; }
+  @bottom-right { content: "fastaccounts.org · " counter(page); font-size: 8pt; color: #9aa6b2; }
+}
+
+html { font-size: 10.5pt; }
+body {
+  font-family: "Helvetica Neue", Helvetica, Arial, "DejaVu Sans", sans-serif;
+  color: #14062b;
+  line-height: 1.5;
+  margin: 0;
+  counter-reset: guide-section;
+}
+
+/* footer text comes from the cover's edition line, so en/et share one stylesheet */
+.cover p:last-child { string-set: guide-footer content(); }
+
+/* every horizontal rule ends a slide */
+hr {
+  page-break-after: always;
+  border: 0; height: 0; margin: 0; visibility: hidden;
+}
+
+/* ---- title slide (first H1) ---- */
+h1 {
+  color: #5b21b6;
+  font-size: 30pt;
+  margin: 1.4cm 0 0.2cm;
+  letter-spacing: .3px;
+}
+h1 + h2 { /* subtitle on the title slide — plain, not a slide bar */
+  background: none; border: 0; border-left: 0; border-radius: 0; padding: 0;
+  color: #55636f; font-size: 17pt; font-weight: 600; margin: .1cm 0 .6cm;
+}
+
+/* ---- cover page (pandoc `::: cover` fenced div) ---- */
+.cover {
+  min-height: 5.9in; margin: -.05in; padding: 1.75in .65in 0;
+  box-sizing: border-box; text-align: center; border-radius: 12px;
+  background: #5b21b6; color: #fff;
+}
+.cover h1 { color: #5b21b6; font-size: 42pt; margin: 0 0 .35cm; letter-spacing: .5px; }
+.cover h2, .cover h3, .cover h4 {
+  background: none; border: 0; padding: 0; border-radius: 0;
+  color: #55636f; font-weight: 600; font-size: 18pt; margin: .25cm 0;
+}
+.cover h1, .cover h2, .cover h3, .cover h4 { color: #fff; }
+.cover p { font-size: 14pt; color: #ede9fe; margin: .4cm 0; }
+.cover strong { color: #fff; }
+.cover em { color: #ede9fe; }
+
+/* ---- component section divider pages ---- */
+.divider {
+  min-height: 5.9in; margin: -.05in; padding: 1.55in .75in 0 1.1in;
+  box-sizing: border-box; border-left: .12in solid #7c3aed;
+  border-radius: 8px; background: #14062b; color: #fff;
+  counter-increment: guide-section;
+}
+.divider::before {
+  content: "SECTION " counter(guide-section, decimal-leading-zero);
+  display: block; margin-bottom: .42in; color: #ede9fe;
+  font-size: 10pt; font-weight: 700; letter-spacing: .08em;
+}
+.divider h2 {
+  padding: 0; margin: 0 0 .28in; border: 0; background: none;
+  color: #fff; font-size: 34pt; letter-spacing: -.5px;
+}
+.divider p { max-width: 8.7in; color: #ede9fe; font-size: 17pt; line-height: 1.45; }
+
+/* ---- slide titles ---- */
+h2 {
+  color: #ffffff;
+  background: #5b21b6;
+  font-size: 17pt;
+  margin: 0 0 .55cm;
+  padding: .28cm .5cm;
+  border-radius: 7px;
+  border-left: 7px solid #7c3aed;
+}
+h3 {
+  color: #5b21b6;
+  font-size: 13pt;
+  margin: .35cm 0 .15cm;
+}
+
+p { margin: .18cm 0; }
+strong { color: #5b21b6; }
+
+ul, ol { margin: .15cm 0 .2cm; padding-left: .85cm; }
+li { margin: .12cm 0; }
+
+a { color: #5b21b6; text-decoration: none; }
+code {
+  background: #f3e8ff; color: #5b21b6;
+  padding: .04cm .14cm; border-radius: 3px;
+  font-family: "DejaVu Sans Mono", monospace; font-size: .88em;
+}
+
+blockquote {
+  margin: .35cm 0; padding: .25cm .55cm;
+  background: #f3e8ff; border-left: 4px solid #5b21b6;
+  color: #3a4855; font-style: italic;
+}
+
+/* screenshots — sit on the right of a slide, capped so the slide fits one page */
+img {
+  display: block;
+  float: right;
+  max-width: 6.0in;
+  max-height: 4.9in;
+  margin: 0 0 .3cm .7cm;
+  border: 1px solid #e4dcf5;
+  border-radius: 6px;
+}
+
+/* reference tables (Appendix) */
+table { border-collapse: collapse; width: 100%; font-size: 8.4pt; margin: .2cm 0; }
+th {
+  background: #5b21b6; color: #fff; text-align: left; font-weight: 600;
+  padding: 3px 7px; border: 1px solid #5b21b6;
+}
+td { padding: 2.5px 7px; border: 1px solid #e4dcf5; vertical-align: top; }
+tr:nth-child(even) td { background: #f3e8ff; }
+table code { font-size: 7.8pt; background: none; color: #5b21b6; padding: 0; }
+
+/* keep a slide's content together on its page */
+h2, h3, p, ul, ol, blockquote, img { page-break-inside: avoid; }
+table { page-break-inside: auto; }
+tr { page-break-inside: avoid; }
