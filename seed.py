@@ -1,4 +1,8 @@
-"""Deterministic-shape, synthetic-only demo books for UK and Estonia."""
+"""Deterministic-shape, synthetic-only demo books for a fresh local database.
+
+The seed is safe to rerun, but its intended use is to prepare a fresh demo
+database so the fixture history remains concise and predictable.
+"""
 from __future__ import annotations
 
 from banking import BankingService
@@ -8,6 +12,18 @@ from organisations import OrganisationService
 
 
 DEMO_EMAIL = "demo@fastaccounts.local"
+DEMO_CONNECTION_NOTE = "demo synthetic connection"
+
+COMPLETED_EMPLOYEE_IMPORT = """Employee ID,Name,Email,Salary
+demo-completed-001,Mari Maasikas,payroll1@example.invalid,2000.00
+demo-completed-002,Jaan Tamm,payroll2@example.invalid,2400.00
+demo-completed-003,Kati Kask,payroll3@example.invalid,3200.00
+"""
+
+REVIEW_EMPLOYEE_IMPORT = """Employee ID,Name,Email,Salary
+demo-review-001,Peeter Saar,payroll4@example.invalid,1950.00
+demo-review-002,Anu Lepp,anu.lepp@example.invalid,2100.00
+"""
 
 
 def _seed_organisation(country: str) -> dict:
@@ -234,6 +250,129 @@ def _seed_sample_payroll() -> dict:
     return organisation
 
 
+def _seed_integration_connections(organisations: list[dict]) -> None:
+    """Create encrypted synthetic connections without contacting providers."""
+    from connectors.providers import FastHRProvider
+    from integration_service import IntegrationService
+
+    db = get_database()
+    service = IntegrationService(db)
+    by_country = {organisation["country_code"]: organisation for organisation in organisations}
+    fixtures = (
+        (
+            by_country["UK"]["id"],
+            "quickbooks",
+            {
+                "access_token": "demo-sandbox-token",
+                "realm_id": "demo-sandbox-qbo",
+                "sandbox": True,
+            },
+            {"note": DEMO_CONNECTION_NOTE, "sandbox": True},
+            "demo-sandbox-qbo",
+        ),
+        (
+            by_country["UK"]["id"],
+            "xero",
+            {
+                "access_token": "demo-synthetic-xero-token",
+                "tenant_id": "demo-synthetic-xero-tenant",
+            },
+            {"note": DEMO_CONNECTION_NOTE},
+            "demo-synthetic-xero-tenant",
+        ),
+        (
+            by_country["EE"]["id"],
+            "merit",
+            {
+                "api_id": "demo-synthetic-merit-api-id",
+                "api_key": "demo-synthetic-merit-api-key",
+            },
+            {"note": DEMO_CONNECTION_NOTE},
+            "demo-synthetic-merit",
+        ),
+        (
+            by_country["EE"]["id"],
+            "fasthr",
+            {
+                "base_url": FastHRProvider.default_base_url,
+                "token": "demo-synthetic-fasthr-token",
+            },
+            {"note": DEMO_CONNECTION_NOTE},
+            "demo-synthetic-fasthr",
+        ),
+    )
+    for organisation_id, provider, credentials, config, external_tenant_id in fixtures:
+        try:
+            existing = service.connection_for_provider(organisation_id, provider)
+        except KeyError:
+            existing = None
+        if (
+            existing
+            and existing["status"] == "Connected"
+            and existing["config"] == config
+            and existing.get("external_tenant_id") == external_tenant_id
+        ):
+            continue
+        connection = service.configure(
+            organisation_id,
+            provider,
+            credentials=credentials,
+            config=config,
+            actor=DEMO_EMAIL,
+            external_tenant_id=external_tenant_id,
+        )
+        service.set_status(
+            connection["id"],
+            "Connected",
+            actor=DEMO_EMAIL,
+            message="Synthetic demo fixture; no live provider check performed.",
+        )
+
+
+def _file_import_run(imports, organisation_id: str, external_id: str) -> dict | None:
+    """Find a previously seeded file-import run through the public service API."""
+    for summary in imports.syncs(organisation_id, "file_import"):
+        staged = imports.get_staged(organisation_id, sync_run_id=summary["id"])
+        if any(record.get("external_id") == external_id for record in staged["records"]):
+            return staged
+    return None
+
+
+def _seed_file_imports(organisation: dict) -> None:
+    """Create one applied and one pending offline employee import run."""
+    from import_service import ImportService
+
+    imports = ImportService(get_database())
+    organisation_id = organisation["id"]
+    completed = _file_import_run(imports, organisation_id, "demo-completed-001")
+    if completed is None:
+        summary = imports.run_sync(
+            organisation_id,
+            "file_import",
+            "employee",
+            actor=DEMO_EMAIL,
+            credentials={"csv_content": COMPLETED_EMPLOYEE_IMPORT},
+            config={"note": "demo synthetic completed employee import"},
+        )
+        staged = imports.get_staged(organisation_id, sync_run_id=summary["id"])
+        imports.apply_staged(
+            organisation_id,
+            "file_import",
+            summary["id"],
+            {record["id"]: "apply" for record in staged["records"]},
+            actor=DEMO_EMAIL,
+        )
+    if _file_import_run(imports, organisation_id, "demo-review-001") is None:
+        imports.run_sync(
+            organisation_id,
+            "file_import",
+            "employee",
+            actor=DEMO_EMAIL,
+            credentials={"csv_content": REVIEW_EMPLOYEE_IMPORT},
+            config={"note": "demo synthetic employee import awaiting review"},
+        )
+
+
 def seed_demo() -> list[dict]:
     """Seed the UK and Estonian demo books (returned) plus the sample-payroll organisation."""
     db = get_database()
@@ -242,6 +381,8 @@ def seed_demo() -> list[dict]:
     _seed_automation(organisations[0])
     _seed_payroll(organisations[1])
     _seed_sample_payroll()
+    _seed_integration_connections(organisations)
+    _seed_file_imports(organisations[1])
     return organisations
 
 
