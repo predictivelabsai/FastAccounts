@@ -559,3 +559,20 @@ authentication and connection failures, empty results, external mappings and a
 repeat sync/apply cycle are covered with mocked HTTP transport; automated tests
 make no live FastHR requests. Production bureau use still requires customer
 configuration and accountant UAT.
+
+## 20. Integration workspace (2026-10-09)
+
+The signed-in workspace now makes the connector lifecycle usable without curl.
+Adapter-ready providers are shown first with tenant-scoped connection status and
+registry-driven configure, test and disconnect controls; secret values are never
+returned or prefilled. Planning stubs and roadmap entries stay collapsed and do
+not compete with usable adapters.
+
+FastHR adds an employee-import action and a reviewed staging workspace. Owners
+and administrators can inspect source payloads, suggested local matches and
+review notes; approve, reject or retry failed rows; apply selected decisions; and
+review outcome counts, failure reasons and recent runs. Empty pulls, unknown
+links and completed queues have explicit non-destructive states. The interface is
+localized in English, Estonian, Latvian and Lithuanian. This adds no migration,
+does not enable unattended imports, and does not change the pending production
+accountant UAT gate.

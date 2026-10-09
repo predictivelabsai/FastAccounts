@@ -57,6 +57,29 @@ def test_workspace_unmatched_status_translations():
         assert i18n.catalog(lang)["workspace"]["Unmatched"] == expected
 
 
+def test_workspace_integration_flow_copy_is_localized_in_all_four_catalogues():
+    expectations = {
+        "en": ("Ready to connect", "Review employee import"),
+        "et": ("Ühendamiseks valmis", "Vaata töötajate import üle"),
+        "lv": ("Gatavi savienošanai", "Pārskatīt darbinieku importu"),
+        "lt": ("Paruošta prijungti", "Peržiūrėti darbuotojų importą"),
+    }
+    required = {
+        "Configure, test and review data for this client.",
+        "Ready to connect",
+        "Planned integrations",
+        "Saved secrets are never shown. Enter the secret again to test or replace this configuration.",
+        "Review employee import",
+        "Apply decisions",
+        "Employee import runs",
+    }
+    for lang, (ready, review) in expectations.items():
+        workspace = i18n.catalog(lang)["workspace"]
+        assert required <= workspace.keys()
+        assert workspace["Ready to connect"] == ready
+        assert workspace["Review employee import"] == review
+
+
 def test_language_dropdown_lists_four_locales_and_preserves_current_route():
     rendered = str(integrations_page("lv"))
     assert '<html lang="lv">' in rendered

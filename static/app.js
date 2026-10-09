@@ -128,8 +128,15 @@
           "In bank": "info",
           Overdue: "danger",
           Active: "success",
+          Configured: "info",
           Connected: "success",
           Disconnected: "warning",
+          "Reauth Required": "warning",
+          Pending: "warning",
+          Rejected: "neutral",
+          Applied: "success",
+          "Review Required": "warning",
+          Completed: "success",
           Sent: "success",
           Failed: "danger",
           Posted: "success",
@@ -357,7 +364,9 @@
   }
   async function render() {
     const ticket = ++generation,
-      view = location.hash.slice(1) || "overview";
+      route = location.hash.slice(1) || "overview",
+      routeParts = route.split("/").filter(Boolean),
+      view = routeParts[0] || "overview";
     app.classList.remove("menu-open");
     document.querySelectorAll(".app-nav").forEach((a) => {
       const disabled = a.dataset.view === "payroll" && !payrollSupported(org);
@@ -381,6 +390,13 @@
       c = {
         oid,
         payrollSupported: payrollSupported(org),
+        route: routeParts.slice(1).map((part) => {
+          try {
+            return decodeURIComponent(part);
+          } catch (_) {
+            return part;
+          }
+        }),
         url: (s) => `/organisations/${encodeURIComponent(oid)}${s}`,
         mount: (html) => {
           if (ticket !== generation) return false;
@@ -1153,25 +1169,391 @@
       });
     },
     integrations: async (c) => {
-      const [rows, email] = await Promise.all([api("/integrations"), api("/email-status")]);
-      if (
-        !c.mount(
-          page(
-            t("Integrations"),
-            t("Connect your accounting workflow."),
-            link("Public catalogue", "/integrations"),
-            `<section class="card section"><div class="section-head"><h2>${tr("Email delivery")}</h2>${pill(email.connected ? "Connected" : "Disconnected")}</div><p>Postmark${email.from_email ? ` · ${esc(email.from_email)}` : ""}</p><p class="muted">${tr("Connect email delivery by setting POSTMARK_API_TOKEN and FROM_EMAIL in the deployment environment (.env).")}</p></section><div class="integration-list">${rows
-              .map((x) => {
-                const copy = catalog.integrations?.items?.[x.key] || {};
-                return `<article class="card integration-row"><img src="${esc(x.logo)}" alt="${esc(copy.name || x.name)}"><div><h2>${esc(copy.name || x.name)}</h2>${pill(x.status)}<p>${esc(copy.description || x.description)}</p><small class="muted">${esc(copy.direction || x.direction || "")}</small></div></article>`;
-              })
-              .join("")}</div>`,
-          ),
-        )
-      )
-        return;
+      await integrationWorkspace(c);
     },
   };
+
+  const integrationName = (item) =>
+      catalog.integrations?.items?.[item.key]?.name || item.name,
+    integrationDescription = (item) =>
+      catalog.integrations?.items?.[item.key]?.description || item.description,
+    integrationDirection = (item) =>
+      catalog.integrations?.items?.[item.key]?.direction || item.direction || "",
+    integrationUrl = (c, provider, suffix = "") =>
+      c.url(`/integrations/${encodeURIComponent(provider)}${suffix}`),
+    readyProviderOrder = ["fasthr", "quickbooks", "xero", "merit"];
+
+  function integrationCard(c, item, connection) {
+    const provider = item.key,
+      name = integrationName(item),
+      status = connection?.status || "Not configured",
+      canImport = provider === "fasthr" && status === "Connected";
+    return `<article class="card integration-provider" data-provider="${esc(provider)}"><div class="integration-provider-head"><img src="${esc(item.logo)}" alt="${esc(name)}"><div><h2>${esc(name)}</h2><div class="integration-statuses"><span>${tr("Registry status")}: ${pill(item.registry_status)}</span><span class="connection-status">${tr("Connection status")}: ${pill(status)}</span></div></div></div><p>${esc(integrationDescription(item))}</p><p class="integration-direction">${esc(integrationDirection(item))}</p><div class="integration-actions">${button("Configure", "configureIntegration", false, `data-provider="${esc(provider)}"`)}${button("Test connection", "testIntegration", false, `data-provider="${esc(provider)}"`)}${connection ? button("Disconnect", "disconnectIntegration", false, `data-provider="${esc(provider)}"`) : ""}${provider === "fasthr" ? button("Recent runs", "integrationRuns", false, `data-provider="${esc(provider)}"`) + button("Run employee import", "runEmployeeImport", true, `data-provider="${esc(provider)}" ${canImport ? "" : `disabled title="${tr("Test the connection before importing.")}"`}`) : ""}</div></article>`;
+  }
+
+  function plannedIntegration(item) {
+    const name = integrationName(item);
+    return `<article class="planned-integration"><img src="${esc(item.logo)}" alt="${esc(name)}"><div><h3>${esc(name)}</h3><p>${esc(integrationDescription(item))}</p></div>${pill(item.registry_status)}</article>`;
+  }
+
+  async function integrationWorkspace(c) {
+    const catalogue = await api("/integrations"),
+      [subview, provider, syncRunId] = c.route,
+      item = provider && catalogue.find((entry) => entry.key === provider);
+    if (subview && (!item || !["review", "runs"].includes(subview))) {
+      c.mount(
+        page(
+          t("Integration not found"),
+          t("This integration or review link is not available."),
+          link("Back to integrations", "#integrations"),
+        ),
+      );
+      return;
+    }
+    if (subview === "review") {
+      if (!syncRunId) {
+        c.mount(
+          page(
+            t("Integration not found"),
+            t("This integration or review link is not available."),
+            link("Back to integrations", "#integrations"),
+          ),
+        );
+        return;
+      }
+      await integrationReview(c, item, provider, syncRunId);
+      return;
+    }
+    if (subview === "runs") {
+      await integrationRuns(c, item, provider);
+      return;
+    }
+
+    const [connections, email] = await Promise.all([
+        api(c.url("/integrations")),
+        api("/email-status"),
+      ]),
+      byProvider = new Map(connections.map((connection) => [connection.provider, connection])),
+      ready = catalogue
+        .filter((entry) => entry.registry_status === "Adapter ready")
+        .sort((left, right) => {
+          const leftIndex = readyProviderOrder.indexOf(left.key),
+            rightIndex = readyProviderOrder.indexOf(right.key);
+          return (leftIndex < 0 ? 999 : leftIndex) - (rightIndex < 0 ? 999 : rightIndex);
+        }),
+      planned = catalogue.filter((entry) => entry.registry_status !== "Adapter ready");
+    if (
+      !c.mount(
+        page(
+          t("Integrations"),
+          t("Configure, test and review data for this client."),
+          link("Public catalogue", "/integrations"),
+          `<section class="integration-ready"><div class="section-head"><h2>${tr("Ready to connect")}</h2><span class="muted">${num(ready.length)} ${tr("providers")}</span></div><div class="integration-grid">${ready.map((entry) => integrationCard(c, entry, byProvider.get(entry.key))).join("")}</div></section><details class="planned-integrations section"><summary><span>${tr("Planned integrations")}</span><small>${num(planned.length)} ${tr("providers")}</small></summary><div class="planned-integration-list">${planned.map(plannedIntegration).join("")}</div></details><section class="card section email-integration"><div class="section-head"><h2>${tr("Email delivery")}</h2>${pill(email.connected ? "Connected" : "Disconnected")}</div><p>Postmark${email.from_email ? ` · ${esc(email.from_email)}` : ""}</p><p class="muted">${tr("Connect email delivery by setting POSTMARK_API_TOKEN and FROM_EMAIL in the deployment environment (.env).")}</p></section>`,
+        ),
+      )
+    )
+      return;
+    const findItem = (button) =>
+        catalogue.find((entry) => entry.key === button.dataset.provider),
+      findConnection = (button) => byProvider.get(button.dataset.provider);
+    bindActions(content, {
+      configureIntegration: (button) =>
+        integrationDialog(c, findItem(button), findConnection(button)),
+      testIntegration: (button) =>
+        integrationDialog(c, findItem(button), findConnection(button), true),
+      disconnectIntegration: (button) => {
+        const selectedProvider = button.dataset.provider;
+        confirmAction(
+          "Disconnect integration",
+          tr("Disconnect this integration? Stored credentials remain encrypted until a new configuration replaces them."),
+          async () => {
+            await post(integrationUrl(c, selectedProvider, "/disconnect"));
+            toast(t("Integration disconnected"));
+            await render();
+          },
+        );
+      },
+      runEmployeeImport: async (button) => {
+        const summary = await post(integrationUrl(c, button.dataset.provider, "/sync"), {
+          object_type: "employee",
+        });
+        toast(
+          t("Employee records staged: {count}").replace(
+            "{count}",
+            num(summary.read_count),
+          ),
+        );
+        location.hash = `integrations/review/${encodeURIComponent(button.dataset.provider)}/${encodeURIComponent(summary.id)}`;
+      },
+      integrationRuns: (button) => {
+        location.hash = `integrations/runs/${encodeURIComponent(button.dataset.provider)}`;
+      },
+    });
+  }
+
+  function integrationCredentialField(meta, connection) {
+    const value =
+        meta.input_type === "secret"
+          ? ""
+          : connection?.config?.[meta.name] ?? meta.default ?? "",
+      required = meta.required ? "required" : "",
+      note = meta.note ? `<small class="field-help">${tr(meta.note)}</small>` : "";
+    if (meta.input_type === "boolean")
+      return `<label class="check integration-check"><input type="checkbox" name="${esc(meta.name)}" ${value ? "checked" : ""}>${tr(meta.label)}${note}</label>`;
+    const secret = meta.input_type === "secret";
+    return `<label>${tr(meta.label)}<input name="${esc(meta.name)}" type="${secret ? "password" : "text"}" value="${esc(value)}" ${required} ${secret ? `autocomplete="new-password" placeholder="${tr("Enter secret")}"` : ""}><span class="field-error" data-error="${esc(meta.name)}"></span>${note}</label>`;
+  }
+
+  function integrationPayload(item, connection, data) {
+    const credentials = {};
+    for (const meta of item.credential_fields || [])
+      credentials[meta.name] =
+        meta.input_type === "boolean"
+          ? data[meta.name] === "on"
+          : String(data[meta.name] ?? "").trim();
+    return {
+      credentials,
+      config: connection?.config || {},
+      external_tenant_id: String(data.external_tenant_id || "").trim(),
+    };
+  }
+
+  function integrationDialog(c, item, connection, focusTest = false) {
+    if (!item) return;
+    const name = integrationName(item),
+      hasSecret = (item.credential_fields || []).some(
+        (meta) => meta.input_type === "secret",
+      ),
+      d = dialog(
+        "Configure integration",
+        `<div class="integration-dialog-intro"><strong>${esc(name)}</strong>${item.credential_note ? `<p>${tr(item.credential_note)}</p>` : ""}${hasSecret && connection ? `<p class="notice">${tr("Saved secrets are never shown. Enter the secret again to test or replace this configuration.")}</p>` : ""}</div><form novalidate><div class="form-grid integration-form">${(item.credential_fields || []).map((meta) => integrationCredentialField(meta, connection)).join("")}${field("External tenant ID", "external_tenant_id", connection?.external_tenant_id || "")}</div><div class="connection-test-result" role="status" aria-live="polite"></div><p class="form-error" role="alert"></p><div class="dialog-actions">${button("Cancel", "cancel")}${button("Test connection", "testConnection")}<button class="button primary" type="submit">${tr("Save configuration")}</button></div></form>`,
+      ),
+      testButton = d.querySelector("[data-action=testConnection]"),
+      result = d.querySelector(".connection-test-result");
+    bindForm(d, async (data, formElement) => {
+      const intent = formElement.dataset.intent || "save";
+      formElement.dataset.intent = "save";
+      const payload = integrationPayload(item, connection, data);
+      if (intent === "test") {
+        testButton.disabled = true;
+        try {
+          const checked = await post(
+            integrationUrl(c, item.key, "/test"),
+            { credentials: payload.credentials, config: payload.config },
+          );
+          const status = checked.ok && checked.live ? "Connected" : "Error";
+          result.innerHTML = `<div class="test-result ${checked.ok && checked.live ? "success" : "danger"}"><div>${pill(status)}<strong>${tr(checked.live ? "Live connection" : "Configuration check")}</strong></div><p>${esc(translateError(checked.message))}</p></div>`;
+          await refreshIntegrationStatus(c, item.key, connection);
+        } catch (error) {
+          result.innerHTML = `<div class="test-result danger"><div>${pill("Error")}<strong>${tr("Connection failed")}</strong></div><p>${esc(error.message)}</p></div>`;
+          await refreshIntegrationStatus(c, item.key, connection);
+          throw error;
+        } finally {
+          testButton.disabled = false;
+        }
+        return;
+      }
+      await post(integrationUrl(c, item.key), payload);
+      closeDialog(d);
+      toast(t("Integration saved"));
+      await render();
+    });
+    testButton.onclick = () => {
+      const formElement = d.querySelector("form");
+      formElement.dataset.intent = "test";
+      formElement.requestSubmit();
+    };
+    if (focusTest) testButton.focus();
+  }
+
+  async function refreshIntegrationStatus(c, provider, existingConnection) {
+    if (!existingConnection) return;
+    const connections = await api(c.url("/integrations")),
+      current = connections.find((entry) => entry.provider === provider),
+      card = content.querySelector(
+        `.integration-provider[data-provider="${CSS.escape(provider)}"]`,
+      ),
+      target = card?.querySelector(".connection-status"),
+      importButton = card?.querySelector('[data-action="runEmployeeImport"]');
+    if (target)
+      target.innerHTML = `${tr("Connection status")}: ${pill(current?.status || "Not configured")}`;
+    if (importButton) {
+      importButton.disabled = current?.status !== "Connected";
+      importButton.title = importButton.disabled
+        ? t("Test the connection before importing.")
+        : "";
+    }
+  }
+
+  const stagedDecisionEligible = (record) =>
+    ["Pending", "Failed"].includes(record.status);
+
+  function stagedRecordRow(record) {
+    const payload = record.external_payload || {},
+      displayName =
+        payload.name ||
+        [payload.first_name, payload.last_name].filter(Boolean).join(" ") ||
+        record.external_id ||
+        "—",
+      detail = [payload.email, payload.personal_id]
+        .filter(Boolean)
+        .map(esc)
+        .join(" · "),
+      eligible = stagedDecisionEligible(record);
+    return row([
+      td(`<strong>${esc(displayName)}</strong>${detail ? `<small>${detail}</small>` : ""}<details class="payload-details"><summary>${tr("View source record")}</summary><pre>${esc(JSON.stringify(payload, null, 2))}</pre></details>`),
+      td(pill(record.status)),
+      td(esc(record.matched_local_employee_name || t("No local match"))),
+      td(record.review_note ? esc(translateError(record.review_note)) : "—"),
+      td(
+        eligible
+          ? `<div class="decision-options" role="group" aria-label="${tr("Decision")}"><label class="check"><input type="checkbox" data-decision="apply" data-id="${esc(record.id)}">${tr(record.status === "Failed" ? "Retry apply" : "Approve")}</label><label class="check"><input type="checkbox" data-decision="reject" data-id="${esc(record.id)}">${tr("Reject")}</label></div>`
+          : `<span class="muted">${tr("Decision recorded")}</span>`,
+      ),
+    ]);
+  }
+
+  function integrationOutcomeSummary(outcome) {
+    if (!outcome) return "";
+    const reasons = outcome.outcomes.filter((entry) => entry.reason);
+    return `<section class="section outcome-summary" aria-live="polite"><div class="section-head"><h2>${tr("Import outcomes")}</h2><span>${pill(outcome.failed ? "Failed" : "Completed")}</span></div><div class="kpis compact-kpis">${[
+      ["Applied", outcome.applied],
+      ["Updated", outcome.updated],
+      ["Unchanged", outcome.unchanged],
+      ["Rejected", outcome.rejected],
+      ["Failed", outcome.failed],
+    ].map(([label, value]) => kpi(label, num(value))).join("")}</div>${reasons.length ? `<div class="notice danger-notice"><strong>${tr("Outcome reasons")}</strong><ul>${reasons.map((entry) => `<li>${esc(translateError(entry.reason))}</li>`).join("")}</ul></div>` : ""}</section>`;
+  }
+
+  async function integrationReview(c, item, provider, syncRunId, outcome = null) {
+    const review = await api(
+        integrationUrl(
+          c,
+          provider,
+          `/sync/${encodeURIComponent(syncRunId)}`,
+        ),
+      ),
+      records = review.records || [],
+      eligible = records.filter(stagedDecisionEligible),
+      stagedBody = records.length
+        ? table(
+            ["Source record", "Status", "Matched employee", "Review note", "Decision"],
+            records.map(stagedRecordRow),
+          )
+        : `<div class="empty integration-empty">${icon()}<h3>${tr("No records were staged")}</h3><p>${tr("The sync completed without new employee records.")}</p></div>`,
+      noDecisions =
+        records.length && !eligible.length
+          ? `<div class="notice" role="status">${tr("No records are awaiting a decision.")}</div>`
+          : "";
+    if (
+      !c.mount(
+        page(
+          t("Review employee import"),
+          `${integrationName(item)} · ${t("Review staged records before payroll data changes.")}`,
+          link("Back to integrations", "#integrations") +
+            link(
+              "Recent runs",
+              `#integrations/runs/${encodeURIComponent(provider)}`,
+            ),
+          `${integrationOutcomeSummary(outcome)}<div class="review-summary">${kpi("Records read", num(review.summary.read_count))}${kpi("Pending", num(review.summary.staged_counts?.Pending))}${kpi("Failed", num(review.summary.staged_counts?.Failed))}</div>${noDecisions}<section class="section"><div class="section-head"><h2>${tr("Staged employees")}</h2>${button("Apply decisions", "applyImportDecisions", true, "disabled")}</div>${stagedBody}</section>`,
+        ),
+      )
+    )
+      return;
+    const applyButton = content.querySelector(
+      '[data-action="applyImportDecisions"]',
+    );
+    content.querySelectorAll("[data-decision]").forEach((input) => {
+      input.onchange = () => {
+        if (input.checked)
+          content
+            .querySelectorAll(
+              `[data-decision][data-id="${CSS.escape(input.dataset.id)}"]`,
+            )
+            .forEach((other) => {
+              if (other !== input) other.checked = false;
+            });
+        applyButton.disabled = !content.querySelector(
+          "[data-decision]:checked",
+        );
+      };
+    });
+    bindActions(content, {
+      applyImportDecisions: async () => {
+        const decisions = Object.fromEntries(
+          [...content.querySelectorAll("[data-decision]:checked")].map(
+            (input) => [input.dataset.id, input.dataset.decision],
+          ),
+        );
+        if (!Object.keys(decisions).length) {
+          toast(t("Choose approve or reject for at least one record."), "info");
+          return;
+        }
+        applyButton.disabled = true;
+        try {
+          const applied = await post(
+            integrationUrl(
+              c,
+              provider,
+              `/sync/${encodeURIComponent(syncRunId)}/apply`,
+            ),
+            { decisions },
+          );
+          toast(t("Import decisions applied"));
+          await integrationReview(c, item, provider, syncRunId, applied);
+        } finally {
+          if (applyButton.isConnected) applyButton.disabled = false;
+        }
+      },
+    });
+  }
+
+  async function integrationRuns(c, item, provider) {
+    const runs = await api(integrationUrl(c, provider, "/syncs"));
+    if (
+      !c.mount(
+        page(
+          t("Employee import runs"),
+          `${integrationName(item)} · ${t("Open a run to review staged employee records.")}`,
+          link("Back to integrations", "#integrations"),
+          table(
+            ["Started", "Status", "Records read", "Staged", "Actions"],
+            runs.map((run) =>
+              row([
+                td(date(run.started_at), "numeric"),
+                td(pill(run.status)),
+                td(num(run.read_count), "numeric"),
+                td(
+                  num(
+                    Object.values(run.staged_counts || {}).reduce(
+                      (sum, value) => sum + Number(value || 0),
+                      0,
+                    ),
+                  ),
+                  "numeric",
+                ),
+                td(
+                  button(
+                    "Open review",
+                    "openIntegrationReview",
+                    false,
+                    `data-id="${esc(run.id)}"`,
+                  ),
+                ),
+              ]),
+            ),
+            link("Back to integrations", "#integrations"),
+          ),
+        ),
+      )
+    )
+      return;
+    bindActions(content, {
+      openIntegrationReview: (button) => {
+        location.hash = `integrations/review/${encodeURIComponent(provider)}/${encodeURIComponent(button.dataset.id)}`;
+      },
+    });
+  }
   const reportNames = {
     "trial-balance": "Trial balance",
     "profit-and-loss": "Profit & loss",
