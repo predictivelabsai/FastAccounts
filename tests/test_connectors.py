@@ -6,6 +6,7 @@ import pytest
 from connectors import (
     BambooHRProvider,
     FastHRProvider,
+    FileImportConnector,
     MeritProvider,
     PersonioProvider,
     QuickBooksProvider,
@@ -129,6 +130,17 @@ def test_documented_contract_registrations_are_real_and_not_overwritten_by_roadm
     assert bamboo.salary_field_id == "customSalary"
     assert REGISTRY["personio"].status == expected_status
     assert REGISTRY["bamboohr"].status == expected_status
+
+
+def test_file_import_registration_is_ready_without_credentials():
+    metadata = provider_metadata("file_import")
+    assert metadata["registry_status"] == "Adapter ready"
+    assert metadata["credential_fields"] == []
+    connector = connector_for(
+        "file_import", credentials={"csv_content": "Name\nMari Maasik\n"}
+    )
+    assert isinstance(connector, FileImportConnector)
+    assert connector.pull("employee").records[0]["name"] == "Mari Maasik"
 
 
 def test_finance_registrations_build_real_providers_from_credentials():

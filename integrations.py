@@ -22,6 +22,20 @@ class Integration:
 
 CATALOGUE = (
     Integration(
+        key="file_import",
+        name="Employee file import",
+        category="HR software",
+        markets=("UK", "EE"),
+        status="Adapter ready",
+        logo="/static/integrations/file-import.svg",
+        logo_alt="Employee file import icon",
+        description="Import employee master records from a CSV or TSV export of any payroll or HR system.",
+        capabilities=("CSV/Excel export import", "Employee master records"),
+        direction="Import · uploaded files",
+        ownership="Uploaded export remains source",
+        docs_url="https://github.com/predictivelabsai/FastAccounts/blob/main/docs/product_roadmap.md#22-universal-file-import-2026-10-09",
+    ),
+    Integration(
         key="quickbooks",
         name="QuickBooks Online",
         category="Accounting platform",

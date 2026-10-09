@@ -162,6 +162,12 @@ class IntegrationSyncIn(BaseModel):
     object_type: str = Field(min_length=1, max_length=80)
 
 
+class FileImportIn(BaseModel):
+    object_type: str = Field(min_length=1, max_length=80)
+    csv_content: str = Field(min_length=1)
+    config: dict[str, Any] = Field(default_factory=dict)
+
+
 class IntegrationApplyIn(BaseModel):
     decisions: dict[str, Literal["apply", "reject"]] = Field(default_factory=dict)
 
@@ -632,6 +638,23 @@ def run_integration_sync(
     _require(organisation_id, user, {"owner", "administrator"})
     return ImportService().run_sync(
         organisation_id, provider, payload.object_type, actor=user.email
+    )
+
+
+@api.post("/organisations/{organisation_id}/integrations/file_import/import")
+def import_employee_file(
+    organisation_id: str,
+    payload: FileImportIn,
+    user: User = Depends(require_csrf),
+):
+    _require(organisation_id, user, {"owner", "administrator"})
+    return ImportService().run_sync(
+        organisation_id,
+        "file_import",
+        payload.object_type,
+        actor=user.email,
+        credentials={"csv_content": payload.csv_content},
+        config=payload.config,
     )
 
 

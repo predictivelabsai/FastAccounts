@@ -1181,14 +1181,25 @@
       catalog.integrations?.items?.[item.key]?.direction || item.direction || "",
     integrationUrl = (c, provider, suffix = "") =>
       c.url(`/integrations/${encodeURIComponent(provider)}${suffix}`),
-    readyProviderOrder = ["fasthr", "quickbooks", "xero", "merit"];
+    readyProviderOrder = ["file_import", "fasthr", "quickbooks", "xero", "merit"];
 
   function integrationCard(c, item, connection) {
     const provider = item.key,
       name = integrationName(item),
-      status = connection?.status || "Not configured",
-      canImport = provider === "fasthr" && status === "Connected";
-    return `<article class="card integration-provider" data-provider="${esc(provider)}"><div class="integration-provider-head"><img src="${esc(item.logo)}" alt="${esc(name)}"><div><h2>${esc(name)}</h2><div class="integration-statuses"><span>${tr("Registry status")}: ${pill(item.registry_status)}</span><span class="connection-status">${tr("Connection status")}: ${pill(status)}</span></div></div></div><p>${esc(integrationDescription(item))}</p><p class="integration-direction">${esc(integrationDirection(item))}</p><div class="integration-actions">${button("Configure", "configureIntegration", false, `data-provider="${esc(provider)}"`)}${button("Test connection", "testIntegration", false, `data-provider="${esc(provider)}"`)}${connection ? button("Disconnect", "disconnectIntegration", false, `data-provider="${esc(provider)}"`) : ""}${provider === "fasthr" ? button("Recent runs", "integrationRuns", false, `data-provider="${esc(provider)}"`) + button("Run employee import", "runEmployeeImport", true, `data-provider="${esc(provider)}" ${canImport ? "" : `disabled title="${tr("Test the connection before importing.")}"`}`) : ""}</div></article>`;
+      fileImport = provider === "file_import",
+      status = fileImport ? "No connection needed" : connection?.status || "Not configured",
+      canImport = provider === "fasthr" && status === "Connected",
+      actions = fileImport
+        ? button("Recent runs", "integrationRuns", false, `data-provider="${esc(provider)}"`) +
+          button("Import file", "importEmployeeFile", true, `data-provider="${esc(provider)}"`)
+        : button("Configure", "configureIntegration", false, `data-provider="${esc(provider)}"`) +
+          button("Test connection", "testIntegration", false, `data-provider="${esc(provider)}"`) +
+          (connection ? button("Disconnect", "disconnectIntegration", false, `data-provider="${esc(provider)}"`) : "") +
+          (provider === "fasthr"
+            ? button("Recent runs", "integrationRuns", false, `data-provider="${esc(provider)}"`) +
+              button("Run employee import", "runEmployeeImport", true, `data-provider="${esc(provider)}" ${canImport ? "" : `disabled title="${tr("Test the connection before importing.")}"`}`)
+            : "");
+    return `<article class="card integration-provider" data-provider="${esc(provider)}"><div class="integration-provider-head"><img src="${esc(item.logo)}" alt="${esc(name)}"><div><h2>${esc(name)}</h2><div class="integration-statuses"><span>${tr("Registry status")}: ${pill(item.registry_status)}</span><span class="connection-status">${tr("Connection status")}: ${pill(status)}</span></div></div></div><p>${esc(integrationDescription(item))}</p><p class="integration-direction">${esc(integrationDirection(item))}</p><div class="integration-actions">${actions}</div></article>`;
   }
 
   function plannedIntegration(item) {
@@ -1285,9 +1296,41 @@
         );
         location.hash = `integrations/review/${encodeURIComponent(button.dataset.provider)}/${encodeURIComponent(summary.id)}`;
       },
+      importEmployeeFile: (button) =>
+        fileImportDialog(c, findItem(button)),
       integrationRuns: (button) => {
         location.hash = `integrations/runs/${encodeURIComponent(button.dataset.provider)}`;
       },
+    });
+  }
+
+  function fileImportDialog(c, item) {
+    if (!item) return;
+    const d = dialog(
+      "Import employee file",
+      `<div class="file-import-intro"><strong>${esc(integrationName(item))}</strong><p>${tr("Upload a CSV or TSV export, or paste its contents below. Your browser reads the selected file; the raw contents are not retained after staging.")}</p><p class="muted">${tr("Only CSV and TSV files are supported. Export Excel workbooks as CSV first.")}</p></div><form novalidate><div class="form-grid file-import-form"><label>${tr("CSV or TSV file")}<input name="employee_file" type="file" accept=".csv,.tsv,text/csv,text/tab-separated-values"><span class="field-error" data-error="employee_file"></span></label><label>${tr("CSV or TSV contents")}<textarea name="csv_content" rows="9" maxlength="2000000" placeholder="${tr("Paste CSV or TSV contents")}"></textarea><span class="field-error" data-error="csv_content"></span></label></div><p class="form-error" role="alert"></p><div class="dialog-actions">${button("Cancel", "cancel")}<button class="button primary" type="submit">${tr("Stage employees")}</button></div></form>`,
+    );
+    bindForm(d, async (data, formElement) => {
+      const file = formElement.elements.employee_file.files[0],
+        csvContent = file
+          ? await file.text()
+          : String(data.csv_content || "");
+      if (!csvContent.trim())
+        throw new Error(t("Choose a CSV or TSV file, or paste its contents."));
+      if (csvContent.length > 2000000)
+        throw new Error(t("File is too large. The limit is 2,000,000 characters."));
+      const summary = await post(
+        integrationUrl(c, "file_import", "/import"),
+        { object_type: "employee", csv_content: csvContent },
+      );
+      closeDialog(d);
+      toast(
+        t("Employee records staged: {count}").replace(
+          "{count}",
+          num(summary.read_count),
+        ),
+      );
+      location.hash = `integrations/review/file_import/${encodeURIComponent(summary.id)}`;
     });
   }
 

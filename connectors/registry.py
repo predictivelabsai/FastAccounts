@@ -7,6 +7,7 @@ from typing import Any, Callable, Literal, Mapping
 import integrations
 
 from .base import Connector
+from .file_import import FileImportConnector
 from .providers import (
     BambooHRProvider,
     FastHRProvider,
@@ -98,6 +99,13 @@ REGISTRY: dict[str, ConnectorRegistration] = {
             "Pull-only directory contract tested with fixtures, not vendor credentials. "
             "Salary requires a reviewed salary_field_id config mapping."
         ),
+    ),
+    "file_import": ConnectorRegistration(
+        status="Adapter ready",
+        factory=lambda credentials, config: FileImportConnector(
+            credentials.get("csv_content", ""), config
+        ),
+        credential_note="Offline CSV or TSV employee import; no provider credentials required.",
     ),
     "fasthr": ConnectorRegistration(
         status="Adapter ready",

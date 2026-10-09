@@ -594,6 +594,35 @@ verifies successful, unauthorized and unavailable providers without live network
 calls. Section 20 covers the integration workspace, which merged before this
 change.
 
+## 22. Universal file import (2026-10-09)
+
+The connection-free `file_import` adapter accepts employee CSV and TSV exports
+from any payroll or HR system and feeds them into the same tenant-scoped review
+and apply workflow as provider adapters. It detects comma, semicolon and tab
+delimiters; supports UTF-8 with or without a BOM, quoted fields and CRLF or LF;
+uses exact Decimal salary parsing; and assigns a stable short hash when no source
+employee ID exists. Empty rows are ignored and duplicate employee IDs within one
+run resolve to one staged record.
+
+The supported header aliases are explicit:
+
+| Canonical field | Accepted source headers |
+| --- | --- |
+| `external_id` | `ID`, `Employee ID`, `Töötaja ID` |
+| `name` | `Name`, `Nimi`, `Full name` |
+| `email` | `Email`, `E-post`, `e-mail` |
+| `gross_salary` | `Salary`, `Base salary`, `Palk`, `Baaspalk`, `Gross salary` |
+| `personal_id` | `Personal ID`, `Isikukood`, `Personal code`, `ID code` |
+| `status` | `Status`, `Staatus` |
+
+Blank, `active`, `aktiivne` and `tööl` status values are active; other values are
+inactive. Unmapped columns remain visible in review with a `file_` prefix. The
+browser can read a selected file or accept pasted content, but the raw CSV/TSV is
+never retained: only parsed staged records are stored. Native Excel workbooks are
+out of scope and must first be exported as CSV. No provider API key, migration or
+live network test is required. Section 21 covers the finance-connector health
+checks, which merged before this change.
+
 ## 23. Personio and BambooHR documented-contract adapters (2026-10-09)
 
 Personio and BambooHR now have pull-only employee adapters implemented against
@@ -616,4 +645,4 @@ Records omit `gross_salary` unless a tenant explicitly configures a reviewed
 Personio `salary_attribute` or BambooHR `salary_field_id`. Without that mapping,
 staging succeeds but applying the row fails independently with `Gross salary is
 required`, leaving the rest of the batch available for review. Section 22 covers
-the universal file import, currently pending on its separate branch.
+the universal file import, which merged before this change.

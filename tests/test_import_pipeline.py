@@ -527,6 +527,11 @@ def test_import_routes_authorise_redact_and_audit_ids(import_api, db, ee_org, mo
     accountant = {"X-Test-User": "accountant@example.test"}
     for method, path, body in (
         ("POST", "/integrations/xero/sync", {"object_type": "employees"}),
+        (
+            "POST",
+            "/integrations/file_import/import",
+            {"object_type": "employee", "csv_content": "Name\nAPI Mari\n"},
+        ),
         ("GET", f"/integrations/xero/sync/{sync['id']}", None),
         ("POST", f"/integrations/xero/sync/{sync['id']}/apply", {"decisions": {}}),
         ("GET", "/integrations/xero/syncs", None),
@@ -538,6 +543,14 @@ def test_import_routes_authorise_redact_and_audit_ids(import_api, db, ee_org, mo
     for route in routes:
         expected = current_user if route.methods == {"GET"} else require_csrf
         assert expected in [dependency.call for dependency in route.dependant.dependencies]
+    file_route = next(
+        route
+        for route in api.routes
+        if route.path.endswith("/integrations/file_import/import")
+    )
+    assert require_csrf in [
+        dependency.call for dependency in file_route.dependant.dependencies
+    ]
 
     audits = db.rows(
         "SELECT object_id,details_json FROM audit_events WHERE organisation_id=? "
@@ -550,6 +563,72 @@ def test_import_routes_authorise_redact_and_audit_ids(import_api, db, ee_org, mo
     assert "API Employee" not in audit_text
     assert "2000.005" not in audit_text
     assert secret not in audit_text
+
+
+def test_file_import_route_imports_and_refuses_invalid_requests(import_api, db, ee_org):
+    client, base = import_api
+    content = "Name,Email,Salary\nRoute Mari,route-mari@example.test,2300\n"
+
+    imported = client.post(
+        base + "/integrations/file_import/import",
+        json={"object_type": "employee", "csv_content": content},
+    )
+    assert imported.status_code == 200, imported.text
+    summary = imported.json()
+    assert summary["provider"] == "file_import"
+    assert summary["object_type"] == "employee"
+    assert summary["read_count"] == 1
+    review = client.get(
+        base + f"/integrations/file_import/sync/{summary['id']}"
+    )
+    assert review.status_code == 200
+    assert review.json()["records"][0]["external_payload"]["name"] == "Route Mari"
+    persisted = db.rows(
+        "SELECT external_payload_json FROM import_staged_records "
+        "WHERE organisation_id=? AND sync_run_id=?",
+        (ee_org["id"], summary["id"]),
+    )
+    audit_rows = db.rows(
+        "SELECT details_json FROM audit_events WHERE organisation_id=?",
+        (ee_org["id"],),
+    )
+    assert content not in json.dumps(persisted + audit_rows)
+
+    refused_connection = client.post(
+        base + "/integrations/file_import",
+        json={"credentials": {"csv_content": content}, "config": {}},
+    )
+    assert refused_connection.status_code == 422
+    assert refused_connection.json()["detail"].startswith(
+        "File import does not use stored connections"
+    )
+    assert db.scalar(
+        "SELECT COUNT(*) FROM integration_connections "
+        "WHERE organisation_id=? AND provider='file_import'",
+        (ee_org["id"],),
+    ) == 0
+
+    missing = client.post(
+        base + "/integrations/file_import/sync", json={"object_type": "employee"}
+    )
+    assert missing.status_code == 422
+    assert missing.json()["detail"] == "CSV content is empty"
+
+    wrong_type = client.post(
+        base + "/integrations/file_import/import",
+        json={"object_type": "invoices", "csv_content": "Name\nMari Maasik\n"},
+    )
+    assert wrong_type.status_code == 422
+    assert wrong_type.json()["detail"] == (
+        "The reviewed import pipeline currently supports employees only"
+    )
+
+    oversize = client.post(
+        base + "/integrations/file_import/import",
+        json={"object_type": "employee", "csv_content": "x" * 2_000_001},
+    )
+    assert oversize.status_code == 422
+    assert "x" * 100 not in oversize.text
 
 
 def test_fasthr_import_applies_part_time_and_hourly_and_skips_unpaid(db, ee_org, monkeypatch):

@@ -72,6 +72,8 @@ def test_workspace_integration_flow_copy_is_localized_in_all_four_catalogues():
         "Review employee import",
         "Apply decisions",
         "Employee import runs",
+        "Import employee file",
+        "Choose a CSV or TSV file, or paste its contents.",
     }
     for lang, (ready, review) in expectations.items():
         workspace = i18n.catalog(lang)["workspace"]
@@ -133,6 +135,22 @@ def test_documented_contract_catalogue_copy_and_status_exist_in_all_locales():
             assert copy["direction"]
             assert copy["ownership"]
             assert copy["name"] in str(integrations_page(lang))
+
+
+def test_file_import_catalogue_copy_exists_in_all_locales():
+    names = {
+        "en": "Employee file import",
+        "et": "Töötajate failiimport",
+        "lv": "Darbinieku faila imports",
+        "lt": "Darbuotojų failo importas",
+    }
+    for lang, name in names.items():
+        copy = i18n.integration_copy(lang, "file_import")
+        assert copy["name"] == name
+        assert len(copy["capabilities"]) == 2
+        assert copy["direction"]
+        assert copy["ownership"]
+        assert name in str(integrations_page(lang))
 
 
 def test_language_selection_persists_in_signed_session():
