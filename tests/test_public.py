@@ -7,7 +7,7 @@ import pytest
 
 import integrations
 from web import i18n
-from web.public import integrations_page, landing_page, login_page
+from web.public import integrations_page, landing_page, login_page, workspace_page
 from web_app import app
 
 
@@ -194,6 +194,23 @@ def test_workspace_requires_authentication():
     response = client.get("/app", follow_redirects=False)
     assert response.status_code == 303
     assert response.headers["location"].startswith("/login?next=")
+
+
+@pytest.mark.parametrize("lang", ["en", "et", "lv", "lt"])
+def test_workspace_shell_renders_localized_integrations_entry(lang):
+    page = BeautifulSoup(
+        str(workspace_page({"email": "owner@example.test"}, lang)),
+        "html.parser",
+    )
+    entry = page.select_one('.app-nav[data-view="integrations"]')
+    assert entry is not None
+    assert entry.get_text(strip=True) == i18n.t("nav.integrations", lang)
+    assert entry["href"] == "#integrations"
+    assert page.select_one("#workspace-app")["data-lang"] == lang
+    assert page.select_one('script[src="/static/app.js"]')
+    catalogue_script = page.find("script", src=False).get_text()
+    assert '"Configure, test and review data for this client."' in catalogue_script
+    assert "stored-token" not in catalogue_script
 
 
 def test_demo_login_displays_demo_user_in_workspace_sidebar(monkeypatch):
