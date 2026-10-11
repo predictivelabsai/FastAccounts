@@ -27,14 +27,15 @@ def no_network(monkeypatch):
     monkeypatch.delenv("FROM_EMAIL", raising=False)
 
 
-def template(db, org, *, day=None, due=None, issued=False):
+def template(db, org, *, day=None, due=None, issued=False, contact_id=None):
     docs = DocumentService(db)
-    contact = docs.create_contact(org["id"], name="Synthetic customer", country_code="GB",
-                                  email="customer@example.invalid", payment_terms_days=14)
+    if contact_id is None:
+        contact_id = docs.create_contact(org["id"], name="Synthetic customer", country_code="GB",
+                                        email="customer@example.invalid", payment_terms_days=14)["id"]
     account = db.scalar("SELECT id FROM accounts WHERE organisation_id=? AND system_role='SALES'", (org["id"],))
     tax = db.scalar("SELECT id FROM tax_codes WHERE organisation_id=? AND code='UK20'", (org["id"],))
     day = day or db.scalar("SELECT starts_on FROM fiscal_periods WHERE organisation_id=? ORDER BY starts_on LIMIT 1", (org["id"],))
-    invoice = docs.create_invoice(org["id"], contact_id=contact["id"], issue_date=day, due_date=due,
+    invoice = docs.create_invoice(org["id"], contact_id=contact_id, issue_date=day, due_date=due,
                                   actor="test", reference="Retainer", lines=[dict(description="Service", quantity="1.2500",
                                   unit_price="100.10", account_id=account, tax_code_id=tax)])
     return docs.issue_invoice(invoice["id"], actor="test") if issued else invoice
@@ -263,11 +264,17 @@ def test_populated_upgrade_preserves_posted_data(tmp_path, monkeypatch):
     db = Database(path=str(tmp_path / "upgrade.sqlite"))
     assert len(db.migrate()) == 6
     org = OrganisationService(db).create(name="Synthetic upgrade", country_code="UK", entity_type="UK_COMPANY", owner_email="test@example.invalid")
-    invoice = template(db, org, issued=True)
+    # Seed the historical schema without invoking the current contact writer,
+    # which requires the supplier IBAN column from migration 0015.
+    contact_id, now = new_id(), utc_now()
+    with db.transaction() as tx:
+        tx.execute("INSERT INTO contacts(id,organisation_id,contact_type,name,country_code,created_at,updated_at) "
+                   "VALUES (?,?,'customer','Synthetic customer','GB',?,?)", (contact_id, org["id"], now, now))
+    invoice = template(db, org, issued=True, contact_id=contact_id)
     ledger = db.rows("SELECT * FROM gl_entries ORDER BY id")
     audits = db.rows("SELECT * FROM audit_events ORDER BY id")
     monkeypatch.setattr(database, "MIGRATIONS", original)
-    assert db.migrate() == ["0007_automation", "0008_import_staging", "0009_local_accounts", "0010_tsd_export", "0011_account_mappings", "0012_external_gl", "0013_sync_review", "0014_sync_push"]
+    assert db.migrate() == ["0007_automation", "0008_import_staging", "0009_local_accounts", "0010_tsd_export", "0011_account_mappings", "0012_external_gl", "0013_sync_review", "0014_sync_push", "0015_payment_orders"]
     assert db.migrate() == []
     current = DocumentService(db).invoice(invoice["id"])
     assert current.pop("reminders_disabled") == 0

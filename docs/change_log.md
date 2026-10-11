@@ -4,6 +4,42 @@ Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as
 delivered.
 
+## 2026-10-11: Payment orders, supplier IBANs and attachments (PR1)
+
+### Added
+
+- Added migration `0015_payment_orders` and the payment-order service and API:
+  eligible bill preview, exclusion reasons, currency totals, audited creation,
+  history and pain.001.001.03 XML downloads with fixed two-decimal amounts.
+- Added full bank and supplier IBAN storage alongside the existing bank mask,
+  and IBAN inputs on existing contact and bank-account creation paths.
+- Froze amounts, currencies, payer/payee names and IBANs, and remittance
+  references, so later document or contact changes do not change the export.
+- Added payment-order controls and history to bills, evidence sections in
+  invoice and bill dialogs, and workspace copy in English, Estonian, Lithuanian
+  and Latvian. No new standalone view is required.
+- Wired invoice, bill and manual journal evidence upload, listing and download,
+  with owner validation, duplicate refusal, bounded upload reads, safe filenames
+  and SHA-256/size verification. Stored paths remain server-side.
+
+### Validation and boundaries
+
+- Added synthetic pytest coverage for candidates, transaction and ledger
+  invariants, frozen XML, currency groups, tenant isolation, route shapes,
+  evidence round trips, access roles and CSRF, plus a Playwright browser flow.
+- Updated all migration-list and count assertions to the actual 15 migrations.
+- Migration 0001 already stored masked bank IBANs; migrations 0011–0014 supplied
+  no full IBANs or payment details. The shared audit helper, database transaction
+  layer, Decimal money helper and existing evidence table are reused.
+- Contact and bank-account update routes remain follow-up work. Bank acceptance
+  testing is pending. Instructions do not record payments or post ledger entries.
+- XML identifiers use UUIDs without hyphens: repository bill UUIDs are 36
+  characters, exceeding pain.001's 35-character identifier limit. The stored
+  bill ID remains unchanged; this is a reversible export representation.
+- Verified `python -m pytest tests/ -q`: 413 passed, 3 optional PostgreSQL tests
+  skipped, on local Python 3.14.6. Python 3.12 is not installed locally; CI
+  remains configured for 3.12. JavaScript syntax and whitespace checks passed.
+
 ## 2026-10-11: Open sign-up switch
 
 ### Added

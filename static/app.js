@@ -646,10 +646,10 @@
                 "numeric",
               ),
               td(
-                x.status === "Draft"
+                button("Attachments", "invoiceAttachments", false, `data-id="${esc(x.id)}"`) + (x.status === "Draft"
                   ? button("Issue", "issue", false, `data-id="${esc(x.id)}"`)
                   : link("PDF", `/api${c.url(`/invoices/${x.id}.pdf`)}`) +
-                      link("XML", `/api${c.url(`/invoices/${x.id}.xml`)}`),
+                      link("XML", `/api${c.url(`/invoices/${x.id}.xml`)}`)),
               ),
             ]),
           ),
@@ -658,6 +658,7 @@
         bindActions(content, {
           newInvoice: () => documentDialog("invoice"),
           newContact: () => contactDialog("customer"),
+          invoiceAttachments: (b) => documentDialog("invoice", b.dataset.id),
           issue: (b) =>
             confirmAction(
               "Issue invoice",
@@ -793,13 +794,14 @@
       });
     },
     bills: async (c) => {
-      const rows = await api(c.url("/bills"));
+      const [rows, orders] = await Promise.all([api(c.url("/bills")), api(c.url("/payment-orders"))]);
       if (
         !c.mount(
           page(
             t("Bills"),
             t("Review supplier documents before posting."),
             button("New supplier", "supplier") +
+              button("Create payment order", "paymentOrder") +
               button("New bill", "bill", true),
             table(
               [
@@ -818,7 +820,7 @@
                   td(pill(x.status)),
                   cash(x.total, x.currency),
                   td(
-                    x.status === "Draft"
+                    button("Attachments", "billAttachments", false, `data-id="${esc(x.id)}"`) + (x.status === "Draft"
                       ? button("Review", "review", false, `data-id="${x.id}"`)
                       : x.status === "In Review"
                         ? button(
@@ -827,12 +829,17 @@
                             true,
                             `data-id="${x.id}"`,
                           )
-                        : "",
+                        : ""),
                   ),
                 ]),
               ),
               button("New bill", "bill"),
-            ),
+            ) + `<section class="section"><h2>${tr("Payment orders")}</h2>${table(
+              ["Execution date", "Bills", ["Total"], "Actions"],
+              orders.map((order) => row([td(date(order.execution_date)), td(esc(order.bill_count)),
+                cash(order.total, order.lines[0]?.currency),
+                td(link("Download XML", `/api${c.url(`/payment-orders/${order.id}.xml`)}`))])),
+            )}</section>`,
           ),
         )
       )
@@ -840,6 +847,8 @@
       bindActions(content, {
         bill: () => documentDialog("bill"),
         supplier: () => contactDialog("supplier"),
+        paymentOrder: () => paymentOrderDialog(),
+        billAttachments: (b) => documentDialog("bill", b.dataset.id),
         review: (b) =>
           confirmAction(
             "Review bill",
@@ -1856,6 +1865,7 @@
           field("VAT number", "vat_no") +
           field("Registration number", "registration_no") +
           field("Address", "address") +
+          field("Supplier IBAN", "iban") +
           field(
             "Payment terms (days)",
             "payment_terms_days",
@@ -1871,8 +1881,18 @@
       await saved(d);
     });
   }
-  async function documentDialog(kind) {
+  async function documentDialog(kind, documentId = null) {
     const base = path("");
+    if (documentId) {
+      const rows = await api(base + (kind === "invoice" ? "/invoices" : "/bills"));
+      if (base !== path("")) return;
+      const record = rows.find((x) => x.id === documentId);
+      if (!record) return;
+      const d = dialog(kind === "invoice" ? "Invoice" : "Bill",
+        `<p>${esc(record.number || record.supplier_number || t("Draft"))} · ${esc(record.contact_name)}</p>`);
+      await attachmentsSection(d, base, kind, documentId);
+      return;
+    }
     const [contacts, accounts, taxes] = await Promise.all([
       api(base + "/contacts"),
       api(base + "/accounts"),
@@ -1952,8 +1972,11 @@
         delete data[k];
       });
       data.lines = [line];
-      await post(base + (invoice ? "/invoices" : "/bills"), data);
-      await saved(d);
+      const record = await post(base + (invoice ? "/invoices" : "/bills"), data);
+      d.querySelector("form").remove();
+      await attachmentsSection(d, base, kind, record.id);
+      toast(t("Saved successfully"));
+      await render();
     });
   }
   function bankDialog() {
@@ -1969,7 +1992,7 @@
             "text",
             'required pattern="[A-Z]{3}"',
           ) +
-          field("IBAN (stored masked)", "iban"),
+          field("IBAN", "iban"),
         "Add account",
       ),
     );
@@ -1978,6 +2001,83 @@
       await saved(d);
     });
   }
+  async function attachmentsSection(d, base, kind, documentId) {
+    d.classList.add("document-evidence-dialog");
+    const section = document.createElement("section");
+    section.className = "section";
+    section.innerHTML = `<h3>${tr("Attachments")}</h3><div data-attachments></div><form novalidate>${field("File", "file", "", "file", "required")}<p class="form-error" role="alert"></p><div class="dialog-actions"><button class="button primary" type="submit">${tr("Upload attachment")}</button></div></form>`;
+    d.querySelector(".dialog-card").append(section);
+    const refresh = async () => {
+      const rows = await api(`${base}/attachments?owner_type=${kind}&owner_id=${encodeURIComponent(documentId)}`);
+      if (!d.isConnected || base !== path("")) return;
+      section.querySelector("[data-attachments]").innerHTML = rows.length
+        ? rows.map((item) => `<p>${esc(item.filename)} ${link("Download", `/api${base}/attachments/${item.id}/download`)}</p>`).join("")
+        : `<p class="muted">${tr("No attachments yet.")}</p>`;
+    };
+    bindForm(section, async (_, f) => {
+      const payload = new FormData();
+      payload.append("file", f.elements.file.files[0]);
+      await api(`${base}/attachments/${kind}/${documentId}`, { method: "POST", body: payload });
+      f.reset();
+      await refresh();
+    });
+    await refresh();
+  }
+
+  async function paymentOrderDialog() {
+    const base = path("");
+    const [accounts, preview] = await Promise.all([
+      api(base + "/bank-accounts"), api(base + "/payment-orders/candidates"),
+    ]);
+    if (base !== path("")) return;
+    const banks = accounts.filter((x) => x.active && x.iban);
+    if (!banks.length) {
+      toast(t("Add a bank account with an IBAN before creating a payment order."), "info");
+      return bankDialog();
+    }
+    const d = dialog("Create payment order", form(
+      select("Bank account", "bank_account_id", banks.map((x) => [x.id, `${x.name} · ${x.currency}`])) +
+      field("Execution date", "execution_date", today(), "date", "required") +
+      field("Due on or before", "due_before", "", "date") +
+      `<div class="full-width" data-payment-preview></div><p class="muted">${tr("This creates payment instructions only. Bills remain unpaid until a payment is recorded.")}</p>`,
+      "Create payment order"));
+    d.classList.add("payment-order-dialog");
+    let current = preview, previewGeneration = 0;
+    const f = d.querySelector("form");
+    const draw = () => {
+      const bank = banks.find((x) => x.id === f.elements.bank_account_id.value);
+      d.querySelector("[data-payment-preview]").innerHTML =
+        `<h3>${tr("Currency totals")}</h3><p>${Object.entries(current.totals).map(([currency, total]) => esc(money(total, currency))).join(" · ") || tr("No eligible bills.")}</p>` +
+        table(["Supplier no.", "Supplier", "Currency", ["Outstanding"], "Select"],
+          current.candidates.map((bill) => row([
+            td(esc(bill.supplier_number)), td(esc(bill.contact_name)), td(esc(bill.currency)), cash(bill.outstanding, bill.currency),
+            td(`<input type="checkbox" name="bill_ids" value="${esc(bill.id)}" aria-label="${esc(bill.supplier_number)}" ${bill.currency === bank.currency ? "checked" : "disabled"}>`),
+          ]))) + `<h3>${tr("Excluded bills")}</h3>` +
+        table(["Supplier no.", "Supplier", "Reason"], current.excluded.map((bill) => row([
+          td(esc(bill.supplier_number)), td(esc(bill.contact_name)), td(tr(bill.reason)),
+        ])));
+    };
+    f.elements.bank_account_id.onchange = draw;
+    f.elements.due_before.onchange = async () => {
+      const request = ++previewGeneration;
+      f.querySelector("[type=submit]").disabled = true;
+      try {
+        const result = await api(`${base}/payment-orders/candidates${f.elements.due_before.value ? `?due_before=${f.elements.due_before.value}` : ""}`);
+        if (request !== previewGeneration || !d.isConnected || base !== path("")) return;
+        current = result;
+        draw();
+        f.querySelector("[type=submit]").disabled = false;
+      } catch (error) { f.querySelector(".form-error").textContent = error.message; }
+    };
+    draw();
+    bindForm(d, async (data, formElement) => {
+      data.bill_ids = new FormData(formElement).getAll("bill_ids");
+      data.due_before ||= null;
+      await post(base + "/payment-orders", data);
+      await saved(d);
+    });
+  }
+
   function importDialog(accounts) {
     if (!accounts.length) return bankDialog();
     const base = path("/bank-accounts");
