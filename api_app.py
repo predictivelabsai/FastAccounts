@@ -9,6 +9,7 @@ from typing import Any, Literal
 
 from fastapi import Depends, FastAPI, File, Header, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, Field, field_validator
 
@@ -31,6 +32,7 @@ from payroll import PayrollConflict, PayrollService
 from tax import TaxService
 from tsd import TSDExportService
 from payment_orders import PaymentOrderService
+from opening_balances import OpeningBalanceService, parse_open_items_csv
 
 
 class User(BaseModel):
@@ -224,6 +226,21 @@ class JournalIn(BaseModel):
     currency: str
     idempotency_key: str
     lines: list[JournalLineIn] = Field(min_length=2)
+
+
+class OpeningBalanceIn(BaseModel):
+    posting_date: str
+    lines: list[JournalLineIn]
+
+
+class OpeningCSVIn(BaseModel):
+    csv_content: str = Field(min_length=1, max_length=2_000_000)
+
+
+class OpeningItemsIn(BaseModel):
+    posting_date: str
+    csv_content: str | None = Field(default=None, min_length=1, max_length=2_000_000)
+    rows: list[dict[str, Any]] | None = None
 
 
 class InvitationIn(BaseModel):
@@ -737,6 +754,45 @@ def create_journal(organisation_id: str, payload: JournalIn, user: User = Depend
         posting_date=payload.posting_date, lines=lines, actor=user.email,
         currency=payload.currency,
     )
+
+
+@api.get("/organisations/{organisation_id}/opening-balance")
+def opening_balance_snapshot(organisation_id: str, opening_date: str,
+                             user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {"viewer"})
+    return jsonable_encoder(OpeningBalanceService().snapshot(organisation_id, opening_date=opening_date),
+                            custom_encoder={Decimal: str})
+
+
+@api.post("/organisations/{organisation_id}/opening-balance", status_code=201)
+def post_opening_balance(organisation_id: str, payload: OpeningBalanceIn,
+                         user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return OpeningBalanceService().post(organisation_id, actor=user.email, **payload.model_dump())
+
+
+@api.get("/organisations/{organisation_id}/opening-balance/open-items/preview")
+def opening_items_preview(organisation_id: str, csv_content: str,
+                          user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {"viewer"})
+    return jsonable_encoder(parse_open_items_csv(csv_content), custom_encoder={Decimal: str})
+
+
+@api.post("/organisations/{organisation_id}/opening-balance/open-items/preview")
+def opening_items_file_preview(organisation_id: str, payload: OpeningCSVIn,
+                               user: User = Depends(require_csrf)):
+    _require(organisation_id, user, APPROVE_ROLES | {"viewer"})
+    return jsonable_encoder(parse_open_items_csv(payload.csv_content), custom_encoder={Decimal: str})
+
+
+@api.post("/organisations/{organisation_id}/opening-balance/open-items", status_code=201)
+def post_opening_items(organisation_id: str, payload: OpeningItemsIn,
+                       user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    if (payload.csv_content is None) == (payload.rows is None):
+        raise ValueError("Supply either CSV content or parsed rows")
+    return OpeningBalanceService().post_open_items(organisation_id, posting_date=payload.posting_date,
+        actor=user.email, rows=payload.csv_content if payload.csv_content is not None else payload.rows)
 
 
 @api.get("/integrations")

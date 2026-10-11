@@ -4,6 +4,58 @@ Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as
 delivered.
 
+## 2026-10-11: Opening balances and opening receivables/payables (PR2)
+
+### Added
+
+- Added `opening_balances.py` with monthly period creation, balance-sheet
+  snapshots and immutable opening postings. Only active Asset, Liability and
+  Equity accounts are allowed; signed differences post to RETAINED_EARNINGS.
+  Existing fiscal periods are preserved, including locked periods. No migrations
+  or configuration changes are needed.
+- Added CSV validation with row-numbered errors and customer/supplier totals.
+  Imports create ledger-only AR debits/AP credits with contact IDs, due dates
+  and original references, balanced by per-side retained-earnings lines.
+  Contacts are reused within the tenant; invoice and bill documents are not
+  fabricated. Contact creation and ledger posting share one transaction.
+- Added viewer snapshots/previews and write-role, CSRF-protected posting APIs.
+  Decimal preview amounts are returned as strings. A POST preview supplements
+  the GET preview so file contents do not need to fit in a URL.
+- Added Accounting dialogs with snapshots, per-account inputs, exact running
+  totals, retained-earnings indicators, file preview/confirmation and copy in
+  English, Estonian, Lithuanian and Latvian. File changes invalidate previews.
+
+### Validation and boundaries
+
+- `LedgerService.post` returns an existing batch for its organisation/type/ID
+  key without checking changed inputs. The opening service compares submitted
+  per-account debit/credit totals and dates before delegation, identifying input
+  lines separately from generated offsets. Changed or reversed opening batches
+  require a correcting journal; equivalent and empty no-op retries return the
+  existing batch.
+- Raw CSV voucher IDs are the first 16 SHA-256 hex characters of the exact UTF-8
+  text. Different content creates a new batch; same-file retries return before
+  creating contacts. Parsed-row API submissions hash canonical JSON of validated
+  rows as a separate identity. Retry file uploads consistently as raw CSV.
+  Organisation locks serialise concurrent imports; period rows are locked on
+  PostgreSQL while validating a new posting.
+- The plan's automatic retained-earnings remainder is implemented. Unequal
+  input totals are balanced by that offset; invalid, negative, non-finite,
+  sub-penny or two-sided lines are rejected, and the final batch must balance.
+- Added synthetic pytest coverage for both countries, month extents and locks,
+  offsets, retries, CSV errors, contact balances, rollback, tenant isolation,
+  route shapes and access/CSRF, plus an intercepted desktop/mobile Playwright
+  flow. No live provider calls are used.
+- Accountant UAT, Estonian copy proofreading and settlement/ageing support for
+  these ledger-only items remain follow-ups. Existing ageing and payment flows
+  use invoice/bill documents. Imported AR/AP amounts must be excluded from the
+  main opening journal to avoid double counting; both dialogs explain this.
+- Verified `python -m pytest tests/ -q`: 457 passed, 3 optional PostgreSQL tests
+  skipped, with 5 dependency deprecation warnings. The 44 opening-balance tests
+  include concurrent retries, valid session-CSRF submissions and one-sided
+  imports. JavaScript syntax, locale coverage and whitespace checks passed.
+  Local validation uses Python 3.14.6 because Python 3.12 is not installed.
+
 ## 2026-10-11: Payment orders, supplier IBANs and attachments (PR1)
 
 ### Added

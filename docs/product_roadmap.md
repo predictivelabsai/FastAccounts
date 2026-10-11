@@ -873,3 +873,39 @@ pending.
 - [ ] Verify exports with the intended banks before production use, including
   their bank-specific requirements and payment identifier limits. This feature
   only creates downloadable instructions and does not submit or settle payments.
+
+## 34. Opening balances (PR2, 2026-10-11)
+
+- [x] Add a Decimal-only opening-balance service, tenant-scoped snapshot and
+  role/CSRF-protected posting routes, without new migrations. Create only the
+  requested missing monthly fiscal period; never modify or reopen existing
+  periods. Locked periods reject new opening postings.
+- [x] Restrict opening inputs to active Asset, Liability and Equity accounts.
+  Post any signed remainder to RETAINED_EARNINGS in the same immutable,
+  balanced ledger transaction. Reject invalid amounts and debit/credit lines.
+- [x] Compare account debit/credit totals and posting dates before returning an
+  existing opening batch. Reordered or split equivalent inputs and empty no-op
+  retries return the original; changed inputs or reversed batches require a
+  correcting journal. Input and generated-offset lines are identified separately.
+- [x] Preview CSV customer/supplier open items with row-numbered errors and
+  per-side totals. Post contact-linked AR debits and AP credits, due dates and
+  original references, with separate retained-earnings offsets. Reuse contacts
+  within the organisation and promote their type to both where needed. Create
+  no invoice or bill documents and no prior-period income or expenses.
+- [x] Use the first 16 hex characters of SHA-256 of the exact UTF-8 CSV text for
+  raw-file retries. Different file content creates a separate batch. Parsed-row
+  API submissions use canonical JSON of validated rows as their separate input
+  identity; use raw CSV consistently when retrying file uploads. A changed
+  posting date or reversed file batch is rejected rather than silently reused.
+- [x] Add both dialogs to Accounting, using existing dialog and form controls,
+  exact integer-cent running totals, read-only snapshots, import previews and
+  English, Estonian, Lithuanian and Latvian copy. GET and POST preview routes
+  return decimal strings; the browser uses POST for file-sized content.
+- [x] Cover periods, offsets, invalid inputs, retry comparisons, transaction
+  rollback, contact balances, tenant isolation, route status/access/CSRF and
+  desktop/mobile browser flows with synthetic tests and intercepted requests.
+- [ ] Accountant UAT and Estonian copy proofreading remain pending. Importing
+  open items adds to AR/AP; exclude those same amounts from the main opening
+  journal to avoid double counting. Existing document-based ageing and payment
+  workflows do not treat these ledger-only entries as invoice/bill documents;
+  their settlement and ageing support remain follow-up work.

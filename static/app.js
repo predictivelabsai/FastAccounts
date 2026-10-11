@@ -979,7 +979,9 @@
           page(
             t("Accounting"),
             t("Reports from your posted ledger."),
-            button("Print / save PDF", "print"),
+            button("Opening balances", "openingBalances") +
+              button("Opening receivables/payables", "openingItems") +
+              button("Print / save PDF", "print"),
             `<div class="tabs" role="tablist">${Object.entries(reportNames)
               .map(
                 ([key, label]) =>
@@ -992,7 +994,11 @@
         )
       )
         return;
-      bindActions(content, { print: () => window.print() });
+      bindActions(content, {
+        print: () => window.print(),
+        openingBalances: openingBalancesDialog,
+        openingItems: openingItemsDialog,
+      });
       let request = 0;
       const f = document.getElementById("report-dates"),
         asAt = () =>
@@ -2022,6 +2028,136 @@
       await refresh();
     });
     await refresh();
+  }
+
+  async function openingBalancesDialog() {
+    const base = path("/opening-balance"), currency = org.base_currency;
+    let snapshot = await api(`${base}?opening_date=${today()}`), request = 0;
+    if (base !== path("/opening-balance")) return;
+    const d = dialog("Opening balances", form(
+      field("Posting date", "posting_date", today(), "date", "required") +
+      `<p class="muted full-width">${tr("Enter balance sheet accounts only. Any difference posts to retained earnings.")}</p>` +
+      `<p class="muted full-width">${tr("Importing open items adds to receivables and payables. Exclude those amounts from this opening journal to avoid counting them twice.")}</p>` +
+      `<p class="full-width" data-opening-status></p><div class="full-width" data-opening-accounts></div>` +
+      `<div class="full-width" data-opening-totals role="status" aria-live="polite"></div>`, "Post opening balances"));
+    d.classList.add("opening-balance-dialog");
+    const f = d.querySelector("form"), submit = f.querySelector("[type=submit]");
+    d.querySelector("[data-opening-accounts]").innerHTML = table(
+      ["Account", ["Current balance"], ["Debit"], ["Credit"]],
+      snapshot.accounts.map((a) => row([
+        td(`${esc(a.code)} ${esc(a.name)}`),
+        td(`<span data-balance="${esc(a.id)}">${esc(money(a.balance, currency))}</span>`, "numeric"),
+        td(field("Debit", `debit_${a.id}`, "", "number", `min="0" step="0.01" ${a.active ? "" : "disabled"} aria-label="${tr("Debit")} ${esc(a.code)} ${esc(a.name)}"`)),
+        td(field("Credit", `credit_${a.id}`, "", "number", `min="0" step="0.01" ${a.active ? "" : "disabled"} aria-label="${tr("Credit")} ${esc(a.code)} ${esc(a.name)}"`)),
+      ])));
+    // Integer cents keep the running preview exact; the server validates and posts.
+    const cents = (value) => {
+      if (!value) return 0n;
+      if (!/^\d+(\.\d{1,2})?$/.test(value)) throw new Error(t("Enter a valid value."));
+      const [whole, fraction = ""] = value.split(".");
+      return BigInt(whole) * 100n + BigInt(fraction.padEnd(2, "0"));
+    };
+    const fixed = (value) => `${value < 0n ? "-" : ""}${(value < 0n ? -value : value) / 100n}.${String((value < 0n ? -value : value) % 100n).padStart(2, "0")}`;
+    const totals = () => {
+      try {
+        let debit = 0n, credit = 0n;
+        for (const a of snapshot.accounts) {
+          debit += cents(f.elements[`debit_${a.id}`].value);
+          credit += cents(f.elements[`credit_${a.id}`].value);
+        }
+        const remainder = debit - credit;
+        d.querySelector("[data-opening-totals]").textContent =
+          `${t("Debit")}: ${fixed(debit)} ${currency} · ${t("Credit")}: ${fixed(credit)} ${currency} · ` +
+          `${t("Retained earnings offset")}: ${t(remainder < 0n ? "Debit" : "Credit")} ${fixed(remainder < 0n ? -remainder : remainder)} ${currency}`;
+      } catch (error) { d.querySelector("[data-opening-totals]").textContent = error.message; }
+    };
+    const drawSnapshot = () => {
+      d.querySelector("[data-opening-status]").textContent = snapshot.opening_batch
+        ? t("Opening balances already posted; add a correcting journal instead") : "";
+      for (const a of snapshot.accounts) {
+        d.querySelector(`[data-balance="${a.id}"]`).textContent = money(a.balance, currency);
+        f.elements[`debit_${a.id}`].disabled = !!snapshot.opening_batch || !a.active;
+        f.elements[`credit_${a.id}`].disabled = !!snapshot.opening_batch || !a.active;
+      }
+      submit.disabled = !!snapshot.opening_batch;
+      totals();
+    };
+    f.oninput = totals;
+    f.elements.posting_date.onchange = async () => {
+      const current = ++request;
+      submit.disabled = true;
+      try {
+        const result = await api(`${base}?opening_date=${encodeURIComponent(f.elements.posting_date.value)}`);
+        if (current !== request || !d.isConnected || base !== path("/opening-balance")) return;
+        snapshot = result;
+        f.querySelector(".form-error").textContent = "";
+        drawSnapshot();
+      } catch (error) { if (current === request) f.querySelector(".form-error").textContent = error.message; }
+    };
+    drawSnapshot();
+    bindForm(d, async (data) => {
+      const lines = snapshot.accounts.filter((a) => a.active).map((a) => ({
+        account_id: a.id, debit: data[`debit_${a.id}`] || "0", credit: data[`credit_${a.id}`] || "0",
+      }));
+      await post(base, { posting_date: data.posting_date, lines });
+      await saved(d);
+    });
+  }
+
+  function openingItemsDialog() {
+    const base = path("/opening-balance/open-items"), currency = org.base_currency;
+    const d = dialog("Opening receivables/payables", form(
+      field("Posting date", "posting_date", today(), "date", "required") +
+      field("CSV file", "opening_file", "", "file", 'required accept=".csv,text/csv"') +
+      `<p class="muted full-width">${tr("CSV columns: type,name,original_number,original_date,due_date,amount. Use customer or supplier, ISO dates and positive amounts in the organisation currency.")}</p>` +
+      `<p class="muted full-width">${tr("Importing open items adds to receivables and payables. Exclude those amounts from this opening journal to avoid counting them twice.")}</p>` +
+      `<p class="muted full-width">${tr("This posts ledger entries only, with retained earnings offsets. No invoices or bills are created.")}</p>` +
+      `<div class="full-width">${button("Preview opening items", "previewOpeningItems")}</div>` +
+      `<div class="full-width" data-opening-items-preview aria-live="polite"></div>`, "Post opening items"));
+    d.classList.add("opening-balance-dialog");
+    const f = d.querySelector("form"), submit = f.querySelector("[type=submit]");
+    let reviewedContent = null, previewRequest = 0;
+    submit.disabled = true;
+    f.elements.opening_file.onchange = () => {
+      previewRequest++;
+      reviewedContent = null;
+      submit.disabled = true;
+      d.querySelector("[data-opening-items-preview]").innerHTML = "";
+    };
+    bindActions(d, { previewOpeningItems: async (b) => {
+      const current = ++previewRequest;
+      reviewedContent = null;
+      submit.disabled = true;
+      b.disabled = true;
+      try {
+        const file = f.elements.opening_file.files[0];
+        if (!file) throw new Error(t("Choose a CSV file to preview."));
+        const csvContent = await file.text();
+        const preview = await post(base + "/preview", { csv_content: csvContent });
+        if (current !== previewRequest || !d.isConnected || base !== path("/opening-balance/open-items")) return;
+        d.querySelector("[data-opening-items-preview]").innerHTML =
+          `<p>${tr("Customer total")}: ${esc(money(preview.totals.customer, currency))} · ${tr("Supplier total")}: ${esc(money(preview.totals.supplier, currency))}</p>` +
+          table(["Type", "Name", "Original number", "Original date", "Due date", ["Amount"]], preview.rows.map((item) => row([
+            td(tr(item.type === "customer" ? "Customer" : "Supplier")), td(esc(item.name)), td(esc(item.original_number)),
+            td(esc(item.original_date)), td(esc(item.due_date)), cash(item.amount, currency),
+          ])));
+        reviewedContent = csvContent;
+        f.querySelector(".form-error").textContent = "";
+        submit.disabled = false;
+      } catch (error) {
+        if (current === previewRequest) {
+          d.querySelector("[data-opening-items-preview]").innerHTML = "";
+          f.querySelector(".form-error").textContent = error.message;
+        }
+      } finally { b.disabled = false; }
+    }});
+    bindForm(d, async (data) => {
+      if (reviewedContent === null) throw new Error(t("Choose a CSV file to preview."));
+      if (await f.elements.opening_file.files[0].text() !== reviewedContent)
+        throw new Error(t("The file changed. Preview it again before posting."));
+      await post(base, { posting_date: data.posting_date, csv_content: reviewedContent });
+      await saved(d);
+    });
   }
 
   async function paymentOrderDialog() {

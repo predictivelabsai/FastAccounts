@@ -878,6 +878,19 @@ form {
 .document-evidence-dialog [data-attachments] {
   overflow-wrap: anywhere;
 }
+.opening-balance-dialog .form-grid > *,
+.opening-balance-dialog input {
+  min-width: 0;
+}
+.opening-balance-dialog .table-wrap {
+  max-width: 100%;
+}
+.opening-balance-dialog p {
+  overflow-wrap: anywhere;
+}
+.opening-balance-dialog td input[type="number"] {
+  width: 110px;
+}
 label {
   display: grid;
   gap: 7px;
