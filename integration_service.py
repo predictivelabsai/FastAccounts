@@ -6,11 +6,13 @@ import hashlib
 import hmac
 import json
 import os
+from datetime import date
+from decimal import Decimal
 
 from cryptography.fernet import Fernet, InvalidToken
 
 from connectors.base import ConnectorResult
-from connectors.registry import PROVIDERS, connector_for, registration_for
+from connectors.registry import connector_for, registration_for
 from core_utils import audit, canonical_json, new_id, sha256_bytes, utc_now
 from database import Database, get_database
 
@@ -267,3 +269,233 @@ class IntegrationService:
                  now, "Received" if valid else "Rejected"),
             )
         return self.db.one("SELECT * FROM webhook_receipts WHERE id=?", (receipt_id,)) or {}
+
+
+class AccountMappingService:
+    """Tenant-scoped external chart mappings and read-only GL reconciliation."""
+
+    STATUSES = frozenset({"Suggested", "Confirmed", "Disabled"})
+
+    def __init__(self, db: Database | None = None):
+        self.db = db or get_database()
+
+    @staticmethod
+    def _provider(provider: str) -> str:
+        key = provider.strip().lower()
+        if not key:
+            raise ValueError("Provider is required")
+        return key
+
+    def list(self, organisation_id: str, provider: str) -> list[dict]:
+        return self.db.rows(
+            "SELECT * FROM account_mappings WHERE organisation_id=? AND provider=? "
+            "ORDER BY external_account_code,local_account_code,id",
+            (organisation_id, self._provider(provider)),
+        )
+
+    def create(
+        self,
+        organisation_id: str,
+        provider: str,
+        *,
+        local_account_code: str,
+        external_account_code: str,
+        external_account_name: str = "",
+        status: str = "Suggested",
+        is_default: bool = False,
+        actor: str,
+    ) -> dict:
+        key = self._provider(provider)
+        local_code = local_account_code.strip()
+        external_code = external_account_code.strip()
+        if not local_code or not external_code:
+            raise ValueError("Local and external account codes are required")
+        if status not in self.STATUSES:
+            raise ValueError("Invalid account-mapping status")
+        now = utc_now()
+        with self.db.transaction() as tx:
+            if not tx.one(
+                "SELECT id FROM accounts WHERE organisation_id=? AND code=?",
+                (organisation_id, local_code),
+            ):
+                raise ValueError("Local account code is not in this organisation")
+            matches = tx.rows(
+                "SELECT * FROM account_mappings WHERE organisation_id=? AND provider=? "
+                "AND (local_account_code=? OR external_account_code=?) ORDER BY id",
+                (organisation_id, key, local_code, external_code),
+            )
+            if len(matches) > 1:
+                raise ValueError("Local and external account codes belong to different mappings")
+            mapping_id = matches[0]["id"] if matches else new_id()
+            if matches:
+                tx.execute(
+                    "UPDATE account_mappings SET local_account_code=?,external_account_code=?,"
+                    "external_account_name=?,status=?,is_default=?,updated_at=? "
+                    "WHERE organisation_id=? AND id=?",
+                    (local_code, external_code, external_account_name.strip() or None,
+                     status, int(is_default), now, organisation_id, mapping_id),
+                )
+                action = "integration.account_mapping_updated"
+            else:
+                tx.execute(
+                    "INSERT INTO account_mappings(id,organisation_id,provider,local_account_code,"
+                    "external_account_code,external_account_name,status,is_default,created_at,updated_at) "
+                    "VALUES (?,?,?,?,?,?,?,?,?,?)",
+                    (mapping_id, organisation_id, key, local_code, external_code,
+                     external_account_name.strip() or None, status, int(is_default), now, now),
+                )
+                action = "integration.account_mapping_created"
+            audit(tx, organisation_id, actor, action, "account_mapping", mapping_id,
+                  {"provider": key, "status": status})
+            return tx.one(
+                "SELECT * FROM account_mappings WHERE organisation_id=? AND id=?",
+                (organisation_id, mapping_id),
+            ) or {}
+
+    def update(
+        self,
+        organisation_id: str,
+        provider: str,
+        mapping_id: str,
+        *,
+        status: str,
+        is_default: bool,
+        actor: str,
+    ) -> dict:
+        key = self._provider(provider)
+        if status not in self.STATUSES:
+            raise ValueError("Invalid account-mapping status")
+        with self.db.transaction() as tx:
+            row = tx.one(
+                "SELECT id FROM account_mappings WHERE organisation_id=? AND provider=? AND id=?",
+                (organisation_id, key, mapping_id),
+            )
+            if not row:
+                raise KeyError("Account mapping not found")
+            tx.execute(
+                "UPDATE account_mappings SET status=?,is_default=?,updated_at=? "
+                "WHERE organisation_id=? AND provider=? AND id=?",
+                (status, int(is_default), utc_now(), organisation_id, key, mapping_id),
+            )
+            audit(tx, organisation_id, actor, "integration.account_mapping_updated",
+                  "account_mapping", mapping_id, {"provider": key, "status": status})
+            return tx.one(
+                "SELECT * FROM account_mappings WHERE organisation_id=? AND provider=? AND id=?",
+                (organisation_id, key, mapping_id),
+            ) or {}
+
+    def resolve(
+        self, organisation_id: str, provider: str, local_account_code: str
+    ) -> dict | None:
+        return self.db.one(
+            "SELECT * FROM account_mappings WHERE organisation_id=? AND provider=? "
+            "AND local_account_code=? AND status<>'Disabled' "
+            "ORDER BY CASE status WHEN 'Confirmed' THEN 0 ELSE 1 END,id LIMIT 1",
+            (organisation_id, self._provider(provider), local_account_code.strip()),
+        )
+
+    def suggest(
+        self,
+        tx,
+        organisation_id: str,
+        provider: str,
+        *,
+        external_account_code: str,
+        external_account_name: str = "",
+        local_account_code: str | None = None,
+    ) -> dict:
+        key = self._provider(provider)
+        external_code = external_account_code.strip()
+        if not external_code:
+            raise ValueError("External account code is required")
+        local_code = (local_account_code or external_code).strip()
+        local = tx.one(
+            "SELECT code FROM accounts WHERE organisation_id=? AND code=?",
+            (organisation_id, local_code),
+        )
+        if not local:
+            raise ValueError("A matching local account code is required for an account suggestion")
+        existing = tx.one(
+            "SELECT * FROM account_mappings WHERE organisation_id=? AND provider=? "
+            "AND external_account_code=?",
+            (organisation_id, key, external_code),
+        )
+        now = utc_now()
+        if existing:
+            tx.execute(
+                "UPDATE account_mappings SET external_account_name=?,updated_at=? "
+                "WHERE organisation_id=? AND id=?",
+                (external_account_name.strip() or existing.get("external_account_name"),
+                 now, organisation_id, existing["id"]),
+            )
+            return tx.one("SELECT * FROM account_mappings WHERE id=?", (existing["id"],)) or {}
+        mapping_id = new_id()
+        tx.execute(
+            "INSERT INTO account_mappings(id,organisation_id,provider,local_account_code,"
+            "external_account_code,external_account_name,status,is_default,created_at,updated_at) "
+            "VALUES (?,?,?,?,?,?,'Suggested',0,?,?)",
+            (mapping_id, organisation_id, key, local_code, external_code,
+             external_account_name.strip() or None, now, now),
+        )
+        return tx.one("SELECT * FROM account_mappings WHERE id=?", (mapping_id,)) or {}
+
+    @staticmethod
+    def _date(value: str | None, label: str) -> str | None:
+        if not value:
+            return None
+        try:
+            return date.fromisoformat(value).isoformat()
+        except ValueError as error:
+            raise ValueError(f"{label} must be an ISO date") from error
+
+    def reconcile(
+        self,
+        organisation_id: str,
+        provider: str,
+        *,
+        date_from: str | None = None,
+        date_to: str | None = None,
+    ) -> list[dict]:
+        key = self._provider(provider)
+        start = self._date(date_from, "date_from")
+        end = self._date(date_to, "date_to")
+        if start and end and start > end:
+            raise ValueError("date_from must not be after date_to")
+        local_dates = ""
+        external_dates = ""
+        local_params: list[object] = []
+        external_params: list[object] = []
+        if start:
+            local_dates += " AND g.entry_date>=?"
+            external_dates += " AND x.entry_date>=?"
+            local_params.append(start)
+            external_params.append(start)
+        if end:
+            local_dates += " AND g.entry_date<=?"
+            external_dates += " AND x.entry_date<=?"
+            local_params.append(end)
+            external_params.append(end)
+        mappings = self.list(organisation_id, key)
+        rows: list[dict] = []
+        for mapping in mappings:
+            local_value = self.db.scalar(
+                "SELECT COALESCE(SUM(g.debit-g.credit),0) FROM gl_entries g "
+                "JOIN accounts a ON a.id=g.account_id AND a.organisation_id=g.organisation_id "
+                "WHERE g.organisation_id=? AND a.code=?" + local_dates,
+                (organisation_id, mapping["local_account_code"], *local_params),
+            )
+            external_value = self.db.scalar(
+                "SELECT COALESCE(SUM(x.debit-x.credit),0) FROM external_gl_entries x "
+                "WHERE x.organisation_id=? AND x.provider=? AND x.external_account_code=?"
+                + external_dates,
+                (organisation_id, key, mapping["external_account_code"], *external_params),
+            )
+            local_total = Decimal(str(local_value or 0)).quantize(Decimal("0.01"))
+            external_total = Decimal(str(external_value or 0)).quantize(Decimal("0.01"))
+            rows.append({
+                **mapping,
+                "local_total": str(local_total),
+                "external_total": str(external_total),
+                "delta": str((local_total - external_total).quantize(Decimal("0.01"))),
+            })
+        return rows

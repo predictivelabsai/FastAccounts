@@ -9,22 +9,22 @@ from typing import Any, Literal
 from fastapi import Depends, FastAPI, File, Header, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 import integrations
 import version
-from banking import BankingService
 from automation import AutomationService, email_configured, email_status
+from banking import BankingService
 from connectors.registry import provider_metadata
 from database import get_database
 from documents import DocumentService
-from integration_service import IntegrationService
-from import_service import ImportService
+from governance import GovernanceService
+from import_service import OBJECT_TYPES, ImportService
+from integration_service import AccountMappingService, IntegrationService
 from ledger import LedgerService, PostingLine
 from organisations import APPROVE_ROLES, WRITE_ROLES, AccessDenied, OrganisationService
-from governance import GovernanceService
-from tax import TaxService
 from payroll import PayrollConflict, PayrollService
+from tax import TaxService
 
 
 class User(BaseModel):
@@ -161,6 +161,14 @@ class ConnectorResultOut(BaseModel):
 class IntegrationSyncIn(BaseModel):
     object_type: str = Field(min_length=1, max_length=80)
 
+    @field_validator("object_type")
+    @classmethod
+    def supported_object_type(cls, value: str) -> str:
+        key = value.strip().lower()
+        if key not in OBJECT_TYPES:
+            raise ValueError("Unsupported reviewed import object type")
+        return key
+
 
 class FileImportIn(BaseModel):
     object_type: str = Field(min_length=1, max_length=80)
@@ -170,6 +178,23 @@ class FileImportIn(BaseModel):
 
 class IntegrationApplyIn(BaseModel):
     decisions: dict[str, Literal["apply", "reject"]] = Field(default_factory=dict)
+
+
+class AccountMappingIn(BaseModel):
+    model_config = {"extra": "forbid"}
+
+    local_account_code: str = Field(min_length=1, max_length=80)
+    external_account_code: str = Field(min_length=1, max_length=160)
+    external_account_name: str = Field(default="", max_length=240)
+    status: Literal["Suggested", "Confirmed", "Disabled"] = "Suggested"
+    is_default: bool = False
+
+
+class AccountMappingUpdateIn(BaseModel):
+    model_config = {"extra": "forbid"}
+
+    status: Literal["Suggested", "Confirmed", "Disabled"]
+    is_default: bool
 
 
 class JournalLineIn(BaseModel):
@@ -630,6 +655,52 @@ def disconnect_integration(organisation_id: str, provider: str,
                            user: User = Depends(require_csrf)):
     _require(organisation_id, user, {"owner", "administrator"})
     return IntegrationService().disconnect(organisation_id, provider, actor=user.email)
+
+
+@api.get("/organisations/{organisation_id}/integrations/{provider}/account-mappings")
+def list_account_mappings(
+    organisation_id: str, provider: str, user: User = Depends(current_user)
+):
+    _require(organisation_id, user, {"owner", "administrator"})
+    return AccountMappingService().list(organisation_id, provider)
+
+
+@api.post("/organisations/{organisation_id}/integrations/{provider}/account-mappings", status_code=201)
+def create_account_mapping(
+    organisation_id: str, provider: str, payload: AccountMappingIn,
+    user: User = Depends(require_csrf),
+):
+    _require(organisation_id, user, {"owner", "administrator"})
+    return AccountMappingService().create(
+        organisation_id, provider, actor=user.email, **payload.model_dump()
+    )
+
+
+@api.put("/organisations/{organisation_id}/integrations/{provider}/account-mappings/{mapping_id}")
+def update_account_mapping(
+    organisation_id: str, provider: str, mapping_id: str,
+    payload: AccountMappingUpdateIn, user: User = Depends(require_csrf),
+):
+    _require(organisation_id, user, {"owner", "administrator"})
+    return AccountMappingService().update(
+        organisation_id, provider, mapping_id, actor=user.email, **payload.model_dump()
+    )
+
+
+@api.get("/organisations/{organisation_id}/integrations/{provider}/gl-reconciliation")
+def gl_reconciliation(
+    organisation_id: str, provider: str, date_from: str | None = None,
+    date_to: str | None = None, user: User = Depends(current_user),
+):
+    _require(
+        organisation_id, user,
+        {"owner", "administrator", "accountant", "approver", "viewer"},
+    )
+    return {
+        "rows": AccountMappingService().reconcile(
+            organisation_id, provider, date_from=date_from, date_to=date_to
+        )
+    }
 
 
 @api.post("/organisations/{organisation_id}/integrations/{provider}/sync")

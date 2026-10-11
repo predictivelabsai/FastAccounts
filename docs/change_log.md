@@ -4,6 +4,19 @@ Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as
 delivered.
 
+## 2026-10-11: General reviewed-import data model
+
+- Added migrations `0010_account_mappings`, `0011_external_gl`, and
+  `0012_sync_review` for reviewed account suggestions, read-only external GL
+  snapshots, generalized staged-record matches, and sync-review attribution.
+- Generalized the reviewed pipeline for contacts, purchase and sales invoices,
+  payments, accounts, and GL entries while retaining the existing employee
+  import behavior. Applied invoices remain drafts, and payments are refused
+  unless their local invoice or bill is already mapped.
+- Added tenant-scoped account-mapping CRUD and GL reconciliation endpoints.
+  Pulled GL rows remain external reconciliation data and are never posted to
+  the FastAccounts ledger.
+
 ## 2026-10-09 — Public-site audience and availability polish
 
 - Split the landing into explicit paths for accounting bureaus managing payroll,
