@@ -342,6 +342,8 @@ upgrade migrations pass; no credential enters source or logs.
 - [x] Create/preview/issue/email PDF sales invoice and issue credit note;
 - [x] Immutable balanced ledger, journals, reversals, locks, audit log;
 - [x] Trial balance, general ledger, P&L, balance sheet, AR aging.
+- [x] Native Excel workbook exports for payroll pay runs, the general ledger,
+  invoices, employees and VAT returns (2026-10-11; see section 28).
 
 **Exit:** property/fixture tests prove every workflow stays balanced, duplicate
 requests are idempotent, issued invoices cannot be rewritten, and UK/EE sample
@@ -742,3 +744,15 @@ required until production UAT is complete. Trust pages expose no more than one
 primary and one secondary button, with additional contact routes kept as text
 links. This section changes public presentation only; no accounting workflow,
 migration or provider connection changed.
+
+## 28. Excel workbook export pack (2026-10-11)
+
+Shipped native Excel workbooks for payroll pay runs, the general ledger,
+invoices, employees and VAT returns. Payroll exports reconcile stored run totals
+against frozen employee items and add the posted accounting lines when present.
+General-ledger exports support optional validated date bounds; all workbook
+routes are organisation-scoped and use the existing read-role guards.
+
+The exports are pure rendered reports: they make no database changes and require
+no migration. Monetary calculations stay Decimal-based, while final two-decimal
+values are written as numeric Excel cells for spreadsheet calculations.
