@@ -18,6 +18,7 @@ def test_demo_seed_creates_encrypted_connections_and_offline_import_runs(db, mon
         ("quickbooks", "Connected", DEMO_CONNECTION_NOTE),
         ("xero", "Connected", DEMO_CONNECTION_NOTE),
         ("merit", "Connected", DEMO_CONNECTION_NOTE),
+        ("smartaccounts", "Connected", DEMO_CONNECTION_NOTE),
         ("fasthr", "Connected", DEMO_CONNECTION_NOTE),
     }
     assert {row["provider"] for row in service.connections(uk["id"])} == {
@@ -27,13 +28,14 @@ def test_demo_seed_creates_encrypted_connections_and_offline_import_runs(db, mon
     assert {row["provider"] for row in service.connections(ee["id"])} == {
         "fasthr",
         "merit",
+        "smartaccounts",
     }
 
-    secret_fragments = ("demo-sandbox-token", "demo-synthetic-xero-token", "demo-synthetic-merit-api-key", "demo-synthetic-fasthr-token")
+    secret_fragments = ("demo-synthetic-smartaccounts-public-key", "demo-synthetic-smartaccounts-secret-key", "demo-sandbox-token", "demo-synthetic-xero-token", "demo-synthetic-merit-api-key", "demo-synthetic-fasthr-token")
     stored = db.rows(
         "SELECT provider,encrypted_credentials FROM integration_connections ORDER BY provider"
     )
-    assert len(stored) == 4
+    assert len(stored) == 5
     assert all(
         fragment not in row["encrypted_credentials"]
         for row in stored

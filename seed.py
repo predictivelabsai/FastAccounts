@@ -292,6 +292,14 @@ def _seed_integration_connections(organisations: list[dict]) -> None:
         ),
         (
             by_country["EE"]["id"],
+            "smartaccounts",
+            {"api_key": "demo-synthetic-smartaccounts-public-key",
+             "secret_key": "demo-synthetic-smartaccounts-secret-key", "lang": "et"},
+            {"note": DEMO_CONNECTION_NOTE},
+            "demo-synthetic-smartaccounts",
+        ),
+        (
+            by_country["EE"]["id"],
             "fasthr",
             {
                 "base_url": FastHRProvider.default_base_url,

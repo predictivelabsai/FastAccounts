@@ -8,6 +8,7 @@ from .providers import (
     FastHRProvider,
     HMRCProvider,
     MeritProvider,
+    SmartAccountsProvider,
     OpenBankingProvider,
     PersonioProvider,
     ProviderError,
@@ -20,7 +21,7 @@ from .stubs import RoadmapStubConnector, StubConnector
 __all__ = [
     "BambooHRProvider", "Connector", "ConnectorResult", "EMTAExportProvider", "FastHRProvider",
     "FileImportConnector", "HMRCProvider",
-    "MeritProvider", "OpenBankingProvider", "PROVIDERS", "ProviderError",
+    "MeritProvider", "SmartAccountsProvider", "OpenBankingProvider", "PROVIDERS", "ProviderError",
     "PersonioProvider", "QuickBooksProvider", "REGISTRY", "RoadmapStubConnector", "StubConnector",
     "XeroProvider", "connector_for", "provider_metadata",
 ]

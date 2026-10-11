@@ -586,7 +586,7 @@ def landing_page(lang: str = i18n.DEFAULT_LANG):
 def _integration_availability(item: integrations.Integration) -> str:
     if item.key in {"file_import", "fasthr"}:
         return "available"
-    if item.key in {"quickbooks", "xero", "merit", "bamboohr", "personio"}:
+    if item.key in {"quickbooks", "xero", "merit", "smartaccounts", "bamboohr", "personio"}:
         return "review_required"
     if item.key in {"hmrc", "emta"}:
         return "pilot"

@@ -9,6 +9,9 @@
 - The FastHR and HR software catalogue SVGs are neutral FastAccounts-created placeholder
   letter marks, not official provider logos or reproductions of brand artwork.
 
+- SmartAccounts is an original FastAccounts-created text service identifier,
+  not an official provider logo.
+
 All product names and trademarks belong to their respective owners. Their use
 identifies planned interoperability and does not imply endorsement or a live
 partnership.
