@@ -986,6 +986,288 @@ class MeritProvider(HTTPProvider):
         )
 
 
+class SmartAccountsProvider(HTTPProvider):
+    """Official documented contract; each pull reads one page of a frozen window."""
+
+    key = "smartaccounts"
+    default_base_url = "https://sa.smartaccounts.eu"
+    PULL_OBJECT_TYPES = ("account", "contact", "sales_invoice", "purchase_invoice", "payment", "gl_entry")
+    PUSH_OBJECT_TYPES = ("gl_batch",)
+    _ENDPOINTS = {
+        "account": ("settings/accounts", "accounts"),
+        "contact": ("purchasesales/clients", "clients"),
+        "sales_invoice": ("purchasesales/clientinvoices", "clientInvoices"),
+        "purchase_invoice": ("purchasesales/vendorinvoices", "vendorInvoices"),
+        "payment": ("purchasesales/payments", "payments"),
+        "gl_entry": ("general/entries", "entries"),
+    }
+
+    def __init__(self, api_key: str, secret_key: str, *, lang: str = "et",
+                 clock: Callable[[], datetime] | None = None, **kwargs):
+        super().__init__(**kwargs)
+        if lang not in {"en", "et"}:
+            raise ValueError("SmartAccounts language must be en or et")
+        from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+        try:
+            self.tallinn = ZoneInfo("Europe/Tallinn")
+        except ZoneInfoNotFoundError as error:
+            raise ValueError("SmartAccounts needs Europe/Tallinn timezone data; pip install tzdata") from error
+        self.api_key, self.secret_key, self.lang = api_key, secret_key, lang
+        self.base_url = f"{self.default_base_url}/{lang}/api"
+        self.clock = clock or (lambda: datetime.now(self.tallinn))
+
+    def _now(self) -> datetime:
+        instant = self.clock()
+        if instant.tzinfo is None or instant.utcoffset() is None:
+            raise ValueError("SmartAccounts clock must be timezone-aware")
+        return instant.astimezone(self.tallinn)
+
+    def _signature(self, query_string: str, body: str = "") -> str:
+        return hmac.new(self.secret_key.encode(), (query_string + body).encode("utf-8"),
+                        hashlib.sha256).hexdigest()
+
+    def _accounting_request(self, method: str, endpoint: str, *, params: dict | None = None,
+                            payload: dict | None = None):
+        body = json.dumps(payload, ensure_ascii=False, separators=(",", ":"), allow_nan=False) if payload is not None else ""
+        # Endpoint parameters precede auth, matching the official encoded codes example.
+        query = urlencode([*(params or {}).items(), ("timestamp", self._now().strftime("%d%m%Y%H%M%S")),
+                           ("apikey", self.api_key)])
+        url = f"{self.base_url}/{endpoint}?{query}&{urlencode({'signature': self._signature(query, body)})}"
+        try:
+            response = self.request(method, url, content=body.encode("utf-8") if payload is not None else None,
+                                    headers={"Accept": "application/json", "Content-Type": "application/json"})
+        except httpx.RequestError as error:
+            raise ProviderError("SmartAccounts API connection error or timeout") from error
+        try:
+            return response.json(parse_float=Decimal)
+        except ValueError as error:
+            raise ProviderError("SmartAccounts returned invalid JSON") from error
+
+    @staticmethod
+    def _decimal(value) -> Decimal:
+        try:
+            if isinstance(value, bool):
+                raise ValueError
+            amount = Decimal(str(value))
+            if not amount.is_finite():
+                raise ValueError
+            return amount
+        except (ArithmeticError, ValueError) as error:
+            raise ValueError("SmartAccounts amount must be a finite decimal") from error
+
+    def _wire_amount(self, value) -> float:
+        amount = self._decimal(value)
+        # Floats are confined to JSON numbers, safe for two-decimal EUR amounts.
+        number = float(amount)
+        if not Decimal(str(number)).is_finite() or Decimal(str(number)) != amount:
+            raise ValueError("SmartAccounts amount exceeds the safe numeric wire range")
+        return number
+
+    @staticmethod
+    def _date(value) -> date:
+        if isinstance(value, date):
+            return value.date() if isinstance(value, datetime) else value
+        for fmt in ("%Y-%m-%d", "%d.%m.%Y"):
+            try:
+                return datetime.strptime(str(value), fmt).date()
+            except ValueError:
+                pass
+        raise ValueError("SmartAccounts date must be ISO or dd.MM.yyyy")
+
+    @staticmethod
+    def _id(row: dict) -> str:
+        if row.get("id") in (None, ""):
+            raise ProviderError("SmartAccounts record is missing id")
+        return str(row["id"])
+
+    @staticmethod
+    def _rows(payload, key: str) -> list[dict]:
+        if isinstance(payload, dict) and ("error" in payload or "errors" in payload):
+            raise ProviderError("SmartAccounts returned an error response")
+        rows = payload if isinstance(payload, list) else payload.get(key) if isinstance(payload, dict) else None
+        # The document defines fields but not every list envelope name. Accept
+        # one unambiguous collection, excluding the documented deletion list.
+        if rows is None and isinstance(payload, dict):
+            collections = [value for name, value in payload.items() if name != "deleted" and isinstance(value, list)]
+            if len(collections) == 1:
+                rows = collections[0]
+        if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
+            raise ProviderError(f"SmartAccounts returned invalid {key} data")
+        return rows
+
+    def _contact_record(self, row: dict) -> dict:
+        address = row.get("address") or {}
+        record = {
+            "external_id": self._id(row), "contact_type": "customer", "name": row.get("name", ""),
+            "registration_no": row.get("regCode", ""), "vat_no": row.get("vatNumber", ""),
+            "email": next((item.get("value", "") for item in row.get("contacts", []) if item.get("type") == "EMAIL"), ""),
+            "country_code": address.get("country", ""),
+            "address": ", ".join(str(address[key]) for key in ("address1", "address2", "city", "postalCode", "county") if address.get(key)),
+        }
+        for key in ("bankAccount", "referenceNumber", "invoiceDueDate", "ignoreOnVatDeclaration"):
+            if key in row:
+                record[key] = row[key]
+        if row.get("dateUpdated") or row.get("dateCreated"):
+            record["external_version"] = row.get("dateUpdated") or row["dateCreated"]
+        return record
+
+    def _invoice_record(self, row: dict, *, purchase: bool) -> dict:
+        partner = row.get("vendor" if purchase else "client") or {}
+        role = "supplier" if purchase else "customer"
+        record = {
+            "external_id": self._id(row), "external_number": row.get("invoiceNumber", ""),
+            "supplier_name" if purchase else "buyer_name": partner.get("name", ""),
+            "bill_date" if purchase else "issue_date": self._date(row.get("date")).isoformat(),
+            "due_date": self._date(row["dueDate"]).isoformat() if row.get("dueDate") else "",
+            "currency": row.get("currency") or "EUR", "amount_type": "exclusive",
+            role: {"name": partner.get("name", ""),
+                   "external_id": row.get("vendorId" if purchase else "clientId") or partner.get("id", ""),
+                   "registration_no": partner.get("regCode", ""), "vat_no": partner.get("vatNumber", "")},
+        }
+        for source, target in (("amount", "total_exvat"), ("vatAmount", "tax_total"), ("totalAmount", "total"),
+                               ("outstandingAmount", "outstanding_amount"), ("roundAmount", "round_amount")):
+            if row.get(source) is not None:
+                record[target] = self._decimal(row[source])
+        record["paid"] = record.get("outstanding_amount") == Decimal("0")
+        if "total" in record and "outstanding_amount" in record:
+            record["paid_amount"] = record["total"] - record["outstanding_amount"]
+        if row.get("dateUpdated") or row.get("dateCreated"):
+            record["external_version"] = row.get("dateUpdated") or row["dateCreated"]
+        # Retain remote rows for review. Tax percentages require explicit local tax mappings.
+        record["smartaccounts_rows"] = self._rows(row.get("rows", []), "rows")
+        return record
+
+    def _payment_records(self, row: dict) -> list[dict]:
+        base = {"external_id": self._id(row), "amount": self._decimal(row.get("amount", 0)),
+                "payment_date": self._date(row.get("date")).isoformat(),
+                "reference": row.get("document") or row.get("number", ""), "currency": row.get("currency") or "EUR",
+                "smartaccounts_account_name": row.get("accountName"), "smartaccounts_account_type": row.get("accountType")}
+        records = []
+        for index, allocation in enumerate(self._rows(row.get("rows", []), "rows"), start=1):
+            record = dict(base, external_id=f"{base['external_id']}:{index}", amount=self._decimal(allocation.get("amount", 0)))
+            if allocation.get("type") in {"CLIENT_INVOICE", "VENDOR_INVOICE"} and allocation.get("id") not in (None, ""):
+                record["document_external_id"] = str(allocation["id"])
+                record["payment_type"] = "customer_receipt" if allocation["type"] == "CLIENT_INVOICE" else "supplier_payment"
+            else:
+                record["import_warning"] = "Payment allocation requires manual handling"
+            records.append(record)
+        return records or [dict(base, import_warning="Payment has no invoice allocations; requires manual handling")]
+
+    def pull(self, object_type: str, *, cursor: str | None = None) -> ConnectorResult:
+        if object_type not in self.PULL_OBJECT_TYPES:
+            raise ValueError(f"Unsupported SmartAccounts pull object type: {object_type}")
+        endpoint, key = self._ENDPOINTS[object_type]
+        params, state = {}, {}
+        if object_type != "account":
+            try:
+                state = json.loads(cursor) if cursor else {}
+                page = state.get("page", 1)
+                if not isinstance(page, int) or isinstance(page, bool) or page < 1:
+                    raise ValueError
+                params["pageNumber"] = page
+                if object_type == "contact":
+                    params.update(fetchContacts="true", fetchAddresses="true")
+                else:
+                    today = self._now().date()
+                    start = self._date(state.get("from", (today - timedelta(days=365)).isoformat()))
+                    end = self._date(state.get("to", min(start + timedelta(days=89), today).isoformat()))
+                    if end < start or end > today or (end - start).days >= 90:
+                        raise ValueError
+                    state = {"from": start.isoformat(), "to": end.isoformat()}
+                    params.update(dateFrom=start.strftime("%d.%m.%Y"), dateTo=end.strftime("%d.%m.%Y"), dateType="date", fetchRows="true")
+                    if object_type == "gl_entry":
+                        params["docType"] = "LEDGER_ENTRY"
+            except (ValueError, TypeError, AttributeError) as error:
+                raise ValueError("Invalid SmartAccounts cursor") from error
+        payload = self._accounting_request("GET", endpoint + ":get", params=params)
+        rows = self._rows(payload, key)
+        next_cursor = None
+        if object_type != "account":
+            if not isinstance(payload, dict) or not isinstance(payload.get("hasMoreEntries"), bool):
+                raise ProviderError("SmartAccounts returned invalid pagination metadata")
+            if payload["hasMoreEntries"]:
+                state["page"] = page + 1
+                next_cursor = json.dumps(state, separators=(",", ":"))
+            elif object_type != "contact" and end < today:
+                next_cursor = json.dumps({"from": (end + timedelta(days=1)).isoformat()}, separators=(",", ":"))
+        records = []
+        for row in rows:
+            if object_type == "account":
+                records.append({"external_id": self._id(row), "code": row.get("code", ""),
+                                "name": row.get("descriptionEn" if self.lang == "en" else "descriptionEt") or row.get("descriptionEt") or row.get("descriptionEn", ""),
+                                "type": row.get("type")})
+            elif object_type == "contact":
+                records.append(self._contact_record(row))
+            elif object_type in {"sales_invoice", "purchase_invoice"}:
+                records.append(self._invoice_record(row, purchase=object_type == "purchase_invoice"))
+            elif object_type == "payment":
+                records.extend(self._payment_records(row))
+            else:
+                for index, line in enumerate(self._rows(row.get("rows"), "rows"), start=1):
+                    records.append({"external_id": f"{self._id(row)}:{index}", "external_batch_ref": row.get("document", ""),
+                                    "entry_date": self._date(row.get("date")).isoformat(), "document": row.get("document", ""),
+                                    "external_account_code": line.get("account", ""), "description": line.get("description", ""),
+                                    "debit": self._decimal(line.get("debitAmount", 0)), "credit": self._decimal(line.get("creditAmount", 0)),
+                                    "currency": row.get("currency") or "EUR", "dims": {"objectId": line.get("objectId")}})
+        return ConnectorResult(self.key, f"pull:{object_type}", True, True,
+                               f"Pulled {len(records)} SmartAccounts {object_type} records", tuple(records), next_cursor)
+
+    def push(self, object_type: str, records: list[dict]) -> ConnectorResult:
+        if object_type not in self.PUSH_OBJECT_TYPES:
+            raise ValueError(f"Unsupported SmartAccounts push object type: {object_type}")
+        payloads = []
+        # Validate every batch before any irreversible provider request.
+        for record in records:
+            if not isinstance(record, dict) or not str(record.get("doc_no") or "").strip():
+                raise ValueError("SmartAccounts GL batch requires a document number")
+            if (record.get("currency") or "EUR") != "EUR":
+                raise ValueError("SmartAccounts GL batch push supports EUR only")
+            lines = record.get("lines")
+            if not isinstance(lines, list) or not lines:
+                raise ValueError("SmartAccounts GL batch requires lines")
+            rows, debit_total, credit_total = [], Decimal(0), Decimal(0)
+            for line in lines:
+                if not isinstance(line, dict):
+                    raise ValueError("SmartAccounts GL lines must be objects")
+                account = str(line.get("external_account_code") or line.get("account_code") or "").strip()
+                debit, credit = self._decimal(line.get("debit", 0)), self._decimal(line.get("credit", 0))
+                if not account or debit < 0 or credit < 0 or (debit and credit):
+                    raise ValueError("SmartAccounts GL line requires an account and one non-negative side")
+                try:
+                    if debit != money(debit) or credit != money(credit):
+                        raise ValueError("SmartAccounts EUR amounts require at most two decimal places")
+                except ArithmeticError as error:
+                    raise ValueError("SmartAccounts amount exceeds the numeric wire range") from error
+                debit_total += debit
+                credit_total += credit
+                rows.append({"account": account, "description": line.get("memo") or line.get("description") or "",
+                             "debitAmount": self._wire_amount(debit), "creditAmount": self._wire_amount(credit)})
+            if debit_total != credit_total or debit_total <= 0:
+                raise ValueError("SmartAccounts GL batch must be balanced with a positive total")
+            payloads.append({"docType": "LEDGER_ENTRY", "date": self._date(record.get("posting_date")).isoformat(),
+                             "document": str(record["doc_no"]), "currency": "EUR", "rows": rows,
+                             "comment": str(record.get("comment") or "")})
+        responses = []
+        for payload in payloads:
+            response = self._accounting_request("POST", "general/entries:add", payload=payload)
+            if not isinstance(response, dict):
+                raise ProviderError("SmartAccounts returned invalid GL batch response")
+            responses.append(dict(response, external_id=self._id(response)))
+        return ConnectorResult(self.key, f"push:{object_type}", True, True,
+                               f"Sent {len(responses)} SmartAccounts GL batches", tuple(responses))
+
+    def check(self) -> ConnectorResult:
+        try:
+            self._rows(self._accounting_request("GET", "settings/accounts:get"), "accounts")
+        except ProviderError as error:
+            if isinstance(error.__cause__, httpx.RequestError):
+                return ConnectorResult(self.key, "check", False, False, "SmartAccounts API connection error or timeout")
+            status = self._status_code(error)
+            message = f"SmartAccounts API authentication failed (HTTP {status})" if status in {401, 403} else "SmartAccounts API check failed"
+            return ConnectorResult(self.key, "check", False, True, message)
+        return ConnectorResult(self.key, "check", True, True, "SmartAccounts API reachable; company context valid")
+
+
 class HMRCProvider(HTTPProvider):
     auth_url = "https://www.tax.service.gov.uk/oauth/authorize"
     sandbox_auth_url = "https://test-www.tax.service.gov.uk/oauth/authorize"

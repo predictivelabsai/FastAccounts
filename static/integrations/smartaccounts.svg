@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="220" height="40" viewBox="0 0 220 40" role="img" aria-labelledby="title">
+  <title id="title">SmartAccounts</title>
+  <rect width="40" height="40" rx="9" fill="#16345c"/>
+  <text x="20" y="26" text-anchor="middle" fill="white" font-family="Arial,sans-serif" font-size="19" font-weight="700">SA</text>
+  <text x="50" y="26" fill="#16345c" font-family="Arial,sans-serif" font-size="21" font-weight="600">SmartAccounts</text>
+</svg>

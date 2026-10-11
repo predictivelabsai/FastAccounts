@@ -17,6 +17,7 @@ from connectors.providers import (
     FastHRProvider,
     HMRCProvider,
     MeritProvider,
+    SmartAccountsProvider,
     OpenBankingProvider,
     PersonioProvider,
     ProviderError,
@@ -113,6 +114,12 @@ def test_configure_validates_against_complete_registry(db, uk_org):
             {"subdomain": "synthetic-company", "api_key": "bamboo-vault-secret"},
             {"salary_field_id": "customSalary"},
             BambooHRProvider,
+        ),
+        (
+            "smartaccounts",
+            {"api_key": "synthetic-sa-public", "secret_key": "synthetic-sa-secret"},
+            {},
+            SmartAccountsProvider,
         ),
     ],
 )
@@ -965,3 +972,239 @@ def test_merit_json_numeric_amounts_preserve_decimal_precision():
     )))
     record = provider.pull("payment").records[0]
     assert record["amount"] == Decimal("123.1234567890123456789")
+
+
+@pytest.fixture
+def smartaccounts_client():
+    seen = []
+    def handler(request):
+        seen.append(request)
+        if request.method == "POST":
+            return httpx.Response(200, json={"id": "new-gl", "docType": "LEDGER_ENTRY", "amount": 12.34, "number": "1"})
+        endpoint = request.url.path.split("/")[-1].split(":")[0]
+        invoice = {"id": "i-1", "invoiceNumber": "INV-1", "date": "02.01.2026", "dueDate": "16.01.2026",
+                   "clientId": "c-1", "vendorId": "v-1", "currency": "EUR", "amount": 100.5,
+                   "vatAmount": 24.12, "totalAmount": 124.62, "outstandingAmount": 0,
+                   "client": {"name": "Synthetic buyer", "regCode": "123"},
+                   "vendor": {"name": "Synthetic vendor", "regCode": "456"}, "rows": [{"price": 100.5, "quantity": 1, "vatPc": "24"}]}
+        data = {
+            "accounts": [{"id": "a-1", "code": "1000", "descriptionEn": "Cash", "descriptionEt": "Raha", "type": "ASSET"}],
+            "clients": [{"id": "c-1", "name": "Synthetic buyer", "regCode": "123", "vatNumber": "EE123",
+                         "dateUpdated": "03.01.2026", "contacts": [{"type": "EMAIL", "value": "buyer@example.test"}]}],
+            "clientinvoices": [invoice], "vendorinvoices": [invoice],
+            "payments": [{"id": "p-1", "date": "03.01.2026", "amount": 124.62, "partnerType": "CLIENT",
+                          "rows": [{"type": "CLIENT_INVOICE", "id": "i-1", "amount": 124.62}]}],
+            "entries": [{"id": "g-1", "date": "04.01.2026", "document": "GL-1", "docType": "LEDGER_ENTRY",
+                         "rows": [{"account": "1000", "description": "Test", "debitAmount": 12.34, "objectId": "object-1"}]}],
+        }
+        key = {"clientinvoices": "clientInvoices", "vendorinvoices": "vendorInvoices"}.get(endpoint, endpoint)
+        return httpx.Response(200, json={key: data[endpoint], "hasMoreEntries": False})
+    provider = SmartAccountsProvider("synthetic-public", "synthetic-secret", lang="en",
+        clock=lambda: datetime(2026, 10, 11, 12, tzinfo=timezone.utc),
+        client=httpx.Client(transport=httpx.MockTransport(handler)))
+    return provider, seen
+
+
+def assert_smartaccounts_signature(request):
+    query, signature = request.url.query.decode().rsplit("&signature=", 1)
+    assert signature == hmac.new(b"synthetic-secret", query.encode() + request.content, hashlib.sha256).hexdigest()
+
+
+def test_smartaccounts_pinned_signature_vectors(smartaccounts_client):
+    provider, seen = smartaccounts_client
+    # Reference calculation performed once with hmac.new(secret, query+body,
+    # hashlib.sha256).hexdigest(); literals guard algorithm and separator drift.
+    # Input is the officially documented example query (SmartAccounts API doc);
+    # the sample api key is joined at runtime because it is a public
+    # documentation value, not a credential.
+    query = "codes=kood1%2Ckood2%2Ckood3&timestamp=14022013133802&apikey=" \
+        "a066f7de6042458da916"
+    assert provider._signature(query) == "3216ae3aa3731097203ec5541e70abf0dcd0edb34e2dacaf34dbfa1d6bc90808"
+    assert provider._signature("timestamp=03032021090000&apikey=synthetic-public", '{"document":"GL-1"}') == "4a09674e57962587f40d73c90e289dac1ffe041e3b84cfa14fefb8395ae4ed05"
+    provider.api_key = query.rsplit("apikey=", 1)[1]
+    provider.clock = lambda: datetime(2013, 2, 14, 13, 38, 2, tzinfo=provider.tallinn)
+    provider._accounting_request("GET", "settings/accounts:get", params={"codes": "kood1,kood2,kood3"})
+    assert seen[0].url.query.decode() == query + "&signature=3216ae3aa3731097203ec5541e70abf0dcd0edb34e2dacaf34dbfa1d6bc90808"
+
+
+@pytest.mark.parametrize("instant,expected", [
+    (datetime(2026, 3, 29, 0, 30, tzinfo=timezone.utc), "29032026023000"),
+    (datetime(2026, 3, 29, 1, 30, tzinfo=timezone.utc), "29032026043000"),
+])
+def test_smartaccounts_tallinn_dst_timestamp(smartaccounts_client, instant, expected):
+    provider, seen = smartaccounts_client
+    provider.clock = lambda: instant
+    assert provider.check().ok
+    assert seen[-1].url.params["timestamp"] == expected
+    assert_smartaccounts_signature(seen[-1])
+
+
+@pytest.mark.parametrize("object_type,endpoint", [
+    ("account", "settings/accounts"), ("contact", "purchasesales/clients"),
+    ("sales_invoice", "purchasesales/clientinvoices"), ("purchase_invoice", "purchasesales/vendorinvoices"),
+    ("payment", "purchasesales/payments"), ("gl_entry", "general/entries"),
+])
+def test_smartaccounts_pull_dispatch(smartaccounts_client, object_type, endpoint):
+    provider, seen = smartaccounts_client
+    result = provider.pull(object_type)
+    assert result.ok and result.records[0]["external_id"]
+    assert seen[-1].url.path == f"/en/api/{endpoint}:get"
+    assert_smartaccounts_signature(seen[-1])
+    if object_type not in {"account", "contact"}:
+        assert seen[-1].url.params["fetchRows"] == "true"
+        assert seen[-1].url.params["dateType"] == "date"
+    if object_type == "gl_entry":
+        assert seen[-1].url.params["docType"] == "LEDGER_ENTRY"
+
+
+@pytest.mark.parametrize("object_type,key", [("contact", "clients"), ("sales_invoice", "invoices")])
+def test_smartaccounts_pagination_uses_metadata_not_page_size(smartaccounts_client, object_type, key):
+    provider, seen = smartaccounts_client
+    def handler(request):
+        seen.append(request)
+        return httpx.Response(200, json={key: [], "hasMoreEntries": request.url.params["pageNumber"] == "1"})
+    provider.client = httpx.Client(transport=httpx.MockTransport(handler))
+    first = provider.pull(object_type, cursor='{"from":"2026-10-01"}' if object_type != "contact" else None)
+    assert json.loads(first.cursor)["page"] == 2
+    second = provider.pull(object_type, cursor=first.cursor)
+    assert second.cursor is None
+    assert [r.url.params["pageNumber"] for r in seen] == ["1", "2"]
+    if object_type != "contact":
+        assert seen[0].url.params["dateFrom"] == seen[1].url.params["dateFrom"] == "01.10.2026"
+        assert seen[0].url.params["dateTo"] == seen[1].url.params["dateTo"] == "11.10.2026"
+    third = provider.pull("payment", cursor='{"from":"2026-01-01"}')
+    # First page has more entries; the frozen 90-day end survives its cursor.
+    assert json.loads(third.cursor)["to"] == "2026-03-31"
+
+
+def smartaccounts_batch():
+    return {"doc_no": "GL-1", "posting_date": "2026-01-04", "currency": "EUR",
+            "lines": [{"external_account_code": "1000", "debit": Decimal("12.34"), "memo": "Tõend"},
+                      {"external_account_code": "2000", "credit": Decimal("12.34")} ]}
+
+
+def test_smartaccounts_gl_push_one_request_and_response_id(smartaccounts_client):
+    provider, seen = smartaccounts_client
+    batch = smartaccounts_batch()
+    batch["lines"] *= 501
+    result = provider.push("gl_batch", [batch])
+    assert result.records[0]["external_id"] == "new-gl"
+    assert isinstance(result.records[0]["amount"], Decimal)
+    assert len(seen) == 1 and seen[0].url.path == "/en/api/general/entries:add"
+    payload = json.loads(seen[0].content)
+    assert payload["docType"] == "LEDGER_ENTRY" and payload["currency"] == "EUR"
+    assert payload["date"] == "2026-01-04" and payload["document"] == "GL-1"
+    assert len(payload["rows"]) == 1002
+    assert payload["rows"][0] == {"account": "1000", "description": "Tõend", "debitAmount": 12.34, "creditAmount": 0}
+    assert_smartaccounts_signature(seen[0])
+
+
+@pytest.mark.parametrize("field,value", [("doc_no", ""), ("posting_date", "bad"), ("currency", "GBP"),
+    ("lines", []), ("lines", [None]), ("lines", [{"account_code": "1000", "debit": "NaN"}]),
+    ("lines", [{"account_code": "1000", "debit": "1e9999"}]),
+    ("lines", [{"account_code": "1000", "debit": "1.001"}]),
+    ("lines", [{"account_code": "1000", "debit": "1"}]),
+    ("lines", [{"account_code": "1000", "debit": "-1"}]), ("lines", [{"debit": "1"}])])
+def test_smartaccounts_validates_all_batches_before_network(smartaccounts_client, field, value):
+    provider, seen = smartaccounts_client
+    with pytest.raises(ValueError):
+        provider.push("gl_batch", [smartaccounts_batch(), dict(smartaccounts_batch(), **{field: value})])
+    assert seen == []
+
+
+def test_smartaccounts_checks_and_invalid_contracts(smartaccounts_client):
+    provider, seen = smartaccounts_client
+    assert provider.check().ok and seen[-1].url.path == "/en/api/settings/accounts:get"
+    provider.client = httpx.Client(transport=httpx.MockTransport(lambda request: httpx.Response(401)))
+    result = provider.check()
+    assert not result.ok and result.live and "authentication failed (HTTP 401)" in result.message
+    assert "synthetic" not in result.message
+    def timeout(request):
+        raise httpx.ConnectError("offline", request=request)
+    provider.client = httpx.Client(transport=httpx.MockTransport(timeout))
+    assert not provider.check().live
+    with pytest.raises(ValueError, match="Unsupported"):
+        provider.pull("employees")
+    with pytest.raises(ValueError, match="Unsupported"):
+        provider.push("sales_invoice", [])
+    for payload in ({"accounts": [{}]}, {"unexpected": "bad"}):
+        provider.client = httpx.Client(transport=httpx.MockTransport(lambda request: httpx.Response(200, json=payload)))
+        with pytest.raises(ProviderError):
+            provider.pull("account")
+    provider.client = httpx.Client(transport=httpx.MockTransport(lambda request: httpx.Response(200, json={"clients": []})))
+    with pytest.raises(ProviderError, match="pagination"):
+        provider.pull("contact")
+
+
+def test_smartaccounts_normalisers_match_apply_aliases(smartaccounts_client):
+    from import_service import ImportService
+    provider, _ = smartaccounts_client
+    service = object.__new__(ImportService)
+    contact = provider.pull("contact").records[0]
+    values = service._contact_payload(contact)
+    assert values["contact_type"] == "customer" and values["email"] == "buyer@example.test"
+    assert values["registration_no"] == "123" and values["vat_no"] == "EE123"
+    assert contact["external_version"] == "03.01.2026"
+    for kind, role in (("sales_invoice", "customer"), ("purchase_invoice", "supplier")):
+        invoice = provider.pull(kind).records[0]
+        assert service._contact_payload(invoice, role)["name"].startswith("Synthetic")
+        assert invoice["tax_total"] == Decimal("24.12") and invoice["total"] == Decimal("124.62")
+        assert invoice["total_exvat"] == Decimal("100.5") and invoice["paid"]
+        assert invoice["due_date"] == "2026-01-16"
+        with pytest.raises(ValueError, match="At least one document line"):
+            service._document_lines(None, "org", "smartaccounts", invoice)
+    payment = provider.pull("payment").records[0]
+    assert service._text(payment, "document_external_id", "invoice_external_id") == "i-1"
+    assert payment["payment_type"] == "customer_receipt" and payment["amount"] == Decimal("124.62")
+    gl = provider.pull("gl_entry").records[0]
+    assert gl["external_id"] == "g-1:1" and gl["debit"] == Decimal("12.34")
+    assert service._text(gl, "entry_date", "date") == "2026-01-04"
+    assert gl["dims"] == {"objectId": "object-1"}
+
+
+def test_smartaccounts_decimal_json_and_registry(smartaccounts_client):
+    provider, _ = smartaccounts_client
+    provider.client = httpx.Client(transport=httpx.MockTransport(lambda request: httpx.Response(200,
+        content=b'{"payments":[{"id":"p","date":"01.01.2026","amount":123.1234567890123456789}],"hasMoreEntries":false}')))
+    assert provider.pull("payment").records[0]["amount"] == Decimal("123.1234567890123456789")
+    registered = connector_for("smartaccounts", credentials={"api_key": "public", "secret_key": "secret"})
+    assert isinstance(registered, SmartAccountsProvider) and registered.lang == "et"
+    assert registered.base_url == "https://sa.smartaccounts.eu/et/api"
+    with pytest.raises(ValueError, match="language"):
+        SmartAccountsProvider("public", "secret", lang="de")
+    for cursor in ('{"page":0}', '[]', '{bad', '{"from":"2027-01-01"}'):
+        with pytest.raises(ValueError, match="cursor"):
+            provider.pull("sales_invoice", cursor=cursor)
+
+
+def test_smartaccounts_503_retry_and_timezone_errors(smartaccounts_client, monkeypatch):
+    provider, seen = smartaccounts_client
+    delays = []
+    def handler(request):
+        seen.append(request)
+        return httpx.Response(503, headers={"Retry-After": "2"}) if len(seen) == 1 else httpx.Response(200, json={"accounts": []})
+    provider.client = httpx.Client(transport=httpx.MockTransport(handler))
+    provider.sleep = delays.append
+    assert provider.check().ok and delays == [2]
+    assert seen[0].url == seen[1].url
+    for request in seen:
+        assert_smartaccounts_signature(request)
+    provider.clock = lambda: datetime(2026, 1, 1)
+    with pytest.raises(ValueError, match="timezone-aware"):
+        provider.pull("account")
+    from zoneinfo import ZoneInfoNotFoundError
+    def missing_zone(name):
+        raise ZoneInfoNotFoundError(name)
+    monkeypatch.setattr("zoneinfo.ZoneInfo", missing_zone)
+    with pytest.raises(ValueError, match="pip install tzdata"):
+        SmartAccountsProvider("public", "secret")
+
+
+def test_smartaccounts_registry_metadata():
+    from connectors.registry import provider_metadata
+    metadata = provider_metadata("smartaccounts")
+    assert metadata["registry_status"] == "Documented contract · not live-verified"
+    fields = metadata["credential_fields"]
+    assert [field["name"] for field in fields] == ["api_key", "secret_key", "lang"]
+    assert fields[0]["input_type"] == fields[1]["input_type"] == "secret"
+    assert fields[2]["default"] == "et"

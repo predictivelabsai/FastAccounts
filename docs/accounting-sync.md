@@ -81,3 +81,93 @@ does not change local ledger lines or implement provider deletion.
 
 These statuses follow the supplied verified contracts and existing production
 usage. This change is verified with synthetic fixtures only, with no live calls.
+
+## SmartAccounts
+
+The company-scoped adapter uses `https://sa.smartaccounts.eu/{lang}/api`, with
+`lang=et` by default or `en`. Constructor credentials are `api_key` (the public
+company API key) and `secret_key` (the secret signing key). Both are encrypted
+credentials. The contract is SmartAccounts API version 1.7, dated 28 April 2025.
+
+| Object | Method and path | Parameters |
+| --- | --- | --- |
+| Connection check / accounts | GET `/settings/accounts:get` | Full account list, no filters |
+| Clients | GET `/purchasesales/clients:get` | `pageNumber`, `fetchContacts=true`, `fetchAddresses=true` |
+| Sales invoices | GET `/purchasesales/clientinvoices:get` | `dateFrom`, `dateTo`, `dateType=date`, `pageNumber`, `fetchRows=true` |
+| Purchase invoices | GET `/purchasesales/vendorinvoices:get` | Same dated parameters |
+| Payments | GET `/purchasesales/payments:get` | Same dated parameters |
+| Manual ledger entries | GET `/general/entries:get` | Same dated parameters, `docType=LEDGER_ENTRY` |
+| GL batch | POST `/general/entries:add` | `docType=LEDGER_ENTRY`, `date`, `document`, `currency=EUR`, `comment`, `rows` |
+
+Every request signs the exact URL-encoded query string before `&signature=`.
+Endpoint parameters appear first in insertion order, followed by `timestamp`
+and `apikey`. POST appends the exact compact UTF-8 JSON body immediately, with
+no separator. GET signs only the query string. The server URL is never signed.
+HMAC-SHA256 uses the secret key and produces lowercase hexadecimal; the
+URL-encoded signature is the final query parameter. The official example input is:
+
+```text
+codes=kood1%2Ckood2%2Ckood3&timestamp=14022013133802&apikey=a066f7de6042458da916
+```
+
+Timestamps use `ddMMyyyyHHmmss` in Europe/Tallinn, including DST conversion
+from an aware injected clock. On Windows, install `tzdata` (`pip install tzdata`)
+to supply the IANA timezone database. Date filters use `dd.MM.yyyy`, following
+the official filter examples; canonical dates remain ISO. GL add uses the
+requested ISO `yyyy-mm-dd` date. Its field table specifies Date without an
+explicit encoding; confirm this with the test company before live acceptance.
+
+Each pull makes one request. Accounts have no cursor. Clients use compact
+`{"page":2}` cursors and end only when `hasMoreEntries=false`. Dated objects
+use inclusive 90-day windows starting 365 days before today by default. While
+paging, `{"from":"2026-01-01","to":"2026-03-31","page":2}` freezes the
+window; after its last page the cursor is `{"from":"2026-04-01"}`. Once the
+last window reaches today the cursor is `None`. Page size is never assumed.
+The document does not specify every collection envelope name: the adapter
+accepts its named collection or a single unambiguous array, excluding `deleted`.
+Malformed pagination fails explicitly. Date filtering uses document dates;
+historical edits require replaying the relevant date window. Remote deletions
+are not applied to local books.
+
+Client email comes from `contacts` entries with `type=EMAIL`; `dateUpdated`
+(or `dateCreated`) supplies the external version. Invoice counterparties come
+from nested `client` / `vendor`, totals from `amount`, `vatAmount`, `totalAmount`
+and paid status from `outstandingAmount`. Remote invoice rows are retained as
+`smartaccounts_rows`; applying drafts requires reviewed local lines, accounts
+and tax codes, as for Merit headers. Payment invoice allocations become separate
+records with IDs `{payment_id}:{row_index}` and allocation amounts, avoiding
+duplicating the entire payment per invoice. Bank accounts need local review.
+Unsupported allocations and payments without allocations remain review records
+without a linked document. Ledger row IDs are `{entry_id}:{row_index}`;
+`objectId` is preserved in `dims`. External GL is reconciliation data only.
+
+GL push validates all batches and lines before the first request: EUR only,
+finite two-decimal amounts, accounts, dates, document numbers, non-negative
+single-sided lines and a positive balanced total. Wire rows use `account`,
+`description`, `debitAmount` and `creditAmount`, never OriginalCurrency fields.
+Decimal arithmetic is retained until the JSON numeric wire boundary. One batch
+is one request, with no row chunking: the document specifies no add row cap.
+The returned `id` is captured as `external_id`. SmartAccounts supports
+`entries:delete`, but this adapter never calls delete or edit. Corrections are
+new linked reversal entries. Multiple batches are not remotely atomic and no
+provider idempotency token is documented; inspect provider state before retrying
+an uncertain or partially completed push.
+
+Limits are 60 requests/minute and 1000 requests/24 hours, exceeded with HTTP
+503. Shared HTTP retry/backoff honours `Retry-After`; 503 can also indicate a
+billing problem. Offline fixtures exercise the contract without vendor access.
+
+### Live verification status
+
+| Capability | Status |
+| --- | --- |
+| Connection check and accounts | Documented contract · not live-verified |
+| Clients | Documented contract · not live-verified |
+| Sales and purchase invoices | Documented contract · not live-verified |
+| Payments and allocations | Documented contract · not live-verified |
+| Ledger entries | Documented contract · not live-verified |
+| EUR GL batch push | Documented contract · not live-verified |
+
+Acceptance with a SmartAccounts test company, including collection envelopes,
+date encoding and fetch flags, remains pending. The synthetic encrypted demo
+connection performs no live check.

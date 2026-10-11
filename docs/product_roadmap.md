@@ -769,3 +769,18 @@ routes are organisation-scoped and use the existing read-role guards.
 The exports are pure rendered reports: they make no database changes and require
 no migration. Monetary calculations stay Decimal-based, while final two-decimal
 values are written as numeric Excel cells for spreadsheet calculations.
+
+## 29. SmartAccounts reviewed accounting adapter (2026-10-11)
+
+- [x] Implement the documented company-key signature contract, Tallinn timestamps,
+  accounts/clients/invoices/payments/manual-ledger pulls and paginated dated cursors.
+- [x] Add validated balanced EUR GL batch pushes, registry/catalogue metadata,
+  text service logo and synthetic encrypted demo connection, with offline pytest
+  coverage and [accounting-sync documentation](accounting-sync.md#smartaccounts).
+- [ ] Verify with a SmartAccounts test company before production acceptance.
+
+Status: **Documented contract · not live-verified**. Reviewed invoice lines need
+local account/tax mappings and payments need local bank-account review. External
+GL is reconciliation data; provider delete/edit is unused and corrections are
+new reversal entries. No row cap or idempotency token is documented, so each
+batch is sent once per request and uncertain outcomes require reconciliation.

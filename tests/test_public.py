@@ -200,7 +200,7 @@ def test_public_availability_vocabulary_is_consistent(lang):
     expected_statuses = {
         "file_import": "available", "fasthr": "available",
         "quickbooks": "review_required", "xero": "review_required",
-        "merit": "review_required", "bamboohr": "review_required",
+        "merit": "review_required", "smartaccounts": "review_required", "bamboohr": "review_required",
         "personio": "review_required", "hmrc": "pilot", "emta": "pilot",
         "open_banking": "planned",
     }

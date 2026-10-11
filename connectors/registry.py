@@ -12,6 +12,7 @@ from .providers import (
     BambooHRProvider,
     FastHRProvider,
     MeritProvider,
+    SmartAccountsProvider,
     PersonioProvider,
     QuickBooksProvider,
     XeroProvider,
@@ -153,6 +154,19 @@ REGISTRY: dict[str, ConnectorRegistration] = {
             CredentialField("api_id", "API ID"),
             CredentialField("api_key", "API key", "secret"),
         ),
+    ),
+    "smartaccounts": ConnectorRegistration(
+        status="Documented contract · not live-verified",
+        factory=lambda credentials, config: SmartAccountsProvider(
+            api_key=credentials.get("api_key", ""), secret_key=credentials.get("secret_key", ""),
+            lang=credentials.get("lang") or "et",
+        ),
+        credential_fields=(
+            CredentialField("api_key", "Company public API key", "secret"),
+            CredentialField("secret_key", "Secret API key", "secret"),
+            CredentialField("lang", "Language (en or et)", required=False, default="et"),
+        ),
+        credential_note="Per-company keys; reviewed accounting pulls and EUR GL batch push. Test company verification pending.",
     ),
     "hmrc": ConnectorRegistration(
         status="Planning stub",

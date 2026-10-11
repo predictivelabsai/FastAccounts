@@ -4,6 +4,26 @@ Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as
 delivered.
 
+## 2026-10-11: SmartAccounts reviewed accounting adapter
+
+### Added
+
+- Added company-key HMAC-signed accounts, clients, invoices, payments and manual
+  ledger pulls, metadata-based pagination and bounded dated cursors. Added
+  validated balanced EUR GL batch pushes, without row splitting or deletion.
+- Registered SmartAccounts with encrypted key fields, language configuration,
+  an original text logo and a synthetic encrypted Estonian demo connection.
+- Added offline signature vectors, Tallinn DST, dispatch, pagination, validation,
+  normaliser and connection tests; documented the contract in accounting-sync.
+
+### Data and boundaries
+
+- Documented contract only, not live-verified. Invoice rows require local
+  account/tax review; payments require mapped invoices and bank accounts.
+  External GL remains reconciliation data. Corrections use new reversal entries.
+- No schema changes, local ledger changes or MeritProvider changes. Test-company
+  acceptance and uncertain push reconciliation remain follow-up work.
+
 ## 2026-10-11: Merit reviewed accounting adapter
 
 ### Added
