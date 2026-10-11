@@ -168,6 +168,14 @@ REGISTRY: dict[str, ConnectorRegistration] = {
         ),
         credential_note="Per-company keys; reviewed accounting pulls and EUR GL batch push. Test company verification pending.",
     ),
+    "einvoice_operator": ConnectorRegistration(
+        status="Planning stub",
+        factory=_planning_stub("einvoice_operator"),
+        credential_note=(
+            "TBD: Finbite/Omniva hosted e-invoice delivery requires operator "
+            "contracts and a reviewed delivery adapter."
+        ),
+    ),
     "hmrc": ConnectorRegistration(
         status="Planning stub",
         factory=_planning_stub("hmrc"),

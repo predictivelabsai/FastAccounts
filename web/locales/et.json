@@ -650,6 +650,12 @@
   },
   "nav.pricing": "Hinnad",
   "workspace": {
+    "Import e-invoice": "Impordi e-arve",
+    "Choose an Estonian e-arve XML file. The bill is saved as a draft for review, with the source file attached.": "Vali Eesti e-arve XML-fail. Ostuarve salvestatakse kontrollimiseks mustandina koos lisatud algfailiga.",
+    "E-invoice XML file": "E-arve XML-fail",
+    "Import draft bill": "Impordi ostuarve mustand",
+    "Choose a non-empty e-invoice XML file.": "Vali e-arve XML-fail, mis ei ole tühi.",
+    "E-invoice imported as a draft bill.": "E-arve imporditi ostuarve mustandina.",
     "Create payment order": "Koosta maksekorraldus",
     "Payment orders": "Maksekorraldused",
     "Execution date": "Makse kuupäev",

@@ -650,6 +650,12 @@
   },
   "nav.pricing": "Kainos",
   "workspace": {
+    "Import e-invoice": "Importuoti e. sąskaitą",
+    "Choose an Estonian e-arve XML file. The bill is saved as a draft for review, with the source file attached.": "Pasirinkite Estijos e-arve XML failą. Pirkimo sąskaita bus išsaugota kaip juodraštis peržiūrai su pridėtu šaltinio failu.",
+    "E-invoice XML file": "E. sąskaitos XML failas",
+    "Import draft bill": "Importuoti pirkimo sąskaitos juodraštį",
+    "Choose a non-empty e-invoice XML file.": "Pasirinkite netuščią e. sąskaitos XML failą.",
+    "E-invoice imported as a draft bill.": "E. sąskaita importuota kaip pirkimo sąskaitos juodraštis.",
     "Create payment order": "Sukurti mokėjimo nurodymą",
     "Payment orders": "Mokėjimo nurodymai",
     "Execution date": "Mokėjimo data",

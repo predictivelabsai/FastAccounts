@@ -19,7 +19,7 @@ from integrations import CATALOGUE
 
 @pytest.mark.parametrize(
     "provider",
-    ["hmrc", "emta", "open_banking"],
+    ["hmrc", "emta", "open_banking", "einvoice_operator"],
 )
 def test_connector_stubs_are_explicitly_non_live(provider):
     connector = connector_for(provider)
@@ -39,6 +39,17 @@ def test_connector_stubs_are_explicitly_non_live(provider):
 def test_unknown_connector_is_rejected():
     with pytest.raises(KeyError, match="Unknown connector"):
         connector_for("made-up-provider")
+
+
+def test_einvoice_operator_delivery_is_contract_gated():
+    from connectors.providers import EInvoiceOperatorProvider
+
+    with pytest.raises(PermissionError, match="requires operator contracts"):
+        EInvoiceOperatorProvider().submit(b"synthetic XML")
+    metadata = provider_metadata("einvoice_operator")
+    assert metadata["registry_status"] == "Planning stub"
+    assert metadata["credential_fields"] == []
+    assert "Finbite/Omniva" in metadata["credential_note"]
 
 
 def test_registry_covers_every_catalogue_provider():

@@ -801,6 +801,7 @@
             t("Bills"),
             t("Review supplier documents before posting."),
             button("New supplier", "supplier") +
+              button("Import e-invoice", "importEInvoice") +
               button("Create payment order", "paymentOrder") +
               button("New bill", "bill", true),
             table(
@@ -846,6 +847,7 @@
         return;
       bindActions(content, {
         bill: () => documentDialog("bill"),
+        importEInvoice: () => eInvoiceImportDialog(),
         supplier: () => contactDialog("supplier"),
         paymentOrder: () => paymentOrderDialog(),
         billAttachments: (b) => documentDialog("bill", b.dataset.id),
@@ -1983,6 +1985,30 @@
       await attachmentsSection(d, base, kind, record.id);
       toast(t("Saved successfully"));
       await render();
+    });
+  }
+  function eInvoiceImportDialog() {
+    const base = path("");
+    const d = dialog(
+      "Import e-invoice",
+      form(
+        `<p class="muted full-width">${tr("Choose an Estonian e-arve XML file. The bill is saved as a draft for review, with the source file attached.")}</p>` +
+          field("E-invoice XML file", "file", "", "file", 'required accept=".xml,application/xml,text/xml"'),
+        "Import draft bill",
+      ),
+    );
+    bindForm(d, async (_, formElement) => {
+      const file = formElement.elements.file.files[0];
+      if (!(await file.text()).trim())
+        throw new Error(t("Choose a non-empty e-invoice XML file."));
+      const payload = new FormData();
+      payload.append("file", file);
+      const result = await api(`${base}/e-invoices/import`, { method: "POST", body: payload });
+      closeDialog(d);
+      toast(t("E-invoice imported as a draft bill."));
+      if (base !== path("")) return;
+      await render();
+      await documentDialog("bill", result.bill_id);
     });
   }
   function bankDialog() {

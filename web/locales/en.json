@@ -758,6 +758,12 @@
   },
   "nav.pricing": "Pricing",
   "workspace": {
+    "Import e-invoice": "Import e-invoice",
+    "Choose an Estonian e-arve XML file. The bill is saved as a draft for review, with the source file attached.": "Choose an Estonian e-arve XML file. The bill is saved as a draft for review, with the source file attached.",
+    "E-invoice XML file": "E-invoice XML file",
+    "Import draft bill": "Import draft bill",
+    "Choose a non-empty e-invoice XML file.": "Choose a non-empty e-invoice XML file.",
+    "E-invoice imported as a draft bill.": "E-invoice imported as a draft bill.",
     "Create payment order": "Create payment order",
     "Payment orders": "Payment orders",
     "Execution date": "Execution date",
