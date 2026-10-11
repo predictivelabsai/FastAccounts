@@ -10,6 +10,20 @@ from core_utils import audit, canonical_json, db_number, money, new_id, utc_now
 from database import Database, get_database
 
 
+KMD_REVERSE_CHARGE_WARNING = (
+    "Reverse-charge activity needs accountant classification: the current EE tax kinds "
+    "do not distinguish KMD lines 6, 7 and 9 or import VAT. No additional reverse-charge boxes were derived."
+)
+KMD_ICS_PURCHASE_WARNING = (
+    "The intra_eu tax kind describes supply, not acquisition. Purchase activity needs "
+    "accountant classification before KMD line 6 can be derived."
+)
+KMD_ICS_SUPPLY_WARNING = (
+    "Intra-Community supply is included in KMD lines 3 and 3.1. The current EE tax kinds "
+    "do not distinguish goods from services for line 3.1.1; accountant review is required."
+)
+
+
 class TaxService:
     def __init__(self, db: Database | None = None):
         self.db = db or get_database()
@@ -64,6 +78,7 @@ class TaxService:
         output_tax += reverse_output
         sales_net = sum((weighted(r, "net_amount", "credit_note") for r in sales_lines if r["tax_kind"] != "out_of_scope"), Decimal("0"))
         purchase_net = sum((weighted(r, "net_amount", "supplier_credit") for r in purchase_lines if r["tax_kind"] != "out_of_scope"), Decimal("0"))
+        warnings = ["Cash-basis values are weighted by allocated payment and require accountant review"] if basis == "cash" else []
         if country == "UK":
             boxes = {
                 "box1_vat_due_sales": money(output_tax), "box2_vat_due_acquisitions": money(0),
@@ -78,13 +93,31 @@ class TaxService:
             reduced_supply = sum((weighted(r, "net_amount", "credit_note") for r in sales_lines
                                   if money(r["tax_rate"]) in {Decimal("13.00"), Decimal("9.00")}), Decimal("0"))
             zero_supply = sum((weighted(r, "net_amount", "credit_note") for r in sales_lines
-                               if r["tax_kind"] == "zero"), Decimal("0"))
+                               if r["tax_kind"] in {"zero", "intra_eu"}), Decimal("0"))
             boxes = {
                 "kmd_1_taxable_supply_24": money(standard_supply),
                 "kmd_2_reduced_rate_supply": money(reduced_supply), "kmd_3_zero_rate_supply": money(zero_supply),
                 "kmd_4_output_vat": money(output_tax), "kmd_5_input_vat": money(input_tax),
                 "kmd_12_vat_payable": money(output_tax - input_tax),
             }
+            # EMTA Form KMD (valid from 01.07.2025), lines 3 and 3.1:
+            # https://www.emta.ee/sites/default/files/documents/2025-07/vorm_kmd_2025_07_eng.pdf
+            # Line 3 is zero-rated activity; 3.1 is its intra-Community goods/services
+            # supply subset. EEICS directly evidences supply, not goods alone (3.1.1).
+            ics_sales = [r for r in sales_lines if r["tax_kind"] == "intra_eu"]
+            if ics_sales:
+                boxes["kmd_3_1_intra_community_supply"] = money(sum(
+                    (weighted(r, "net_amount", "credit_note") for r in ics_sales), Decimal("0")))
+                warnings.append(KMD_ICS_SUPPLY_WARNING)
+            # Form titles: 7 "Acquisition of other goods and services subject to VAT",
+            # 11 "Adjustments -". Line 6 concerns EU acquisitions, 7 other taxable acquisitions,
+            # 8 exempt supply, 9 specific special-arrangement supplies and
+            # 11 downward adjustments. Generic EERC cannot select 6/7/9;
+            # none of these fields is a generic reverse-charge VAT amount.
+            if any(r["tax_kind"] == "reverse_charge" for r in sales_lines + purchase_lines):
+                warnings.append(KMD_REVERSE_CHARGE_WARNING)
+            if any(r["tax_kind"] == "intra_eu" for r in purchase_lines):
+                warnings.append(KMD_ICS_PURCHASE_WARNING)
         existing = self.db.one(
             "SELECT id FROM vat_returns WHERE organisation_id=? AND country_code=? AND period_start=? AND period_end=? AND basis=?",
             (organisation_id, country, period_start, period_end, basis),
@@ -104,7 +137,7 @@ class TaxService:
         return {"id": return_id, "country_code": country, "period_start": period_start,
                 "period_end": period_end, "basis": basis, "status": "Draft", "boxes": boxes,
                 "sales": sales, "purchases": purchases,
-                "warnings": ["Cash-basis values are weighted by allocated payment and require accountant review"] if basis == "cash" else []}
+                "warnings": warnings}
 
     def get(self, return_id: str) -> dict:
         row = self.db.one("SELECT * FROM vat_returns WHERE id=?", (return_id,))

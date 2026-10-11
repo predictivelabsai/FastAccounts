@@ -863,3 +863,22 @@ the entries below, plus one connector fix:
   JavaScript syntax and diff checks passed. The existing integration browser test
   was updated for seven connectable cards; no new bank-consent browser test was
   added. Validation ran on installed Python 3.14; Python 3.12 is unavailable.
+
+## 2026-10-11: KMD reverse-charge and ICS coverage (PR5)
+
+- Audited seeded EE kinds and verified the EMTA KMD form. Qualified case (a):
+  EEICS evidences supply; generic EERC cannot select detailed acquisition or
+  special-arrangement fields. The proposed meanings for lines 7/8/9/11 differ
+  from the official form, so those remain absent with classification warnings.
+- Included posted intra-Community sales in line 3 and added the line 3.1 subset
+  only when evidence exists, retaining credit signs and Decimal cash weighting.
+- Added warnings for ambiguous reverse charge, supply-kind purchases and missing
+  goods/service separation, with translations in all four locales.
+- Added synthetic regression coverage for amounts, credits, cash weighting,
+  draft/period/tenant exclusion, warning deduplication, UK isolation and CSV
+  export. Documented existing field limitations and follow-ups in `docs/kmd.md`;
+  roadmap scope is synchronised. No migration, tax-code or filing change.
+- Validation: `python -m pytest tests/ -q`: 542 passed, three optional PostgreSQL
+  skips and five existing dependency deprecation warnings. Targeted tax/locale
+  checks, compilation and diff checks passed. Tests used synthetic data and no
+  live providers. Python 3.14.6 was used because Python 3.12 is unavailable.

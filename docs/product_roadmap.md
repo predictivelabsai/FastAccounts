@@ -952,3 +952,20 @@ pending.
   passed. The existing integration browser regression includes the seventh
   connectable card; no new bank-consent browser test was added. Commands ran on
   installed Python 3.14 because Python 3.12 is unavailable on this machine.
+
+## PR5: KMD reverse-charge and ICS coverage (2026-10-11)
+
+- [x] Audit the existing EE tax kinds against the EMTA KMD form. Include posted
+  intra-Community supply in line 3 and derive its line 3.1 subset only when present,
+  with existing credit signs, Decimal rounding and cash weighting.
+- [x] Warn on generic reverse-charge activity and purchase-side use of the supply
+  kind. No ambiguous acquisition, import or reverse-charge field is inferred.
+  Add the line label and warnings in English, Estonian, Lithuanian and Latvian.
+- [x] Document verified numbering, formulas and retained limitations in
+  [`kmd.md`](kmd.md). No migration, new tax code or filing change.
+- [ ] More specific acquisition/import evidence, goods/service separation,
+  existing line 2/12 form alignment and accountant UAT remain follow-ups.
+- Validation: `python -m pytest tests/ -q` passed with 542 tests and three optional
+  PostgreSQL skips. Targeted tax/locale checks, compilation and diff checks passed.
+  Tests used synthetic data and no live providers. Python 3.14.6 was used because
+  Python 3.12 is unavailable on this machine.
