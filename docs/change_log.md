@@ -840,3 +840,26 @@ the entries below, plus one connector fix:
   no live network), API tests, i18n parity and a Playwright workspace regression.
   Accountant UAT for reminder copy and real delivery remains pending. No external
   network access was used.
+
+## 2026-10-11: GoCardless read-only bank feed (PR4)
+
+- Added GoCardless Bank Account Data token acquisition, one-time HTTP 401 refresh,
+  bank selection and consent link completion. Stored user secrets use the existing
+  key-versioned Fernet vault; persisted access tokens are encrypted and excluded
+  from public connection responses.
+- Added tenant-scoped mapping to existing bank accounts, account balances and
+  manual 90-day booked transaction imports with source-hash and row-fingerprint
+  idempotency. Outgoing amounts remain negative; incoming amounts remain positive.
+- Added the connectable integration card and consent, mapping and pull controls
+  with English, Estonian, Lithuanian and Latvian translations.
+- No migration or background worker. Consent may last around 180 days depending
+  on the bank and agreement, and renewal requires re-linking. The documented
+  default agreement currently gives 90 days of account access; API access tokens
+  have a separate, shorter expiry. Live consent UAT remains pending.
+- Verified using synthetic providers and httpx MockTransport, with no live bank
+  endpoints. Roadmap scope is synchronised in `docs/product_roadmap.md`.
+- Validation: `python -m pytest tests/ -q`: 533 passed, three optional PostgreSQL
+  skips and existing dependency deprecation warnings. `python -m compileall -q .`,
+  JavaScript syntax and diff checks passed. The existing integration browser test
+  was updated for seven connectable cards; no new bank-consent browser test was
+  added. Validation ran on installed Python 3.14; Python 3.12 is unavailable.

@@ -60,6 +60,11 @@ class IntegrationService:
             raise ValueError(
                 "File import does not use stored connections; use the file import endpoint"
             )
+        if key == "open_banking":
+            if not credentials.get("secret_id") or not credentials.get("secret_key"):
+                raise ValueError("GoCardless secret ID and secret key are required")
+            # Consent state must come from GoCardless, never caller-supplied config.
+            config = {}
         connection_id, now = new_id(), utc_now()
         encrypted = self.vault.encrypt(credentials)
         with self.db.transaction() as tx:
@@ -106,7 +111,7 @@ class IntegrationService:
             "provider": connection["provider"],
             "status": connection["status"],
             "external_tenant_id": connection.get("external_tenant_id"),
-            "config": config,
+            "config": {key: value for key, value in config.items() if key != "access_token_encrypted"},
             "updated_at": connection["updated_at"],
             "registry_status": registration_for(connection["provider"]).status,
         }
@@ -149,6 +154,9 @@ class IntegrationService:
         )
         if connection:
             status = "Connected" if result.ok and result.live else "Error"
+            if key == "open_banking" and result.ok:
+                # Credential verification alone is not bank consent.
+                status = self.connection(connection["id"])["status"]
             self.set_status(connection["id"], status, actor=actor, message=result.message)
         return result
 

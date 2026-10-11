@@ -211,7 +211,7 @@ def test_workspace_integration_connection_and_review_flow(monkeypatch):
         page.route("**/*", respond)
         page.goto("http://workspace.test/app#integrations")
         page.wait_for_timeout(500)
-        assert page.locator(".integration-provider").count() == 6, (
+        assert page.locator(".integration-provider").count() == 7, (
             page_errors,
             page.locator("#app-content").inner_text(),
             calls,

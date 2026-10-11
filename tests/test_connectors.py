@@ -19,7 +19,7 @@ from integrations import CATALOGUE
 
 @pytest.mark.parametrize(
     "provider",
-    ["hmrc", "emta", "open_banking", "einvoice_operator"],
+    ["hmrc", "emta", "einvoice_operator"],
 )
 def test_connector_stubs_are_explicitly_non_live(provider):
     connector = connector_for(provider)
@@ -90,7 +90,7 @@ def test_credential_field_metadata_is_ordered_and_complete():
     assert [field["name"] for field in provider_metadata("merit")["credential_fields"]] == [
         "api_id", "api_key",
     ]
-    for provider in ("hmrc", "emta", "open_banking"):
+    for provider in ("hmrc", "emta"):
         assert provider_metadata(provider)["credential_note"].startswith("TBD:")
     assert "Adapter not yet built" in provider_metadata("hibob")["credential_note"]
 

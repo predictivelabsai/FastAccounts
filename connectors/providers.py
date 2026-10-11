@@ -1311,24 +1311,76 @@ class HMRCProvider(HTTPProvider):
 
 class OpenBankingProvider(HTTPProvider):
     """Read-only GoCardless Bank Account Data adapter; no payment initiation."""
+    key = "open_banking"
     base_url = "https://bankaccountdata.gocardless.com/api/v2"
 
-    def __init__(self, access_token: str, **kwargs):
+    def __init__(self, access_token: str = "", *, secret_id: str = "", secret_key: str = "", **kwargs):
         super().__init__(**kwargs)
-        self.headers = {"Authorization": f"Bearer {access_token}", "Accept": "application/json"}
+        self.access_token = access_token
+        self.secret_id, self.secret_key = secret_id, secret_key
+
+    def fetch_token(self, secret_id: str, secret_key: str) -> dict:
+        if not secret_id or not secret_key:
+            raise ValueError("GoCardless secret ID and secret key are required")
+        self.secret_id, self.secret_key = secret_id, secret_key
+        # Bank Account Data uses user secrets, not an OAuth client_credentials grant.
+        payload = super().request("POST", f"{self.base_url}/token/new/",
+                                  json={"secret_id": secret_id, "secret_key": secret_key}).json()
+        if not payload.get("access") and payload.get("refresh"):
+            payload = super().request("POST", f"{self.base_url}/token/refresh/",
+                                      json={"refresh": payload["refresh"]}).json()
+        if not payload.get("access"):
+            raise ProviderError("GoCardless returned no access token")
+        self.access_token = payload["access"]
+        return payload
+
+    def _api(self, method: str, path: str, **kwargs):
+        if not self.access_token:
+            self.fetch_token(self.secret_id, self.secret_key)
+        for attempt in range(2):
+            try:
+                return super().request(method, self.base_url + path,
+                    headers={"Authorization": f"Bearer {self.access_token}", "Accept": "application/json"},
+                    **kwargs).json()
+            except ProviderError as error:
+                if attempt or self._status_code(error) != 401 or not (self.secret_id and self.secret_key):
+                    raise
+                self.fetch_token(self.secret_id, self.secret_key)
 
     def institutions(self, country: str) -> list[dict]:
-        return self.request("GET", f"{self.base_url}/institutions/", params={"country": country}, headers=self.headers).json()
+        return self._api("GET", "/institutions/", params={"country": country})
 
     def create_requisition(self, *, redirect: str, institution_id: str, reference: str) -> dict:
-        payload = {"redirect": redirect, "institution_id": institution_id,
-                   "reference": reference, "user_language": "EN"}
-        return self.request("POST", f"{self.base_url}/requisitions/", json=payload, headers=self.headers).json()
+        return self._api("POST", "/requisitions/", json={"redirect": redirect,
+            "institution_id": institution_id, "reference": reference, "user_language": "EN"})
+
+    def get_requisition(self, requisition_id: str) -> dict:
+        return self._api("GET", f"/requisitions/{requisition_id}/")
+
+    def get_account(self, account_id: str) -> dict:
+        return self._api("GET", f"/accounts/{account_id}/")
+
+    def balances(self, account_id: str) -> dict:
+        return self._api("GET", f"/accounts/{account_id}/balances/")
 
     def transactions(self, account_id: str, *, date_from: str = "", date_to: str = "") -> dict:
         params = {key: value for key, value in (("date_from", date_from), ("date_to", date_to)) if value}
-        return self.request("GET", f"{self.base_url}/accounts/{account_id}/transactions/",
-                            params=params, headers=self.headers).json()
+        return self._api("GET", f"/accounts/{account_id}/transactions/", params=params)
+
+    def check(self) -> ConnectorResult:
+        if not (self.secret_id and self.secret_key) and not self.access_token:
+            return ConnectorResult(self.key, "check", False, False, "GoCardless credentials are required")
+        try:
+            self.institutions("GB")
+        except (ProviderError, httpx.RequestError):
+            return ConnectorResult(self.key, "check", False, False, "GoCardless connection failed")
+        return ConnectorResult(self.key, "check", True, True, "GoCardless credentials verified; link a bank to approve access")
+
+    def pull(self, object_type: str, *, cursor: str | None = None) -> ConnectorResult:
+        raise ValueError("Use the linked bank account transaction pull")
+
+    def push(self, object_type: str, records: list[dict]) -> ConnectorResult:
+        raise PermissionError("GoCardless bank feeds are read-only")
 
 
 class EMTAExportProvider:
