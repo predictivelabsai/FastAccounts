@@ -83,16 +83,29 @@ def exchange(request, code: str) -> dict | None:
     return {"email": email, "name": info.get("name") or email}
 
 
+def open_signup() -> bool:
+    """Public sign-up switch: any verified identity may create an account.
+
+    Off by default; production sets FASTACCOUNTS_OPEN_SIGNUP while the product
+    is early-stage. Existing allow-list, membership and invitation checks are
+    kept in force when the flag is absent, disabled or falsy.
+    """
+    return os.getenv("FASTACCOUNTS_OPEN_SIGNUP", "").strip().lower() in {"1", "true", "yes", "on"}
+
+
 def access_allowed(email: str) -> bool:
     """Shared sign-in policy for Google and email/password accounts.
 
     An address may sign in when it is explicitly allowed by configuration, already
-    belongs to an organisation, holds a pending invitation, or when an
-    unconfigured deployment has no organisations yet (first-owner bootstrap).
+    belongs to an organisation, holds a pending invitation, when an
+    unconfigured deployment has no organisations yet (first-owner bootstrap),
+    or when FASTACCOUNTS_OPEN_SIGNUP enables public sign-up for everyone.
     """
     email = (email or "").strip().lower()
     if not email or "@" not in email:
         return False
+    if open_signup():
+        return True
     domains = {x.strip().lower() for x in os.getenv("GOOGLE_ALLOWED_DOMAINS", "").split(",") if x.strip()}
     emails = {x.strip().lower() for x in os.getenv("GOOGLE_ALLOWED_EMAILS", "").split(",") if x.strip()}
     domain = email.rsplit("@", 1)[-1]
