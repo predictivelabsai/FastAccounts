@@ -308,6 +308,7 @@ def test_route_roles_csrf_and_missing_organisation(client, db, uk_org):
 
 
 def test_workspace_opening_balances_and_open_items_browser(client, db, uk_org, monkeypatch, tmp_path):
+    pytest.importorskip("playwright.sync_api")
     from urllib.parse import urlsplit
     from playwright.sync_api import sync_playwright, expect
     from web_app import app
