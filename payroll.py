@@ -181,6 +181,10 @@ class PayrollService:
     def __init__(self, db: Database | None = None):
         self.db = db or get_database()
 
+    def pushes(self, organisation_id, run_id):
+        from push_service import PushService
+        return PushService(self.db).list(organisation_id, pay_run_id=run_id)
+
     def _organisation(self, tx, organisation_id):
         org = tx.one('SELECT * FROM organisations WHERE id=?', (organisation_id,))
         if not org:

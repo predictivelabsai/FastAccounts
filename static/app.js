@@ -1074,10 +1074,15 @@
           `<div class="notice" role="status">${tr("Payroll is available only for Estonian organisations with EUR books. Switch to an Estonian EUR organisation to manage payroll.")}</div>`));
         return;
       }
-      const [employees, runs] = await Promise.all([
+      const [employees, runs, connections] = await Promise.all([
         optionalPayroll(c.url("/employees")),
         optionalPayroll(c.url("/pay-runs")),
+        api(c.url("/integrations")),
       ]);
+      const accountingProviders = connections.filter((entry) => ["merit", "smartaccounts"].includes(entry.provider) && entry.status !== "Disconnected");
+      await Promise.all((runs || []).map(async (run) => {
+        run.pushes = await api(c.url(`/pay-runs/${run.id}/pushes`));
+      }));
       const unavailable = employees === null || runs === null;
       if (
         !c.mount(
@@ -1124,7 +1129,7 @@
                       ["Employer cost"],
                       "Actions",
                     ],
-                    runs.map((r) => renderRun(r, c)),
+                    runs.map((r) => renderRun(r, c, accountingProviders)),
                   )
                 : empty(
                     "No pay runs yet",
@@ -1136,6 +1141,11 @@
       )
         return;
       bindActions(content, {
+        ...pushActions(c),
+        preparePush: async (b) => {
+          await post(integrationUrl(c, b.dataset.provider, `/push/pay-runs/${encodeURIComponent(b.dataset.id)}/prepare`), {});
+          await render();
+        },
         employee: () => employeeDialog(),
         edit: (b) =>
           employeeDialog(employees.find((x) => String(x.id) === b.dataset.id)),
@@ -1211,7 +1221,7 @@
     const catalogue = await api("/integrations"),
       [subview, provider, syncRunId] = c.route,
       item = provider && catalogue.find((entry) => entry.key === provider);
-    if (subview && (!item || !["review", "runs"].includes(subview))) {
+    if (subview && (!item || !["review", "runs", "accounting"].includes(subview))) {
       c.mount(
         page(
           t("Integration not found"),
@@ -1235,6 +1245,10 @@
       await integrationReview(c, item, provider, syncRunId);
       return;
     }
+    if (subview === "accounting") {
+      await accountingIntegration(c, item, provider);
+      return;
+    }
     if (subview === "runs") {
       await integrationRuns(c, item, provider);
       return;
@@ -1246,13 +1260,13 @@
       ]),
       byProvider = new Map(connections.map((connection) => [connection.provider, connection])),
       ready = catalogue
-        .filter((entry) => entry.registry_status === "Adapter ready")
+        .filter((entry) => entry.registry_status === "Adapter ready" || ["merit", "smartaccounts"].includes(entry.key))
         .sort((left, right) => {
           const leftIndex = readyProviderOrder.indexOf(left.key),
             rightIndex = readyProviderOrder.indexOf(right.key);
           return (leftIndex < 0 ? 999 : leftIndex) - (rightIndex < 0 ? 999 : rightIndex);
         }),
-      planned = catalogue.filter((entry) => entry.registry_status !== "Adapter ready");
+      planned = catalogue.filter((entry) => entry.registry_status !== "Adapter ready" && !["merit", "smartaccounts"].includes(entry.key));
     if (
       !c.mount(
         page(
@@ -1264,6 +1278,10 @@
       )
     )
       return;
+    content.querySelectorAll('.integration-provider').forEach((card) => {
+      if (["merit", "smartaccounts"].includes(card.dataset.provider))
+        card.querySelector('.integration-actions').insertAdjacentHTML('beforeend', link("Journal pushes and mappings", `#integrations/accounting/${encodeURIComponent(card.dataset.provider)}`));
+    });
     const findItem = (button) =>
         catalogue.find((entry) => entry.key === button.dataset.provider),
       findConnection = (button) => byProvider.get(button.dataset.provider);
@@ -1597,6 +1615,83 @@
       },
     });
   }
+  const canReviewPush = () => ["owner", "administrator", "accountant", "approver"].includes(org?.role),
+    canExecutePush = () => ["owner", "administrator", "accountant"].includes(org?.role),
+    canEditMappings = () => ["owner", "administrator"].includes(org?.role);
+
+  function pushTable(pushes) {
+    return table(["Provider", "Source document", "Status", "Actions"], pushes.map((push) => {
+      const pending = ["Review Required", "Failed"].includes(push.status),
+        payload = JSON.parse(push.payload_json || "{}");
+      return row([
+        td(esc(push.provider)),
+        td(`<strong>${esc(payload.doc_no || push.local_ref)}</strong><details><summary>${tr("View prepared journal")}</summary><p>${esc(payload.posting_date)} · ${esc(payload.currency)}</p>${table(["Local account", "External account", ["Debit"], ["Credit"], "Memo"], (payload.lines || []).map((line) => row([td(esc(line.account_code)), td(esc(line.external_account_code)), cash(line.debit, "EUR"), cash(line.credit, "EUR"), td(esc(line.memo))])))}</details>`),
+        td(`${pill(push.status)}${push.reviewed_at ? `<small>${pill("Reviewed")} ${esc(push.reviewed_by)} · ${date(push.reviewed_at)}</small>` : ""}${push.error_message ? `<small>${esc(translateError(push.error_message))}</small>` : ""}`),
+        td(pending ? button("Review push", "reviewPush", false, `data-id="${esc(push.id)}" ${canReviewPush() ? "" : "disabled"}`) + button("Execute push", "executePush", true, `data-id="${esc(push.id)}" ${push.reviewed_at && canExecutePush() ? "" : "disabled"}`) : ""),
+      ]);
+    }));
+  }
+
+  function pushActions(c) {
+    return {
+      reviewPush: async (b) => {
+        await post(c.url(`/pushes/${encodeURIComponent(b.dataset.id)}/review`));
+        await render();
+      },
+      executePush: (b) => confirmAction("Execute push", tr("Send this reviewed journal to the accounting provider? Inspect provider records before retrying a failed send."), async () => {
+        await post(c.url(`/pushes/${encodeURIComponent(b.dataset.id)}/execute`));
+        await render();
+      }),
+    };
+  }
+
+  async function accountingIntegration(c, item, provider) {
+    const [pushes, mappings] = await Promise.all([
+      api(integrationUrl(c, provider, "/pushes")),
+      canEditMappings() ? api(integrationUrl(c, provider, "/account-mappings")) : Promise.resolve([]),
+    ]);
+    if (!c.mount(page(integrationName(item), t("Journal pushes and mappings"), link("Back to integrations", "#integrations"),
+      `<section class="section"><div class="section-head"><h2>${tr("Journal pushes")}</h2>${button("Prepare journal push", "prepareJournal", false, canReviewPush() ? "" : "disabled")}</div><p class="muted">${tr("Review the journal and confirmed account mappings before sending.")}</p>${pushTable(pushes)}</section><section class="section"><div class="section-head"><h2>${tr("Account mappings")}</h2><div>${button("Suggest mappings", "suggestMappings", false, canEditMappings() ? "" : "disabled")}${button("Add mapping", "addMapping", false, canEditMappings() ? "" : "disabled")}${button("GL reconciliation", "glReconciliation")}</div></div>${canEditMappings() ? table(["Local account", "External account", "Name", "Status", "Actions"], mappings.map((mapping) => row([td(esc(mapping.local_account_code)), td(esc(mapping.external_account_code)), td(esc(mapping.external_account_name)), td(pill(mapping.status)), td(button("Edit", "editMapping", false, `data-id="${esc(mapping.id)}"`) + button("Confirm mapping", "confirmMapping", false, `data-id="${esc(mapping.id)}" ${mapping.status === "Confirmed" ? "disabled" : ""}`))]))) : `<p>${tr("Account mappings are managed by organisation administrators.")}</p>`}<div id="mapping-suggestions" aria-live="polite"></div><div id="gl-reconciliation" aria-live="polite"></div></section>`))) return;
+    const saveMapping = async (mapping, status = "Confirmed") => {
+      if (mapping.id) await post(integrationUrl(c, provider, `/account-mappings/${encodeURIComponent(mapping.id)}`), {status, is_default: Boolean(mapping.is_default)}, "PUT");
+      else await post(integrationUrl(c, provider, "/account-mappings"), {local_account_code: mapping.local_account_code, external_account_code: mapping.external_account_code, external_account_name: mapping.external_account_name || "", status, is_default: Boolean(mapping.is_default)});
+      await render();
+    };
+    const mappingDialog = (mapping = {}) => {
+      const d = dialog("Account mapping", form(field("Local account", "local_account_code", mapping.local_account_code || "", "text", "required") + field("External account", "external_account_code", mapping.external_account_code || "", "text", "required") + field("Name", "external_account_name", mapping.external_account_name || "") + select("Status", "status", ["Suggested", "Confirmed", "Disabled"].map((status) => [status, t(status)]), mapping.status || "Suggested"), "Save"));
+      bindForm(d, async (data) => {
+        await post(integrationUrl(c, provider, "/account-mappings"), {...data, is_default: Boolean(mapping.is_default)});
+        closeDialog(d);
+        await render();
+      });
+    };
+    let suggestions = [];
+    bindActions(content, {
+      ...pushActions(c),
+      prepareJournal: () => {
+        const d = dialog("Prepare journal push", form(field("Batch ID or voucher reference", "batch", "", "text", "required"), "Prepare push"));
+        bindForm(d, async (data) => {
+          await post(integrationUrl(c, provider, `/push/journals/${encodeURIComponent(data.batch)}/prepare`), {});
+          closeDialog(d);
+          await render();
+        });
+      },
+      addMapping: () => mappingDialog(),
+      editMapping: (b) => mappingDialog(mappings.find((entry) => entry.id === b.dataset.id)),
+      confirmMapping: (b) => saveMapping(mappings.find((entry) => entry.id === b.dataset.id)),
+      suggestMappings: async () => {
+        suggestions = await api(integrationUrl(c, provider, "/account-mappings/suggest"));
+        const target = content.querySelector('#mapping-suggestions');
+        target.innerHTML = `<h3>${tr("Suggested mappings")}</h3>${suggestions.length ? table(["Local account", "External account", "Name", "Actions"], suggestions.map((mapping, index) => row([td(esc(mapping.local_account_code)), td(esc(mapping.external_account_code)), td(esc(mapping.external_account_name)), td(button("Confirm mapping", "confirmSuggestion", false, `data-index="${index}"`))]))) : `<p>${tr("No account suggestions. Import accounts first or add a mapping.")}</p>`}`;
+        bindActions(target, {confirmSuggestion: (b) => saveMapping(suggestions[Number(b.dataset.index)])});
+      },
+      glReconciliation: async () => {
+        const result = await api(integrationUrl(c, provider, "/gl-reconciliation"));
+        content.querySelector('#gl-reconciliation').innerHTML = `<h3>${tr("GL reconciliation")}</h3>${table(["Local account", "External account", ["Local total"], ["External total"], ["Difference"]], result.rows.map((entry) => row([td(esc(entry.local_account_code)), td(esc(entry.external_account_code)), cash(entry.local_total, "EUR"), cash(entry.external_total, "EUR"), cash(entry.delta, "EUR")])))}`;
+      },
+    });
+  }
+
   const reportNames = {
     "trial-balance": "Trial balance",
     "profit-and-loss": "Profit & loss",
@@ -2179,7 +2274,7 @@
       );
     });
   }
-  function renderRun(r, c) {
+  function renderRun(r, c, providers = []) {
     const draft = String(r.status).toLowerCase() === "draft",
       items = r.items || [];
     return `${row([
@@ -2236,7 +2331,7 @@
           ),
         ]),
       ),
-    )}</details></td></tr>`;
+    )}</details>${r.status === "Approved" ? `<section class="section"><div class="section-head"><h3>${tr("Journal pushes")}</h3><div class="integration-actions">${providers.map((entry) => button("Prepare push", "preparePush", false, `data-id="${esc(r.id)}" data-provider="${esc(entry.provider)}" ${canReviewPush() ? "" : "disabled"}`) + `<span>${esc(entry.provider)}</span>`).join("")}</div></div><p class="muted">${tr("Review the journal and confirmed account mappings before sending.")}</p>${pushTable(r.pushes || [])}</section>` : ""}</td></tr>`;
   }
   window.addEventListener("hashchange", render);
   document.addEventListener("keydown", (e) => {

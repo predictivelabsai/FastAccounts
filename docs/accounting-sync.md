@@ -1,5 +1,56 @@
 # Reviewed accounting sync
 
+## Reviewed push pipeline
+
+Status: **Documented contract · not live-verified**.
+
+Bookkeepers explicitly prepare, review and execute exports to Merit Aktiva or
+SmartAccounts. Preparation reads an organisation-scoped, balanced ledger batch
+and freezes its exact EUR amounts as decimal strings. Payroll must be Approved
+and have a posted batch. Payroll document numbers are `PAY-{period}`, matching
+the local voucher; journal and reversal voucher numbers pass through unchanged.
+Only Estonian organisations with EUR books qualify. Every account requires a
+Confirmed provider mapping. Unmapped or merely Suggested accounts cause a hard
+stop listing every missing code. Pending preparations block duplicates.
+
+Review rebuilds the payload from the source journal and current mappings. A
+changed payload is refused with `prepared payload changed; prepare again`.
+The obsolete preparation is marked Failed and its review cleared, allowing a
+fresh preparation without the pending-document lock.
+Successful review records the reviewer and timestamp. Execution requires that
+review, revalidates the source and atomically claims the run as Running. A local
+export mapping for the same document, including its payroll/journal alias,
+causes an already-pushed refusal. The schema calls local ownership
+`fastaccounts`; exports use `object_type=gl_batch` and `direction=export`.
+
+An acknowledged external ID completes the run and is recorded for subsequent
+duplicate checks. ProviderError, connector ValueError or transport failure
+marks the run Failed, stores the error and increments its conflict count.
+There is no automatic retry, including HTTP posting retries. A failed run can
+be executed again explicitly, subject to all gates. Inspect provider records
+first after uncertain outcomes or partially accepted Merit chunks: these APIs
+do not guarantee remote idempotency or atomic chunk submission. A stuck Running
+run also requires reconciliation before any operational recovery.
+
+Merit acknowledgements accept canonical `external_id` or its raw `GLBId` field.
+For journals split into 500-line chunks, every acknowledgement must contain an
+ID before completion. The first ID identifies the export mapping; its
+`external_version` JSON retains all chunk IDs for reconciliation. Missing IDs
+cause Failed rather than an unsupported assumption that the posting succeeded.
+
+The workspace shows prepared journals, review attribution, failures and actions
+on pay runs and provider detail pages. Approvers can prepare/review; only owners,
+administrators and accountants can execute. Account-mapping CRUD retains its
+existing owner/administrator guards. Suggestions use already staged external
+accounts and existing Suggested mappings without making provider requests.
+GL reconciliation reads the existing external snapshots.
+
+Corrections are new reversal journals produced by `LedgerService.reverse`,
+with `REV-...` voucher numbers. This pipeline pushes FastAccounts-approved
+ledger journals to the provider. Neither provider's own records are edited,
+and external GL can never be deleted through this pipeline. Local posted ledger
+lines remain immutable.
+
 ## Merit Aktiva
 
 The adapter stages accounts, contacts, sales and purchase invoice headers,
