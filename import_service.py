@@ -1,4 +1,4 @@
-"""Accountant-reviewed staging and application of connector employee records."""
+"""Accountant-reviewed staging and application of connector records."""
 from __future__ import annotations
 
 import json
@@ -10,12 +10,20 @@ from typing import Any
 from psycopg.errors import UniqueViolation
 
 import connectors.registry as connector_registry
-from core_utils import audit, canonical_json, new_id, utc_now
-from database import Database, get_database
 from connectors.providers import FASTHR_NO_PAY_AMOUNT
-from integration_service import IntegrationService
+from core_utils import (
+    audit,
+    canonical_json,
+    db_number,
+    money,
+    new_id,
+    sha256_bytes,
+    utc_now,
+)
+from database import Database, get_database
+from documents import DocumentService
+from integration_service import AccountMappingService, IntegrationService
 from payroll import PayrollConflict, PayrollService
-
 
 EMPLOYEE_FIELDS = {
     "name",
@@ -38,6 +46,23 @@ DECIMAL_EMPLOYEE_FIELDS = {"gross_salary", "funded_pension_percent", "fte", "hou
 STAGED_STATUSES = ("Pending", "Approved", "Rejected", "Applied", "Failed")
 FILE_IMPORT_PROVIDER = "file_import"
 MAX_FILE_IMPORT_CHARS = 2_000_000
+OBJECT_TYPES = {
+    "employee": "employee",
+    "employees": "employee",
+    "contact": "contact",
+    "contacts": "contact",
+    "sales_invoice": "sales_invoice",
+    "sales_invoices": "sales_invoice",
+    "purchase_invoice": "purchase_invoice",
+    "purchase_invoices": "purchase_invoice",
+    "payment": "payment",
+    "payments": "payment",
+    "account": "account",
+    "accounts": "account",
+    "gl_entry": "gl_entry",
+    "gl_entries": "gl_entry",
+    "g_entries": "gl_entry",
+}
 
 
 class ImportService:
@@ -45,6 +70,17 @@ class ImportService:
         self.db = db or get_database()
         self.integration = integration or IntegrationService(self.db)
         self.payroll = PayrollService(self.db)
+        self.documents = DocumentService(self.db)
+        self.account_mappings = AccountMappingService(self.db)
+        self.APPLY_HANDLERS = {
+            "employee": self._apply_employee,
+            "contact": self._apply_contact,
+            "purchase_invoice": self._apply_purchase_invoice,
+            "sales_invoice": self._apply_sales_invoice,
+            "payment": self._apply_payment,
+            "account": self._apply_account,
+            "gl_entry": self._apply_gl_entry,
+        }
 
     def _connection_material(
         self,
@@ -106,13 +142,27 @@ class ImportService:
         credentials: dict | None = None,
         config: dict | None = None,
     ) -> dict:
-        if object_type not in {"employee", "employees"}:
-            raise ValueError("The reviewed import pipeline currently supports employees only")
         key, resolved_credentials, resolved_config = self._connection_material(
             organisation_id, provider, credentials, config
         )
-        if key == FILE_IMPORT_PROVIDER:
-            object_type = "employee"
+        if key == FILE_IMPORT_PROVIDER and object_type not in {"employee", "employees"}:
+            raise ValueError("The reviewed import pipeline currently supports employees only")
+        requested_type = object_type.strip().lower()
+        canonical_type = OBJECT_TYPES.get(requested_type)
+        if canonical_type is None:
+            raise ValueError(f"Unsupported reviewed import object type: {object_type}")
+        object_type = (
+            requested_type
+            if canonical_type == "employee" and key != FILE_IMPORT_PROVIDER
+            else canonical_type
+        )
+        connector = connector_registry.connector_for(
+            key, credentials=resolved_credentials, config=resolved_config
+        )
+        declared = getattr(connector, "PULL_OBJECT_TYPES", ("employee", "employees"))
+        supported = {OBJECT_TYPES.get(str(item).strip().lower(), str(item).strip().lower()) for item in declared}
+        if canonical_type not in supported:
+            raise ValueError(f"{key} does not support reviewed import object type '{canonical_type}'")
         cursor_before = (
             None
             if key == FILE_IMPORT_PROVIDER
@@ -137,17 +187,14 @@ class ImportService:
                     sync_id,
                     {"provider": key, "object_type": object_type},
                 )
-            connector = connector_registry.connector_for(
-                key, credentials=resolved_credentials, config=resolved_config
-            )
             result = connector.pull(object_type, cursor=cursor_before)
             if not result.ok:
-                raise ValueError(result.message or f"{key} did not return employee records")
+                raise ValueError(result.message or f"{key} did not return {object_type} records")
             records = list(result.records)
             if any(not isinstance(record, Mapping) for record in records):
-                raise ValueError("Connector employee records must be objects")
+                raise ValueError(f"Connector {object_type} records must be objects")
             cursor_after = result.cursor if result.cursor is not None else cursor_before
-            staged_ids = self._stage_records(
+            self._stage_records(
                 organisation_id,
                 sync_id,
                 key,
@@ -186,10 +233,13 @@ class ImportService:
     ) -> list[str]:
         now = utc_now()
         staged_ids: list[str] = []
+        canonical_type = OBJECT_TYPES.get(object_type, object_type)
         with self.db.transaction() as tx:
             for payload in records:
                 external_id = self._external_id(payload)
-                matched_id, review_note = self._employee_match(tx, organisation_id, payload)
+                matched_id, review_note, match = self._local_match(
+                    tx, organisation_id, provider, object_type, external_id, payload
+                )
                 warning = payload.get("import_warning")
                 if not review_note and isinstance(warning, str) and warning:
                     review_note = warning
@@ -205,11 +255,14 @@ class ImportService:
                     staged_id = existing["id"]
                     tx.execute(
                         "UPDATE import_staged_records SET external_payload_json=?,"
-                        "matched_local_employee_id=?,review_note=?,updated_at=? "
+                        "matched_local_employee_id=?,matched_local_id=?,match_json=?,"
+                        "review_note=?,updated_at=? "
                         "WHERE organisation_id=? AND id=?",
                         (
                             canonical_json(payload),
+                            matched_id if canonical_type == "employee" else None,
                             matched_id,
+                            canonical_json(match) if match else None,
                             review_note,
                             now,
                             organisation_id,
@@ -221,7 +274,8 @@ class ImportService:
                     tx.execute(
                         "INSERT INTO import_staged_records(id,organisation_id,sync_run_id,provider,"
                         "object_type,external_id,external_payload_json,status,matched_local_employee_id,"
-                        "review_note,created_at,updated_at) VALUES (?,?,?,?,?,?,?,'Pending',?,?,?,?)",
+                        "matched_local_id,match_json,review_note,created_at,updated_at) "
+                        "VALUES (?,?,?,?,?,?,?,'Pending',?,?,?,?,?,?)",
                         (
                             staged_id,
                             organisation_id,
@@ -230,7 +284,9 @@ class ImportService:
                             object_type,
                             external_id,
                             canonical_json(payload),
+                            matched_id if canonical_type == "employee" else None,
                             matched_id,
+                            canonical_json(match) if match else None,
                             review_note,
                             now,
                             now,
@@ -270,7 +326,7 @@ class ImportService:
         return str(value).strip() or None
 
     @staticmethod
-    def _employee_match(tx, organisation_id: str, payload: Mapping[str, Any]) -> tuple[str | None, str | None]:
+    def _employee_match(tx, organisation_id: str, payload: Mapping[str, Any]) -> tuple[str | None, str | None, dict | None]:
         email = payload.get("email")
         personal_id = payload.get("personal_id")
         email = email.strip() if isinstance(email, str) else ""
@@ -284,19 +340,87 @@ class ImportService:
             clauses.append("trim(personal_id)=?")
             params.append(personal_id)
         if not clauses:
-            return None, None
+            return None, None, None
         matches = tx.rows(
-            "SELECT id,name FROM employees WHERE organisation_id=? AND ("
+            "SELECT id,name,email,personal_id FROM employees WHERE organisation_id=? AND ("
             + " OR ".join(clauses)
             + ") ORDER BY name,id",
             tuple(params),
         )
         if len(matches) == 1:
-            return matches[0]["id"], None
+            strategy = "email" if email and str(matches[0].get("email", "")).strip().lower() == email.lower() else "personal_id"
+            return matches[0]["id"], None, {"strategy": strategy, strategy: email if strategy == "email" else personal_id}
         if len(matches) > 1:
             names = ", ".join(item["name"] for item in matches)
-            return None, f"Ambiguous employee match: {names}"
-        return None, None
+            return None, f"Ambiguous employee match: {names}", None
+        return None, None, None
+
+    def _local_match(
+        self, tx, organisation_id: str, provider: str, object_type: str,
+        external_id: str | None, payload: Mapping[str, Any]
+    ) -> tuple[str | None, str | None, dict | None]:
+        canonical_type = OBJECT_TYPES.get(object_type, object_type)
+        if external_id:
+            mapping = tx.one(
+                "SELECT local_id FROM external_mappings WHERE organisation_id=? AND provider=? "
+                "AND object_type=? AND external_id=? AND direction IN ('import','bidirectional')",
+                (organisation_id, provider, object_type, external_id),
+            )
+            if mapping:
+                return mapping["local_id"], None, {
+                    "strategy": "external_mapping", "external_id": external_id
+                }
+        if canonical_type == "employee":
+            return self._employee_match(tx, organisation_id, payload)
+        if canonical_type == "contact":
+            registration = self._text(payload, "registration_no", "registry_code", "registration_code")
+            email = self._text(payload, "email")
+            if registration:
+                rows = tx.rows(
+                    "SELECT id,name FROM contacts WHERE organisation_id=? AND trim(registration_no)=?",
+                    (organisation_id, registration),
+                )
+                if len(rows) == 1:
+                    return rows[0]["id"], None, {"strategy": "registry_code", "registry_code": registration}
+                if len(rows) > 1:
+                    return None, "Ambiguous contact registry-code match", None
+            if email:
+                rows = tx.rows(
+                    "SELECT id,name FROM contacts WHERE organisation_id=? AND lower(trim(email))=lower(?)",
+                    (organisation_id, email),
+                )
+                if len(rows) == 1:
+                    return rows[0]["id"], None, {"strategy": "email", "email": email}
+                if len(rows) > 1:
+                    return None, "Ambiguous contact email match", None
+        if canonical_type in {"purchase_invoice", "sales_invoice"}:
+            sales = canonical_type == "sales_invoice"
+            table = "invoices" if sales else "bills"
+            number_col = "number" if sales else "supplier_number"
+            party_key = "buyer_name" if sales else "supplier_name"
+            party_name = self._text(payload, party_key, "contact_name", "customer_name" if sales else "vendor_name")
+            number = self._text(payload, "number", "external_number", "invoice_number", "supplier_number")
+            if party_name and number:
+                rows = tx.rows(
+                    f"SELECT d.id FROM {table} d JOIN contacts c ON c.id=d.contact_id "
+                    f"WHERE d.organisation_id=? AND lower(trim(c.name))=lower(?) AND d.{number_col}=?",
+                    (organisation_id, party_name, number),
+                )
+                if len(rows) == 1:
+                    return rows[0]["id"], None, {
+                        "strategy": "natural_key", "party_name": party_name, "number": number
+                    }
+                if len(rows) > 1:
+                    return None, f"Ambiguous {canonical_type.replace('_', ' ')} match", None
+        return None, None, None
+
+    @staticmethod
+    def _text(payload: Mapping[str, Any], *keys: str) -> str:
+        for key in keys:
+            value = payload.get(key)
+            if value not in (None, ""):
+                return str(value).strip()
+        return ""
 
     def get_staged(
         self,
@@ -314,9 +438,19 @@ class ImportService:
             if not sync:
                 raise KeyError("Sync run not found")
         query = (
-            "SELECT s.*,e.name AS matched_local_employee_name FROM import_staged_records s "
+            "SELECT s.*,e.name AS matched_local_employee_name,"
+            "CASE WHEN s.object_type='contact' THEN c.name "
+            "WHEN s.object_type='purchase_invoice' THEN bc.name||' / '||b.supplier_number "
+            "WHEN s.object_type='sales_invoice' THEN ic.name||' / '||COALESCE(i.number,'Draft') "
+            "WHEN s.object_type IN ('employee','employees') THEN e.name END AS matched_local_name "
+            "FROM import_staged_records s "
             "LEFT JOIN employees e ON e.organisation_id=s.organisation_id "
-            "AND e.id=s.matched_local_employee_id WHERE s.organisation_id=?"
+            "AND e.id=s.matched_local_employee_id "
+            "LEFT JOIN contacts c ON c.organisation_id=s.organisation_id AND c.id=s.matched_local_id "
+            "LEFT JOIN bills b ON b.organisation_id=s.organisation_id AND b.id=s.matched_local_id "
+            "LEFT JOIN contacts bc ON bc.id=b.contact_id "
+            "LEFT JOIN invoices i ON i.organisation_id=s.organisation_id AND i.id=s.matched_local_id "
+            "LEFT JOIN contacts ic ON ic.id=i.contact_id WHERE s.organisation_id=?"
         )
         params: list[Any] = [organisation_id]
         if sync_run_id:
@@ -329,6 +463,7 @@ class ImportService:
         records = self.db.rows(query, tuple(params))
         for record in records:
             record["external_payload"] = json.loads(record.pop("external_payload_json"))
+            record["match"] = json.loads(record["match_json"]) if record.get("match_json") else None
         summary = self._sync_summary(organisation_id, sync_run_id) if sync_run_id else None
         return {"summary": summary, "records": records}
 
@@ -362,6 +497,8 @@ class ImportService:
             "error_message": sync.get("error_message"),
             "started_at": sync.get("started_at"),
             "completed_at": sync.get("completed_at"),
+            "reviewed_at": sync.get("reviewed_at"),
+            "reviewed_by": sync.get("reviewed_by"),
             "created_at": sync["created_at"],
         }
 
@@ -390,8 +527,10 @@ class ImportService:
         )
         if not sync:
             raise KeyError("Sync run not found")
-        if sync["object_type"] not in {"employee", "employees"}:
-            raise ValueError("Only staged employee records can be applied")
+        object_type = OBJECT_TYPES.get(sync["object_type"], sync["object_type"])
+        handler = self.APPLY_HANDLERS.get(object_type)
+        if handler is None:
+            raise ValueError(f"Staged {sync['object_type']} records cannot be applied")
         invalid = {value for value in decisions.values() if value not in {"apply", "reject"}}
         if invalid:
             raise ValueError("Decisions must be 'apply' or 'reject'")
@@ -412,7 +551,7 @@ class ImportService:
                 outcomes.append(self._reject(organisation_id, row, actor))
                 continue
             try:
-                outcomes.append(self._apply_one(organisation_id, sync, row, actor))
+                outcomes.append(handler(organisation_id, sync, row, actor))
             except (
                 ValueError,
                 KeyError,
@@ -424,7 +563,7 @@ class ImportService:
                 reason = str(error.args[0] if isinstance(error, KeyError) else error)
                 outcomes.append(self._fail_one(organisation_id, sync, row, actor, reason))
                 conflicts_raised += 1
-        self._refresh_sync_state(organisation_id, sync_run_id)
+        self._refresh_sync_state(organisation_id, sync_run_id, actor=actor)
         counts = {name: 0 for name in ("applied", "updated", "unchanged", "rejected", "failed")}
         for outcome in outcomes:
             counts[outcome["outcome"]] += 1
@@ -461,7 +600,7 @@ class ImportService:
             )
         return {"staged_id": row["id"], "outcome": "rejected"}
 
-    def _apply_one(self, organisation_id: str, sync: dict, row: dict, actor: str) -> dict:
+    def _apply_employee(self, organisation_id: str, sync: dict, row: dict, actor: str) -> dict:
         payload = json.loads(row["external_payload_json"])
         external_id = row.get("external_id")
         if not external_id:
@@ -534,8 +673,8 @@ class ImportService:
                 )
             tx.execute(
                 "UPDATE import_staged_records SET status='Applied',matched_local_employee_id=?,"
-                "review_note=NULL,updated_at=? WHERE organisation_id=? AND id=?",
-                (employee["id"], utc_now(), organisation_id, row["id"]),
+                "matched_local_id=?,review_note=NULL,updated_at=? WHERE organisation_id=? AND id=?",
+                (employee["id"], employee["id"], utc_now(), organisation_id, row["id"]),
             )
             audit(
                 tx,
@@ -555,6 +694,435 @@ class ImportService:
             "outcome": outcome,
             "employee_id": employee["id"],
         }
+
+    def _mapping_values(self, payload: Mapping[str, Any]) -> tuple[str | None, str]:
+        payload_hash = self._text(payload, "payload_hash", "hash")
+        external_version = self._text(payload, "external_version", "version") or payload_hash or None
+        last_hash = payload_hash or sha256_bytes(canonical_json(payload).encode())
+        return external_version, last_hash
+
+    def _upsert_external_mapping(
+        self, tx, organisation_id: str, provider: str, object_type: str,
+        local_id: str, external_id: str, payload: Mapping[str, Any]
+    ) -> None:
+        external_version, last_hash = self._mapping_values(payload)
+        existing = tx.one(
+            "SELECT id,local_id FROM external_mappings WHERE organisation_id=? AND provider=? "
+            "AND object_type=? AND external_id=?",
+            (organisation_id, provider, object_type, external_id),
+        )
+        if existing:
+            if existing["local_id"] != local_id:
+                raise ValueError("External record is already mapped to another local record")
+            tx.execute(
+                "UPDATE external_mappings SET external_version=?,ownership='external',"
+                "direction='import',last_hash=?,updated_at=? WHERE id=?",
+                (external_version, last_hash, utc_now(), existing["id"]),
+            )
+            return
+        local = tx.one(
+            "SELECT id FROM external_mappings WHERE organisation_id=? AND provider=? "
+            "AND object_type=? AND local_id=?",
+            (organisation_id, provider, object_type, local_id),
+        )
+        if local:
+            raise ValueError("Local record is already mapped to another external record")
+        tx.execute(
+            "INSERT INTO external_mappings(id,organisation_id,provider,object_type,local_id,"
+            "external_id,external_version,ownership,direction,last_hash,updated_at) "
+            "VALUES (?,?,?,?,?,?,?,'external','import',?,?)",
+            (new_id(), organisation_id, provider, object_type, local_id, external_id,
+             external_version, last_hash, utc_now()),
+        )
+
+    def _mark_applied(
+        self, tx, organisation_id: str, sync: dict, row: dict, actor: str,
+        local_id: str | None, outcome: str = "applied"
+    ) -> dict:
+        tx.execute(
+            "UPDATE import_staged_records SET status='Applied',matched_local_id=?,"
+            "review_note=NULL,updated_at=? WHERE organisation_id=? AND id=?",
+            (local_id, utc_now(), organisation_id, row["id"]),
+        )
+        audit(tx, organisation_id, actor, "integration.staged_applied",
+              "import_staged_record", row["id"],
+              {"sync_run_id": sync["id"], "local_id": local_id, "outcome": outcome})
+        result = {"staged_id": row["id"], "outcome": outcome}
+        if local_id:
+            result["local_id"] = local_id
+        return result
+
+    @staticmethod
+    def _contact_type(payload: Mapping[str, Any], required: str | None = None) -> str:
+        supplied = str(payload.get("contact_type") or "").strip().lower()
+        if supplied in {"customer", "supplier", "both"}:
+            value = supplied
+        else:
+            client = bool(payload.get("is_client", payload.get("is_customer", False)))
+            supplier = bool(payload.get("is_supplier", payload.get("is_vendor", False)))
+            if not client and not supplier and required:
+                value = required
+            else:
+                value = "both" if client == supplier else "customer" if client else "supplier"
+        if required and value != required:
+            value = "both"
+        return value
+
+    def _contact_payload(self, payload: Mapping[str, Any], role: str | None = None) -> dict[str, Any]:
+        nested: Mapping[str, Any] = payload
+        for key in (("supplier", "vendor") if role == "supplier" else ("buyer", "customer", "client") if role == "customer" else ("contact",)):
+            candidate = payload.get(key)
+            if isinstance(candidate, Mapping):
+                nested = candidate
+                break
+        name_keys = ("name", "supplier_name", "vendor_name") if role == "supplier" else ("name", "buyer_name", "customer_name", "client_name")
+        return {
+            "name": self._text(nested, *name_keys) or self._text(payload, *name_keys),
+            "registration_no": self._text(nested, "registration_no", "registry_code", "registration_code"),
+            "vat_no": self._text(nested, "vat_no", "vat_number"),
+            "email": self._text(nested, "email"),
+            "address": self._text(nested, "address"),
+            "country_code": self._text(nested, "country_code", "country"),
+            "contact_type": self._contact_type(nested, role),
+            "external_id": self._text(nested, "external_id", "id") or self._text(payload, f"{role}_external_id" if role else "contact_external_id"),
+        }
+
+    def _find_or_create_contact(
+        self, tx, organisation_id: str, provider: str, payload: Mapping[str, Any],
+        actor: str, role: str | None = None, matched_id: str | None = None
+    ) -> tuple[dict, bool]:
+        values = self._contact_payload(payload, role)
+        contact = None
+        if matched_id and role is None:
+            contact = tx.one(
+                "SELECT * FROM contacts WHERE organisation_id=? AND id=?",
+                (organisation_id, matched_id),
+            )
+        if not contact and values["external_id"]:
+            mapping = tx.one(
+                "SELECT local_id FROM external_mappings WHERE organisation_id=? AND provider=? "
+                "AND object_type='contact' AND external_id=? AND direction IN ('import','bidirectional')",
+                (organisation_id, provider, values["external_id"]),
+            )
+            if mapping:
+                contact = tx.one(
+                    "SELECT * FROM contacts WHERE organisation_id=? AND id=?",
+                    (organisation_id, mapping["local_id"]),
+                )
+        if not contact and values["registration_no"]:
+            contact = tx.one(
+                "SELECT * FROM contacts WHERE organisation_id=? AND registration_no=?",
+                (organisation_id, values["registration_no"]),
+            )
+        if not contact and values["email"]:
+            contact = tx.one(
+                "SELECT * FROM contacts WHERE organisation_id=? AND lower(trim(email))=lower(?)",
+                (organisation_id, values["email"]),
+            )
+        if not contact and values["name"]:
+            contact = tx.one(
+                "SELECT * FROM contacts WHERE organisation_id=? AND lower(trim(name))=lower(?)",
+                (organisation_id, values["name"]),
+            )
+        created = False
+        if not contact:
+            if not values["name"]:
+                raise ValueError("Contact name is required")
+            country = values["country_code"] or tx.scalar(
+                "SELECT country_code FROM organisations WHERE id=?", (organisation_id,)
+            )
+            contact = self.documents.create_contact(
+                organisation_id, name=values["name"], country_code=str(country),
+                contact_type=values["contact_type"], email=values["email"],
+                vat_no=values["vat_no"], registration_no=values["registration_no"],
+                address=values["address"], tx=tx,
+            )
+            created = True
+        elif role and contact["contact_type"] not in {role, "both"}:
+            tx.execute(
+                "UPDATE contacts SET contact_type='both',updated_at=? "
+                "WHERE organisation_id=? AND id=?",
+                (utc_now(), organisation_id, contact["id"]),
+            )
+            contact["contact_type"] = "both"
+        if values["external_id"]:
+            self._upsert_external_mapping(
+                tx, organisation_id, provider, "contact", contact["id"],
+                values["external_id"], payload
+            )
+        return contact, created
+
+    def _apply_contact(self, organisation_id: str, sync: dict, row: dict, actor: str) -> dict:
+        payload = json.loads(row["external_payload_json"])
+        external_id = row.get("external_id")
+        if not external_id:
+            raise ValueError("External ID is required to apply a contact record")
+        with self.db.transaction() as tx:
+            contact, created = self._find_or_create_contact(
+                tx, organisation_id, sync["provider"], payload, actor,
+                matched_id=row.get("matched_local_id")
+            )
+            self._upsert_external_mapping(
+                tx, organisation_id, sync["provider"], "contact", contact["id"],
+                external_id, payload
+            )
+            return self._mark_applied(
+                tx, organisation_id, sync, row, actor, contact["id"],
+                "applied" if created else "unchanged"
+            )
+
+    def _document_lines(self, tx, organisation_id: str, provider: str, payload: Mapping[str, Any]) -> list[dict]:
+        source = payload.get("lines") or payload.get("items")
+        if not isinstance(source, list) or not source:
+            raise ValueError("At least one document line is required")
+        result: list[dict] = []
+        for raw in source:
+            if not isinstance(raw, Mapping):
+                raise ValueError("Document lines must be objects")
+            account_id = self._text(raw, "account_id")
+            if not account_id:
+                local_code = self._text(raw, "local_account_code", "account_code")
+                external_code = self._text(raw, "external_account_code")
+                if external_code:
+                    mapping = tx.one(
+                        "SELECT local_account_code FROM account_mappings WHERE organisation_id=? "
+                        "AND provider=? AND external_account_code=? AND status<>'Disabled' "
+                        "ORDER BY CASE status WHEN 'Confirmed' THEN 0 ELSE 1 END LIMIT 1",
+                        (organisation_id, provider, external_code),
+                    )
+                    local_code = mapping["local_account_code"] if mapping else ""
+                account = tx.one(
+                    "SELECT id FROM accounts WHERE organisation_id=? AND code=? AND active=1",
+                    (organisation_id, local_code),
+                ) if local_code else None
+                account_id = account["id"] if account else ""
+            if not account_id:
+                raise ValueError("A mapped local account is required for every document line")
+            tax_code_id = self._text(raw, "tax_code_id") or None
+            if not tax_code_id:
+                tax_code = self._text(raw, "tax_code")
+                if tax_code:
+                    found = tx.one(
+                        "SELECT id FROM tax_codes WHERE organisation_id=? AND code=? AND active=1 "
+                        "ORDER BY valid_from DESC LIMIT 1", (organisation_id, tax_code)
+                    )
+                    tax_code_id = found["id"] if found else None
+            quantity = Decimal(self._text(raw, "quantity", "qty") or "1")
+            unit_price_text = self._text(raw, "unit_price", "price", "net_unit_price")
+            if not unit_price_text:
+                total_text = self._text(raw, "net_amount", "line_total", "total")
+                if not total_text:
+                    raise ValueError("A unit price is required for every document line")
+                unit_price_text = str(Decimal(total_text) / quantity)
+            result.append({
+                "description": self._text(raw, "description", "name") or "Imported line",
+                "quantity": quantity,
+                "unit_price": Decimal(unit_price_text),
+                "account_id": account_id,
+                "tax_code_id": tax_code_id,
+            })
+        return result
+
+    def _apply_purchase_invoice(self, organisation_id: str, sync: dict, row: dict, actor: str) -> dict:
+        payload = json.loads(row["external_payload_json"])
+        external_id = row.get("external_id")
+        if not external_id:
+            raise ValueError("External ID is required to apply a purchase invoice")
+        with self.db.transaction() as tx:
+            existing_mapping = tx.one(
+                "SELECT local_id FROM external_mappings WHERE organisation_id=? AND provider=? "
+                "AND object_type='purchase_invoice' AND external_id=?",
+                (organisation_id, sync["provider"], external_id),
+            )
+            existing_id = existing_mapping["local_id"] if existing_mapping else row.get("matched_local_id")
+            if existing_id:
+                existing = tx.one(
+                    "SELECT id FROM bills WHERE organisation_id=? AND id=?",
+                    (organisation_id, existing_id),
+                )
+                if existing:
+                    self._upsert_external_mapping(
+                        tx, organisation_id, sync["provider"], "purchase_invoice",
+                        existing["id"], external_id, payload
+                    )
+                    return self._mark_applied(
+                        tx, organisation_id, sync, row, actor, existing["id"], "unchanged"
+                    )
+            contact, _ = self._find_or_create_contact(
+                tx, organisation_id, sync["provider"], payload, actor, role="supplier"
+            )
+            supplier_number = self._text(payload, "external_number", "supplier_number", "invoice_number", "number")
+            bill_date = self._text(payload, "bill_date", "invoice_date", "date")
+            due_date = self._text(payload, "due_date") or bill_date
+            bill = self.documents.create_bill(
+                organisation_id, contact_id=contact["id"], supplier_number=supplier_number,
+                bill_date=bill_date, due_date=due_date,
+                lines=self._document_lines(tx, organisation_id, sync["provider"], payload),
+                actor=actor, currency=self._text(payload, "currency") or None,
+                reference=self._text(payload, "reference"), notes=self._text(payload, "notes"), tx=tx,
+            )
+            expected = self._text(payload, "total", "gross_total", "amount_total")
+            if expected and money(expected) != money(bill["total"]):
+                raise ValueError("Purchase invoice line totals do not match the payload total")
+            self._upsert_external_mapping(
+                tx, organisation_id, sync["provider"], "purchase_invoice", bill["id"], external_id, payload
+            )
+            return self._mark_applied(tx, organisation_id, sync, row, actor, bill["id"])
+
+    def _apply_sales_invoice(self, organisation_id: str, sync: dict, row: dict, actor: str) -> dict:
+        payload = json.loads(row["external_payload_json"])
+        external_id = row.get("external_id")
+        if not external_id:
+            raise ValueError("External ID is required to apply a sales invoice")
+        with self.db.transaction() as tx:
+            existing_mapping = tx.one(
+                "SELECT local_id FROM external_mappings WHERE organisation_id=? AND provider=? "
+                "AND object_type='sales_invoice' AND external_id=?",
+                (organisation_id, sync["provider"], external_id),
+            )
+            existing_id = existing_mapping["local_id"] if existing_mapping else row.get("matched_local_id")
+            if existing_id:
+                existing = tx.one(
+                    "SELECT id FROM invoices WHERE organisation_id=? AND id=?",
+                    (organisation_id, existing_id),
+                )
+                if existing:
+                    self._upsert_external_mapping(
+                        tx, organisation_id, sync["provider"], "sales_invoice",
+                        existing["id"], external_id, payload
+                    )
+                    return self._mark_applied(
+                        tx, organisation_id, sync, row, actor, existing["id"], "unchanged"
+                    )
+            contact, _ = self._find_or_create_contact(
+                tx, organisation_id, sync["provider"], payload, actor, role="customer"
+            )
+            issue_date = self._text(payload, "issue_date", "invoice_date", "date")
+            invoice = self.documents.create_invoice(
+                organisation_id, contact_id=contact["id"], issue_date=issue_date,
+                due_date=self._text(payload, "due_date") or None,
+                lines=self._document_lines(tx, organisation_id, sync["provider"], payload),
+                actor=actor, currency=self._text(payload, "currency") or None,
+                amount_type=self._text(payload, "amount_type") or "exclusive",
+                reference=self._text(payload, "external_number", "invoice_number", "number", "reference"),
+                notes=self._text(payload, "notes"), tx=tx,
+            )
+            self._upsert_external_mapping(
+                tx, organisation_id, sync["provider"], "sales_invoice", invoice["id"], external_id, payload
+            )
+            return self._mark_applied(tx, organisation_id, sync, row, actor, invoice["id"])
+
+    def _apply_payment(self, organisation_id: str, sync: dict, row: dict, actor: str) -> dict:
+        payload = json.loads(row["external_payload_json"])
+        external_id = row.get("external_id")
+        if not external_id:
+            raise ValueError("External ID is required to apply a payment")
+        document_external_id = self._text(
+            payload, "document_external_id", "invoice_external_id", "bill_external_id"
+        )
+        document_type = self._text(payload, "document_type").lower()
+        payment_type = self._text(payload, "payment_type").lower()
+        if not payment_type:
+            payment_type = "supplier_payment" if document_type in {"bill", "purchase_invoice"} or payload.get("bill_external_id") else "customer_receipt"
+        mapping_type = "purchase_invoice" if payment_type == "supplier_payment" else "sales_invoice"
+        with self.db.transaction() as tx:
+            payment_mapping = tx.one(
+                "SELECT local_id FROM external_mappings WHERE organisation_id=? AND provider=? "
+                "AND object_type='payment' AND external_id=?",
+                (organisation_id, sync["provider"], external_id),
+            )
+            if payment_mapping and tx.one(
+                "SELECT id FROM payments WHERE organisation_id=? AND id=?",
+                (organisation_id, payment_mapping["local_id"]),
+            ):
+                return self._mark_applied(
+                    tx, organisation_id, sync, row, actor, payment_mapping["local_id"], "unchanged"
+                )
+            mapping = tx.one(
+                "SELECT local_id FROM external_mappings WHERE organisation_id=? AND provider=? "
+                "AND object_type=? AND external_id=? AND direction IN ('import','bidirectional')",
+                (organisation_id, sync["provider"], mapping_type, document_external_id),
+            ) if document_external_id else None
+            if not mapping:
+                raise ValueError("no local document linked for this payment")
+            table = "bills" if mapping_type == "purchase_invoice" else "invoices"
+            document = tx.one(
+                f"SELECT * FROM {table} WHERE organisation_id=? AND id=?",
+                (organisation_id, mapping["local_id"]),
+            )
+            if not document:
+                raise ValueError("no local document linked for this payment")
+            amount = self._text(payload, "amount", "total")
+            payment = self.documents.record_payment(
+                organisation_id, payment_type=payment_type,
+                bank_account_id=self._text(payload, "bank_account_id"),
+                payment_date=self._text(payload, "payment_date", "date"), amount=amount,
+                actor=actor, contact_id=document["contact_id"],
+                reference=self._text(payload, "reference"),
+                allocations=[{"document_type": "bill" if mapping_type == "purchase_invoice" else "invoice",
+                              "document_id": document["id"], "amount": amount}], tx=tx,
+            )
+            self._upsert_external_mapping(
+                tx, organisation_id, sync["provider"], "payment", payment["id"], external_id, payload
+            )
+            return self._mark_applied(tx, organisation_id, sync, row, actor, payment["id"])
+
+    def _apply_account(self, organisation_id: str, sync: dict, row: dict, actor: str) -> dict:
+        payload = json.loads(row["external_payload_json"])
+        external_code = self._text(payload, "external_account_code", "code")
+        external_id = row.get("external_id") or external_code
+        local_code = self._text(payload, "local_account_code") or external_code
+        with self.db.transaction() as tx:
+            mapping = self.account_mappings.suggest(
+                tx, organisation_id, sync["provider"], external_account_code=external_code,
+                external_account_name=self._text(payload, "external_account_name", "name"),
+                local_account_code=local_code,
+            )
+            audit(tx, organisation_id, actor, "integration.account_mapping_suggested",
+                  "account_mapping", mapping["id"], {"provider": sync["provider"]})
+            self._upsert_external_mapping(
+                tx, organisation_id, sync["provider"], "account", mapping["id"],
+                external_id, payload
+            )
+            return self._mark_applied(tx, organisation_id, sync, row, actor, mapping["id"])
+
+    def _apply_gl_entry(self, organisation_id: str, sync: dict, row: dict, actor: str) -> dict:
+        payload = json.loads(row["external_payload_json"])
+        external_id = row.get("external_id")
+        if not external_id:
+            raise ValueError("External ID is required to apply a GL entry")
+        external_code = self._text(payload, "external_account_code", "account_code")
+        with self.db.transaction() as tx:
+            mapping = tx.one(
+                "SELECT local_account_code FROM account_mappings WHERE organisation_id=? "
+                "AND provider=? AND external_account_code=? "
+                "ORDER BY CASE status WHEN 'Confirmed' THEN 0 WHEN 'Suggested' THEN 1 ELSE 2 END,id LIMIT 1",
+                (organisation_id, sync["provider"], external_code),
+            )
+            tx.execute(
+                "INSERT INTO external_gl_entries(id,organisation_id,provider,external_id,"
+                "external_batch_ref,entry_date,external_account_code,local_account_code,"
+                "description,document,debit,credit,dims_json,created_at) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(organisation_id,provider,external_id) DO NOTHING",
+                (new_id(), organisation_id, sync["provider"], external_id,
+                 self._text(payload, "external_batch_ref", "batch_ref") or external_id,
+                 self._text(payload, "entry_date", "date"), external_code,
+                 mapping["local_account_code"] if mapping else None,
+                 self._text(payload, "description") or None,
+                 self._text(payload, "document", "document_number") or None,
+                 db_number(money(payload.get("debit", 0))),
+                 db_number(money(payload.get("credit", 0))),
+                 canonical_json(payload.get("dimensions", payload.get("dims", {}))), utc_now()),
+            )
+            stored = tx.one(
+                "SELECT id FROM external_gl_entries WHERE organisation_id=? AND provider=? AND external_id=?",
+                (organisation_id, sync["provider"], external_id),
+            )
+            self._upsert_external_mapping(
+                tx, organisation_id, sync["provider"], "gl_entry", stored["id"],
+                external_id, payload
+            )
+            return self._mark_applied(tx, organisation_id, sync, row, actor, stored["id"])
 
     @staticmethod
     def _assert_name_available(tx, organisation_id: str, name: str, employee_id: str | None) -> None:
@@ -617,9 +1185,9 @@ class ImportService:
                     sync["id"],
                     sync["provider"],
                     sync["object_type"],
-                    row.get("matched_local_employee_id"),
+                    row.get("matched_local_id") or row.get("matched_local_employee_id"),
                     row.get("external_id"),
-                    "employee_import_validation",
+                    f"{OBJECT_TYPES.get(sync['object_type'], sync['object_type'])}_import_validation",
                     None,
                     canonical_json({"staged_record_id": row["id"], "reason": reason}),
                     now,
@@ -641,7 +1209,7 @@ class ImportService:
             )
         return {"staged_id": row["id"], "outcome": "failed", "reason": reason}
 
-    def _refresh_sync_state(self, organisation_id: str, sync_run_id: str) -> None:
+    def _refresh_sync_state(self, organisation_id: str, sync_run_id: str, *, actor: str) -> None:
         with self.db.transaction() as tx:
             counts = {
                 row["status"]: int(row["record_count"])
@@ -657,6 +1225,7 @@ class ImportService:
                 else "Completed"
             )
             tx.execute(
-                "UPDATE sync_runs SET status=?,write_count=? WHERE organisation_id=? AND id=?",
-                (status, counts.get("Applied", 0), organisation_id, sync_run_id),
+                "UPDATE sync_runs SET status=?,write_count=?,reviewed_at=?,reviewed_by=? "
+                "WHERE organisation_id=? AND id=?",
+                (status, counts.get("Applied", 0), utc_now(), actor, organisation_id, sync_run_id),
             )

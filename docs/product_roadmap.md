@@ -264,6 +264,15 @@ explicit exports from FastAccounts. Do not offer continuous bidirectional sync
 until ownership rules are chosen per object; otherwise two accounting systems
 can both post or renumber the same transaction.
 
+### Data and boundaries
+
+The reviewed import model is implemented through migrations
+`0010_account_mappings`, `0011_external_gl`, and `0012_sync_review`. Pulled GL
+is stored read-only in `external_gl_entries` and is NEVER posted to the local
+ledger; it exists for reconciliation only. Pulled payments require a mapped
+local document, imported invoices apply as drafts, and nothing is auto-posted
+without accountant review.
+
 Recommended order:
 
 1. CSV import/export and opening-balance migration templates;

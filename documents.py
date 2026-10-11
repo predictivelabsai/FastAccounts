@@ -23,22 +23,29 @@ class DocumentService:
     def create_contact(self, organisation_id: str, *, name: str, country_code: str,
                        contact_type: str = "both", email: str = "", vat_no: str = "",
                        registration_no: str = "", address: str = "",
-                       payment_terms_days: int = 14) -> dict:
+                       payment_terms_days: int = 14, tx=None) -> dict:
         if contact_type not in {"customer", "supplier", "both"} or not name.strip():
             raise ValueError("Valid contact name and type are required")
+        if tx is None:
+            with self.db.transaction() as owned_tx:
+                return self.create_contact(
+                    organisation_id, name=name, country_code=country_code,
+                    contact_type=contact_type, email=email, vat_no=vat_no,
+                    registration_no=registration_no, address=address,
+                    payment_terms_days=payment_terms_days, tx=owned_tx,
+                )
         contact_id, now = new_id(), utc_now()
-        with self.db.transaction() as tx:
-            if not tx.one("SELECT id FROM organisations WHERE id=?", (organisation_id,)):
-                raise KeyError("Organisation not found")
-            tx.execute(
-                "INSERT INTO contacts(id,organisation_id,contact_type,name,registration_no,vat_no,email,address,country_code,payment_terms_days,created_at,updated_at) "
-                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
-                (contact_id, organisation_id, contact_type, name.strip(),
-                 registration_no.strip() or None, vat_no.strip() or None,
-                 email.strip() or None, address.strip() or None, country_code.upper(),
-                 payment_terms_days, now, now),
-            )
-        return self.db.one("SELECT * FROM contacts WHERE id=?", (contact_id,)) or {}
+        if not tx.one("SELECT id FROM organisations WHERE id=?", (organisation_id,)):
+            raise KeyError("Organisation not found")
+        tx.execute(
+            "INSERT INTO contacts(id,organisation_id,contact_type,name,registration_no,vat_no,email,address,country_code,payment_terms_days,created_at,updated_at) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+            (contact_id, organisation_id, contact_type, name.strip(),
+             registration_no.strip() or None, vat_no.strip() or None,
+             email.strip() or None, address.strip() or None, country_code.upper(),
+             payment_terms_days, now, now),
+        )
+        return tx.one("SELECT * FROM contacts WHERE id=?", (contact_id,)) or {}
 
     def create_item(self, organisation_id: str, *, code: str, name: str,
                     item_type: str = "service", description: str = "",
@@ -115,37 +122,51 @@ class DocumentService:
                        lines: list[dict], actor: str, due_date: str | None = None,
                        currency: str | None = None, amount_type: str = "exclusive",
                        reference: str = "", notes: str = "", document_type: str = "invoice",
-                       original_invoice_id: str | None = None) -> dict:
+                       original_invoice_id: str | None = None, tx=None) -> dict:
         if document_type not in {"invoice", "credit_note"}:
             raise ValueError("Invalid sales document type")
-        invoice_id, now = new_id(), utc_now()
-        with self.db.transaction() as tx:
-            organisation = tx.one("SELECT * FROM organisations WHERE id=?", (organisation_id,))
-            contact = tx.one("SELECT * FROM contacts WHERE id=? AND organisation_id=?", (contact_id, organisation_id))
-            if not organisation or not contact or contact["contact_type"] not in {"customer", "both"}:
-                raise ValueError("A customer in this organisation is required")
-            calculated, subtotal, tax_total, total = self._document_lines(tx, organisation_id, lines, amount_type)
-            due = due_date or (date.fromisoformat(issue_date) + timedelta(days=contact["payment_terms_days"])).isoformat()
-            tx.execute(
-                "INSERT INTO invoices(id,organisation_id,contact_id,document_type,issue_date,tax_point_date,due_date,currency,line_amount_type,reference,notes,original_invoice_id,subtotal,tax_total,total,created_by,created_at,updated_at) "
-                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                (invoice_id, organisation_id, contact_id, document_type, issue_date, issue_date,
-                 due, (currency or organisation["base_currency"]).upper(), amount_type,
-                 reference.strip() or None, notes.strip() or None, original_invoice_id,
-                 db_number(subtotal), db_number(tax_total), db_number(total), actor, now, now),
-            )
-            for line in calculated:
-                tx.execute(
-                    "INSERT INTO invoice_lines(id,invoice_id,line_number,description,quantity,unit_price,account_id,tax_code_id,tax_rate,net_amount,tax_amount,gross_amount) "
-                    "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
-                    (line["id"], invoice_id, line["line_number"], line["description"],
-                     db_number(line["quantity"]), db_number(line["unit_price"]), line["account_id"],
-                     line["tax_code_id"], db_number(line["tax_rate"]), db_number(line["net_amount"]),
-                     db_number(line["tax_amount"]), db_number(line["gross_amount"])),
+        if tx is None:
+            with self.db.transaction() as owned_tx:
+                return self.create_invoice(
+                    organisation_id, contact_id=contact_id, issue_date=issue_date,
+                    lines=lines, actor=actor, due_date=due_date, currency=currency,
+                    amount_type=amount_type, reference=reference, notes=notes,
+                    document_type=document_type, original_invoice_id=original_invoice_id,
+                    tx=owned_tx,
                 )
-            audit(tx, organisation_id, actor, "invoice.created", "invoice", invoice_id,
-                  {"document_type": document_type, "total": str(total)})
-        return self.invoice(invoice_id, organisation_id)
+        invoice_id, now = new_id(), utc_now()
+        organisation = tx.one("SELECT * FROM organisations WHERE id=?", (organisation_id,))
+        contact = tx.one("SELECT * FROM contacts WHERE id=? AND organisation_id=?", (contact_id, organisation_id))
+        if not organisation or not contact or contact["contact_type"] not in {"customer", "both"}:
+            raise ValueError("A customer in this organisation is required")
+        calculated, subtotal, tax_total, total = self._document_lines(tx, organisation_id, lines, amount_type)
+        due = due_date or (date.fromisoformat(issue_date) + timedelta(days=contact["payment_terms_days"])).isoformat()
+        tx.execute(
+            "INSERT INTO invoices(id,organisation_id,contact_id,document_type,issue_date,tax_point_date,due_date,currency,line_amount_type,reference,notes,original_invoice_id,subtotal,tax_total,total,created_by,created_at,updated_at) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (invoice_id, organisation_id, contact_id, document_type, issue_date, issue_date,
+             due, (currency or organisation["base_currency"]).upper(), amount_type,
+             reference.strip() or None, notes.strip() or None, original_invoice_id,
+             db_number(subtotal), db_number(tax_total), db_number(total), actor, now, now),
+        )
+        for line in calculated:
+            tx.execute(
+                "INSERT INTO invoice_lines(id,invoice_id,line_number,description,quantity,unit_price,account_id,tax_code_id,tax_rate,net_amount,tax_amount,gross_amount) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                (line["id"], invoice_id, line["line_number"], line["description"],
+                 db_number(line["quantity"]), db_number(line["unit_price"]), line["account_id"],
+                 line["tax_code_id"], db_number(line["tax_rate"]), db_number(line["net_amount"]),
+                 db_number(line["tax_amount"]), db_number(line["gross_amount"])),
+            )
+        audit(tx, organisation_id, actor, "invoice.created", "invoice", invoice_id,
+              {"document_type": document_type, "total": str(total)})
+        row = tx.one(
+            "SELECT i.*,c.name contact_name,c.email contact_email,c.address contact_address,c.vat_no contact_vat_no "
+            "FROM invoices i JOIN contacts c ON c.id=i.contact_id "
+            "WHERE i.id=? AND i.organisation_id=?", (invoice_id, organisation_id),
+        ) or {}
+        row["lines"] = tx.rows("SELECT * FROM invoice_lines WHERE invoice_id=? ORDER BY line_number", (invoice_id,))
+        return row
 
     def invoice(self, invoice_id: str, organisation_id: str | None = None) -> dict:
         params = (invoice_id, organisation_id) if organisation_id else (invoice_id,)
@@ -245,35 +266,47 @@ class DocumentService:
     def create_bill(self, organisation_id: str, *, contact_id: str, supplier_number: str,
                     bill_date: str, due_date: str, lines: list[dict], actor: str,
                     currency: str | None = None, reference: str = "", notes: str = "",
-                    document_type: str = "bill") -> dict:
+                    document_type: str = "bill", tx=None) -> dict:
         if document_type not in {"bill", "supplier_credit"} or not supplier_number.strip():
             raise ValueError("Valid supplier document details are required")
-        bill_id, now = new_id(), utc_now()
-        with self.db.transaction() as tx:
-            organisation = tx.one("SELECT * FROM organisations WHERE id=?", (organisation_id,))
-            contact = tx.one("SELECT * FROM contacts WHERE id=? AND organisation_id=?", (contact_id, organisation_id))
-            if not organisation or not contact or contact["contact_type"] not in {"supplier", "both"}:
-                raise ValueError("A supplier in this organisation is required")
-            calculated, subtotal, tax_total, total = self._document_lines(tx, organisation_id, lines, "exclusive")
-            tx.execute(
-                "INSERT INTO bills(id,organisation_id,contact_id,document_type,supplier_number,bill_date,due_date,currency,reference,notes,subtotal,tax_total,total,created_by,created_at,updated_at) "
-                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                (bill_id, organisation_id, contact_id, document_type, supplier_number.strip(), bill_date,
-                 due_date, (currency or organisation["base_currency"]).upper(), reference or None,
-                 notes or None, db_number(subtotal), db_number(tax_total), db_number(total), actor, now, now),
-            )
-            for line in calculated:
-                tx.execute(
-                    "INSERT INTO bill_lines(id,bill_id,line_number,description,quantity,unit_price,account_id,tax_code_id,tax_rate,net_amount,tax_amount,recoverable_tax,gross_amount) "
-                    "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                    (line["id"], bill_id, line["line_number"], line["description"],
-                     db_number(line["quantity"]), db_number(line["unit_price"]), line["account_id"],
-                     line["tax_code_id"], db_number(line["tax_rate"]), db_number(line["net_amount"]),
-                     db_number(line["tax_amount"]), db_number(line["recoverable_tax"]), db_number(line["gross_amount"])),
+        if tx is None:
+            with self.db.transaction() as owned_tx:
+                return self.create_bill(
+                    organisation_id, contact_id=contact_id, supplier_number=supplier_number,
+                    bill_date=bill_date, due_date=due_date, lines=lines, actor=actor,
+                    currency=currency, reference=reference, notes=notes,
+                    document_type=document_type, tx=owned_tx,
                 )
-            audit(tx, organisation_id, actor, "bill.created", "bill", bill_id,
-                  {"supplier_number": supplier_number, "total": str(total)})
-        return self.bill(bill_id)
+        bill_id, now = new_id(), utc_now()
+        organisation = tx.one("SELECT * FROM organisations WHERE id=?", (organisation_id,))
+        contact = tx.one("SELECT * FROM contacts WHERE id=? AND organisation_id=?", (contact_id, organisation_id))
+        if not organisation or not contact or contact["contact_type"] not in {"supplier", "both"}:
+            raise ValueError("A supplier in this organisation is required")
+        calculated, subtotal, tax_total, total = self._document_lines(tx, organisation_id, lines, "exclusive")
+        tx.execute(
+            "INSERT INTO bills(id,organisation_id,contact_id,document_type,supplier_number,bill_date,due_date,currency,reference,notes,subtotal,tax_total,total,created_by,created_at,updated_at) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (bill_id, organisation_id, contact_id, document_type, supplier_number.strip(), bill_date,
+             due_date, (currency or organisation["base_currency"]).upper(), reference or None,
+             notes or None, db_number(subtotal), db_number(tax_total), db_number(total), actor, now, now),
+        )
+        for line in calculated:
+            tx.execute(
+                "INSERT INTO bill_lines(id,bill_id,line_number,description,quantity,unit_price,account_id,tax_code_id,tax_rate,net_amount,tax_amount,recoverable_tax,gross_amount) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (line["id"], bill_id, line["line_number"], line["description"],
+                 db_number(line["quantity"]), db_number(line["unit_price"]), line["account_id"],
+                 line["tax_code_id"], db_number(line["tax_rate"]), db_number(line["net_amount"]),
+                 db_number(line["tax_amount"]), db_number(line["recoverable_tax"]), db_number(line["gross_amount"])),
+            )
+        audit(tx, organisation_id, actor, "bill.created", "bill", bill_id,
+              {"supplier_number": supplier_number, "total": str(total)})
+        row = tx.one(
+            "SELECT b.*,c.name contact_name FROM bills b JOIN contacts c ON c.id=b.contact_id WHERE b.id=?",
+            (bill_id,),
+        ) or {}
+        row["lines"] = tx.rows("SELECT * FROM bill_lines WHERE bill_id=? ORDER BY line_number", (bill_id,))
+        return row
 
     def bill(self, bill_id: str) -> dict:
         row = self.db.one(
@@ -365,7 +398,7 @@ class DocumentService:
 
     def record_payment(self, organisation_id: str, *, payment_type: str, bank_account_id: str,
                        payment_date: str, amount: object, actor: str, contact_id: str | None = None,
-                       reference: str = "", allocations: list[dict] | None = None) -> dict:
+                       reference: str = "", allocations: list[dict] | None = None, tx=None) -> dict:
         if payment_type not in {"customer_receipt", "supplier_payment", "transfer"}:
             raise ValueError("Invalid payment type")
         value = money(amount)
@@ -375,56 +408,63 @@ class DocumentService:
         allocations = allocations or []
         if money(sum((decimal(a["amount"]) for a in allocations), Decimal("0"))) > value:
             raise ValueError("Allocations cannot exceed the payment")
-        with self.db.transaction() as tx:
-            bank = tx.one("SELECT * FROM bank_accounts WHERE id=? AND organisation_id=?", (bank_account_id, organisation_id))
-            organisation = tx.one("SELECT * FROM organisations WHERE id=?", (organisation_id,))
-            if not bank or not organisation:
-                raise ValueError("Bank account is not in this organisation")
-            if payment_type == "transfer":
-                raise ValueError("Transfers require two bank accounts and are not accepted by this method")
-            control_role = "AR" if payment_type == "customer_receipt" else "AP"
-            control = self._role_account(tx, organisation_id, control_role)
-            if payment_type == "customer_receipt":
-                lines = [PostingLine(bank["ledger_account_id"], debit=value, memo=reference),
-                         PostingLine(control, credit=value, contact_id=contact_id, memo=reference)]
-            else:
-                lines = [PostingLine(control, debit=value, contact_id=contact_id, memo=reference),
-                         PostingLine(bank["ledger_account_id"], credit=value, memo=reference)]
-            batch = self.ledger.post(
-                organisation_id=organisation_id, voucher_type="payment", voucher_id=payment_id,
-                voucher_code=reference or f"PAY-{payment_id[:8]}", posting_date=payment_date,
-                lines=lines, actor=actor, currency=bank["currency"], tx=tx,
+        if tx is None:
+            with self.db.transaction() as owned_tx:
+                return self.record_payment(
+                    organisation_id, payment_type=payment_type,
+                    bank_account_id=bank_account_id, payment_date=payment_date,
+                    amount=amount, actor=actor, contact_id=contact_id,
+                    reference=reference, allocations=allocations, tx=owned_tx,
+                )
+        bank = tx.one("SELECT * FROM bank_accounts WHERE id=? AND organisation_id=?", (bank_account_id, organisation_id))
+        organisation = tx.one("SELECT * FROM organisations WHERE id=?", (organisation_id,))
+        if not bank or not organisation:
+            raise ValueError("Bank account is not in this organisation")
+        if payment_type == "transfer":
+            raise ValueError("Transfers require two bank accounts and are not accepted by this method")
+        control_role = "AR" if payment_type == "customer_receipt" else "AP"
+        control = self._role_account(tx, organisation_id, control_role)
+        if payment_type == "customer_receipt":
+            lines = [PostingLine(bank["ledger_account_id"], debit=value, memo=reference),
+                     PostingLine(control, credit=value, contact_id=contact_id, memo=reference)]
+        else:
+            lines = [PostingLine(control, debit=value, contact_id=contact_id, memo=reference),
+                     PostingLine(bank["ledger_account_id"], credit=value, memo=reference)]
+        batch = self.ledger.post(
+            organisation_id=organisation_id, voucher_type="payment", voucher_id=payment_id,
+            voucher_code=reference or f"PAY-{payment_id[:8]}", posting_date=payment_date,
+            lines=lines, actor=actor, currency=bank["currency"], tx=tx,
+        )
+        tx.execute(
+            "INSERT INTO payments(id,organisation_id,payment_type,contact_id,bank_account_id,payment_date,amount,currency,reference,posting_batch_id,created_by,created_at) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+            (payment_id, organisation_id, payment_type, contact_id, bank_account_id,
+             payment_date, db_number(value), bank["currency"], reference or None,
+             batch["id"], actor, now),
+        )
+        expected_type = "invoice" if payment_type == "customer_receipt" else "bill"
+        for item in allocations:
+            if item.get("document_type", expected_type) != expected_type:
+                raise ValueError("Allocation document type does not match payment type")
+            table = "invoices" if expected_type == "invoice" else "bills"
+            document = tx.one(
+                f"SELECT * FROM {table} WHERE id=? AND organisation_id=? AND contact_id=?",
+                (item["document_id"], organisation_id, contact_id),
             )
+            allocated = money(item["amount"])
+            if not document or allocated <= 0 or allocated > money(document["total"]) - money(document["paid_total"]):
+                raise ValueError("Allocation exceeds the open document balance")
             tx.execute(
-                "INSERT INTO payments(id,organisation_id,payment_type,contact_id,bank_account_id,payment_date,amount,currency,reference,posting_batch_id,created_by,created_at) "
-                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
-                (payment_id, organisation_id, payment_type, contact_id, bank_account_id,
-                 payment_date, db_number(value), bank["currency"], reference or None,
-                 batch["id"], actor, now),
+                "INSERT INTO payment_allocations(id,payment_id,document_type,document_id,amount) VALUES (?,?,?,?,?)",
+                (new_id(), payment_id, expected_type, document["id"], db_number(allocated)),
             )
-            expected_type = "invoice" if payment_type == "customer_receipt" else "bill"
-            for item in allocations:
-                if item.get("document_type", expected_type) != expected_type:
-                    raise ValueError("Allocation document type does not match payment type")
-                table = "invoices" if expected_type == "invoice" else "bills"
-                document = tx.one(
-                    f"SELECT * FROM {table} WHERE id=? AND organisation_id=? AND contact_id=?",
-                    (item["document_id"], organisation_id, contact_id),
-                )
-                allocated = money(item["amount"])
-                if not document or allocated <= 0 or allocated > money(document["total"]) - money(document["paid_total"]):
-                    raise ValueError("Allocation exceeds the open document balance")
-                tx.execute(
-                    "INSERT INTO payment_allocations(id,payment_id,document_type,document_id,amount) VALUES (?,?,?,?,?)",
-                    (new_id(), payment_id, expected_type, document["id"], db_number(allocated)),
-                )
-                paid = money(document["paid_total"]) + allocated
-                status = "Paid" if paid == money(document["total"]) else "Part Paid"
-                tx.execute(f"UPDATE {table} SET paid_total=?,status=?,updated_at=? WHERE id=?",
-                           (db_number(paid), status, now, document["id"]))
-            audit(tx, organisation_id, actor, "payment.posted", "payment", payment_id,
-                  {"amount": str(value), "type": payment_type})
-        return self.db.one("SELECT * FROM payments WHERE id=?", (payment_id,)) or {}
+            paid = money(document["paid_total"]) + allocated
+            status = "Paid" if paid == money(document["total"]) else "Part Paid"
+            tx.execute(f"UPDATE {table} SET paid_total=?,status=?,updated_at=? WHERE id=?",
+                       (db_number(paid), status, now, document["id"]))
+        audit(tx, organisation_id, actor, "payment.posted", "payment", payment_id,
+              {"amount": str(value), "type": payment_type})
+        return tx.one("SELECT * FROM payments WHERE id=?", (payment_id,)) or {}
 
     def attach_evidence(self, organisation_id: str, *, owner_type: str, owner_id: str,
                         filename: str, content_type: str, content: bytes, actor: str) -> dict:
