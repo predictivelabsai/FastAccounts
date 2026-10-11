@@ -293,6 +293,27 @@ class AccountMappingService:
             (organisation_id, self._provider(provider)),
         )
 
+    def suggestions(self, organisation_id: str, provider: str) -> list[dict]:
+        """Suggest code matches from already staged accounts without provider access."""
+        key = self._provider(provider)
+        local_codes = {row['code'] for row in self.db.rows(
+            'SELECT code FROM accounts WHERE organisation_id=?', (organisation_id,))}
+        mappings = self.list(organisation_id, key)
+        protected = {row['external_account_code'] for row in mappings if row['status'] != 'Suggested'}
+        suggestions = {row['external_account_code']: row for row in mappings
+                       if row['status'] == 'Suggested'}
+        for row in self.db.rows(
+            "SELECT external_payload_json FROM import_staged_records WHERE organisation_id=? "
+            "AND provider=? AND object_type='account' ORDER BY created_at,id", (organisation_id, key)):
+            payload = json.loads(row['external_payload_json'])
+            external = str(payload.get('external_account_code') or payload.get('code') or '')
+            local = str(payload.get('local_account_code') or external)
+            if external and external not in protected and local in local_codes:
+                suggestions[external] = {'local_account_code': local, 'external_account_code': external,
+                                         'external_account_name': payload.get('external_account_name') or payload.get('name') or '',
+                                         'status': 'Suggested', 'is_default': False}
+        return sorted(suggestions.values(), key=lambda row: row['external_account_code'])
+
     def create(
         self,
         organisation_id: str,

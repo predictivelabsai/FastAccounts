@@ -391,7 +391,31 @@ def seed_demo() -> list[dict]:
     _seed_sample_payroll()
     _seed_integration_connections(organisations)
     _seed_file_imports(organisations[1])
+    _seed_push(organisations[1])
     return organisations
+
+
+def _seed_push(organisation: dict) -> None:
+    """Prepare one synthetic journal, using its real frozen ledger lines."""
+    from integration_service import AccountMappingService
+    from push_service import PushService
+
+    db = get_database()
+    oid = organisation['id']
+    if db.one("SELECT id FROM sync_runs WHERE organisation_id=? AND provider='smartaccounts' AND direction='export'",
+              (oid,)):
+        return
+    run = db.one("SELECT posted_batch_id FROM pay_runs WHERE organisation_id=? AND period='2026-09' AND status='Approved'", (oid,))
+    if not run or not run['posted_batch_id']:
+        return
+    accounts = db.rows('SELECT DISTINCT a.code,a.name FROM accounts a JOIN gl_entries g '
+                       'ON g.account_id=a.id AND g.organisation_id=a.organisation_id '
+                       'WHERE a.organisation_id=? AND g.posting_batch_id=? ORDER BY a.code', (oid, run['posted_batch_id']))
+    mappings = AccountMappingService(db)
+    for account in accounts:
+        mappings.create(oid, 'smartaccounts', local_account_code=account['code'], external_account_code=account['code'],
+                        external_account_name=account['name'], status='Confirmed', actor=DEMO_EMAIL)
+    PushService(db).prepare(oid, 'smartaccounts', 'journals', run['posted_batch_id'], DEMO_EMAIL)
 
 
 if __name__ == "__main__":
