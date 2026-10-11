@@ -287,6 +287,7 @@ def test_invoice_and_manual_journal_attachments(client, db, uk_org):
 
 
 def test_workspace_payment_order_and_attachments_browser(client, db, uk_org, monkeypatch, tmp_path):
+    pytest.importorskip("playwright.sync_api")
     from urllib.parse import urlsplit
     from playwright.sync_api import sync_playwright, expect
     from web_app import app
