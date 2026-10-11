@@ -4,6 +4,21 @@ Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as
 delivered.
 
+## 2026-10-11: Open sign-up switch
+
+### Added
+
+- Added the `FASTACCOUNTS_OPEN_SIGNUP` switch to the shared sign-in policy, so
+  any verified address may create an account by mail or Google while production
+  is early-stage. When absent or false, the v0.4.0 access rules apply unchanged.
+- Documented the switch in the environment samples and the roadmap.
+
+### Data and boundaries
+
+- Existing throttles, confirmation-before-session, hashed single-use tokens and
+  identical public outcomes are unchanged; the flag only widens access, never
+  weakens throttling. A live production sign-up test remains follow-up work.
+
 ## 2026-10-11: SmartAccounts reviewed accounting adapter
 
 ### Added

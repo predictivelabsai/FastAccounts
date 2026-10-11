@@ -503,3 +503,41 @@ def test_sign_out_ends_the_session_but_keeps_the_language(env):
     c.get("/logout")
     assert c.get("/api/organisations").status_code == 401
     assert 'lang="et"' in c.get("/login").text
+
+
+STRANGER = "stranger@example.test"
+
+
+def test_open_signup_lets_anyone_register_verify_and_sign_in(env, monkeypatch):
+    monkeypatch.setenv("FASTACCOUNTS_OPEN_SIGNUP", "true")
+    monkeypatch.delenv("GOOGLE_ALLOWED_EMAILS", raising=False)
+    c = client()
+    register_and_verify(c, env, email=STRANGER)
+    assert env["mails"][-1]["to"] == STRANGER
+    # A verified account may sign in on a later visit without any allow-list entry.
+    c2 = client()
+    assert post(c2, "/auth/local/login", {"email": STRANGER, "password": PASSWORD}).status_code == 303
+    assert c2.get("/api/organisations").status_code == 200
+
+
+def test_open_signup_accepts_any_google_identity(env, monkeypatch):
+    from web import google_auth
+    monkeypatch.setenv("FASTACCOUNTS_OPEN_SIGNUP", "yes")
+    monkeypatch.delenv("GOOGLE_ALLOWED_EMAILS", raising=False)
+    assert google_auth.access_allowed(STRANGER)
+    account = accounts.link_google(STRANGER, "Stranger From Google")
+    assert account["google_linked"] == 1 and account["email_verified"] == 1
+
+
+def test_without_the_flag_strangers_stay_rejected(env, monkeypatch):
+    monkeypatch.delenv("FASTACCOUNTS_OPEN_SIGNUP", raising=False)
+    monkeypatch.delenv("GOOGLE_ALLOWED_EMAILS", raising=False)
+    assert not google_access(STRANGER)
+    post(client(), "/auth/local/register", {"name": "Stranger", "email": STRANGER, "password": PASSWORD})
+    assert not env["db"].one("SELECT id FROM user_accounts WHERE email=?", (STRANGER,))
+    assert all(mail["to"] != STRANGER for mail in env["mails"])
+
+
+def google_access(email):
+    from web.google_auth import access_allowed
+    return access_allowed(email)

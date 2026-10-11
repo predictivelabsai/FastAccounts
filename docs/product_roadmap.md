@@ -784,3 +784,22 @@ local account/tax mappings and payments need local bank-account review. External
 GL is reconciliation data; provider delete/edit is unused and corrections are
 new reversal entries. No row cap or idempotency token is documented, so each
 batch is sent once per request and uncertain outcomes require reconciliation.
+
+## 31. Open sign-up switch (2026-10-11)
+
+Anyone may now create a FastAccounts account while the product is early-stage.
+A single shared switch, `FASTACCOUNTS_OPEN_SIGNUP`, is honoured by the sign-in
+policy that both mail sign-up and Google SSO already check; when it is not set
+or false, access rules fall back to the exact v0.4.0 behaviour (organisation
+membership, pending invitation, approved domain or address, first-owner
+bootstrap).
+
+- [x] Implement the shared switch in the sign-in policy and document it.
+- [x] Cover open sign-up mail-verify-and-sign-in, Google-identity acceptance and
+  default-off strict behaviour in the auth suite.
+- [ ] Confirm a live public sign-up end to end on production after deployment.
+
+Existing defences are unchanged and stay in force with sign-up open: per-IP and
+per-address registration and sign-in throttles, email confirmation before any
+session, single-use hashed tokens, fresh sessions on every sign-in and identical
+public outcomes for unknown addresses.
