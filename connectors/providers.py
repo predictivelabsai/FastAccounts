@@ -7,7 +7,7 @@ import hmac
 import json
 import re
 import time
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Callable
 from urllib.parse import urlencode
@@ -670,8 +670,19 @@ class BambooHRProvider(HTTPProvider):
 
 
 class MeritProvider(HTTPProvider):
+    """Documented accounting contracts for one implicit Merit company.
+
+    Unfiltered customer/vendor lists can fail server-side. With no cursor we
+    attempt them once, then retry server errors with ChangedDate=today-365 days.
+    Date-window pulls also start there by default; JSON cursors carry the next
+    window's ``from`` date. Invoice lists have no lines, so applying their staged
+    headers requires reviewed line/account enrichment.
+    """
+
     key = "merit"
     base_url = "https://aktiva.merit.ee/api/v2"
+    PULL_OBJECT_TYPES = ("account", "contact", "sales_invoice", "purchase_invoice", "payment", "gl_entry")
+    PUSH_OBJECT_TYPES = ("gl_batch", "sales_invoice")
 
     def __init__(self, api_id: str, api_key: str, *, clock=None, **kwargs):
         super().__init__(**kwargs)
@@ -695,6 +706,250 @@ class MeritProvider(HTTPProvider):
     def payments(self, period_start: str, period_end: str) -> dict:
         return self.post("getpayments", {"PeriodStart": period_start.replace("-", ""),
                                          "PeriodEnd": period_end.replace("-", ""), "DateType": 0})
+
+    def _accounting_request(self, method: str, endpoint: str, *, version: int = 2,
+                            payload: dict | None = None, params: dict | None = None):
+        body = (json.dumps(payload, ensure_ascii=False, separators=(",", ":"), allow_nan=False).encode()
+                if method == "POST" else b"")
+        query = dict(self.signed_params(body), **(params or {}))
+        kwargs = {"params": query, "headers": {"Accept": "application/json"}}
+        if method == "POST":
+            kwargs.update(content=body, headers={"Content-Type": "application/json", "Accept": "application/json"})
+        try:
+            response = self.request(method, f"{self.base_url.rsplit('/', 1)[0]}/v{version}/{endpoint}", **kwargs)
+        except httpx.RequestError as error:
+            raise ProviderError("Merit accounting API connection error or timeout") from error
+        try:
+            return json.loads(response.content, parse_float=Decimal)
+        except (ValueError, UnicodeError) as error:
+            raise ProviderError("Merit returned invalid JSON") from error
+
+    @staticmethod
+    def _rows(payload, key: str) -> list[dict]:
+        rows = payload.get(key, payload.get("data")) if isinstance(payload, dict) else payload
+        if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
+            raise ProviderError("Merit returned an invalid accounting list")
+        return rows
+
+    @staticmethod
+    def _date(value) -> date:
+        try:
+            text = str(value)
+            return date.fromisoformat(text[:10]) if "-" in text else datetime.strptime(text, "%Y%m%d").date()
+        except (TypeError, ValueError) as error:
+            raise ValueError("Merit requires an ISO or yyyymmdd date") from error
+
+    @staticmethod
+    def _decimal(value) -> Decimal:
+        try:
+            number = Decimal(str(value))
+        except (ArithmeticError, ValueError) as error:
+            raise ValueError("Merit amount must be a finite decimal") from error
+        if not number.is_finite():
+            raise ValueError("Merit amount must be a finite decimal")
+        return number
+
+    @staticmethod
+    def _external_id(row: dict, key: str) -> str:
+        if row.get(key) in (None, ""):
+            raise ProviderError(f"Merit record is missing {key}")
+        return str(row[key])
+
+    def _wire_amount(self, value) -> float:
+        number = float(self._decimal(value))
+        if not Decimal(str(number)).is_finite():
+            raise ValueError("Merit amount exceeds the numeric wire range")
+        return number
+
+    def _cursor_start(self, cursor: str | None) -> date:
+        if cursor is None:
+            return self.clock().date() - timedelta(days=365)
+        try:
+            state = json.loads(cursor) if cursor.lstrip().startswith("{") else {"from": cursor}
+            return self._date(state["from"])
+        except (KeyError, TypeError, ValueError) as error:
+            raise ValueError("Invalid Merit cursor; expected an ISO date or JSON with from") from error
+
+    def _period(self, start: date, end: date, *, max_days: int) -> dict:
+        if end < start or (end - start).days + 1 > max_days:
+            raise ValueError(f"Merit period must be between 1 and {max_days} days")
+        return {"PeriodStart": start.strftime("%Y%m%d"), "PeriodEnd": end.strftime("%Y%m%d")}
+
+    def _contact_record(self, row: dict, role: str) -> dict:
+        return {
+            "external_id": self._external_id(row, "CustomerId" if role == "customer" else "VendorId"),
+            "contact_type": role, "name": row.get("Name", ""),
+            "registration_no": row.get("RegNo", ""), "vat_no": row.get("VatRegNo", ""),
+            "email": row.get("Email", ""), "country_code": row.get("CountryCode", ""),
+            "address": ", ".join(str(row[key]) for key in ("Address", "City", "PostalCode", "CountryName") if row.get(key)),
+            "external_version": row.get("ChangedDate"),
+        }
+
+    def _invoice_record(self, row: dict, *, purchase: bool) -> dict:
+        role = "supplier" if purchase else "customer"
+        record = {
+            "external_id": self._external_id(row, "PIHId" if purchase else "SIHId"),
+            "external_number": row.get("BillNo" if purchase else "InvoiceNo", ""),
+            "supplier_name" if purchase else "buyer_name": row.get("VendorName" if purchase else "CustomerName", ""),
+            "bill_date" if purchase else "issue_date": self._date(row.get("DocumentDate")).isoformat(),
+            "due_date": self._date(row["DueDate"]).isoformat() if row.get("DueDate") else "",
+            "currency": row.get("CurrencyCode", "EUR"), "paid": row.get("Paid", False),
+            role: {"name": row.get("VendorName" if purchase else "CustomerName", ""),
+                   "external_id": row.get("VendorId" if purchase else "CustomerId", ""),
+                   "registration_no": row.get("VendorRegNo" if purchase else "CustomerRegNo", "")},
+        }
+        for source, target in (("TaxAmount", "tax_total"), ("TotalSum", "total"),
+                               ("TotalAmount", "total_exvat"), ("PaidAmount", "paid_amount")):
+            if row.get(source) is not None:
+                record[target] = self._decimal(row[source])
+        if purchase:
+            record["invoice_date"] = record["bill_date"]
+        else:
+            record["customer_name"] = record["buyer_name"]
+            record["amount_type"] = "inclusive" if row.get("PriceInclVat") else "exclusive"
+        if row.get("ChangedDate") is not None:
+            record["payload_hash"] = hashlib.sha256(str(row["ChangedDate"]).encode()).hexdigest()
+            record["external_version"] = row["ChangedDate"]
+        return record
+
+    def _payment_record(self, row: dict) -> dict:
+        record = {
+            "external_id": self._external_id(row, "PIHId"), "amount": self._decimal(row.get("Amount")),
+            "payment_date": self._date(row.get("DocumentDate")).isoformat(),
+            "reference": row.get("DocumentNo", ""), "currency": row.get("CurrencyCode", "EUR"),
+            "CounterPartType": row.get("CounterPartType"), "CounterPartName": row.get("CounterPartName"),
+            "CounterPartId": row.get("CounterPartId"), "Direction": row.get("Direction"),
+        }
+        direction = str(row.get("Direction"))
+        if direction in {"1", "2"}:
+            record["payment_type"] = "customer_receipt" if direction == "1" else "supplier_payment"
+        else:
+            record["merit_payment_note"] = "Other income/expense direction; needs manual handling"
+            # The reviewed pipeline displays import_warning as its review note.
+            record["import_warning"] = record["merit_payment_note"]
+        details = row.get("PaymAPIDetails")
+        if details is not None:
+            if not isinstance(details, dict):
+                raise ProviderError("Merit returned invalid payment allocation details")
+            record["document_external_id"] = details.get("DocId", "")
+            record["PaymAPIDetails"] = dict(details)
+            if details.get("PaidAmount") is not None:
+                record["PaymAPIDetails"]["PaidAmount"] = self._decimal(details["PaidAmount"])
+        return record
+
+    def pull(self, object_type: str, *, cursor: str | None = None) -> ConnectorResult:
+        if object_type not in self.PULL_OBJECT_TYPES:
+            raise ValueError(f"Unsupported Merit pull object type: {object_type}")
+        records: list[dict] = []
+        next_cursor = None
+        if object_type == "account":
+            rows = self._rows(self._accounting_request("GET", "accounts", params={"UsageFilter": 0}), "Accounts")
+            records = [{"external_id": self._external_id(row, "AccountID"), "code": row.get("Code", ""),
+                        "name": row.get("Name") or row.get("NameET") or row.get("NameEN") or ""} for row in rows]
+        elif object_type == "contact":
+            for endpoint, key, role in (("getcustomers", "Customers", "customer"), ("getvendors", "Vendors", "supplier")):
+                params = {"ChangedDate": self._cursor_start(cursor).strftime("%Y%m%d")} if cursor else {}
+                try:
+                    payload = self._accounting_request("GET", endpoint, version=1, params=params)
+                except ProviderError as error:
+                    if cursor or self._status_code(error) not in {500, 502, 503, 504}:
+                        raise
+                    payload = self._accounting_request("GET", endpoint, version=1, params={
+                        "ChangedDate": self._cursor_start(None).strftime("%Y%m%d")})
+                records.extend(self._contact_record(row, role) for row in self._rows(payload, key))
+        else:
+            days = 31 if object_type == "gl_entry" else 90
+            start = self._cursor_start(cursor)
+            today = self.clock().date()
+            end = min(start + timedelta(days=days - 1), today)
+            payload = self._period(start, end, max_days=days)
+            endpoint, key, version = {
+                "sales_invoice": ("getinvoices", "Invoices", 2),
+                "purchase_invoice": ("getpurchorders", "PurchOrders", 2),
+                "payment": ("getpayments", "Payments", 2),
+                "gl_entry": ("GetGLBatchesFull", "GLBatches", 1),
+            }[object_type]
+            if object_type != "sales_invoice":
+                payload["DateType"] = 0
+            if object_type == "purchase_invoice":
+                payload["UnPaid"] = False
+            if object_type == "gl_entry":
+                payload["WithLines"] = 1
+            rows = self._rows(self._accounting_request("POST", endpoint, version=version, payload=payload), key)
+            if object_type in {"sales_invoice", "purchase_invoice"}:
+                records = [self._invoice_record(row, purchase=object_type == "purchase_invoice") for row in rows]
+            elif object_type == "payment":
+                records = [self._payment_record(row) for row in rows]
+            else:
+                for batch in rows:
+                    batch_id = self._external_id(batch, "GLBId")
+                    for index, line in enumerate(self._rows(batch.get("Entries"), "Entries"), start=1):
+                        records.append({
+                            "external_id": f"{batch_id}:{line.get('LineNo') or line.get('line_no') or index}",
+                            "external_batch_ref": batch.get("BatchCode", ""),
+                            "entry_date": self._date(batch.get("BatchDate")).isoformat(),
+                            "currency": batch.get("CurrencyCode", "EUR"),
+                            "external_account_code": line.get("AccountCode", ""),
+                            "description": line.get("Memo", ""), "document": line.get("Document", batch.get("Document", "")),
+                            "debit": self._decimal(line.get("DebitAmount", 0)),
+                            "credit": self._decimal(line.get("CreditAmount", 0)),
+                            "dims": line.get("CostAllocLines", []), "merit_tax_id": line.get("TaxId"),
+                        })
+            if end < today:
+                next_cursor = json.dumps({"from": (end + timedelta(days=1)).isoformat()}, separators=(",", ":"))
+        return ConnectorResult(self.key, f"pull:{object_type}", True, True,
+                               f"Pulled {len(records)} Merit {object_type} records", tuple(records), next_cursor)
+
+    def push(self, object_type: str, records: list[dict]) -> ConnectorResult:
+        if object_type not in self.PUSH_OBJECT_TYPES:
+            raise ValueError(f"Unsupported Merit push object type: {object_type}")
+        if any(not isinstance(record, dict) for record in records):
+            raise ValueError("Merit push records must be objects")
+        responses = []
+        if object_type == "sales_invoice":
+            for record in records:
+                try:
+                    response = self.create_invoice(record)
+                except httpx.RequestError as error:
+                    raise ProviderError("Merit invoice API connection error or timeout") from error
+                if not isinstance(response, dict):
+                    raise ProviderError("Merit returned an invalid invoice response")
+                responses.append(response)
+        else:
+            payloads = []
+            for record in records:
+                doc_no = str(record.get("doc_no") or "")
+                if not doc_no or len(doc_no) > 35:
+                    raise ValueError("Merit DocNo must contain 1 to 35 characters")
+                lines = record.get("lines")
+                if not isinstance(lines, list) or not lines:
+                    raise ValueError("Merit GL batch requires lines")
+                currency = record.get("currency") or "EUR"
+                if currency != "EUR":
+                    raise ValueError("Merit GL batch push supports EUR only")
+                entries = []
+                for line in lines:
+                    if not isinstance(line, dict):
+                        raise ValueError("Merit GL lines must be objects")
+                    account = str(line.get("account_code") or line.get("external_account_code") or "")
+                    memo = str(line.get("memo") or line.get("description") or "")
+                    if not account or len(account) > 8 or len(memo) > 150:
+                        raise ValueError("Merit AccountCode must contain 1 to 8 characters; Memo at most 150")
+                    # Numeric floats are confined to the Merit wire format, never accounting arithmetic.
+                    entries.append({"AccountCode": account, "Debit": self._wire_amount(line.get("debit", 0)),
+                                    "Credit": self._wire_amount(line.get("credit", 0)), "Memo": memo})
+                for offset in range(0, len(entries), 500):
+                    suffix = f"-{offset // 500 + 1}" if offset else ""
+                    payloads.append({"DocNo": doc_no[:35 - len(suffix)] + suffix,
+                                     "BatchDate": self._date(record.get("posting_date")).strftime("%Y%m%d"),
+                                     "CurrencyCode": currency, "EntryRow": entries[offset:offset + 500]})
+            for payload in payloads:
+                response = self._accounting_request("POST", "sendglbatch", version=1, payload=payload)
+                if not isinstance(response, dict):
+                    raise ProviderError("Merit returned an invalid GL batch response")
+                responses.append(response)
+        return ConnectorResult(self.key, f"push:{object_type}", True, True,
+                               f"Sent {len(responses)} Merit {object_type} requests", tuple(responses))
 
     def check(self) -> ConnectorResult:
         try:

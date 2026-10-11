@@ -4,6 +4,28 @@ Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as
 delivered.
 
+## 2026-10-11: Merit reviewed accounting adapter
+
+### Added
+
+- Added signed, bounded Merit pulls for accounts, customers/vendors, sales and
+  purchase invoice headers, payments and external GL entries, with next-window
+  JSON cursors and Decimal amounts. Added GL batch pushes with 500-row chunks
+  and sales invoice pushes through the existing invoice API.
+- Added synthetic fixture tests and [accounting-sync contracts](accounting-sync.md).
+  GL and accounting pulls remain documented contracts, not live-verified;
+  existing invoice/payment/check APIs retain their production-use status.
+
+### Data and boundaries
+
+- Invoice headers require reviewed line/account enrichment; external GL remains
+  read-only reconciliation data. Other income/expense payments carry a manual
+  review warning. Customer/vendor server errors fall back to ChangedDate-filtered
+  recent-year lists; older unchanged contacts need an earlier supplied cursor.
+- No schema, local posting, credentials or configuration changes. GL corrections
+  use reversal journals; provider GL deletion is unavailable. Chunked pushes are
+  separate requests and require reconciliation before retry after partial failure.
+
 ## 2026-10-11: General reviewed-import data model
 
 - Added migrations `0010_account_mappings`, `0011_external_gl`, and

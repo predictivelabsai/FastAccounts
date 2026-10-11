@@ -4,7 +4,7 @@ import base64
 import hashlib
 import hmac
 import json
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 
 import httpx
@@ -723,3 +723,245 @@ def test_fasthr_maps_annual_salary_work_time_ratio_personal_code_and_hourly():
 
     bad_ratio = record(dict(base, id=7, base_salary=12000, working_time_ratio=1.5))
     assert bad_ratio["import_warning"] == FASTHR_INVALID_WORK_TIME_RATIO and "fte" not in bad_ratio
+
+
+@pytest.fixture
+def merit_client():
+    """Synthetic contract responses; no provider network access."""
+    seen = []
+    fixtures = {
+        "accounts": [{"AccountID": "account-1", "Code": "1000", "Name": "Cash"}],
+        "getcustomers": [{"CustomerId": "customer-1", "Name": "Test buyer", "RegNo": "123",
+                          "VatRegNo": "EE123", "Email": "buyer@example.test", "Address": "Test street",
+                          "City": "Tallinn", "PostalCode": "10000", "CountryName": "Estonia",
+                          "CountryCode": "EE", "ChangedDate": "20260101"}],
+        "getvendors": [{"VendorId": "vendor-1", "Name": "Test supplier", "RegNo": "456",
+                        "ChangedDate": "20260102"}],
+        "getinvoices": [{"SIHId": "invoice-1", "InvoiceNo": "INV-1", "CustomerId": "customer-1",
+                         "CustomerName": "Test buyer", "CustomerRegNo": "123", "DocumentDate": "20260102",
+                         "DueDate": "20260116", "CurrencyCode": "EUR", "TaxAmount": "24.12",
+                         "TotalAmount": "100.50", "TotalSum": "124.62", "PaidAmount": "0",
+                         "Paid": False, "PriceInclVat": False, "ChangedDate": "20260103"}],
+        "getpurchorders": [{"PIHId": "bill-1", "BillNo": "BILL-1", "VendorId": "vendor-1",
+                            "VendorName": "Test supplier", "VendorRegNo": "456", "DocumentDate": "20260102",
+                            "DueDate": "20260116", "TaxAmount": "24.12", "TotalAmount": "100.50",
+                            "TotalSum": "124.62", "Paid": True}],
+        "getpayments": [{"PIHId": f"payment-{direction}", "DocumentNo": f"PAY-{direction}",
+                         "DocumentDate": "20260103", "Amount": "124.620000000000000001",
+                         "Direction": direction, "CounterPartType": 2 if direction == 1 else 3,
+                         "CounterPartName": "Test counterparty", "CounterPartId": "contact-1",
+                         "PaymAPIDetails": {"PaymId": "allocation-1", "DocId": "invoice-1",
+                                            "DocNo": "INV-1", "PaidAmount": "124.62"}}
+                        for direction in (1, 2, 3, 4)],
+        "GetGLBatchesFull": [{"GLBId": "batch-1", "BatchCode": "GL-1", "BatchDate": "20260104",
+                              "Document": "Test document", "Entries": [
+                                  {"AccountCode": "1000", "DebitAmount": "10.1234567890123456789",
+                                   "CreditAmount": 0, "Memo": "Test debit", "TaxId": "tax-1"},
+                                  {"LineNo": 7, "AccountCode": "2000", "DebitAmount": 0,
+                                   "CreditAmount": "10.1234567890123456789"}]}],
+    }
+
+    def handler(request):
+        seen.append(request)
+        return httpx.Response(200, json=fixtures.get(request.url.path.rsplit("/", 1)[-1], {"ok": True}))
+
+    provider = MeritProvider("synthetic-id", "synthetic-key",
+                             clock=lambda: datetime(2026, 10, 11, 12, 13, 14, tzinfo=timezone.utc),
+                             client=httpx.Client(transport=httpx.MockTransport(handler)), retries=0)
+    return provider, seen
+
+
+def assert_merit_signature(request):
+    params = request.url.params
+    assert params["apiId"] == "synthetic-id"
+    assert params["timestamp"] == "20261011121314"
+    expected = base64.b64encode(hmac.new(
+        b"synthetic-key", b"synthetic-id20261011121314" + request.content, hashlib.sha256,
+    ).digest()).decode()
+    assert params["signature"] == expected
+    if request.method == "POST":
+        assert set(params) == {"apiId", "timestamp", "signature"}
+        assert request.content == json.dumps(json.loads(request.content), ensure_ascii=False,
+                                             separators=(",", ":")).encode()
+
+
+@pytest.mark.parametrize("object_type,endpoint,days", [
+    ("sales_invoice", "getinvoices", 90), ("purchase_invoice", "getpurchorders", 90),
+    ("payment", "getpayments", 90), ("gl_entry", "GetGLBatchesFull", 31),
+])
+def test_merit_pull_windows_advance_and_sign(merit_client, object_type, endpoint, days):
+    provider, seen = merit_client
+    start = date(2026, 1, 1)
+    first = provider.pull(object_type, cursor=json.dumps({"from": start.isoformat()}))
+    second = provider.pull(object_type, cursor=first.cursor)
+    for index, request in enumerate(seen):
+        window_start = start + timedelta(days=index * days)
+        body = json.loads(request.content)
+        assert body["PeriodStart"] == window_start.strftime("%Y%m%d")
+        assert body["PeriodEnd"] == (window_start + timedelta(days=days - 1)).strftime("%Y%m%d")
+        assert request.url.path == f"/api/v{1 if object_type == 'gl_entry' else 2}/{endpoint}"
+        assert_merit_signature(request)
+        if object_type != "sales_invoice":
+            assert body["DateType"] == 0
+        if object_type == "purchase_invoice":
+            assert body["UnPaid"] is False
+        if object_type == "gl_entry":
+            assert body["WithLines"] == 1
+    assert json.loads(second.cursor) == {"from": (start + timedelta(days=2 * days)).isoformat()}
+    terminal = provider.pull(object_type, cursor="2026-10-10")
+    assert terminal.cursor is None
+    assert json.loads(seen[-1].content)["PeriodEnd"] == "20261011"
+
+
+def test_merit_pull_normalisers_match_apply_aliases(merit_client):
+    from import_service import ImportService
+
+    provider, seen = merit_client
+    account = provider.pull("account").records[0]
+    assert account == {"external_id": "account-1", "code": "1000", "name": "Cash"}
+    contacts = provider.pull("contact", cursor='{"from":"2026-01-01"}')
+    assert contacts.cursor is None
+    service = object.__new__(ImportService)
+    buyer = service._contact_payload(contacts.records[0])
+    assert buyer["external_id"] == "customer-1" and buyer["registration_no"] == "123"
+    assert buyer["contact_type"] == "customer" and buyer["vat_no"] == "EE123"
+    assert buyer["address"] == "Test street, Tallinn, 10000, Estonia"
+    assert contacts.records[0]["external_version"] == "20260101"
+    assert contacts.records[1]["contact_type"] == "supplier"
+    for request in seen:
+        assert_merit_signature(request)
+    assert seen[0].url.params["UsageFilter"] == "0"
+    assert all(request.url.params["ChangedDate"] == "20260101" for request in seen[1:])
+    for object_type, role, name_key, date_key in (
+        ("sales_invoice", "customer", "buyer_name", "issue_date"),
+        ("purchase_invoice", "supplier", "supplier_name", "bill_date"),
+    ):
+        invoice = provider.pull(object_type).records[0]
+        contact = service._contact_payload(invoice, role)
+        assert contact["name"] == invoice[name_key] and contact["external_id"] == f"{'customer' if role == 'customer' else 'vendor'}-1"
+        assert invoice[date_key] == "2026-01-02" and invoice["due_date"] == "2026-01-16"
+        assert invoice["total"] == Decimal("124.62") and invoice["tax_total"] == Decimal("24.12")
+        assert invoice["total_exvat"] == Decimal("100.50")
+        assert isinstance(invoice["total"], Decimal) and invoice["external_id"]
+        with pytest.raises(ValueError, match="At least one document line"):
+            service._document_lines(None, "org-1", "merit", invoice)
+    sales = provider.pull("sales_invoice").records[0]
+    assert sales["payload_hash"] == hashlib.sha256(b"20260103").hexdigest()
+    payments = provider.pull("payment").records
+    assert [item.get("payment_type") for item in payments] == ["customer_receipt", "supplier_payment", None, None]
+    assert all(item["document_external_id"] == "invoice-1" for item in payments)
+    assert all(item["amount"] == Decimal("124.620000000000000001") for item in payments)
+    assert all(item["external_id"] and item["payment_date"] == "2026-01-03" for item in payments)
+    assert all(item["import_warning"] == item["merit_payment_note"] for item in payments[2:])
+    gl = provider.pull("gl_entry").records
+    assert [item["external_id"] for item in gl] == ["batch-1:1", "batch-1:7"]
+    assert gl[0]["debit"] == gl[1]["credit"] == Decimal("10.1234567890123456789")
+    assert gl[0]["external_batch_ref"] == "GL-1" and gl[0]["document"] == "Test document"
+    assert gl[0]["external_account_code"] == "1000" and gl[0]["entry_date"] == "2026-01-04"
+
+
+def test_merit_contact_server_error_falls_back_but_auth_does_not():
+    seen = []
+
+    def handler(request):
+        seen.append(request)
+        return httpx.Response(200, json=[]) if "ChangedDate" in request.url.params else httpx.Response(500)
+
+    provider = MeritProvider("synthetic-id", "synthetic-key", retries=0,
+                             clock=lambda: datetime(2026, 10, 11, tzinfo=timezone.utc),
+                             client=httpx.Client(transport=httpx.MockTransport(handler)))
+    assert provider.pull("contact").records == ()
+    assert len(seen) == 4
+    assert all(request.url.params["ChangedDate"] == "20251011" for request in seen[1::2])
+    provider.client = httpx.Client(transport=httpx.MockTransport(lambda request: httpx.Response(401)))
+    with pytest.raises(ProviderError, match="HTTP 401"):
+        provider.pull("contact")
+    provider.client = httpx.Client(transport=httpx.MockTransport(lambda request: httpx.Response(500)))
+    with pytest.raises(ProviderError, match="HTTP 500"):
+        provider.pull("contact", cursor="2026-01-01")
+
+
+@pytest.mark.parametrize("days", [31, 90])
+def test_merit_period_caps_and_invalid_cursors(merit_client, days):
+    provider, seen = merit_client
+    start = date(2026, 1, 1)
+    with pytest.raises(ValueError, match="period"):
+        provider._period(start, start + timedelta(days=days), max_days=days)
+    with pytest.raises(ValueError, match="period"):
+        provider._period(start, start - timedelta(days=1), max_days=days)
+    for cursor in ('{"from":"bad"}', '{}', '{broken', "2027-01-01"):
+        with pytest.raises(ValueError):
+            provider.pull("gl_entry", cursor=cursor)
+    assert seen == []
+
+
+def test_merit_gl_push_numeric_payload_chunking_and_delegation(merit_client, monkeypatch):
+    provider, seen = merit_client
+    batch = {"doc_no": "G" * 35, "posting_date": "2026-01-04", "currency": "EUR",
+             "lines": [{"account_code": "1000", "debit": Decimal("12.34"), "credit": Decimal("0"),
+                        "description": "Tõend"}] * 1001}
+    result = provider.push("gl_batch", [batch])
+    assert result.ok and len(result.records) == 3
+    bodies = [json.loads(request.content) for request in seen]
+    assert [len(body["EntryRow"]) for body in bodies] == [500, 500, 1]
+    assert [body["DocNo"] for body in bodies] == ["G" * 35, "G" * 33 + "-2", "G" * 33 + "-3"]
+    assert all(len(body["DocNo"]) <= 35 and body["BatchDate"] == "20260104" for body in bodies)
+    assert bodies[0]["EntryRow"][0] == {"AccountCode": "1000", "Debit": 12.34, "Credit": 0, "Memo": "Tõend"}
+    for request in seen:
+        assert request.url.path == "/api/v1/sendglbatch"
+        assert_merit_signature(request)
+    delegated = []
+    monkeypatch.setattr(provider, "create_invoice", lambda payload: delegated.append(payload) or {"SIHId": "new-1"})
+    invoice = {"DocNo": "INV-2"}
+    assert provider.push("sales_invoice", [invoice]).records == ({"SIHId": "new-1"},)
+    assert delegated == [invoice]
+    monkeypatch.undo()
+    provider.push("sales_invoice", [invoice])
+    assert seen[-1].url.path == "/api/v2/sendinvoice"
+    assert_merit_signature(seen[-1])
+
+
+@pytest.mark.parametrize("field,value", [("doc_no", "x" * 36), ("posting_date", "bad"),
+                                          ("currency", "GBP"), ("lines", []),
+                                          ("lines", [{"account_code": "x" * 9}]),
+                                          ("lines", [{"account_code": "1000", "memo": "x" * 151}]),
+                                          ("lines", [{"account_code": "1000", "debit": "NaN"}]),
+                                          ("lines", [{"account_code": "1000", "debit": "1e9999"}])])
+def test_merit_gl_push_validates_before_any_request(merit_client, field, value):
+    provider, seen = merit_client
+    valid = {"doc_no": "GL-1", "posting_date": "2026-01-01", "lines": [{"account_code": "1000"}]}
+    with pytest.raises(ValueError):
+        provider.push("gl_batch", [valid, dict(valid, **{field: value})])
+    assert seen == []
+
+
+def test_merit_unsupported_types_and_invalid_responses(merit_client):
+    provider, seen = merit_client
+    assert provider.PULL_OBJECT_TYPES == ("account", "contact", "sales_invoice", "purchase_invoice", "payment", "gl_entry")
+    assert provider.PUSH_OBJECT_TYPES == ("gl_batch", "sales_invoice")
+    with pytest.raises(ValueError, match="Unsupported"):
+        provider.pull("contacts")
+    with pytest.raises(ValueError, match="Unsupported"):
+        provider.push("payment", [])
+    assert seen == []
+    for response in (httpx.Response(200, content=b"invalid"), httpx.Response(200, json={"error": "bad"}),
+                     httpx.Response(200, json=[{"Code": "1000"}])):
+        provider.client = httpx.Client(transport=httpx.MockTransport(lambda request: response))
+        with pytest.raises(ProviderError):
+            provider.pull("account")
+
+    def timeout(request):
+        raise httpx.ReadTimeout("synthetic timeout", request=request)
+
+    provider.client = httpx.Client(transport=httpx.MockTransport(timeout))
+    with pytest.raises(ProviderError, match="connection error"):
+        provider.pull("account")
+
+
+def test_merit_json_numeric_amounts_preserve_decimal_precision():
+    provider = MeritProvider("synthetic-id", "synthetic-key", client=httpx.Client(transport=httpx.MockTransport(
+        lambda request: httpx.Response(200, content=b'[{"PIHId":"p-1","DocumentDate":"20260101",'
+                                     b'"Direction":1,"Amount":123.1234567890123456789}]'),
+    )))
+    record = provider.pull("payment").records[0]
+    assert record["amount"] == Decimal("123.1234567890123456789")
