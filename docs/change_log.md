@@ -121,6 +121,41 @@ delivered.
 - `pytest -q tests/test_excel_export.py` — 6 passed in 1.68s.
 - `pytest -q` — 325 passed, 3 skipped in 148.77s.
 
+## 2026-10-09 — Accountant-reviewed Estonian TSD file export
+
+### Added
+
+- Added a tenant-scoped TSD preparation and review workflow for approved
+  Estonian EUR pay runs, with one immutable payment record per employee.
+- Added XBRL GL XML and transitional CSV downloads for reviewed manual upload.
+  Gross, net and employer-cost totals must reconcile to the approved run before
+  either format is serialized; all money remains `Decimal`-based.
+- Added payroll-run actions and English, Estonian, Latvian and Lithuanian copy.
+  The workspace labels the output **not live-verified against e-MTA** and keeps
+  direct filing disabled.
+- Added [`docs/tsd-export.md`](tsd-export.md), documenting every field, XBRL GL
+  envelope element, classification label, assumption and current resident-only
+  limit.
+
+### Data and boundaries
+
+- Added migration `0010_tsd_export`, which snapshots the employee personal ID
+  on each pay-run item and backfills existing runs once. No posted ledger data is
+  changed.
+- TSD preparation uses `sync_runs` export records with an explicit accountant
+  review gate. `EMTATSDExportProvider.submit()` always raises `PermissionError`;
+  no X-tee, SOAP, e-MTA upload or other network client was added.
+- The XML/CSV mapping is structurally tested but has not been uploaded to or
+  accepted by e-MTA. Production accountant UAT remains pending.
+
+### Verification
+
+- Added offline tests for per-payment XBRL GL structure, CSV fields, Decimal
+  total reconciliation, frozen personal IDs, EE/EUR and review gates, API file
+  downloads, and the export-only provider boundary.
+- The full suite passed: 324 passed and three optional PostgreSQL tests skipped;
+  no live network calls were made.
+
 ## 2026-10-09 — Public-site audience and availability polish
 
 - Split the landing into explicit paths for accounting bureaus managing payroll,

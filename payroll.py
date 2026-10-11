@@ -378,7 +378,7 @@ class PayrollService:
                 raise ValueError('A pay run requires at least one active employee')
             monthly_minimum, hourly_minimum = minimum_wage(period)
             totals = dict(gross=Decimal(0), net=Decimal(0), employer_cost=Decimal(0))
-            columns = ('id', 'pay_run_id', 'organisation_id', 'employee_id', 'employee_name', 'gross_salary',
+            columns = ('id', 'pay_run_id', 'organisation_id', 'employee_id', 'employee_name', 'employee_personal_id', 'gross_salary',
                        'board_member', 'funded_pension_percent', 'pay_basis', 'fte', 'hourly_rate', 'hours',
                        'minimum_wage', 'social_tax_minimum_exemption', *AMOUNTS)
             for employee in employees:
@@ -395,7 +395,7 @@ class PayrollService:
                         raise ValueError(f"{employee['name']}: hourly rate must be at least EUR {hourly_minimum:.2f}")
                     worked = self._hours(employee, hours)
                 amounts = calculate_pay(employee, period=period, hours=worked)
-                values = (new_id(), run_id, organisation_id, employee['id'], employee['name'],
+                values = (new_id(), run_id, organisation_id, employee['id'], employee['name'], employee.get('personal_id'),
                           db_number(amounts['gross'] if basis == 'hourly' else money(employee['gross_salary'])),
                           int(basis == 'board_fee'), db_number(decimal(employee['funded_pension_percent'])), basis,
                           db_number(four_dp(fte)), None if basis != 'hourly' else db_number(four_dp(employee['hourly_rate'])),

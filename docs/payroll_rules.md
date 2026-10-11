@@ -4,7 +4,9 @@ This is the agreed 2026 accounting-bureau demo specification. Production
 accountant UAT is pending. Only EUR Estonian books and 2026 periods are accepted.
 Monthly calculations cover monthly salaries (full- or part-time), hourly pay and
 board-member fees, and the social tax minimum obligation. They exclude leave,
-sickness, benefits, non-resident cases, TSD submission and payment execution.
+sickness, benefits, non-resident calculations, direct TSD submission and payment
+execution. Reviewed resident-only TSD manual-upload files are documented in
+[`tsd-export.md`](tsd-export.md).
 
 All calculations use Decimal, with ROUND_HALF_UP to cents on each tax/deduction.
 Each employee's rounded amounts are then summed; aggregate taxes are not recomputed.

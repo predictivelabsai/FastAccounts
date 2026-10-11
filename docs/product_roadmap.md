@@ -476,7 +476,8 @@ books use the seed constants. Backend validation errors and stored payroll memos
 can still be English.
 Rules and corrected arithmetic fixtures are in
 [payroll rules](payroll_rules.md). Production accountant UAT remains pending;
-TSD filing, payment execution, leave, benefits, and general HR are not included.
+Direct TSD filing, payment execution, leave, benefits, and general HR are not
+included. Reviewed TSD manual-upload files are delivered in section 32.
 
 ## 14. Payroll part-time, hourly pay and social tax minimum (2026-10-08, v0.2.1)
 
@@ -490,7 +491,9 @@ labelled "Demo OÜ (sample payroll)" seed organisation carries seven synthetic
 employees. Still open: the reduced minimum for the employer applying the basic
 exemption when there are several employers, Töötukassa social tax relief for
 reduced-work-ability staff, automatic pro-rating of monthly pay for partial
-months, pension-age unemployment insurance, leave and sickness pay, TSD export.
+months, pension-age unemployment insurance, leave and sickness pay. Reviewed
+TSD manual-upload export is delivered in section 32; direct filing remains out
+of scope.
 See [payroll rules](payroll_rules.md).
 
 ## 15. Automation demo: recurring invoices and payment reminders (2026-10-08)
@@ -821,3 +824,25 @@ Existing defences are unchanged and stay in force with sign-up open: per-IP and
 per-address registration and sign-in throttles, email confirmation before any
 session, single-use hashed tokens, fresh sessions on every sign-in and identical
 public outcomes for unknown addresses.
+
+## 32. Accountant-reviewed Estonian TSD file export (2026-10-09)
+
+Approved Estonian EUR payroll runs can now be prepared as one frozen payment
+record per employee for the data-based TSD Annex 1–2 direction. An accountant
+review gate precedes downloadable XBRL GL XML and the transitional CSV variant,
+which is limited to payment dates through the end of 2027. Both formats use
+Decimal-derived values and must reconcile gross, net and employer-cost totals to
+the approved pay run.
+
+The implementation snapshots the employee personal ID on the pay-run item,
+records the preparation as a tenant-scoped e-MTA export in `sync_runs`, and keeps
+the not-live-verified UAT status visible in the workspace and XML. Current
+payroll calculations remain resident-only, so generated payments map to Annex 1;
+Annex 2 is reserved without inferring non-resident status. The assumed payment
+date, semantic classification labels and every field mapping are documented in
+[`tsd-export.md`](tsd-export.md).
+
+This is file export only. There is no X-tee, SOAP, upload, submission,
+confirmation or network client, and the TSD provider boundary rejects direct
+submission. Production accountant UAT and e-MTA upload verification remain
+pending.
