@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import os
 import secrets
+from datetime import date
 from decimal import Decimal
 from typing import Any, Literal
 
@@ -18,6 +19,8 @@ from automation import AutomationService, email_configured, email_status
 from connectors.registry import provider_metadata
 from database import get_database
 from documents import DocumentService
+from excel_export import (employees_workbook, general_ledger_workbook,
+                          invoices_workbook, vat_returns_workbook)
 from integration_service import IntegrationService
 from import_service import ImportService
 from ledger import LedgerService, PostingLine
@@ -559,6 +562,62 @@ def general_ledger(organisation_id: str, start: str, end: str, user: User = Depe
     return LedgerService().general_ledger(organisation_id, start=start, end=end)
 
 
+def _iso_date_bound(value: str | None, default: str) -> str:
+    if value is None:
+        return default
+    try:
+        parsed = date.fromisoformat(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("Report dates must use YYYY-MM-DD format") from exc
+    if parsed.isoformat() != value:
+        raise ValueError("Report dates must use YYYY-MM-DD format")
+    return value
+
+
+def _report_workbook(organisation_id: str, book: str, date_from: str | None,
+                     date_to: str | None) -> bytes:
+    if book not in {"general_ledger", "invoices", "employees", "vat_returns"}:
+        raise KeyError("Report workbook not found")
+    database = get_database()
+    organisation = database.one("SELECT * FROM organisations WHERE id=?", (organisation_id,))
+    if not organisation:
+        raise KeyError("Organisation not found")
+    if book == "general_ledger":
+        start = _iso_date_bound(date_from, "0001-01-01")
+        end = _iso_date_bound(date_to, "9999-12-31")
+        if start > end:
+            raise ValueError("Report date_from cannot be after date_to")
+        return general_ledger_workbook(
+            organisation, LedgerService(database).general_ledger(organisation_id, start=start, end=end)
+        )
+    if book == "invoices":
+        rows = database.rows(
+            "SELECT i.*,c.name contact_name FROM invoices i "
+            "JOIN contacts c ON c.id=i.contact_id AND c.organisation_id=i.organisation_id "
+            "WHERE i.organisation_id=? ORDER BY i.issue_date DESC,i.created_at DESC", (organisation_id,)
+        )
+        return invoices_workbook(organisation, rows)
+    if book == "employees":
+        return employees_workbook(organisation, PayrollService(database).employees(organisation_id))
+    rows = database.rows(
+        "SELECT * FROM vat_returns WHERE organisation_id=? ORDER BY period_end DESC,created_at DESC",
+        (organisation_id,),
+    )
+    return vat_returns_workbook(organisation, rows)
+
+
+@api.get("/organisations/{organisation_id}/reports/{book}.xlsx")
+def report_workbook(organisation_id: str, book: str, date_from: str | None = None,
+                    date_to: str | None = None, user: User = Depends(current_user)):
+    _require(organisation_id, user, {"owner", "administrator", "accountant", "approver", "viewer"})
+    content = _report_workbook(organisation_id, book, date_from, date_to)
+    return Response(
+        content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{book}.xlsx"'},
+    )
+
+
 @api.get("/organisations/{organisation_id}/reports/receivables-aging")
 def receivables_aging(organisation_id: str, as_at: str, user: User = Depends(current_user)):
     _require(organisation_id, user, {"owner", "administrator", "accountant", "viewer"})
@@ -803,3 +862,13 @@ def payroll_payslips(organisation_id: str, run_id: str, user: User = Depends(cur
     _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
     return Response(PayrollService().payslips_pdf(organisation_id, run_id), media_type='application/pdf',
                     headers={'Content-Disposition': 'attachment; filename="payslips.pdf"'})
+
+
+@api.get('/organisations/{organisation_id}/pay-runs/{run_id}/workbook.xlsx')
+def payroll_workbook(organisation_id: str, run_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    return Response(
+        PayrollService().workbook_xlsx(organisation_id, run_id),
+        media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        headers={'Content-Disposition': 'attachment; filename="pay-run-workbook.xlsx"'},
+    )

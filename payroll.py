@@ -461,3 +461,18 @@ class PayrollService:
             run = self._run(tx, organisation_id, run_id)
             org = self._organisation(tx, organisation_id)
         return payroll_pdf(org, run)
+
+    def workbook_xlsx(self, organisation_id, run_id):
+        from excel_export import pay_run_workbook
+        with self.db.transaction() as tx:
+            run = self._run(tx, organisation_id, run_id)
+            org = self._organisation(tx, organisation_id)
+            journal_lines = None
+            if run.get('posted_batch_id'):
+                journal_lines = tx.rows(
+                    'SELECT a.code account_code,a.name account_name,g.memo,g.debit,g.credit '
+                    'FROM gl_entries g JOIN accounts a ON a.id=g.account_id AND a.organisation_id=g.organisation_id '
+                    'WHERE g.organisation_id=? AND g.posting_batch_id=? ORDER BY g.line_number',
+                    (organisation_id, run['posted_batch_id']),
+                )
+        return pay_run_workbook(org, run, run['items'], journal_lines)
