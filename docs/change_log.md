@@ -4,6 +4,31 @@ Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as
 delivered.
 
+## 2026-10-11 — Excel workbook export pack
+
+### Added
+
+- Added native `.xlsx` downloads for payroll pay runs, the general ledger,
+  invoices, employees and VAT returns. Payroll workbooks include summary and
+  frozen-item reconciliation sheets, plus accounting lines when the run has a
+  posted batch.
+- Added the pay-run **Export workbook** action in English, Estonian, Latvian and
+  Lithuanian, and authenticated report download routes with optional validated
+  general-ledger date bounds.
+
+### Data and boundaries
+
+- These workbooks are rendered reports only. Exporting does not post, update or
+  delete accounting data, and this change adds no database migration.
+- Accounting calculations remain Decimal-based. Two-decimal EUR values are
+  converted from `Decimal` to numeric Excel cells as float values so spreadsheet
+  totals and filters work normally; cells use the `#,##0.00` number format.
+
+### Verification
+
+- `pytest -q tests/test_excel_export.py` — 6 passed in 1.68s.
+- `pytest -q` — 325 passed, 3 skipped in 148.77s.
+
 ## 2026-10-09 — Public-site audience and availability polish
 
 - Split the landing into explicit paths for accounting bureaus managing payroll,

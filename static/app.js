@@ -2189,13 +2189,17 @@
       cash(r.total_net ?? r.net_total ?? r.net, "EUR"),
       cash(r.total_employer_cost ?? r.employer_cost, "EUR"),
       td(
-        draft
+        (draft
           ? button("Delete draft", "delete", false, `data-id="${r.id}"`) +
               button("Approve & post", "approve", true, `data-id="${r.id}"`)
           : link(
               "Payslips PDF",
               `/api${c.url(`/pay-runs/${r.id}/payslips.pdf`)}`,
-            ),
+            )) +
+          link(
+            "Export workbook",
+            `/api${c.url(`/pay-runs/${r.id}/workbook.xlsx`)}`,
+          ),
       ),
     ])}<tr class="run-detail"><td colspan="6"><details ${draft ? "open" : ""}><summary>${tr("Employee breakdown")} (${num(items.length)})</summary>${table(
       [
