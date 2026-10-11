@@ -107,6 +107,19 @@ Sources: [Accounting API](https://developer.xero.com/documentation/api/accountin
 
 ### Merit Aktiva
 
+Implemented on 2026-10-11: the reviewed accounting adapter pulls accounts,
+customers/vendors, sales and purchase invoice headers, payments and external
+GL snapshots in bounded windows, and pushes GL batches plus sales invoices.
+Synthetic fixture verification covers signing, Decimal normalisation, cursors,
+contact fallback and the 500-row GL limit. GL and accounting pulls remain
+**Documented contract · not live-verified**; the existing invoice/payment/check
+APIs are in production use. Live test-company verification remains pending.
+Invoice headers need reviewed line/account enrichment before draft application;
+external GL snapshots never post to the local ledger. Other-direction payments
+need manual review, and ChangedDate fallback lists cover only the recent year.
+GL corrections use reversal journals. See [accounting-sync contracts](accounting-sync.md)
+for endpoints, limits, cursor semantics and partial-push retry boundaries.
+
 Merit is the most useful localization reference for Estonia. Its REST/JSON API
 covers sales and purchase invoices, credit invoices, payments, bank statement
 imports, GL transactions, taxes, accounts, customers/vendors, projects, cost
