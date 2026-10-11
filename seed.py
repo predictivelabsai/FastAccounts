@@ -281,6 +281,32 @@ def _seed_integration_connections(organisations: list[dict]) -> None:
             "demo-synthetic-xero-tenant",
         ),
         (
+            by_country["UK"]["id"],
+            "personio",
+            {
+                "client_id": "demo-synthetic-personio-client-id",
+                "client_secret": "demo-synthetic-personio-secret",
+            },
+            {
+                "note": DEMO_CONNECTION_NOTE,
+                "salary_attribute": "demo-synthetic-salary",
+            },
+            "demo-synthetic-pers",
+        ),
+        (
+            by_country["UK"]["id"],
+            "bamboohr",
+            {
+                "subdomain": "demo-synthetic",
+                "api_key": "demo-synthetic-bamboohr-api-key",
+            },
+            {
+                "note": DEMO_CONNECTION_NOTE,
+                "salary_field_id": "demo-synthetic-salaryfield",
+            },
+            "demo-synthetic-bamboo",
+        ),
+        (
             by_country["EE"]["id"],
             "merit",
             {
