@@ -60,14 +60,38 @@ def test_demo_seed_creates_encrypted_connections_and_offline_import_runs(db, mon
         (review["id"],),
     ) == 2
 
+    from push_service import PushService
+    import json
+    from decimal import Decimal
+
+    pushes = PushService(db).list(ee['id'], 'smartaccounts')
+    assert len(pushes) == 1
+    push = pushes[0]
+    assert (push['direction'], push['object_type'], push['status']) == ('export', 'journals', 'Review Required')
+    batch = db.one('SELECT posted_batch_id FROM pay_runs WHERE organisation_id=? AND period=?', (ee['id'], '2026-09'))
+    assert push['local_ref'] == batch['posted_batch_id'] and push['reviewed_at'] is None
+    payload = json.loads(push['payload_json'])
+    assert payload['currency'] == 'EUR' and len(payload['lines']) == 7
+    assert sum((Decimal(line['debit']) for line in payload['lines']), Decimal(0)) == sum((Decimal(line['credit']) for line in payload['lines']), Decimal(0))
+    assert all(db.one("SELECT id FROM account_mappings WHERE organisation_id=? AND provider='smartaccounts' "
+                      "AND local_account_code=? AND status='Confirmed'", (ee['id'], line['account_code'])) for line in payload['lines'])
+    # The seeded payload is genuinely reviewable against its source journal.
+    expected, _, _ = PushService(db)._payload(ee['id'], 'smartaccounts', 'journals', push['local_ref'])
+    from core_utils import canonical_json
+    assert canonical_json(expected) == push['payload_json']
+
     before = {
         "connections": db.rows("SELECT * FROM integration_connections ORDER BY id"),
         "runs": db.rows("SELECT * FROM sync_runs WHERE provider='file_import' ORDER BY id"),
         "staged": db.rows("SELECT * FROM import_staged_records ORDER BY id"),
+        "pushes": db.rows("SELECT * FROM sync_runs WHERE direction='export' ORDER BY id"),
+        "account_mappings": db.rows("SELECT * FROM account_mappings ORDER BY id"),
     }
     seed_demo()
     assert before == {
         "connections": db.rows("SELECT * FROM integration_connections ORDER BY id"),
         "runs": db.rows("SELECT * FROM sync_runs WHERE provider='file_import' ORDER BY id"),
         "staged": db.rows("SELECT * FROM import_staged_records ORDER BY id"),
+        "pushes": db.rows("SELECT * FROM sync_runs WHERE direction='export' ORDER BY id"),
+        "account_mappings": db.rows("SELECT * FROM account_mappings ORDER BY id"),
     }

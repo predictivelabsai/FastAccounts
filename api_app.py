@@ -23,6 +23,7 @@ from excel_export import (employees_workbook, general_ledger_workbook,
                           invoices_workbook, vat_returns_workbook)
 from governance import GovernanceService
 from import_service import OBJECT_TYPES, ImportService
+from push_service import PushService
 from integration_service import AccountMappingService, IntegrationService
 from ledger import LedgerService, PostingLine
 from organisations import APPROVE_ROLES, WRITE_ROLES, AccessDenied, OrganisationService
@@ -682,7 +683,7 @@ def integration_catalogue(user: User = Depends(current_user)):
 
 @api.get("/organisations/{organisation_id}/integrations")
 def organisation_integrations(organisation_id: str, user: User = Depends(current_user)):
-    _require(organisation_id, user, {"owner", "administrator"})
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
     return IntegrationService().connections(organisation_id)
 
 
@@ -834,6 +835,54 @@ def integration_syncs(
     return ImportService().syncs(organisation_id, provider)
 
 # Accounting-bureau payroll API. Monetary values are returned as decimal strings.
+
+
+@api.post('/organisations/{organisation_id}/integrations/{provider}/push/journals/{batch_id}/prepare')
+def prepare_journal_push(organisation_id: str, provider: str, batch_id: str, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, APPROVE_ROLES)
+    return PushService().prepare(organisation_id, provider, 'journals', batch_id, user.email)
+
+
+@api.post('/organisations/{organisation_id}/integrations/{provider}/push/pay-runs/{run_id}/prepare')
+def prepare_payroll_push(organisation_id: str, provider: str, run_id: str, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, APPROVE_ROLES)
+    return PushService().prepare(organisation_id, provider, 'pay_runs', run_id, user.email)
+
+
+@api.get('/organisations/{organisation_id}/integrations/{provider}/pushes')
+def provider_pushes(organisation_id: str, provider: str, object_type: str | None = None, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    return PushService().list(organisation_id, provider, object_type)
+
+
+@api.get('/organisations/{organisation_id}/pushes/{push_id}')
+def get_push(organisation_id: str, push_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    return PushService().get(organisation_id, push_id)
+
+
+@api.post('/organisations/{organisation_id}/pushes/{push_id}/review')
+def review_push(organisation_id: str, push_id: str, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, APPROVE_ROLES)
+    return PushService().review(organisation_id, push_id, user.email)
+
+
+@api.post('/organisations/{organisation_id}/pushes/{push_id}/execute')
+def execute_push(organisation_id: str, push_id: str, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, {'owner', 'administrator', 'accountant'})
+    return PushService().execute(organisation_id, push_id, user.email)
+
+
+@api.get('/organisations/{organisation_id}/pay-runs/{run_id}/pushes')
+def payroll_pushes(organisation_id: str, run_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    return PayrollService().pushes(organisation_id, run_id)
+
+
+@api.get('/organisations/{organisation_id}/integrations/{provider}/account-mappings/suggest')
+def suggest_account_mappings(organisation_id: str, provider: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, {'owner', 'administrator', 'accountant'})
+    return AccountMappingService().suggestions(organisation_id, provider)
 
 
 PayBasis = Literal['monthly', 'hourly', 'board_fee']

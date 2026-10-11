@@ -784,3 +784,21 @@ local account/tax mappings and payments need local bank-account review. External
 GL is reconciliation data; provider delete/edit is unused and corrections are
 new reversal entries. No row cap or idempotency token is documented, so each
 batch is sent once per request and uncertain outcomes require reconciliation.
+
+## 30. Reviewed push pipeline (2026-10-11)
+
+- [x] Prepare, review and explicitly execute approved payroll and local ledger
+  journals to Merit Aktiva and SmartAccounts with confirmed account mappings.
+- [x] Add Decimal-safe frozen payloads, migration `0014_sync_push`, tenant and
+  EE/EUR gates, duplicate refusal, export attribution and manual failure retry.
+- [x] Expose payroll/provider push history, mapping editing, offline suggestions
+  and GL reconciliation with translated workspace controls and synthetic seed.
+- [x] Cover reviewed export success/failure, source changes, roles, tenancy,
+  Decimal round trips and reversal corrections with offline tests.
+- [ ] Complete provider test-company acceptance and production UAT.
+
+Status: **Documented contract · not live-verified**. These are new exports of
+FastAccounts-approved ledger journals. Provider records are never edited or
+deleted; corrections use reversal entries. Uncertain outcomes require provider
+reconciliation before explicit retry. The seed retains the real payroll batch's
+seven lines so its stored payload can pass source-based review.

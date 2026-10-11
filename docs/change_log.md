@@ -4,6 +4,28 @@ Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as
 delivered.
 
+## 2026-10-11: Reviewed push pipeline
+
+### Added
+
+- Added migration `0014_sync_push`, prepared payloads and source references,
+  with explicit review and execution for approved payroll and ledger journals.
+- Added confirmed account-mapping coverage, exact Decimal amounts, tenant and
+  EE/EUR gates, duplicate export refusal and manual retry after failure.
+- Added thin API routes, payroll push history, provider mapping controls and GL
+  reconciliation, with English, Estonian, Latvian and Lithuanian workspace copy.
+- Added one offline synthetic SmartAccounts journal preparation and confirmed
+  mappings, using all seven lines of the seeded payroll batch for exact review.
+
+### Verification
+
+- Offline pytest covers source gates, mappings, exact payloads, review changes,
+  success, failures, explicit retry, listing, role/tenant isolation and reversals.
+- Browser regression exercises prepare, review, execution permissions, mappings
+  and reconciliation with intercepted requests and synthetic data.
+- Documented contract · not live-verified. Production provider acceptance remains
+  pending. Local export ownership uses the existing schema value `fastaccounts`.
+
 ## 2026-10-11: SmartAccounts reviewed accounting adapter
 
 ### Added
