@@ -212,7 +212,7 @@ def test_source_currency_tax_and_account_guards(db, purchase):
     account = db.scalar("SELECT id FROM accounts WHERE organisation_id=? AND system_role='SALES'", (oid,))
     with pytest.raises(ValueError):
         create(purchase, expense_account_id=account)
-    for column, value in [('currency', 'USD'), ('document_type', 'supplier_credit'), ('exchange_rate', '2')]:
+    for column, value in [('document_type', 'supplier_credit')]:
         with db.transaction() as tx:
             tx.execute(f'UPDATE bills SET {column}=? WHERE organisation_id=? AND id=?', (value, oid, bill['id']))
         with pytest.raises(ValueError):
@@ -300,7 +300,7 @@ def test_upgrade_preserves_data_and_custom_chart(tmp_path, monkeypatch, country,
             tx.execute("INSERT INTO accounts(id,organisation_id,code,name,account_type,normal_balance,system_role) VALUES (?,?,?,'Custom deferred','Asset','Debit','PERIODISED_PURCHASES')", (new_id(), oid, '9999'))
     before = {t: db.rows(f'SELECT * FROM {t} ORDER BY id') for t in ['organisations', 'accounts', 'contacts', 'bills', 'gl_entries', 'posting_batches', 'audit_events']}
     monkeypatch.setattr(database, 'MIGRATIONS', original)
-    assert db.migrate() == ['0021_periodisation', '0022_payment_links', '0023_analytical_objects', '0024_reminder_rules'] and db.migrate() == []
+    assert db.migrate() == ['0021_periodisation', '0022_payment_links', '0023_analytical_objects', '0024_reminder_rules', '0025_fx_realised'] and db.migrate() == []
     for table, rows in before.items():
         if table == 'accounts':
             assert all(r in db.rows('SELECT * FROM accounts') for r in rows)
@@ -452,7 +452,7 @@ def test_bill_change_and_locked_approval_preserve_schedule(db, purchase):
     assert not db.rows('SELECT * FROM gl_entries')
     with db.transaction() as tx:
         tx.execute("UPDATE fiscal_periods SET status='Open' WHERE organisation_id=?", (oid,))
-        tx.execute('UPDATE bills SET exchange_rate=2 WHERE organisation_id=? AND id=?', (oid, bill['id']))
+        tx.execute("UPDATE bills SET document_type='supplier_credit' WHERE organisation_id=? AND id=?", (oid, bill['id']))
     with pytest.raises(ValueError, match='no longer matches'):
         DocumentService(db).approve_bill(bill['id'], actor=ACTOR)
     assert not db.rows('SELECT * FROM gl_entries')

@@ -231,7 +231,7 @@ def test_upgrade_and_rerun_preserve_existing_data(tmp_path, monkeypatch):
     tables = ['organisations', 'accounts', 'contacts', 'invoices', 'invoice_lines', 'posting_batches', 'gl_entries', 'audit_events']
     before = {table: db.rows(f'SELECT * FROM {table} ORDER BY id') for table in tables}
     monkeypatch.setattr(database, 'MIGRATIONS', original)
-    assert db.migrate() == ['0022_payment_links', '0023_analytical_objects', '0024_reminder_rules'] and db.migrate() == []
+    assert db.migrate() == ['0022_payment_links', '0023_analytical_objects', '0024_reminder_rules', '0025_fx_realised'] and db.migrate() == []
     service = PaymentLinkService(db)
     method = service.create_config(org['id'], actor=ACTOR, **CONFIG)
     link = service.generate(org['id'], invoice['id'], method['id'])

@@ -10,9 +10,9 @@ from organisations import AccessDenied, OrganisationService
 
 def test_empty_migration_is_idempotent(tmp_path):
     db = Database(path=str(tmp_path / "empty.sqlite"))
-    assert db.migrate() == ["0001_accounting_core", "0002_integrations", "0003_operations", "0004_document_immutability", "0005_payroll", "0006_payroll_part_time_hourly", "0007_automation", "0008_import_staging", "0009_local_accounts", "0010_tsd_export", "0011_account_mappings", "0012_external_gl", "0013_sync_review", "0014_sync_push", "0015_payment_orders", "0016_bank_feed_schedules", "0017_prepayments", "0018_fixed_assets", "0019_master_data_import", "0020_quotes", "0021_periodisation", "0022_payment_links", "0023_analytical_objects", "0024_reminder_rules"]
+    assert db.migrate() == ["0001_accounting_core", "0002_integrations", "0003_operations", "0004_document_immutability", "0005_payroll", "0006_payroll_part_time_hourly", "0007_automation", "0008_import_staging", "0009_local_accounts", "0010_tsd_export", "0011_account_mappings", "0012_external_gl", "0013_sync_review", "0014_sync_push", "0015_payment_orders", "0016_bank_feed_schedules", "0017_prepayments", "0018_fixed_assets", "0019_master_data_import", "0020_quotes", "0021_periodisation", "0022_payment_links", "0023_analytical_objects", "0024_reminder_rules", "0025_fx_realised"]
     assert db.migrate() == []
-    assert db.scalar("SELECT COUNT(*) FROM schema_migrations") == 24
+    assert db.scalar("SELECT COUNT(*) FROM schema_migrations") == 25
     assert db.scalar(
         "SELECT COUNT(*) FROM sqlite_master WHERE type='table' "
         "AND name IN ('account_mappings','external_gl_entries')"
@@ -78,7 +78,7 @@ def test_organisation_entity_country_and_seed_data(db):
     uk = service.create(name="UK Sole", country_code="UK", entity_type="UK_SOLE_TRADER", owner_email="a@example.test")
     ee = service.create(name="EE FIE", country_code="EE", entity_type="EE_FIE", owner_email="a@example.test")
     assert uk["base_currency"] == "GBP" and ee["base_currency"] == "EUR"
-    assert db.scalar("SELECT COUNT(*) FROM accounts WHERE organisation_id=?", (uk["id"],)) == 16
+    assert db.scalar("SELECT COUNT(*) FROM accounts WHERE organisation_id=?", (uk["id"],)) == 17
     assert db.scalar("SELECT COUNT(*) FROM tax_codes WHERE organisation_id=?", (ee["id"],)) == 8
     assert db.scalar("SELECT COUNT(*) FROM fiscal_periods WHERE organisation_id=?", (uk["id"],)) == 24
     assert {row["code"]: row["name"] for row in db.rows(
@@ -189,7 +189,7 @@ def test_fixed_asset_upgrade_preserves_custom_charts_and_postings(tmp_path, monk
         lines=[PostingLine(accounts["BANK"], debit=Decimal("10")), PostingLine(accounts["CAPITAL"], credit=Decimal("10"))], actor="owner@example.test")
     before = {table: db.rows(f"SELECT * FROM {table} ORDER BY id") for table in ["organisations", "accounts", "gl_entries", "posting_batches", "audit_events"]}
     monkeypatch.setattr(database, "MIGRATIONS", original)
-    assert db.migrate() == ["0018_fixed_assets", "0019_master_data_import", "0020_quotes", "0021_periodisation", "0022_payment_links", "0023_analytical_objects", "0024_reminder_rules"]
+    assert db.migrate() == ["0018_fixed_assets", "0019_master_data_import", "0020_quotes", "0021_periodisation", "0022_payment_links", "0023_analytical_objects", "0024_reminder_rules", "0025_fx_realised"]
     assert db.migrate() == []
     after_accounts = db.rows("SELECT * FROM accounts ORDER BY id")
     assert all(row in after_accounts for row in before["accounts"])

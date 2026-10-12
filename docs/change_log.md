@@ -4,6 +4,33 @@ Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as
 delivered.
 
+## 2026-10-12: Realised FX on settlement and advance integration
+
+- Added migration `0025_fx_realised`: retained prepayment exchange rates and a
+  combined `FX_GAIN_LOSS` role, preserving existing custom roles and selecting
+  the next free account code. UK/EE default charts, CI and upgrade checks include
+  the change; the migration count is 25 and reruns are safe. Nullable
+  payment-allocation booked-base portions retain exact aggregate control shares.
+- Receipts and supplier payments relieve actual original booked AR/AP base
+  portions through two aggregate legs and one net FX line. Higher-rate receipts
+  recognise gains and higher-rate supplier payments recognise losses. Effective
+  rates treat every base-currency document as booked at 1, even when its stored
+  explicit rate differs. Ordinary equal effective rates preserve existing payment batches; final-cent
+  rounding exceptions prioritise exact clearing and recognise the difference in FX.
+- Enabled foreign-currency prepayments, foreign/base offsets in both directions
+  and refund-date FX differences with original reversal links. Periodisation uses
+  the bill's effective rate and cumulative funded-base cents so completed transit
+  balances clear exactly. VAT remains on the original bill. No UI or locale change.
+- Added offline accounting, rollback, equality, reversal-link, migration and
+  transit-clearing regressions. All 69 new realised-FX checks passed. Windows,
+  Python 3.14.6, full `python -m pytest -q`: `1168 passed, 4 skipped, 5 warnings
+  in 893.41s (0:14:53)`. The four skips are existing PostgreSQL opt-ins; warnings
+  are existing dependency deprecations. Tests used synthetic data and no live
+  provider calls. Diff checks passed.
+- Periodic revaluation of open balances is the next deferred item. Automated
+  feeds, accountant UAT and live PostgreSQL validation remain pending. Detailed
+  settlement and allocation semantics are in `docs/specs/fx-rates.md`.
+
 ## 2026-10-12: Sales quotes
 
 - Added tenant-scoped quotes and quote lines with migration `0020_quotes`,
@@ -1168,7 +1195,7 @@ the entries below, plus one connector fix:
   including offline browser flows in all four locales. The four skips are
   existing opt-in PostgreSQL checks. No live provider calls were made. JavaScript
   syntax, focused Python compilation, locale preservation and diff checks passed.
-- Production accountant UAT, partial VAT recovery, foreign currency, irregular
+- Production accountant UAT, partial VAT recovery, irregular
   periods, monetary schedule editing and coordinated reversals or cancellation
   settlement remain deferred. Roadmap status and scope are synchronised.
 
@@ -1328,8 +1355,9 @@ the entries below, plus one connector fix:
   manual-pair refusal and exchange_rate.created/exchange_rate.deleted audits.
   Add Settings rate table/form and disabled non-administrator controls; append
   fx_rates in English, Estonian, Lithuanian and Latvian catalogues.
-- Defer realised FX, revaluation, gain/loss accounts, automated feeds and
-  periodisation/prepayment FX integration to P2 item 2. Existing refusals remain.
+- Realised FX, gain/loss accounts and periodisation/prepayment FX integration
+  are delivered in P2 item 2 above. Periodic revaluation and automated feeds
+  remain deferred.
   Production accountant UAT is pending. See docs/specs/fx-rates.md.
 - Validation: Python 3.14.6, full `python -m pytest -q`: `1099 passed,
   4 skipped, 5 warnings in 824.88s (0:13:44)`. All 57 new FX checks passed,

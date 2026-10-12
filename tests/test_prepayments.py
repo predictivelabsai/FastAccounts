@@ -195,11 +195,11 @@ def test_rounding_currency_contact_type_and_idempotency_conflicts(db, ee_org):
     docs, contact, bank, accounts, day, document, create, allocate = setup(db, ee_org)
     service, oid = PrepaymentService(db), ee_org["id"]
     for currency in ["USD", "GBP"]:
-        with pytest.raises(ValueError, match="base currency"):
+        with pytest.raises(ValueError, match="match the bank"):
             service.create(oid, **create, currency=currency)
     usd = docs.create_bank_account(oid, name="Synthetic USD", currency="USD")
-    with pytest.raises(ValueError, match="base currency"):
-        service.create(oid, **{**create, "bank_account_id": usd["id"]})
+    foreign = service.create(oid, **{**create, "bank_account_id": usd["id"], "idempotency_key": "foreign"})
+    assert foreign["currency"] == "USD"
     supplier = docs.create_contact(oid, name="Synthetic supplier only", country_code="EE", contact_type="supplier")
     with pytest.raises(ValueError, match="Contact type"):
         service.create(oid, **{**create, "contact_id": supplier["id"]})
@@ -326,7 +326,7 @@ def test_upgrade_adds_missing_roles_preserves_chart_and_ledger(tmp_path, monkeyp
                        (new_id(), org["id"]))
     before = {table: db.rows(f"SELECT * FROM {table} ORDER BY id") for table in ["organisations", "accounts", "gl_entries", "invoices", "audit_events"]}
     monkeypatch.setattr(database, "MIGRATIONS", original)
-    assert db.migrate() == ["0017_prepayments", "0018_fixed_assets", "0019_master_data_import", "0020_quotes", "0021_periodisation", "0022_payment_links", "0023_analytical_objects", "0024_reminder_rules"]
+    assert db.migrate() == ["0017_prepayments", "0018_fixed_assets", "0019_master_data_import", "0020_quotes", "0021_periodisation", "0022_payment_links", "0023_analytical_objects", "0024_reminder_rules", "0025_fx_realised"]
     assert db.migrate() == []
     after_accounts = db.rows("SELECT * FROM accounts ORDER BY id")
     assert all(r in after_accounts for r in before["accounts"])

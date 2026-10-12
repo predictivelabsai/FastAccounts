@@ -74,6 +74,14 @@ class PeriodisationRepository:
         self.tx.execute('UPDATE purchase_schedules SET funding_batch_id=?,updated_at=? WHERE organisation_id=? AND id=?',
                         (batch_id, utc_now(), self.oid, schedule_id))
 
+    def funding_entries(self, schedule):
+        return self.tx.rows(
+            'SELECT g.debit,g.credit,d.projects_project_id,d.projects_location_id,'
+            'd.projects_person_id,d.projects_object_id FROM gl_entries g '
+            'LEFT JOIN gl_entry_objects d ON d.organisation_id=g.organisation_id AND d.line_id=g.id '
+            'WHERE g.organisation_id=? AND g.posting_batch_id=? AND g.account_id=?',
+            (self.oid, schedule['funding_batch_id'], schedule['deferred_account_id']))
+
     def transition(self, schedule_id, status, notes):
         self.tx.execute('UPDATE purchase_schedules SET status=?,notes=?,updated_at=? WHERE organisation_id=? AND id=?',
                         (status, notes, utc_now(), self.oid, schedule_id))

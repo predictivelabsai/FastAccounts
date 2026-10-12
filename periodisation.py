@@ -17,6 +17,7 @@ from database import get_database
 from ledger import LedgerService, PostingLine
 from periodisation_repository import PeriodisationRepository
 from objects import dimensions
+from fx_settlement import effective_rate
 from objects_repository import DIMENSIONS
 
 
@@ -72,8 +73,6 @@ class PeriodisationService:
                 raise ValueError('This bill already has a purchase schedule')
             if bill['document_type'] != 'bill' or bill['status'] not in {'Draft', 'In Review', 'Approved', 'Part Paid', 'Paid'}:
                 raise ValueError('A valid purchase bill is required')
-            if bill['currency'] != org['base_currency'] or decimal(bill['exchange_rate']) != 1:
-                raise ValueError('Periodisation requires the organisation base currency')
             if not bill['lines'] or any(l['account_type'] != 'Expense' for l in bill['lines']):
                 raise ValueError('Periodisation requires expense bill lines')
             if sum((money(l['recoverable_tax']) for l in bill['lines']), Decimal(0)) != money(bill['tax_total']):
@@ -117,6 +116,7 @@ class PeriodisationService:
                 batch = self.ledger.post(organisation_id=organisation_id, voucher_type='purchase_deferral',
                     voucher_id=schedule_id, voucher_code='DEFER-' + bill['supplier_number'],
                     posting_date=bill['bill_date'], lines=lines, actor=actor, currency=bill['currency'], tx=tx,
+                    exchange_rate=effective_rate(bill['currency'], org['base_currency'], bill['exchange_rate']),
                     allow_inactive_objects=True)
                 repo.funding(schedule_id, batch['id'])
             audit(tx, organisation_id, actor, 'periodisation.created', 'purchase_schedule', schedule_id)
@@ -139,7 +139,7 @@ class PeriodisationService:
             raise ValueError('Purchase periods cannot be posted in advance')
         with self.db.transaction() as tx:
             repo = PeriodisationRepository(tx, organisation_id)
-            repo.lock_organisation()
+            org = repo.lock_organisation()
             schedule = repo.get(schedule_id)
             selected = [p for p in schedule['periods'] if period_id is None or p['id'] == period_id]
             if period_id and not selected:
@@ -170,17 +170,33 @@ class PeriodisationService:
                     if scheduled['id'] == period['id']:
                         break
                     groups = {tags: value - current[tags] for tags, value in groups.items()}
+                rate = effective_rate(bill['currency'], org['base_currency'], bill['exchange_rate'])
+                # Distribute actual funded base cents cumulatively by dimension.
+                # This consumes every funded cent even when period conversion
+                # rounded independently would leave a transit residual.
+                if rate != 1:
+                    funded = defaultdict(Decimal)
+                    for row in repo.funding_entries(schedule):
+                        funded[tuple(row.get(key) for key in DIMENSIONS)] += decimal(row['debit']) - decimal(row['credit'])
+                    original_groups = defaultdict(Decimal)
+                    for line in bill['lines']:
+                        original_groups[tuple(dimensions(line).values())] += money(line['net_amount'])
+                    current = {tags: money(funded[tags] * (original_groups[tags] - groups[tags] + portion) / original_groups[tags])
+                               - money(funded[tags] * (original_groups[tags] - groups[tags]) / original_groups[tags])
+                               for tags, portion in current.items()}
                 lines = []
                 for tags, portion in current.items():
                     if portion:
                         values = dict(zip(DIMENSIONS, tags))
+                        if rate != 1:
+                            values['transaction_currency'] = org['base_currency']
                         lines.extend([
                             PostingLine(schedule['expense_account_id'], debit=portion, source_line_type='purchase_period', source_line_id=period['id'], **values),
                             PostingLine(schedule['deferred_account_id'], credit=portion, source_line_type='purchase_period', source_line_id=period['id'], **values)])
                 batch = self.ledger.post(organisation_id=organisation_id, voucher_type='purchase_period',
                     voucher_id=period['id'], voucher_code='PER-' + bill['supplier_number'] + '-' + period['period_date'],
                     posting_date=period['period_date'], currency=schedule['currency'], actor=actor, tx=tx,
-                    lines=lines, allow_inactive_objects=True)
+                    lines=lines, exchange_rate=rate, allow_inactive_objects=True)
                 repo.posted(schedule_id, period['id'], batch['id'])
                 audit(tx, organisation_id, actor, 'periodisation.posted', 'purchase_schedule_period', period['id'], {'posting_batch_id': batch['id']})
             result = repo.get(schedule_id)
