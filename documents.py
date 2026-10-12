@@ -18,6 +18,7 @@ import einvoice
 from core_utils import audit, db_number, decimal, money, new_id, sha256_bytes, utc_now
 from database import Database, get_database
 from ledger import LedgerService, PostingLine
+from periodisation_repository import PeriodisationRepository
 
 
 class EInvoiceAlreadyImported(ValueError):
@@ -433,9 +434,24 @@ class DocumentService:
     def approve_bill(self, bill_id: str, *, actor: str) -> dict:
         with self.db.transaction() as tx:
             bill = tx.one("SELECT * FROM bills WHERE id=?", (bill_id,))
+            if bill:
+                period_repo = PeriodisationRepository(tx, bill['organisation_id'])
+                period_repo.lock_organisation()
+                bill = tx.one("SELECT * FROM bills WHERE id=? AND organisation_id=?", (bill_id, bill['organisation_id']))
             if not bill or bill["status"] not in {"Draft", "In Review"}:
                 raise ValueError("Only a draft or in-review bill can be approved")
             lines = tx.rows("SELECT * FROM bill_lines WHERE bill_id=? ORDER BY line_number", (bill_id,))
+            schedule = period_repo.for_bill(bill_id)
+            if schedule and schedule['status'] == 'Cancelled':
+                schedule = None
+            if schedule:
+                if (money(schedule['net_amount']) != money(bill['subtotal']) or schedule['currency'] != bill['currency']
+                        or decimal(bill['exchange_rate']) != 1 or bill['document_type'] != 'bill'
+                        or sum((money(l['recoverable_tax']) for l in lines), Decimal(0)) != money(bill['tax_total'])):
+                    raise ValueError('Bill no longer matches its purchase schedule')
+                deferred = period_repo.account(schedule['deferred_account_id'])
+                if not deferred or deferred['account_type'] != 'Asset':
+                    raise ValueError('Active deferred account is required')
             ap = self._role_account(tx, bill["organisation_id"], "AP")
             input_vat = self._role_account(tx, bill["organisation_id"], "INPUT_VAT")
             is_credit = bill["document_type"] == "supplier_credit"
@@ -443,7 +459,7 @@ class DocumentService:
             for line in lines:
                 amount = money(line["net_amount"])
                 postings.append(PostingLine(
-                    account_id=line["account_id"], debit=Decimal("0") if is_credit else amount,
+                    account_id=schedule['deferred_account_id'] if schedule else line["account_id"], debit=Decimal("0") if is_credit else amount,
                     credit=amount if is_credit else Decimal("0"), contact_id=bill["contact_id"],
                     memo=bill["supplier_number"], source_line_type="bill", source_line_id=bill_id,
                 ))
@@ -475,6 +491,8 @@ class DocumentService:
                 exchange_rate=decimal(bill["exchange_rate"]), tx=tx,
             )
             now = utc_now()
+            if schedule:
+                period_repo.funding(schedule['id'], batch['id'])
             tx.execute(
                 "UPDATE bills SET status='Approved',posting_batch_id=?,approved_at=?,approved_by=?,updated_at=? WHERE id=?",
                 (batch["id"], now, actor, now, bill_id),

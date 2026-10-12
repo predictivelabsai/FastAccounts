@@ -1526,5 +1526,62 @@
     "hosted_title": "Majuta meie juures",
     "hosted_price": "1 € / kuu",
     "hosted_body": "Haldame toodet sinu eest FastSME taristus. 1 € toote kohta kuus."
+  },
+  "periodisation": {
+    "nav": {
+      "periodised": "Periodiseeritud"
+    },
+    "views": {
+      "periodised": "Periodiseeritud"
+    },
+    "workspace": {
+      "Periodised": "Periodiseeritud",
+      "Spread purchase expenses across accounting periods.": "Jaota perioodilised ostud arvestusperioodide vahel.",
+      "New purchase schedule": "Loo ostu periodiseerimise kava",
+      "Purchase periods": "Ostu perioodid",
+      "Activate schedule": "Aktiveeri kava",
+      "Post due portions": "Kanna saabunud osad kulusse",
+      "Cancel future portions": "Tühista tulevased osad",
+      "Start period": "Algusperiood",
+      "Progress": "Edenemine",
+      "Number of periods": "Perioodide arv",
+      "Cent remainder": "Sendijääk",
+      "First period": "Esimene periood",
+      "Last period": "Viimane periood",
+      "Net amount": "Netosumma",
+      "Deferred cost awaiting review": "Ülevaatust ootav periodiseeritud kulu",
+      "Create a purchase bill before adding a schedule.": "Loo enne kava lisamist ostuarve.",
+      "VAT stays on the original bill. Portions transfer net expense only.": "Käibemaks jääb algsele ostuarvele. Osadega kantakse kulusse ainult netosumma.",
+      "Post balanced net expense transfers for all due portions. VAT stays on the original bill.": "Kanna kõik saabunud netokulu osad tasakaalus kannetega kulusse. Käibemaks jääb algsele ostuarvele.",
+      "Future portions stop. Any remaining deferred cost needs accountant review.": "Tulevased osad peatatakse. Allesjäänud periodiseeritud kulu vajab raamatupidaja ülevaatust.",
+      "Cancelled": "Tühistatud",
+      "Schedule amount must be positive, finite and in whole cents": "Kava summa peab olema positiivne ja lõplik täissentides",
+      "Number of periods must be between 1 and 120": "Perioodide arv peab olema 1 kuni 120",
+      "Invalid purchase schedule configuration": "Ostu periodiseerimise kava seadistus on vigane",
+      "This bill already has a purchase schedule": "Sellel ostuarvel on juba periodiseerimise kava",
+      "A valid purchase bill is required": "Vaja on kehtivat ostuarvet",
+      "Periodisation requires the organisation base currency": "Periodiseerimine nõuab ettevõtte põhivaluutat",
+      "Periodisation requires expense bill lines": "Periodiseerimine nõuab kulukontoga ostuarve ridu",
+      "Periodisation requires fully recoverable VAT or no VAT": "Periodiseerimine nõuab täielikult mahaarvatavat käibemaksu või käibemaksuta ostu",
+      "Active expense and deferred accounts in this organisation are required": "Vaja on selle ettevõtte aktiivset kulukontot ja periodiseerimise kontot",
+      "Schedule total must equal the bill net amount": "Kava kogusumma peab võrduma ostuarve netosummaga",
+      "Each purchase period must contain at least one penny or cent": "Igas ostuperioodis peab olema vähemalt üks sent",
+      "Purchase periods cannot precede the bill date": "Ostu perioodid ei või eelneda ostuarve kuupäevale",
+      "The original bill posting must be unreversed": "Algne ostuarve kanne ei tohi olla tühistatud",
+      "Only Draft purchase schedules can be activated or edited": "Aktiveerida või muuta saab ainult mustandkavasid",
+      "Purchase periods cannot be posted in advance": "Ostu perioode ei saa ette kulusse kanda",
+      "Purchase period not found": "Ostu perioodi ei leitud",
+      "Purchase schedule not found": "Ostu periodiseerimise kava ei leitud",
+      "Only Active purchase schedules can post periods": "Perioode saab kulusse kanda ainult aktiivse kava alusel",
+      "Approve the bill and retain unreversed funding before posting periods": "Enne perioodide kulusse kandmist kinnita ostuarve ja säilita tühistamata algkanded",
+      "Purchase period is not due": "Ostu periood ei ole veel saabunud",
+      "Completed purchase schedules cannot be cancelled": "Lõpetatud ostukavasid ei saa tühistada",
+      "Post due periods before cancelling future periods": "Enne tulevaste perioodide tühistamist kanna saabunud perioodid kulusse",
+      "Bill no longer matches its purchase schedule": "Ostuarve ei vasta enam periodiseerimise kavale",
+      "Active deferred account is required": "Vaja on aktiivset periodiseerimise kontot",
+      "Purchase schedule fields cannot be null": "Ostukava väljad ei või olla tühiväärtusega",
+      "Purchase period is no longer pending": "Ostu periood ei ole enam ootel",
+      "Purchase periodisation failed": "Ostu periodiseerimine ebaõnnestus"
+    }
   }
 }

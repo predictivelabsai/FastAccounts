@@ -1526,5 +1526,62 @@
     "hosted_title": "Mitiniet pie mums",
     "hosted_price": "1 € / mēnesī",
     "hosted_body": "Mēs darbinām produktu jūsu vietā FastSME pārvaldītā infrastruktūrā. 1 € par produktu mēnesī."
+  },
+  "periodisation": {
+    "nav": {
+      "periodised": "Periodizēts"
+    },
+    "views": {
+      "periodised": "Periodizēts"
+    },
+    "workspace": {
+      "Periodised": "Periodizēts",
+      "Spread purchase expenses across accounting periods.": "Sadaliet pirkumu izmaksas pa grāmatvedības periodiem.",
+      "New purchase schedule": "Jauns pirkuma grafiks",
+      "Purchase periods": "Pirkuma periodi",
+      "Activate schedule": "Aktivizēt grafiku",
+      "Post due portions": "Grāmatot pienākušās daļas",
+      "Cancel future portions": "Atcelt nākamās daļas",
+      "Start period": "Sākuma periods",
+      "Progress": "Progress",
+      "Number of periods": "Periodu skaits",
+      "Cent remainder": "Centu atlikums",
+      "First period": "Pirmais periods",
+      "Last period": "Pēdējais periods",
+      "Net amount": "Neto summa",
+      "Deferred cost awaiting review": "Atliktās izmaksas pārskatīšanai",
+      "Create a purchase bill before adding a schedule.": "Pirms grafika pievienošanas izveidojiet pirkuma rēķinu.",
+      "VAT stays on the original bill. Portions transfer net expense only.": "PVN paliek sākotnējā rēķinā. Daļās pārnes tikai neto izmaksas.",
+      "Post balanced net expense transfers for all due portions. VAT stays on the original bill.": "Grāmatojiet līdzsvarotus neto izmaksu pārnesumus visām pienākušajām daļām. PVN paliek sākotnējā rēķinā.",
+      "Future portions stop. Any remaining deferred cost needs accountant review.": "Nākamās daļas tiek apturētas. Atlikušās atliktās izmaksas jāpārskata grāmatvedim.",
+      "Cancelled": "Atcelts",
+      "Schedule amount must be positive, finite and in whole cents": "Grafika summai jābūt pozitīvai, galīgai un veselos centos",
+      "Number of periods must be between 1 and 120": "Periodu skaitam jābūt no 1 līdz 120",
+      "Invalid purchase schedule configuration": "Nederīga pirkuma grafika konfigurācija",
+      "This bill already has a purchase schedule": "Šim rēķinam jau ir pirkuma grafiks",
+      "A valid purchase bill is required": "Nepieciešams derīgs pirkuma rēķins",
+      "Periodisation requires the organisation base currency": "Periodizācijai nepieciešama uzņēmuma pamatvalūta",
+      "Periodisation requires expense bill lines": "Periodizācijai nepieciešamas izmaksu rēķina rindas",
+      "Periodisation requires fully recoverable VAT or no VAT": "Periodizācijai nepieciešams pilnībā atskaitāms PVN vai pirkums bez PVN",
+      "Active expense and deferred accounts in this organisation are required": "Nepieciešami aktīvi šī uzņēmuma izmaksu un atlikto izmaksu konti",
+      "Schedule total must equal the bill net amount": "Grafika kopsummai jāatbilst rēķina neto summai",
+      "Each purchase period must contain at least one penny or cent": "Katrā pirkuma periodā jābūt vismaz vienam centam",
+      "Purchase periods cannot precede the bill date": "Pirkuma periodi nevar būt pirms rēķina datuma",
+      "The original bill posting must be unreversed": "Sākotnējais rēķina grāmatojums nedrīkst būt reversēts",
+      "Only Draft purchase schedules can be activated or edited": "Aktivizēt vai rediģēt var tikai melnraksta grafikus",
+      "Purchase periods cannot be posted in advance": "Pirkuma periodus nevar grāmatot iepriekš",
+      "Purchase period not found": "Pirkuma periods nav atrasts",
+      "Purchase schedule not found": "Pirkuma grafiks nav atrasts",
+      "Only Active purchase schedules can post periods": "Periodus var grāmatot tikai aktīvos grafikos",
+      "Approve the bill and retain unreversed funding before posting periods": "Pirms periodu grāmatošanas apstipriniet rēķinu un saglabājiet nereversētus sākotnējos ierakstus",
+      "Purchase period is not due": "Pirkuma periods vēl nav pienācis",
+      "Completed purchase schedules cannot be cancelled": "Pabeigtus pirkuma grafikus nevar atcelt",
+      "Post due periods before cancelling future periods": "Pirms nākamo periodu atcelšanas grāmatojiet pienākušos periodus",
+      "Bill no longer matches its purchase schedule": "Rēķins vairs neatbilst pirkuma grafikam",
+      "Active deferred account is required": "Nepieciešams aktīvs atlikto izmaksu konts",
+      "Purchase schedule fields cannot be null": "Pirkuma grafika lauki nevar būt null",
+      "Purchase period is no longer pending": "Pirkuma periods vairs nav gaidīšanā",
+      "Purchase periodisation failed": "Pirkuma periodizācija neizdevās"
+    }
   }
 }

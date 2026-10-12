@@ -22,6 +22,7 @@ from connectors.registry import provider_metadata
 from database import get_database
 from documents import DocumentService, EInvoiceAlreadyImported
 from quotes import QuoteService
+from periodisation import PeriodisationService
 from statements import StatementService
 from cash_flow import CashFlowService
 from excel_export import (employees_workbook, general_ledger_workbook,
@@ -113,6 +114,37 @@ class QuotePatch(BaseModel):
         if value is None:
             raise ValueError('Quote fields cannot be null')
         return value
+
+
+class PurchaseScheduleIn(BaseModel):
+    model_config = {'extra': 'forbid'}
+    bill_id: str
+    expense_account_id: str
+    start_period: str
+    number_of_periods: int = Field(ge=1, le=120, strict=True)
+    amount: Decimal | None = None
+    split_rule: Literal['equal_first', 'equal_last'] = 'equal_first'
+    status: Literal['Draft', 'Active'] = 'Active'
+    notes: str = ''
+
+
+class PurchaseSchedulePatch(BaseModel):
+    model_config = {'extra': 'forbid'}
+    status: Literal['Active'] | None = None
+    notes: str | None = None
+
+    @field_validator('status', 'notes')
+    @classmethod
+    def reject_null(cls, value):
+        if value is None:
+            raise ValueError('Purchase schedule fields cannot be null')
+        return value
+
+
+class PurchasePeriodPostIn(BaseModel):
+    model_config = {'extra': 'forbid'}
+    as_at: str | None = None
+    period_id: str | None = None
 
 
 class BillIn(BaseModel):
@@ -495,6 +527,42 @@ def discard_master_data_import(organisation_id: str, batch_id: str, user: User =
 def create_contact(organisation_id: str, payload: ContactIn, user: User = Depends(require_csrf)):
     _require(organisation_id, user, WRITE_ROLES)
     return DocumentService().create_contact(organisation_id, **payload.model_dump())
+
+
+@api.get('/organisations/{organisation_id}/purchase-schedules')
+def list_purchase_schedules(organisation_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, {'owner', 'administrator', 'accountant', 'approver', 'viewer'})
+    return jsonable_encoder(PeriodisationService().list(organisation_id), custom_encoder={Decimal: str})
+
+
+@api.get('/organisations/{organisation_id}/purchase-schedules/{schedule_id}')
+def get_purchase_schedule(organisation_id: str, schedule_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, {'owner', 'administrator', 'accountant', 'approver', 'viewer'})
+    return jsonable_encoder(PeriodisationService().get(organisation_id, schedule_id), custom_encoder={Decimal: str})
+
+
+@api.post('/organisations/{organisation_id}/purchase-schedules', status_code=201)
+def create_purchase_schedule(organisation_id: str, payload: PurchaseScheduleIn, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return jsonable_encoder(PeriodisationService().create(organisation_id, actor=user.email, **payload.model_dump()), custom_encoder={Decimal: str})
+
+
+@api.patch('/organisations/{organisation_id}/purchase-schedules/{schedule_id}')
+def update_purchase_schedule(organisation_id: str, schedule_id: str, payload: PurchaseSchedulePatch, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return jsonable_encoder(PeriodisationService().update(organisation_id, schedule_id, actor=user.email, **payload.model_dump(exclude_unset=True)), custom_encoder={Decimal: str})
+
+
+@api.post('/organisations/{organisation_id}/purchase-schedules/{schedule_id}/post')
+def post_purchase_periods(organisation_id: str, schedule_id: str, payload: PurchasePeriodPostIn | None = None, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return jsonable_encoder(PeriodisationService().post_due(organisation_id, schedule_id, actor=user.email, **(payload.model_dump() if payload else {})), custom_encoder={Decimal: str})
+
+
+@api.post('/organisations/{organisation_id}/purchase-schedules/{schedule_id}/cancel')
+def cancel_purchase_schedule(organisation_id: str, schedule_id: str, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return jsonable_encoder(PeriodisationService().cancel(organisation_id, schedule_id, actor=user.email), custom_encoder={Decimal: str})
 
 
 @api.get("/organisations/{organisation_id}/quotes")

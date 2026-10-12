@@ -1634,5 +1634,62 @@
     "hosted_title": "Host with us",
     "hosted_price": "€1 / month",
     "hosted_body": "We run the product for you on FastSME-managed infrastructure. €1 per product per month."
+  },
+  "periodisation": {
+    "nav": {
+      "periodised": "Periodised"
+    },
+    "views": {
+      "periodised": "Periodised"
+    },
+    "workspace": {
+      "Periodised": "Periodised",
+      "Spread purchase expenses across accounting periods.": "Spread purchase expenses across accounting periods.",
+      "New purchase schedule": "New purchase schedule",
+      "Purchase periods": "Purchase periods",
+      "Activate schedule": "Activate schedule",
+      "Post due portions": "Post due portions",
+      "Cancel future portions": "Cancel future portions",
+      "Start period": "Start period",
+      "Progress": "Progress",
+      "Number of periods": "Number of periods",
+      "Cent remainder": "Cent remainder",
+      "First period": "First period",
+      "Last period": "Last period",
+      "Net amount": "Net amount",
+      "Deferred cost awaiting review": "Deferred cost awaiting review",
+      "Create a purchase bill before adding a schedule.": "Create a purchase bill before adding a schedule.",
+      "VAT stays on the original bill. Portions transfer net expense only.": "VAT stays on the original bill. Portions transfer net expense only.",
+      "Post balanced net expense transfers for all due portions. VAT stays on the original bill.": "Post balanced net expense transfers for all due portions. VAT stays on the original bill.",
+      "Future portions stop. Any remaining deferred cost needs accountant review.": "Future portions stop. Any remaining deferred cost needs accountant review.",
+      "Cancelled": "Cancelled",
+      "Schedule amount must be positive, finite and in whole cents": "Schedule amount must be positive, finite and in whole cents",
+      "Number of periods must be between 1 and 120": "Number of periods must be between 1 and 120",
+      "Invalid purchase schedule configuration": "Invalid purchase schedule configuration",
+      "This bill already has a purchase schedule": "This bill already has a purchase schedule",
+      "A valid purchase bill is required": "A valid purchase bill is required",
+      "Periodisation requires the organisation base currency": "Periodisation requires the organisation base currency",
+      "Periodisation requires expense bill lines": "Periodisation requires expense bill lines",
+      "Periodisation requires fully recoverable VAT or no VAT": "Periodisation requires fully recoverable VAT or no VAT",
+      "Active expense and deferred accounts in this organisation are required": "Active expense and deferred accounts in this organisation are required",
+      "Schedule total must equal the bill net amount": "Schedule total must equal the bill net amount",
+      "Each purchase period must contain at least one penny or cent": "Each purchase period must contain at least one penny or cent",
+      "Purchase periods cannot precede the bill date": "Purchase periods cannot precede the bill date",
+      "The original bill posting must be unreversed": "The original bill posting must be unreversed",
+      "Only Draft purchase schedules can be activated or edited": "Only Draft purchase schedules can be activated or edited",
+      "Purchase periods cannot be posted in advance": "Purchase periods cannot be posted in advance",
+      "Purchase period not found": "Purchase period not found",
+      "Purchase schedule not found": "Purchase schedule not found",
+      "Only Active purchase schedules can post periods": "Only Active purchase schedules can post periods",
+      "Approve the bill and retain unreversed funding before posting periods": "Approve the bill and retain unreversed funding before posting periods",
+      "Purchase period is not due": "Purchase period is not due",
+      "Completed purchase schedules cannot be cancelled": "Completed purchase schedules cannot be cancelled",
+      "Post due periods before cancelling future periods": "Post due periods before cancelling future periods",
+      "Bill no longer matches its purchase schedule": "Bill no longer matches its purchase schedule",
+      "Active deferred account is required": "Active deferred account is required",
+      "Purchase schedule fields cannot be null": "Purchase schedule fields cannot be null",
+      "Purchase period is no longer pending": "Purchase period is no longer pending",
+      "Purchase periodisation failed": "Purchase periodisation failed"
+    }
   }
 }

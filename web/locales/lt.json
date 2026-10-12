@@ -1526,5 +1526,62 @@
     "hosted_title": "Priglobkite pas mus",
     "hosted_price": "1 € / mėnesį",
     "hosted_body": "Mes prižiūrime produktą FastSME valdomoje infrastruktūroje. 1 € už produktą per mėnesį."
+  },
+  "periodisation": {
+    "nav": {
+      "periodised": "Periodizuota"
+    },
+    "views": {
+      "periodised": "Periodizuota"
+    },
+    "workspace": {
+      "Periodised": "Periodizuota",
+      "Spread purchase expenses across accounting periods.": "Paskirstykite pirkimo sąnaudas apskaitos laikotarpiams.",
+      "New purchase schedule": "Naujas pirkimo grafikas",
+      "Purchase periods": "Pirkimo laikotarpiai",
+      "Activate schedule": "Aktyvuoti grafiką",
+      "Post due portions": "Registruoti mokėtinas dalis",
+      "Cancel future portions": "Atšaukti būsimas dalis",
+      "Start period": "Pradžios laikotarpis",
+      "Progress": "Pažanga",
+      "Number of periods": "Laikotarpių skaičius",
+      "Cent remainder": "Centų likutis",
+      "First period": "Pirmasis laikotarpis",
+      "Last period": "Paskutinis laikotarpis",
+      "Net amount": "Grynoji suma",
+      "Deferred cost awaiting review": "Peržiūros laukiančios atidėtos sąnaudos",
+      "Create a purchase bill before adding a schedule.": "Prieš pridėdami grafiką sukurkite pirkimo sąskaitą.",
+      "VAT stays on the original bill. Portions transfer net expense only.": "PVM lieka pradinėje sąskaitoje. Dalimis perkeliamos tik grynosios sąnaudos.",
+      "Post balanced net expense transfers for all due portions. VAT stays on the original bill.": "Registruokite subalansuotus visų suėjusių dalių grynųjų sąnaudų perkėlimus. PVM lieka pradinėje sąskaitoje.",
+      "Future portions stop. Any remaining deferred cost needs accountant review.": "Būsimos dalys sustabdomos. Likusias atidėtas sąnaudas turi peržiūrėti buhalteris.",
+      "Cancelled": "Atšaukta",
+      "Schedule amount must be positive, finite and in whole cents": "Grafiko suma turi būti teigiama, baigtinė ir pilnais centais",
+      "Number of periods must be between 1 and 120": "Laikotarpių skaičius turi būti nuo 1 iki 120",
+      "Invalid purchase schedule configuration": "Netinkama pirkimo grafiko konfigūracija",
+      "This bill already has a purchase schedule": "Ši sąskaita jau turi pirkimo grafiką",
+      "A valid purchase bill is required": "Reikalinga galiojanti pirkimo sąskaita",
+      "Periodisation requires the organisation base currency": "Periodizacijai reikalinga įmonės pagrindinė valiuta",
+      "Periodisation requires expense bill lines": "Periodizacijai reikalingos sąnaudų sąskaitos eilutės",
+      "Periodisation requires fully recoverable VAT or no VAT": "Periodizacijai reikalingas visiškai atskaitomas PVM arba pirkimas be PVM",
+      "Active expense and deferred accounts in this organisation are required": "Reikalingos aktyvios šios įmonės sąnaudų ir atidėtų sąnaudų sąskaitos",
+      "Schedule total must equal the bill net amount": "Grafiko suma turi sutapti su sąskaitos grynąja suma",
+      "Each purchase period must contain at least one penny or cent": "Kiekviename pirkimo laikotarpyje turi būti bent vienas centas",
+      "Purchase periods cannot precede the bill date": "Pirkimo laikotarpiai negali būti ankstesni už sąskaitos datą",
+      "The original bill posting must be unreversed": "Pradinės sąskaitos įrašas negali būti anuliuotas",
+      "Only Draft purchase schedules can be activated or edited": "Aktyvuoti arba redaguoti galima tik juodraščio grafikus",
+      "Purchase periods cannot be posted in advance": "Pirkimo laikotarpių negalima registruoti iš anksto",
+      "Purchase period not found": "Pirkimo laikotarpis nerastas",
+      "Purchase schedule not found": "Pirkimo grafikas nerastas",
+      "Only Active purchase schedules can post periods": "Laikotarpius galima registruoti tik aktyviuose grafikuose",
+      "Approve the bill and retain unreversed funding before posting periods": "Prieš registruodami laikotarpius patvirtinkite sąskaitą ir išlaikykite neanuliuotus pradinius įrašus",
+      "Purchase period is not due": "Pirkimo laikotarpis dar nesuėjo",
+      "Completed purchase schedules cannot be cancelled": "Baigtų pirkimo grafikų negalima atšaukti",
+      "Post due periods before cancelling future periods": "Prieš atšaukdami būsimus laikotarpius registruokite suėjusius laikotarpius",
+      "Bill no longer matches its purchase schedule": "Sąskaita nebeatitinka pirkimo grafiko",
+      "Active deferred account is required": "Reikalinga aktyvi atidėtų sąnaudų sąskaita",
+      "Purchase schedule fields cannot be null": "Pirkimo grafiko laukai negali būti null",
+      "Purchase period is no longer pending": "Pirkimo laikotarpis nebelaukia",
+      "Purchase periodisation failed": "Pirkimo periodizacija nepavyko"
+    }
   }
 }

@@ -861,7 +861,7 @@ def workspace_page(user: dict, lang: str = "en"):
     display_name = user.get("name") or user.get("email") or ""
     groups = [
         ("bureau", [("overview", "overview")]),
-        ("documents", [("invoices", "invoices"), ("quotes", "quotes"), ("bills", "bills"), ("contacts", "contacts")]),
+        ("documents", [("invoices", "invoices"), ("quotes", "quotes"), ("bills", "bills"), ("periodised", "periodised"), ("contacts", "contacts")]),
         ("automation", [("recurring", "recurring")]),
         ("money", [("banking", "banking")]),
         ("accounting", [("accounting", "accounting"), ("cash-flow", "cash_flow"), ("fixed-assets", "fixed_assets"), ("tax", "tax")]),

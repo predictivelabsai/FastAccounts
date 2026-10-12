@@ -1210,3 +1210,38 @@ pending.
   opt-in PostgreSQL checks. No live provider calls were made.
 - [ ] Deferred: quote email delivery, scheduling the daily expiry helper and
   production UAT. Mark sent records status only and says so in the interface.
+
+### Purchase periodisation (2026-10-12)
+
+- [x] Deliver P1 item 8 with additive, rerunnable migration `0021_periodisation`,
+  tenant-scoped purchase schedules and periods, composite foreign keys, CHECK
+  constraints and a deferred-cost role in both UK and Estonian charts. Preserve
+  existing chart codes and roles, and update the inline CI migration list and
+  all explicit migration expectations.
+- [x] Schedule a whole purchase bill's net cost in 1 to 120 monthly portions,
+  with exact Decimal amounts and deterministic first/last cent remainder.
+  Defer net cost at draft-bill approval, or add a balanced reclassification for
+  an already posted bill without editing the original bill or journal lines.
+  Each portion posts one immutable balanced expense-to-deferred-cost batch.
+- [x] Keep full input VAT deduction on the original bill. Period portions carry
+  no VAT and do not change AP or payment allocation. Support base-currency
+  expense bills with fully recoverable VAT or no VAT.
+- [x] Add Draft activation, due-period or catch-up posting, progress, retries,
+  organisation row locking, locked-period rejection, audit events and daily
+  automation-worker failure isolation. Cancel only future Pending portions after
+  due portions are posted; retain posted journals and any remaining funded
+  deferred balance for an explicit accountant-reviewed adjustment.
+- [x] Add viewer-readable GET and write-role/CSRF-protected API routes with exact
+  decimal-string responses. Add Periodised under Documents with creation,
+  period details, progress and posting/cancellation confirmations. Append a
+  feature translation block at the end of all four locale files, preserving
+  every existing key and translation.
+- Validation: Python 3.12.14, `python -m pytest -q`:
+  `881 passed, 4 skipped in 652.14s (0:10:52)`. All 49 new service, API, migration
+  and four-locale browser checks passed. The skips are existing opt-in PostgreSQL
+  checks. Tests used synthetic data and no live provider calls. JavaScript
+  syntax, focused Python compilation, locale preservation and diff checks passed.
+- [ ] Deferred: production accountant UAT, partial VAT recovery, foreign currency,
+  explicit irregular period lists, monetary schedule editing and coordinated
+  bill/deferral/portion reversals or cancellation settlement. See
+  `docs/specs/purchase-periodisation.md` for the ledger and VAT decisions.
