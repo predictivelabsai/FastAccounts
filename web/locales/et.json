@@ -1369,7 +1369,7 @@
     "Other": "Muud",
     "Liquid account detail": "Rahakontode üksikasjad",
     "Classification": "Liigitus",
-    "Liquid accounts with the BANK role only. Internal transfers are excluded from totals.": "Ainult BANK-rolliga rahakontod. Sisemised ülekanded ei sisaldu kogusummades.",
+    "Liquid accounts with the BANK role only. Internal transfers are excluded from totals.": "Ainult pangakontod (BANK-roll). Sisemised ülekanded ei sisaldu kogusummades.",
     "Report period": "Aruandeperiood",
     "Date range": "Kuupäevavahemik",
     "Quarter": "Kvartal",
