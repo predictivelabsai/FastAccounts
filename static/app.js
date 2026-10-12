@@ -891,7 +891,7 @@
         return;
       const draw = () => {
         document.getElementById("contacts-table").innerHTML = table(
-          ["Name", "Type", "Email", "Country", "VAT number"],
+          ["Name", "Type", "Email", "Country", "VAT number", "Actions"],
           rows
             .filter(
               (x) =>
@@ -906,6 +906,7 @@
                 td(esc(x.email || "—")),
                 td(esc(x.country_code)),
                 td(esc(x.vat_no || "—")),
+                td(button("Statement of account", "statement", false, `data-id="${x.id}"`)),
               ]),
             ),
           button("New customer", "customer"),
@@ -913,6 +914,7 @@
         bindActions(content, {
           customer: () => contactDialog("customer"),
           supplier: () => contactDialog("supplier"),
+          statement: (b) => statementDialog(rows.find((x) => x.id === b.dataset.id)),
         });
       };
       draw();
@@ -1927,6 +1929,25 @@
         );
       });
     return `<div class="kpis">${summary.map(([k, v]) => kpi(k, money(v))).join("")}</div>${table(["Code", "Account", ["Debit"], ["Credit"], ["Balance"]], rows)}`;
+  }
+  async function statementDialog(contact) {
+    const base = path("");
+    const today = new Date().toISOString().slice(0, 10);
+    const d = dialog("Statement of account", `<p>${esc(contact.name)}</p>` + form(
+      field("Statement start date", "date_from", today.slice(0, 4) + "-01-01", "date", "required") +
+      field("Statement end date", "date_to", today, "date", "required") +
+      select("Type", "side", [["customer", t("Customer")], ["supplier", t("Supplier")]],
+        contact.contact_type === "supplier" ? "supplier" : "customer") +
+      (org.base_currency === "EUR" ? "" : field("EUR per unit of base currency", "eur_rate", "", "number", 'required min="0.0000000001" step="any"')),
+      "Download statement PDF"));
+    bindForm(d, async (data) => {
+      const query = new URLSearchParams(data).toString();
+      // Validate through the same service before navigating to the PDF download.
+      await api(`${base}/contacts/${contact.id}/statement?${query}`);
+      if (base !== path("")) return;
+      window.location.assign(`/api${base}/contacts/${contact.id}/statement.pdf?${query}`);
+      closeDialog(d);
+    });
   }
   async function contactDialog(type) {
     const url = path("/contacts");

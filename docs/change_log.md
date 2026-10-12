@@ -4,6 +4,43 @@ Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as
 delivered.
 
+## 2026-10-12: Customer and supplier statements of account (PR6)
+
+### Added
+
+- Added `statements.py` for historical contact AR/AP statements with opening,
+  chronological movements and closing balances. Include ledger-only opening
+  receivables/payables and original/reversal batches; filter every ledger join
+  by organisation. Customer and supplier statements remain separate.
+- Added Decimal base and per-transaction-currency balances, plus EUR presentation
+  amounts. For non-EUR base currencies, require an explicit positive rate per
+  base unit and show it on the PDF. Amounts are rounded per movement so opening
+  plus movements equals closing. No historical rate is inferred or fetched.
+- Added authorised JSON and PDF GET routes under organisation contacts. The
+  existing web API mount serves the Contacts download button and date/side/rate
+  dialog using session authentication. PDFs use country-specific Estonian or
+  English labels, embedded Unicode fonts, wrapping and repeated table headers.
+  Added UI and validation copy to all four locales without changing old keys.
+  No migration or configuration change is required.
+
+### Validation and boundaries
+
+- Targeted pytest checks cover historical arithmetic, reversals, opening imports,
+  real invoices/bills/payments, currencies, tenant/contact isolation, empty
+  statements, invalid inputs and authorised mounted web downloads. Playwright
+  checks English/GBP and Estonian/EUR dialogs, error recovery, downloads and
+  mobile layout using intercepted requests. A synthetic nine-page PDF was
+  rendered and visually checked for wrapping, Unicode text and closing totals.
+- Validation: the statement, browser, document, ledger, opening-balance, locale
+  and API pytest files passed with 106 tests and one existing dependency
+  deprecation warning. Python compilation, JavaScript syntax and diff checks
+  passed. Tests used synthetic data and no live provider calls.
+- Statements reproduce recorded control-account amounts. The explicit EUR rate
+  is a presentation conversion, not historical valuation or FX revaluation.
+  Accountant UAT and historical EUR rate sourcing remain pending; upstream
+  currency posting, ageing and opening-item allocation changes are outside this
+  task. Python 3.14.6 was used locally because Python 3.12 is unavailable.
+
 ## 2026-10-11: Estonian e-invoice export and purchase inbox (PR3)
 
 ### Added

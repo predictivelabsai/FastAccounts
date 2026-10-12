@@ -969,3 +969,31 @@ pending.
   PostgreSQL skips. Targeted tax/locale checks, compilation and diff checks passed.
   Tests used synthetic data and no live providers. Python 3.14.6 was used because
   Python 3.12 is unavailable on this machine.
+
+## PR6: Customer and supplier statements of account (2026-10-12)
+
+- [x] Add tenant-scoped contact statements from posted and reversed AR/AP ledger
+  entries. Opening balances include earlier contact-tagged open items; the
+  selected range includes both endpoints. Keep customer and supplier sides
+  separate, with positive debts/liabilities and signed movements.
+- [x] Return Decimal base amounts and separate running balances for each
+  transaction currency. Include EUR presentation amounts without changing
+  posted entries. EUR organisations use rate 1; other base currencies require
+  an explicit positive EUR-per-base-unit presentation rate, shown in the PDF.
+  The repository has no historical EUR rate store; this is a presentation
+  conversion of recorded ledger amounts, not foreign-exchange revaluation.
+- [x] Add authorised JSON and PDF contact routes, available through the web
+  application's existing /api mount. Add a Contacts download dialog with range,
+  customer/supplier selection and a EUR rate required for non-EUR organisations,
+  translated in all four locales. PDFs use Estonian saldoteatis labels for EE and English elsewhere,
+  Unicode fonts, wrapped descriptions and repeated table headers. No migration.
+- [x] Verify arithmetic, date boundaries, opening imports, payments, reversals,
+  currency separation, tenant/contact isolation, invalid input and PDF bytes.
+  Browser regressions cover English/GBP and Estonian/EUR downloads, validation
+  errors and mobile dialog layout with intercepted requests.
+- [ ] Accountant UAT and historical exchange-rate sourcing remain follow-ups.
+  Statements reproduce existing postings; they do not repair upstream currency
+  conversion or change document ageing and opening-item allocation workflows.
+- Validation: seven relevant pytest files passed with 106 tests and one existing
+  dependency warning on Python 3.14.6. Compilation, JavaScript syntax and diff
+  checks passed; a synthetic nine-page PDF was rendered and visually reviewed.
