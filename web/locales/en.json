@@ -1691,5 +1691,28 @@
       "Purchase period is no longer pending": "Purchase period is no longer pending",
       "Purchase periodisation failed": "Purchase periodisation failed"
     }
+  },
+  "payment_links": {
+    "nav": {
+      "payment_methods": "Payment methods"
+    },
+    "workspace": {
+      "Payment methods": "Payment methods",
+      "Payment links": "Payment links",
+      "Payment link": "Payment link",
+      "Copy link": "Copy link",
+      "Link copied": "Link copied",
+      "Add payment method": "Add payment method",
+      "Edit payment method": "Edit payment method",
+      "Configure payment URLs without a provider connection.": "Configure payment URLs without a provider connection.",
+      "No payment links are available for this invoice.": "No payment links are available for this invoice.",
+      "Select and copy the payment link.": "Select and copy the payment link.",
+      "URL template": "URL template",
+      "Currency (blank for any)": "Currency (blank for any)",
+      "Any currency": "Any currency",
+      "Use an HTTPS URL. Placeholders: {invoice_total}, {invoice_due}, {invoice_number}, {invoice_id}, {token}, {currency}.": "Use an HTTPS URL. Placeholders: {invoice_total}, {invoice_due}, {invoice_number}, {invoice_id}, {token}, {currency}.",
+      "Enabled": "Enabled",
+      "Custom": "Custom"
+    }
   }
 }

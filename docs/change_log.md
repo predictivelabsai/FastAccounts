@@ -1171,3 +1171,32 @@ the entries below, plus one connector fix:
 - Production accountant UAT, partial VAT recovery, foreign currency, irregular
   periods, monetary schedule editing and coordinated reversals or cancellation
   settlement remain deferred. Roadmap status and scope are synchronised.
+
+## 2026-10-12: Payment link configuration
+
+- Added the offline configuration slice of P1 item 9: organisation payment methods
+  for EveryPay, LinkPay and custom URLs, plus persistent invoice/method links with
+  stable unpredictable tokens. Migration `0022_payment_links` is additive and
+  rerunnable, with composite tenant foreign keys and concurrent generation guards.
+  Updated the inline CI migration list and all explicit migration expectations.
+- Added validated HTTPS templates with Decimal-formatted total and due amounts,
+  URL-encoded values, currency matching and optional currencyless methods. Hide
+  disabled methods and ineligible invoices without deleting stored links. Refresh
+  resolved URLs on later reads while preserving their tokens and creation times.
+- Added viewer-readable configuration and invoice-link endpoints, invoice detail
+  payloads, owner/administrator configuration writes and CSRF protection. Payment
+  links do not initiate provider calls, post ledger entries or mark invoices paid.
+- Added a small Settings Payment methods view and create/edit dialog, plus payment
+  buttons, read-only URLs and copy controls in the authenticated invoice dialog.
+  Appended all four locale sections and generalised the explicit catalogue merge.
+  Existing translations and invoice PDF/XML routes are preserved.
+- A public invoice page, provider HTTP integration, callbacks, payment verification,
+  automatic reconciliation, provider-side revocation and production UAT remain
+  deferred. Already shared URLs require merchant-side balance and expiry controls.
+  The design note documents these limits; roadmap scope is synchronised.
+- Validation: Python 3.12.14, `python -m pytest -q`:
+  `916 passed, 4 skipped in 674.84s (0:11:14)`. All 35 new service, API,
+  migration, locale and four-locale browser checks passed. The skips are existing
+  opt-in PostgreSQL checks. Tests used synthetic data and no live provider calls.
+  JavaScript syntax, focused Python compilation, existing locale preservation,
+  diff and staged secret-pattern checks passed.
