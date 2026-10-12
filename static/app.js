@@ -782,6 +782,27 @@
         }),
       });
     },
+    "reminder-rules": async (c) => {
+      const rules = await api(c.url('/reminder-rules'));
+      const preview = rules.enabled ? rules.effective_stages.map((x) =>
+        x.stage === 0 ? t('3 days before due') : t('{days} days overdue').replace('{days}', x.days)).join(' · ') : t('Automatic reminders are disabled.');
+      if (!c.mount(page(t('Reminders'), t('Configure automatic invoice reminders for this organisation.'), '',
+        `<section class="section"><h2>${tr('Reminder rules')}</h2><p>${tr('Stage 0 stays three days before due. Overdue stages must increase within 1 to 14 days.')}</p>
+        <p id="reminder-preview" aria-live="polite">${tr('Current effective reminders')}: ${esc(preview)}</p>
+        ${form(check('Enable automatic reminders', 'enabled', rules.enabled) +
+          field('Stage 1: days after due', 'stage_1_days', rules.stages['1'], 'number', 'min="1" max="13" step="1" required') +
+          field('Stage 2: days after due', 'stage_2_days', rules.stages['2'], 'number', 'min="2" max="14" step="1" required') +
+          select('Stop after', 'stop_stage', [['', t('All stages')], ['0', t('Stage 0')], ['1', t('Stage 1')], ['2', t('Stage 2')]], rules.stop_stage ?? ''))}</section>`))) return;
+      content.querySelector('[data-action=cancel]').remove();
+      if (!canEditMappings()) content.querySelectorAll('input, select, button[type=submit]').forEach((x) => { x.disabled = true; });
+      bindForm(content, async (data) => {
+        await post(c.url('/reminder-rules'), {enabled: content.querySelector('[name=enabled]').checked,
+          stages: {'1': Number(data.stage_1_days), '2': Number(data.stage_2_days)},
+          stop_stage: data.stop_stage === '' ? null : Number(data.stop_stage)}, 'PUT');
+        toast(t('Saved successfully'));
+        await render();
+      });
+    },
     "payment-methods": async (c) => {
       const rows = await api(c.url('/payment-methods'));
       if (!c.mount(page(t('Payment methods'), t('Configure payment URLs without a provider connection.'),
@@ -829,7 +850,6 @@
         api(c.url("/invoices")),
       ]);
       const intervals = { weekly: "Weekly", monthly: "Monthly", quarterly: "Quarterly", custom_days: "Custom days" },
-        stages = ["3 days before due", "7 days overdue", "14 days overdue"],
         emailNotice = "Email delivery is not connected. Set POSTMARK_API_TOKEN and FROM_EMAIL to send reminders.";
       // The due endpoint excludes opted-out invoices; keep them reachable for opting back in.
       const items = [...reminders.items, ...invoices.filter((x) =>
@@ -854,7 +874,8 @@
         ${reminders.email_connected === false ? `<div class="notice" role="status">${tr(emailNotice)}</div>` : ""}
         ${items.length ? table(["Number", "Customer", "Due date", "Stage", "Status", "Skip"], items.map((x, index) => row([
           td(esc(x.number)), td(esc(x.contact_name)), td(date(x.due_date)),
-          td(x.stage == null ? "—" : tr(stages[x.stage])),
+          td(x.stage == null ? "" : x.stage === 0 ? tr('3 days before due') : esc(t('{days} days overdue').replace('{days}',
+            Math.round((Date.parse(x.target_date) - Date.parse(x.due_date)) / 86400000)))),
           td(x.sent ? pill("Sent") : x.reminders_disabled ? pill("Skipped") : button("Send reminder", "sendReminder", false, `data-index="${index}"`)),
           td(button("Skip", "skipReminder", false, `data-index="${index}" aria-pressed="${Boolean(x.reminders_disabled)}"`)),
         ]))) : empty("No reminders due")}</section>`))) return;

@@ -1285,3 +1285,28 @@ the entries below, plus one connector fix:
   existing opt-in PostgreSQL checks. `node --check static/app.js`, catalogue
   preservation, staged diff/copy and credential-pattern checks passed. All new
   data is synthetic and no live provider calls were made.
+
+## 2026-10-12: Organisation reminder rules
+
+- Added the final P1 parity item 13: organisation-owned enabled flag, increasing
+  overdue stage offsets within 1 to 14 days, and inclusive stop-after semantics.
+  Stage 0 stays three days before due; absent rows retain the exact -3/+7/+14
+  behaviour. Migration `0024_reminder_rules` seeds no rows and is rerunnable
+  without PostgreSQL-specific substitution. CI and upgrade lists include it.
+- Added viewer-readable GET and owner/administrator plus CSRF-protected PUT,
+  strict boolean/integer/stage/payload validation, scoped persistence and an
+  atomic `reminder_rules.updated` audit event. Worker selection honours enabled,
+  offsets and stop while retaining invoice opt-outs and all existing gates.
+  Event history and ledger data remain intact; email wording stays hard-coded.
+- Added a Settings Reminders card with labelled controls and effective preview,
+  disabled viewer controls and correct configured offsets in the recurring list.
+  Appended and merged English, Estonian, Lithuanian and Latvian catalogue copy.
+- Deferred configurable pre-due timing, longer horizons, extra stages, template
+  editing, retry changes and production accountant UAT. PostgreSQL execution
+  remains opt-in. Roadmap and `docs/specs/reminder-rules.md` share this scope.
+- Validation: Python 3.12.14, `python -m pytest -q`: `1042 passed, 4 skipped
+  in 904.55s (0:15:04)`. All 55 new offline checks passed, including owner/viewer
+  browser flows in all four locales. The skips are the existing PostgreSQL opt-in
+  checks. `node --check static/app.js`, Python compilation, catalogue preservation,
+  CI migration-list matching and staged diff/copy checks passed. New data is
+  synthetic and sends used MockTransport with no live provider calls.

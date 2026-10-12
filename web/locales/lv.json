@@ -1671,5 +1671,32 @@
       "Delivery outcome is unknown. Review delivery history before retrying.": "Sūtīšanas rezultāts nav zināms. Pirms atkārtotas sūtīšanas pārskatiet sūtīšanas vēsturi.",
       "Email provider rejected the message": "E-pasta pakalpojuma sniedzējs noraidīja ziņojumu"
     }
+  },
+  "reminder_rules": {
+    "nav": {
+      "reminder_rules": "Atgādinājumi"
+    },
+    "views": {},
+    "workspace": {
+      "Reminders": "Atgādinājumi",
+      "Reminder rules": "Atgādinājumu noteikumi",
+      "Configure automatic invoice reminders for this organisation.": "Iestatiet šīs organizācijas automātiskos rēķinu atgādinājumus.",
+      "Stage 0 stays three days before due. Overdue stages must increase within 1 to 14 days.": "0. posms paliek trīs dienas pirms maksājuma termiņa. Nākamo posmu dienām jāpieaug no 1 līdz 14 dienām pēc termiņa.",
+      "Current effective reminders": "Pašreizējie atgādinājumi",
+      "Enable automatic reminders": "Ieslēgt automātiskos atgādinājumus",
+      "Stage 1: days after due": "1. posms: dienas pēc maksājuma termiņa",
+      "Stage 2: days after due": "2. posms: dienas pēc maksājuma termiņa",
+      "Stop after": "Beigt pēc",
+      "All stages": "Visi posmi",
+      "Stage 0": "0. posms",
+      "Stage 1": "1. posms",
+      "Stage 2": "2. posms",
+      "Automatic reminders are disabled.": "Automātiskie atgādinājumi ir izslēgti.",
+      "{days} days overdue": "{days} dienas pēc maksājuma termiņa",
+      "Reminder rules require an enabled boolean, stages and stop stage": "Atgādinājumu noteikumiem vajadzīga ieslēgšanas loģiskā vērtība, posmi un pēdējais posms",
+      "Reminder stages must be 1 and 2; stage 0 stays three days before due": "Atgādinājumu posmiem jābūt 1 un 2; 0. posms paliek trīs dienas pirms maksājuma termiņa",
+      "Reminder offsets must increase strictly within 1 to 14 days after due": "Atgādinājumu dienām stingri jāpieaug no 1 līdz 14 dienām pēc maksājuma termiņa",
+      "Stop stage must be 0, 1 or 2": "Pēdējam posmam jābūt 0, 1 vai 2"
+    }
   }
 }

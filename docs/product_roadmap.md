@@ -1356,3 +1356,28 @@ pending.
   existing opt-in PostgreSQL checks. `node --check static/app.js`, catalogue
   preservation, staged diff/copy and credential-pattern checks passed. All new
   data is synthetic and no live provider calls were made.
+
+### Organisation reminder rules (2026-10-12)
+
+- [x] Deliver P1 item 13, the final P1 parity item: one organisation-owned rule
+  row with an enabled flag, increasing stage 1/2 offsets within 1 to 14 days
+  overdue, and an inclusive optional stop at stage 0, 1 or 2. Keep stage 0 at
+  three days before due. No row retains the exact existing -3/+7/+14 ladder.
+- Add portable, rerunnable migration `0024_reminder_rules` without seeded rows;
+  append it to CI's inline migration list and all explicit upgrade expectations.
+  Persist and audit saves atomically with parameterised tenant-scoped queries.
+- Add viewer-readable GET and owner/administrator plus CSRF-protected PUT at
+  `reminder-rules`. Preserve worker eligibility, per-invoice opt-outs, event
+  deduplication, catch-up, hard-coded email content and ledger data.
+- Add a compact Settings Reminders card with enable/day/stop controls, save and
+  current effective preview. Viewers have read-only controls. Show actual offsets
+  in the recurring reminder list. Append all four locales in `reminder_rules`.
+- Defer configurable pre-due timing, longer horizons, additional stages,
+  template editing, retry changes and production accountant UAT. PostgreSQL
+  execution remains opt-in. See `docs/specs/reminder-rules.md`.
+- Validation: Python 3.12.14, `python -m pytest -q`: `1042 passed, 4 skipped
+  in 904.55s (0:15:04)`. All 55 new offline checks passed, including owner/viewer
+  browser flows in all four locales. The skips are the existing PostgreSQL opt-in
+  checks. `node --check static/app.js`, Python compilation, catalogue preservation,
+  CI migration-list matching and staged diff/copy checks passed. New data is
+  synthetic and sends used MockTransport with no live provider calls.
