@@ -1698,5 +1698,28 @@
       "Reminder offsets must increase strictly within 1 to 14 days after due": "Atgādinājumu dienām stingri jāpieaug no 1 līdz 14 dienām pēc maksājuma termiņa",
       "Stop stage must be 0, 1 or 2": "Pēdējam posmam jābūt 0, 1 vai 2"
     }
+  },
+  "fx_rates": {
+    "nav": {
+      "fx_rates": "Valūtu kursi"
+    },
+    "views": {},
+    "workspace": {
+      "Exchange rates": "Valūtu kursi",
+      "Rates are units of the to currency per one unit of the from currency.": "Kurss norāda mērķa valūtas vienību skaitu par vienu sākuma valūtas vienību.",
+      "From currency": "Sākuma valūta",
+      "To currency": "Mērķa valūta",
+      "Exchange rate": "Valūtas kurss",
+      "Source": "Avots",
+      "Add rate": "Pievienot kursu",
+      "Delete rate": "Dzēst kursu",
+      "Exchange rate must be positive": "Valūtas kursam jābūt pozitīvam",
+      "Rate date must use YYYY-MM-DD": "Kursa datumam jābūt formātā YYYY-MM-DD",
+      "Currencies must be three uppercase letters": "Valūtu kodiem jābūt trim lielajiem burtiem",
+      "From and to currencies must differ": "Sākuma un mērķa valūtām jāatšķiras",
+      "Rate must fit NUMERIC(20,10)": "Kursam jāietilpst NUMERIC(20,10)",
+      "A manual exchange rate already exists for this date and currency pair": "Šim datumam un valūtu pārim manuālais kurss jau pastāv",
+      "Exchange rate not found": "Valūtas kurss nav atrasts"
+    }
   }
 }

@@ -18,6 +18,7 @@ import einvoice
 from core_utils import audit, db_number, decimal, money, new_id, sha256_bytes, utc_now
 from database import Database, get_database
 from delivery_repository import DeliveryRepository
+from exchange_rates import booking_rate
 from ledger import LedgerService, PostingLine
 from periodisation_repository import PeriodisationRepository
 from objects import dimensions, validate_dimensions
@@ -159,7 +160,7 @@ class DocumentService:
                        lines: list[dict], actor: str, due_date: str | None = None,
                        currency: str | None = None, amount_type: str = "exclusive",
                        reference: str = "", notes: str = "", document_type: str = "invoice",
-                       original_invoice_id: str | None = None, tx=None) -> dict:
+                       original_invoice_id: str | None = None, exchange_rate: Decimal | None = None, tx=None) -> dict:
         if document_type not in {"invoice", "credit_note"}:
             raise ValueError("Invalid sales document type")
         if tx is None:
@@ -169,22 +170,24 @@ class DocumentService:
                     lines=lines, actor=actor, due_date=due_date, currency=currency,
                     amount_type=amount_type, reference=reference, notes=notes,
                     document_type=document_type, original_invoice_id=original_invoice_id,
-                    tx=owned_tx,
+                    exchange_rate=exchange_rate, tx=owned_tx,
                 )
         invoice_id, now = new_id(), utc_now()
         organisation = tx.one("SELECT * FROM organisations WHERE id=?", (organisation_id,))
         contact = tx.one("SELECT * FROM contacts WHERE id=? AND organisation_id=?", (contact_id, organisation_id))
         if not organisation or not contact or contact["contact_type"] not in {"customer", "both"}:
             raise ValueError("A customer in this organisation is required")
+        currency = (currency or organisation["base_currency"]).upper()
+        exchange_rate = booking_rate(tx, organisation_id, currency, organisation["base_currency"], issue_date, exchange_rate)
         calculated, subtotal, tax_total, total = self._document_lines(tx, organisation_id, lines, amount_type)
         due = due_date or (date.fromisoformat(issue_date) + timedelta(days=contact["payment_terms_days"])).isoformat()
         tx.execute(
-            "INSERT INTO invoices(id,organisation_id,contact_id,document_type,issue_date,tax_point_date,due_date,currency,line_amount_type,reference,notes,original_invoice_id,subtotal,tax_total,total,created_by,created_at,updated_at) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            "INSERT INTO invoices(id,organisation_id,contact_id,document_type,issue_date,tax_point_date,due_date,currency,line_amount_type,reference,notes,original_invoice_id,subtotal,tax_total,total,created_by,created_at,updated_at,exchange_rate) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (invoice_id, organisation_id, contact_id, document_type, issue_date, issue_date,
              due, (currency or organisation["base_currency"]).upper(), amount_type,
              reference.strip() or None, notes.strip() or None, original_invoice_id,
-             db_number(subtotal), db_number(tax_total), db_number(total), actor, now, now),
+             db_number(subtotal), db_number(tax_total), db_number(total), actor, now, now, db_number(exchange_rate)),
         )
         for line in calculated:
             tx.execute(
@@ -309,7 +312,7 @@ class DocumentService:
     def create_bill(self, organisation_id: str, *, contact_id: str, supplier_number: str,
                     bill_date: str, due_date: str, lines: list[dict], actor: str,
                     currency: str | None = None, reference: str = "", notes: str = "",
-                    document_type: str = "bill", declared_vat: list[object] | None = None, tx=None) -> dict:
+                    document_type: str = "bill", declared_vat: list[object] | None = None, exchange_rate: Decimal | None = None, tx=None) -> dict:
         if document_type not in {"bill", "supplier_credit"} or not supplier_number.strip():
             raise ValueError("Valid supplier document details are required")
         if tx is None:
@@ -318,21 +321,23 @@ class DocumentService:
                     organisation_id, contact_id=contact_id, supplier_number=supplier_number,
                     bill_date=bill_date, due_date=due_date, lines=lines, actor=actor,
                     currency=currency, reference=reference, notes=notes,
-                    document_type=document_type, declared_vat=declared_vat, tx=owned_tx,
+                    document_type=document_type, declared_vat=declared_vat, exchange_rate=exchange_rate, tx=owned_tx,
                 )
         bill_id, now = new_id(), utc_now()
         organisation = tx.one("SELECT * FROM organisations WHERE id=?", (organisation_id,))
         contact = tx.one("SELECT * FROM contacts WHERE id=? AND organisation_id=?", (contact_id, organisation_id))
         if not organisation or not contact or contact["contact_type"] not in {"supplier", "both"}:
             raise ValueError("A supplier in this organisation is required")
+        currency = (currency or organisation["base_currency"]).upper()
+        exchange_rate = booking_rate(tx, organisation_id, currency, organisation["base_currency"], bill_date, exchange_rate)
         calculated, subtotal, tax_total, total = self._document_lines(
             tx, organisation_id, lines, "exclusive", declared_vat=declared_vat)
         tx.execute(
-            "INSERT INTO bills(id,organisation_id,contact_id,document_type,supplier_number,bill_date,due_date,currency,reference,notes,subtotal,tax_total,total,created_by,created_at,updated_at) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            "INSERT INTO bills(id,organisation_id,contact_id,document_type,supplier_number,bill_date,due_date,currency,reference,notes,subtotal,tax_total,total,created_by,created_at,updated_at,exchange_rate) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (bill_id, organisation_id, contact_id, document_type, supplier_number.strip(), bill_date,
              due_date, (currency or organisation["base_currency"]).upper(), reference or None,
-             notes or None, db_number(subtotal), db_number(tax_total), db_number(total), actor, now, now),
+             notes or None, db_number(subtotal), db_number(tax_total), db_number(total), actor, now, now, db_number(exchange_rate)),
         )
         for line in calculated:
             tx.execute(
@@ -547,7 +552,7 @@ class DocumentService:
 
     def record_payment(self, organisation_id: str, *, payment_type: str, bank_account_id: str,
                        payment_date: str, amount: object, actor: str, contact_id: str | None = None,
-                       reference: str = "", allocations: list[dict] | None = None, tx=None) -> dict:
+                       reference: str = "", allocations: list[dict] | None = None, exchange_rate: Decimal | None = None, tx=None) -> dict:
         if payment_type not in {"customer_receipt", "supplier_payment", "transfer"}:
             raise ValueError("Invalid payment type")
         value = money(amount)
@@ -563,7 +568,7 @@ class DocumentService:
                     organisation_id, payment_type=payment_type,
                     bank_account_id=bank_account_id, payment_date=payment_date,
                     amount=amount, actor=actor, contact_id=contact_id,
-                    reference=reference, allocations=allocations, tx=owned_tx,
+                    reference=reference, allocations=allocations, exchange_rate=exchange_rate, tx=owned_tx,
                 )
         bank = tx.one("SELECT * FROM bank_accounts WHERE id=? AND organisation_id=?", (bank_account_id, organisation_id))
         organisation = tx.one("SELECT * FROM organisations WHERE id=?", (organisation_id,))
@@ -582,7 +587,8 @@ class DocumentService:
         batch = self.ledger.post(
             organisation_id=organisation_id, voucher_type="payment", voucher_id=payment_id,
             voucher_code=reference or f"PAY-{payment_id[:8]}", posting_date=payment_date,
-            lines=lines, actor=actor, currency=bank["currency"], tx=tx,
+            lines=lines, actor=actor, currency=bank["currency"],
+            exchange_rate=booking_rate(tx, organisation_id, bank["currency"], organisation["base_currency"], payment_date, exchange_rate), tx=tx,
         )
         tx.execute(
             "INSERT INTO payments(id,organisation_id,payment_type,contact_id,bank_account_id,payment_date,amount,currency,reference,posting_batch_id,created_by,created_at) "

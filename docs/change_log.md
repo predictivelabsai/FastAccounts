@@ -1310,3 +1310,30 @@ the entries below, plus one connector fix:
   checks. `node --check static/app.js`, Python compilation, catalogue preservation,
   CI migration-list matching and staged diff/copy checks passed. New data is
   synthetic and sends used MockTransport with no live provider calls.
+
+## 2026-10-12: FX foundation
+
+- Deliver revised P2 item 1: manual exchange rate maintenance and booking
+  conversion for invoices, bills, credit notes, supplier credits and payments.
+- Reuse exchange_rates as-is. No migration or payment rate column is required;
+  immutable ledger entries retain applied payment rates. Migration count stays 24.
+- Use exact from_currency -> to_currency direction: to-currency units per one
+  from-currency unit. Resolution is explicit rate, latest organisation-scoped
+  row on/before the business event date, then 1. No inverse lookup or network.
+- Convert debit/credit in ledger.post with Decimal multiplication and existing
+  money()/db_number(): ROUND_HALF_UP to 0.01 and fixed-point serialisation.
+  Preserve transaction amounts/currency and same-currency rate-1 stored values.
+  Reject rounding imbalance with complete transaction rollback.
+- Add role-protected rate CRUD with CSRF on mutations, strict input, duplicate
+  manual-pair refusal and exchange_rate.created/exchange_rate.deleted audits.
+  Add Settings rate table/form and disabled non-administrator controls; append
+  fx_rates in English, Estonian, Lithuanian and Latvian catalogues.
+- Defer realised FX, revaluation, gain/loss accounts, automated feeds and
+  periodisation/prepayment FX integration to P2 item 2. Existing refusals remain.
+  Production accountant UAT is pending. See docs/specs/fx-rates.md.
+- Validation: Python 3.14.6, full `python -m pytest -q`: `1099 passed,
+  4 skipped, 5 warnings in 824.88s (0:13:44)`. All 57 new FX checks passed,
+  including offline owner/viewer browser flows in all four locales. The skips
+  remain the existing PostgreSQL opt-in checks. `node --check static/app.js`,
+  diff checks and preservation of existing locale sections passed. EstNLTK is
+  unavailable locally; Estonian copy follows the existing valuuta terminology.

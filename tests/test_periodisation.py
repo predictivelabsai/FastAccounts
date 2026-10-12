@@ -393,7 +393,7 @@ def test_locale_additions_are_at_file_end_and_do_not_override_existing_keys():
         name = f'web/locales/{language}.json'
         current = Path(name).read_text(encoding='utf-8')
         new = json.loads(current)
-        assert list(new)[-6:] == ['periodisation', 'payment_links', 'analytical_objects', 'invoice_exports', 'bulk_sending', 'reminder_rules']
+        assert list(new)[-7:] == ['periodisation', 'payment_links', 'analytical_objects', 'invoice_exports', 'bulk_sending', 'reminder_rules', 'fx_rates']
         for section, values in new['periodisation'].items():
             assert not (values.keys() & new[section].keys())
         assert i18n.catalog(language)['nav']['periodised'] == i18n.catalog(language)['workspace']['Periodised']

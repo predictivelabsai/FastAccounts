@@ -1806,5 +1806,28 @@
       "Reminder offsets must increase strictly within 1 to 14 days after due": "Reminder offsets must increase strictly within 1 to 14 days after due",
       "Stop stage must be 0, 1 or 2": "Stop stage must be 0, 1 or 2"
     }
+  },
+  "fx_rates": {
+    "nav": {
+      "fx_rates": "Exchange rates"
+    },
+    "views": {},
+    "workspace": {
+      "Exchange rates": "Exchange rates",
+      "Rates are units of the to currency per one unit of the from currency.": "Rates are units of the to currency per one unit of the from currency.",
+      "From currency": "From currency",
+      "To currency": "To currency",
+      "Exchange rate": "Exchange rate",
+      "Source": "Source",
+      "Add rate": "Add rate",
+      "Delete rate": "Delete rate",
+      "Exchange rate must be positive": "Exchange rate must be positive",
+      "Rate date must use YYYY-MM-DD": "Rate date must use YYYY-MM-DD",
+      "Currencies must be three uppercase letters": "Currencies must be three uppercase letters",
+      "From and to currencies must differ": "From and to currencies must differ",
+      "Rate must fit NUMERIC(20,10)": "Rate must fit NUMERIC(20,10)",
+      "A manual exchange rate already exists for this date and currency pair": "A manual exchange rate already exists for this date and currency pair",
+      "Exchange rate not found": "Exchange rate not found"
+    }
   }
 }
