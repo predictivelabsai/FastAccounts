@@ -20,6 +20,7 @@ from database import Database, get_database
 from delivery_repository import DeliveryRepository
 from exchange_rates import booking_rate
 from fx_settlement import effective_rate, booked_portion, add_fx_line, control_line
+from fx_settlement_repository import revaluation_control
 from ledger import LedgerService, PostingLine
 from periodisation_repository import PeriodisationRepository
 from objects import dimensions, validate_dimensions
@@ -603,6 +604,7 @@ class DocumentService:
                 raise ValueError("Allocation exceeds the open document balance")
             differing_rates |= effective_rate(document['currency'], base, document['exchange_rate']) != paid_rate
             booked_amounts[document_id] = booked_portion(tx, organisation_id, document, control, allocated, base)
+            differing_rates |= revaluation_control(tx, organisation_id, document, control) is not None
             booked_total += booked_amounts[document_id]
             final_rounding |= (money(document['paid_total']) + allocated == money(document['total'])
                                and booked_amounts[document_id] != money(allocated * paid_rate))

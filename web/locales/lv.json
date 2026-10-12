@@ -1719,7 +1719,21 @@
       "From and to currencies must differ": "Sākuma un mērķa valūtām jāatšķiras",
       "Rate must fit NUMERIC(20,10)": "Kursam jāietilpst NUMERIC(20,10)",
       "A manual exchange rate already exists for this date and currency pair": "Šim datumam un valūtu pārim manuālais kurss jau pastāv",
-      "Exchange rate not found": "Valūtas kurss nav atrasts"
+      "Exchange rate not found": "Valūtas kurss nav atrasts",
+      "Document": "Dokuments",
+      "Revalue balances": "Pārvērtēt atlikumus",
+      "Revalue current open foreign balances at the selected date rate.": "Pārvērtējiet pašreizējos atvērtos ārvalstu valūtas atlikumus pēc izvēlētā datuma kursa.",
+      "Revaluation date": "Pārvērtēšanas datums",
+      "Run revaluation": "Veikt pārvērtēšanu",
+      "Open portion": "Atvērtā daļa",
+      "Booked base": "Uzskaitīts pamatvalūtā",
+      "Target base": "Mērķa summa pamatvalūtā",
+      "Delta": "Starpība",
+      "Revaluation history": "Pārvērtēšanas vēsture",
+      "Posting batch": "Grāmatojumu pakete",
+      "No posting": "Grāmatojums nav izveidots",
+      "Revaluation date must use YYYY-MM-DD": "Pārvērtēšanas datumam jābūt YYYY-MM-DD formātā",
+      "A revaluation already exists for this date": "Šim datumam pārvērtēšana jau pastāv"
     }
   }
 }

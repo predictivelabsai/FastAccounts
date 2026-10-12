@@ -4,7 +4,7 @@ from decimal import Decimal
 from core_utils import decimal, money
 from exchange_rates import positive_rate
 from ledger import PostingLine
-from fx_settlement_repository import original_control, settled_control
+from fx_settlement_repository import original_control, settled_control, revaluation_control
 
 
 def effective_rate(currency, base_currency, rate):
@@ -25,6 +25,13 @@ def booked_portion(tx, organisation_id, document, account_id, amount,
     if booked is None:
         booked = money(total * rate)
     paid = money(document['paid_total']) if paid is None else money(paid)
+    adjustment = revaluation_control(tx, organisation_id, document, account_id,
+                                     prepayment=total_key == 'amount')
+    if adjustment is not None:
+        _, relieved = settled_control(tx, organisation_id, document, account_id,
+                                      prepayment=total_key == 'amount')
+        remaining = booked + adjustment - relieved
+        return remaining if paid + amount == total else money(remaining * amount / (total - paid))
     if paid + amount == total:
         recorded_paid, relieved = settled_control(tx, organisation_id, document, account_id,
                                                   prepayment=total_key == 'amount')

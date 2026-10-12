@@ -1827,7 +1827,21 @@
       "From and to currencies must differ": "From and to currencies must differ",
       "Rate must fit NUMERIC(20,10)": "Rate must fit NUMERIC(20,10)",
       "A manual exchange rate already exists for this date and currency pair": "A manual exchange rate already exists for this date and currency pair",
-      "Exchange rate not found": "Exchange rate not found"
+      "Exchange rate not found": "Exchange rate not found",
+      "Document": "Document",
+      "Revalue balances": "Revalue balances",
+      "Revalue current open foreign balances at the selected date rate.": "Revalue current open foreign balances at the selected date rate.",
+      "Revaluation date": "Revaluation date",
+      "Run revaluation": "Run revaluation",
+      "Open portion": "Open portion",
+      "Booked base": "Booked base",
+      "Target base": "Target base",
+      "Delta": "Delta",
+      "Revaluation history": "Revaluation history",
+      "Posting batch": "Posting batch",
+      "No posting": "No posting",
+      "Revaluation date must use YYYY-MM-DD": "Revaluation date must use YYYY-MM-DD",
+      "A revaluation already exists for this date": "A revaluation already exists for this date"
     }
   }
 }

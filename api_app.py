@@ -27,6 +27,7 @@ from quotes import QuoteService
 from periodisation import PeriodisationService
 from payment_links import PaymentLinkService
 from exchange_rates import ExchangeRateService
+from fx_revaluation import FxRevaluationService
 from reminder_rules import ReminderRuleService, validate_rule
 from objects import ObjectService
 from statements import StatementService
@@ -115,6 +116,17 @@ class ObjectPatch(BaseModel):
     def reject_null(cls, value):
         if value is None:
             raise ValueError('Object fields cannot be null')
+        return value
+
+
+class FxRevaluationIn(BaseModel):
+    model_config = {'extra': 'forbid'}
+    revaluation_date: str = Field(pattern=r'^\d{4}-\d{2}-\d{2}$')
+
+    @field_validator('revaluation_date')
+    @classmethod
+    def valid_date(cls, value):
+        date.fromisoformat(value)
         return value
 
 
@@ -768,6 +780,18 @@ def invoice_list_export(organisation_id: str, format_: str, request: Request,
                   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     return Response(content, media_type=media_type,
                     headers={"Content-Disposition": f'attachment; filename="{kind}.{format_}"'})
+
+
+@api.get('/organisations/{organisation_id}/fx-revaluations')
+def list_fx_revaluations(organisation_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, {'owner', 'administrator', 'accountant', 'approver', 'viewer'})
+    return FxRevaluationService().list(organisation_id)
+
+
+@api.post('/organisations/{organisation_id}/fx-revaluations', status_code=201)
+def run_fx_revaluation(organisation_id: str, payload: FxRevaluationIn, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, {'owner', 'administrator'})
+    return FxRevaluationService().run(organisation_id, **payload.model_dump(), actor=user.email)
 
 
 @api.get('/organisations/{organisation_id}/exchange-rates')

@@ -4,6 +4,34 @@ Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as
 delivered.
 
+## 2026-10-12: Open-balance FX revaluation
+
+- Added rerun-safe migration `0026_fx_revaluations`, tenant-scoped run identity,
+  a unique organisation/date and composite tenant indexes. CI and upgrade
+  expectations include 26 migrations. Immutable audit results hold per-document
+  details without a companion table.
+- Revalue current open foreign AR/AP documents and customer/supplier prepayments
+  with Decimal deltas from original plus prior linked revaluations less tracked
+  relief. Resolve the selected date's exact-direction rate with fallback 1. One
+  balanced base-currency batch holds document controls and one net FX line when
+  needed. Zero deltas post no rows. Same-date repeats are refused; later runs
+  converge, and subsequent settlements/offsets/refunds clear the revalued base.
+- Added member-readable history and owner/administrator plus CSRF POST, strict
+  date validation and a compact Exchange rates run form/result/history section.
+  Viewer controls are disabled. Locale additions stay within the existing
+  trailing fx_rates sections in en/et/lt/lv. No prepayment deferral.
+- Validation: Windows, Python 3.14.6, full `python -m pytest -q`:
+  `1219 passed, 4 skipped, 5 warnings in 1233.70s (0:20:33)`. All 51 new
+  revaluation checks passed, covering accounting signs, cents, repeatability,
+  rollback, tenancy, access, CSRF and offline owner/viewer browser flows in all
+  four locales. The skips are existing PostgreSQL opt-ins; warnings are existing
+  dependency deprecations. Synthetic data only, no live provider calls. Diff and
+  locale preservation checks passed; every Estonian addition is listed for copy
+  QA in `docs/specs/fx-rates.md`.
+- Rate feeds/schedules, foreign bank cash revaluation, historical as-of
+  reconstruction, accountant UAT and live PostgreSQL validation remain outside
+  this delivery. Detailed scope is in `docs/specs/fx-rates.md`.
+
 ## 2026-10-12: Realised FX on settlement and advance integration
 
 - Added migration `0025_fx_realised`: retained prepayment exchange rates and a

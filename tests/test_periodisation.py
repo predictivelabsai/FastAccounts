@@ -300,7 +300,7 @@ def test_upgrade_preserves_data_and_custom_chart(tmp_path, monkeypatch, country,
             tx.execute("INSERT INTO accounts(id,organisation_id,code,name,account_type,normal_balance,system_role) VALUES (?,?,?,'Custom deferred','Asset','Debit','PERIODISED_PURCHASES')", (new_id(), oid, '9999'))
     before = {t: db.rows(f'SELECT * FROM {t} ORDER BY id') for t in ['organisations', 'accounts', 'contacts', 'bills', 'gl_entries', 'posting_batches', 'audit_events']}
     monkeypatch.setattr(database, 'MIGRATIONS', original)
-    assert db.migrate() == ['0021_periodisation', '0022_payment_links', '0023_analytical_objects', '0024_reminder_rules', '0025_fx_realised'] and db.migrate() == []
+    assert db.migrate() == ['0021_periodisation', '0022_payment_links', '0023_analytical_objects', '0024_reminder_rules', '0025_fx_realised', '0026_fx_revaluations'] and db.migrate() == []
     for table, rows in before.items():
         if table == 'accounts':
             assert all(r in db.rows('SELECT * FROM accounts') for r in rows)
