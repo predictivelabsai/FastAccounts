@@ -140,7 +140,7 @@ def test_upgrade_preserves_existing_master_data(tmp_path, monkeypatch):
     contact = docs.create_contact(org['id'], name='Preserved contact', country_code='EE')
     item = docs.create_item(org['id'], code='OLD', name='Preserved item', unit_price='1.25')
     monkeypatch.setattr(database, 'MIGRATIONS', original)
-    assert db.migrate() == ['0019_master_data_import', '0020_quotes', '0021_periodisation', '0022_payment_links', '0023_analytical_objects', '0024_reminder_rules', '0025_fx_realised', '0026_fx_revaluations', '0027_mfa']
+    assert db.migrate() == ['0019_master_data_import', '0020_quotes', '0021_periodisation', '0022_payment_links', '0023_analytical_objects', '0024_reminder_rules', '0025_fx_realised', '0026_fx_revaluations', '0027_mfa', '0028_document_settings']
     assert db.migrate() == []
     assert db.one('SELECT * FROM contacts WHERE organisation_id=? AND id=?', (org['id'], contact['id'])) == contact
     after = db.one('SELECT * FROM items WHERE organisation_id=? AND id=?', (org['id'], item['id']))

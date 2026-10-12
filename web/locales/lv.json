@@ -1758,5 +1758,34 @@
       "Revaluation date must use YYYY-MM-DD": "Pārvērtēšanas datumam jābūt YYYY-MM-DD formātā",
       "A revaluation already exists for this date": "Šim datumam pārvērtēšana jau pastāv"
     }
+  },
+  "document_settings": {
+    "nav": {
+      "document_settings": "Dokumentu izskats"
+    },
+    "views": {},
+    "workspace": {
+      "Document appearance": "Dokumentu izskats",
+      "Customise sales invoice and credit note PDFs for this organisation.": "Pielāgojiet šīs organizācijas pārdošanas rēķinu un kredītrēķinu PDF failu izskatu.",
+      "Appearance settings": "Izskata iestatījumi",
+      "Use an accent colour": "Izmantot akcenta krāsu",
+      "Accent colour": "Akcenta krāsa",
+      "Invoice footer": "Rēķina kājene",
+      "Organisation logo": "Organizācijas logotips",
+      "No logo uploaded.": "Logotips nav augšupielādēts.",
+      "Upload a PNG or JPEG image, up to 512 KB.": "Augšupielādējiet PNG vai JPEG attēlu, kura izmērs nepārsniedz 512 KB.",
+      "Logo file": "Logotipa fails",
+      "Upload logo": "Augšupielādēt logotipu",
+      "Remove logo": "Noņemt logotipu",
+      "Remove the logo from sales invoice and credit note PDFs?": "Vai noņemt logotipu no pārdošanas rēķinu un kredītrēķinu PDF failiem?",
+      "Logo must be no larger than 512 KB.": "Logotipa izmērs nedrīkst pārsniegt 512 KB.",
+      "Accent colour must contain six hexadecimal digits after #": "Akcenta krāsai jāsastāv no zīmes # un sešiem heksadecimāliem cipariem",
+      "Invoice footer must contain at most 500 characters": "Rēķina kājenē drīkst būt ne vairāk kā 500 rakstzīmes",
+      "Logo must be a PNG or JPEG image": "Logotipam jābūt PNG vai JPEG attēlam",
+      "Logo must contain at most 512 KB": "Logotipa izmērs nedrīkst pārsniegt 512 KB",
+      "Logo content and filename must match its image type": "Logotipa saturam un faila nosaukumam jāatbilst attēla tipam",
+      "Logo not found": "Logotips nav atrasts",
+      "Logo file not found": "Logotipa fails nav atrasts"
+    }
   }
 }

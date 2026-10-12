@@ -29,6 +29,7 @@ from payment_links import PaymentLinkService
 from exchange_rates import ExchangeRateService
 from fx_revaluation import FxRevaluationService
 from reminder_rules import ReminderRuleService, validate_rule
+from document_settings import DocumentSettingsService, MAX_LOGO_BYTES
 from objects import ObjectService
 from statements import StatementService
 from cash_flow import CashFlowService
@@ -225,6 +226,12 @@ class ReminderRuleIn(BaseModel):
     def valid_rule(self):
         validate_rule(self.model_dump())
         return self
+
+
+class DocumentSettingsIn(BaseModel):
+    model_config = {'extra': 'forbid'}
+    accent_colour: str | None = Field(default=None, pattern=r'^#[0-9a-fA-F]{6}$')
+    footer_text: str | None = Field(default=None, max_length=500)
 
 
 class PaymentMethodIn(BaseModel):
@@ -828,6 +835,41 @@ def get_reminder_rules(organisation_id: str, user: User = Depends(current_user))
 def put_reminder_rules(organisation_id: str, payload: ReminderRuleIn, user: User = Depends(require_csrf)):
     _require(organisation_id, user, {'owner', 'administrator'})
     return ReminderRuleService().save(organisation_id, **payload.model_dump(), actor=user.email)
+
+
+@api.get('/organisations/{organisation_id}/document-settings')
+def get_document_settings(organisation_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, {'owner', 'administrator', 'accountant', 'approver', 'viewer'})
+    return DocumentSettingsService().get(organisation_id)
+
+
+@api.put('/organisations/{organisation_id}/document-settings')
+def put_document_settings(organisation_id: str, payload: DocumentSettingsIn, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES & {'owner', 'administrator'})
+    return DocumentSettingsService().save(organisation_id, **payload.model_dump(), actor=user.email)
+
+
+@api.post('/organisations/{organisation_id}/document-settings/logo')
+async def upload_document_logo(organisation_id: str, file: UploadFile = File(...),
+                               user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES & {'owner', 'administrator'})
+    content = await file.read(MAX_LOGO_BYTES + 1)
+    return DocumentSettingsService().upload_logo(
+        organisation_id, filename=file.filename or '', content_type=file.content_type,
+        content=content, actor=user.email)
+
+
+@api.delete('/organisations/{organisation_id}/document-settings/logo')
+def delete_document_logo(organisation_id: str, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES & {'owner', 'administrator'})
+    return DocumentSettingsService().delete_logo(organisation_id, actor=user.email)
+
+
+@api.get('/organisations/{organisation_id}/document-settings/logo')
+def get_document_logo(organisation_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, {'owner', 'administrator', 'accountant', 'approver', 'viewer'})
+    attachment, content = DocumentSettingsService().logo(organisation_id)
+    return Response(content, media_type=attachment['content_type'])
 
 
 @api.get('/organisations/{organisation_id}/objects')

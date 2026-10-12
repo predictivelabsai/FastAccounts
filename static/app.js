@@ -782,6 +782,47 @@
         }),
       });
     },
+    documents: async (c) => {
+      const settings = await api(c.url('/document-settings'));
+      const editable = canEditMappings();
+      if (!c.mount(page(t('Document appearance'), t('Customise sales invoice and credit note PDFs for this organisation.'), '',
+        `<section class="section" data-document-appearance><h2>${tr('Appearance settings')}</h2>` +
+        form(check('Use an accent colour', 'use_accent_colour', settings.accent_colour != null) +
+          field('Accent colour', 'accent_colour', settings.accent_colour || '#000000', 'color') +
+          `<label class="full-width">${tr('Invoice footer')}<textarea name="footer_text" rows="4" maxlength="500">${esc(settings.footer_text || '')}</textarea><span class="field-error" data-error="footer_text"></span></label>`) +
+        `</section><section class="section" data-document-logo><h2>${tr('Organisation logo')}</h2>` +
+        (settings.logo_attachment_id ? `<p><img src="/api${esc(c.url('/document-settings/logo'))}?v=${esc(settings.logo_attachment_id)}" alt="${tr('Organisation logo')}" style="max-width:280px;max-height:80px"></p>` : `<p class="muted">${tr('No logo uploaded.')}</p>`) +
+        `<p class="muted">${tr('Upload a PNG or JPEG image, up to 512 KB.')}</p>` +
+        form(field('Logo file', 'file', '', 'file', 'required accept=".png,.jpg,.jpeg,image/png,image/jpeg"'), 'Upload logo') +
+        (settings.logo_attachment_id ? button('Remove logo', 'removeDocumentLogo', false, editable ? '' : 'disabled') : '') + `</section>`))) return;
+      content.querySelectorAll('[data-action=cancel]').forEach((x) => x.remove());
+      if (!editable) content.querySelectorAll('input, textarea, button').forEach((x) => { x.disabled = true; });
+      const appearance = content.querySelector('[data-document-appearance]');
+      const accentEnabled = appearance.querySelector('[name=use_accent_colour]');
+      const accent = appearance.querySelector('[name=accent_colour]');
+      accent.disabled = !editable || !accentEnabled.checked;
+      accentEnabled.onchange = () => { accent.disabled = !editable || !accentEnabled.checked; };
+      bindForm(appearance, async (data) => {
+        await post(c.url('/document-settings'), {accent_colour: accentEnabled.checked ? data.accent_colour : null,
+          footer_text: data.footer_text || null}, 'PUT');
+        toast(t('Saved successfully'));
+        await render();
+      });
+      bindForm(content.querySelector('[data-document-logo]'), async (_, formElement) => {
+        const file = formElement.elements.file.files[0];
+        if (file.size > 512 * 1024) throw new Error(t('Logo must be no larger than 512 KB.'));
+        const payload = new FormData();
+        payload.append('file', file);
+        await api(c.url('/document-settings/logo'), {method: 'POST', body: payload});
+        toast(t('Saved successfully'));
+        await render();
+      });
+      bindActions(content, {removeDocumentLogo: () => confirmAction('Remove logo', tr('Remove the logo from sales invoice and credit note PDFs?'), async () => {
+        await post(c.url('/document-settings/logo'), {}, 'DELETE');
+        toast(t('Saved successfully'));
+        await render();
+      })});
+    },
     "reminder-rules": async (c) => {
       const rules = await api(c.url('/reminder-rules'));
       const preview = rules.enabled ? rules.effective_stages.map((x) =>
