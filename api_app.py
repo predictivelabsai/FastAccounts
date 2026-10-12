@@ -35,6 +35,7 @@ from tax import TaxService
 from tsd import TSDExportService
 from payment_orders import PaymentOrderService
 from prepayments import PrepaymentService
+from fixed_assets import FixedAssetService
 from opening_balances import OpeningBalanceService, parse_open_items_csv
 
 
@@ -161,6 +162,35 @@ class PrepaymentRefundIn(BaseModel):
     amount: Decimal = Field(gt=0, allow_inf_nan=False)
     reference: str = Field(default="", max_length=240)
     idempotency_key: str = Field(min_length=1, max_length=160)
+
+
+class AssetGroupIn(BaseModel):
+    name: str = Field(min_length=1, max_length=240)
+    annual_percentage: Decimal = Field(gt=0, le=100, allow_inf_nan=False)
+    frequency: Literal["monthly", "quarterly", "yearly"] = "monthly"
+    asset_account_id: str | None = None
+    accumulated_depreciation_account_id: str | None = None
+    expense_account_id: str | None = None
+
+
+class FixedAssetIn(BaseModel):
+    group_id: str
+    name: str = Field(min_length=1, max_length=240)
+    acquisition_date: str
+    acquisition_cost: Decimal = Field(gt=0, allow_inf_nan=False)
+    bank_account_id: str
+    idempotency_key: str = Field(min_length=1, max_length=160)
+
+
+class AssetDisposalIn(BaseModel):
+    disposal_date: str
+    disposal_amount: Decimal = Field(ge=0, allow_inf_nan=False)
+    bank_account_id: str
+
+
+class DepreciationRunIn(BaseModel):
+    period_date: str
+    kind: Literal["monthly", "quarterly", "yearly"] = "monthly"
 
 
 class ReconcileIn(BaseModel):
@@ -544,6 +574,60 @@ def approve_bill(organisation_id: str, bill_id: str, user: User = Depends(requir
     _require(organisation_id, user, APPROVE_ROLES)
     _object_in_org("bills", bill_id, organisation_id)
     return DocumentService().approve_bill(bill_id, actor=user.email)
+
+
+@api.get("/organisations/{organisation_id}/asset-groups")
+def asset_groups(organisation_id: str, locale: Literal["en", "et", "lt", "lv"] = "en",
+                 user: User = Depends(current_user)):
+    _require(organisation_id, user, {"owner", "administrator", "accountant", "approver", "viewer"})
+    return jsonable_encoder(FixedAssetService().groups(organisation_id, locale=locale), custom_encoder={Decimal: str})
+
+
+@api.post("/organisations/{organisation_id}/asset-groups", status_code=201)
+def create_asset_group(organisation_id: str, payload: AssetGroupIn, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return jsonable_encoder(FixedAssetService().create_group(organisation_id, actor=user.email,
+                            **payload.model_dump()), custom_encoder={Decimal: str})
+
+
+@api.get("/organisations/{organisation_id}/fixed-assets")
+def fixed_asset_register(organisation_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, {"owner", "administrator", "accountant", "approver", "viewer"})
+    return jsonable_encoder(FixedAssetService().register(organisation_id), custom_encoder={Decimal: str})
+
+
+@api.post("/organisations/{organisation_id}/fixed-assets", status_code=201)
+def create_fixed_asset(organisation_id: str, payload: FixedAssetIn, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return jsonable_encoder(FixedAssetService().create(organisation_id, actor=user.email,
+                            **payload.model_dump()), custom_encoder={Decimal: str})
+
+
+@api.get("/organisations/{organisation_id}/fixed-assets/schedule")
+def depreciation_schedule(organisation_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, {"owner", "administrator", "accountant", "approver", "viewer"})
+    return jsonable_encoder(FixedAssetService().schedule(organisation_id), custom_encoder={Decimal: str})
+
+
+@api.get("/organisations/{organisation_id}/fixed-assets/runs")
+def depreciation_runs(organisation_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, {"owner", "administrator", "accountant", "approver", "viewer"})
+    return jsonable_encoder(FixedAssetService().runs(organisation_id), custom_encoder={Decimal: str})
+
+
+@api.post("/organisations/{organisation_id}/fixed-assets/runs")
+def run_depreciation(organisation_id: str, payload: DepreciationRunIn, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return jsonable_encoder(FixedAssetService().run(organisation_id, actor=user.email,
+                            **payload.model_dump()), custom_encoder={Decimal: str})
+
+
+@api.post("/organisations/{organisation_id}/fixed-assets/{asset_id}/dispose")
+def dispose_fixed_asset(organisation_id: str, asset_id: str, payload: AssetDisposalIn,
+                        user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return jsonable_encoder(FixedAssetService().dispose(organisation_id, asset_id, actor=user.email,
+                            **payload.model_dump()), custom_encoder={Decimal: str})
 
 
 @api.get("/organisations/{organisation_id}/prepayments")

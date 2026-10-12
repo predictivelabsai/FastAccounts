@@ -221,7 +221,7 @@ def test_existing_payroll_upgrades_to_0006(tmp_path, monkeypatch):
                    "social_tax,ui_employer,employer_cost) VALUES ('i1','r1',?,'e2','Old Staff',900,0,2,900,18,14.4,0,191.86,"
                    "675.74,224.26,297,7.2,1204.2)", (org['id'],))
     monkeypatch.setattr(database, 'MIGRATIONS', original)
-    assert db.migrate() == ['0006_payroll_part_time_hourly', '0007_automation', '0008_import_staging', '0009_local_accounts', '0010_tsd_export', '0011_account_mappings', '0012_external_gl', '0013_sync_review', '0014_sync_push', '0015_payment_orders', '0016_bank_feed_schedules', '0017_prepayments']
+    assert db.migrate() == ['0006_payroll_part_time_hourly', '0007_automation', '0008_import_staging', '0009_local_accounts', '0010_tsd_export', '0011_account_mappings', '0012_external_gl', '0013_sync_review', '0014_sync_push', '0015_payment_orders', '0016_bank_feed_schedules', '0017_prepayments', '0018_fixed_assets']
     assert db.rows('PRAGMA foreign_key_check') == []
     service = PayrollService(db)
     employees = {e['name']: e for e in service.employees(org['id'])}

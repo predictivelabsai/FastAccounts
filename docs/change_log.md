@@ -4,6 +4,58 @@ Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as
 delivered.
 
+## 2026-10-12: Fixed assets and automatic depreciation
+
+### Added
+
+- Added additive migration `0018_fixed_assets` with tenant-scoped asset groups,
+  acquired assets, reproducible depreciation runs and per-asset amounts. Added
+  CI migration-list parity and migration expectations. Seeded charts and existing
+  organisations receive fixed asset, accumulated depreciation and depreciation
+  expense roles without repurposing custom accounts or existing roles. The
+  service creates equipment 20%, computers 25% and other 10% default groups at
+  first use with locale-appropriate names and monthly depreciation.
+- Added atomic, immutable and balanced acquisition, depreciation and disposal
+  events. Paid acquisition debits the fixed asset account and credits bank.
+  Each acquired asset snapshots its policy and accounts; stable voucher keys
+  make retries idempotent. Runs post one expense/accumulated-depreciation batch
+  across eligible assets, tagged by asset id. Recorded zero-cent instalments
+  advance the schedule without posting an empty batch.
+- Added authorised tenant-scoped API routes for groups, acquisitions, disposal,
+  runs, register and schedule through the existing web API mount. Added a fixed
+  assets page with per-asset/group costs, accumulated depreciation and carrying
+  values, run and schedule lists, and group, acquisition, disposal and manual-run
+  dialogs. Added append-only copy in all four locales, using Estonian põhivarad,
+  põhivara grupp and kulumi arvutus.
+- Extended the existing default-off automation worker with due depreciation.
+  Organisation failures are isolated and expose safe error messages, retaining
+  the existing `FASTACCOUNTS_AUTOMATION_WORKER` gate.
+
+### Accounting rules and boundaries
+
+- Calendar month, quarter and year ends define due dates. The full acquisition
+  period counts, without daily prorating. Each charge is the rounded cumulative
+  straight-line target less prior charges, capped at acquisition cost, so the
+  final period tops up exactly and accumulated depreciation never exceeds cost.
+  One organisation/period/frequency run is reproducible and reruns return the
+  stored result. Completed runs cannot absorb assets acquired afterwards.
+- Disposal catches up every unpaid scheduled charge through the disposal calendar
+  period in the same disposal batch, using full periods. It debits accumulated
+  depreciation and bank proceeds, credits original cost, and posts any explicit
+  gain to sales or loss to operating expenses. Acquisition and run records remain
+  intact; disposed assets receive no further depreciation.
+- Accountant UAT, acquisition reversal, tax-specific depreciation, residual values,
+  revaluation, impairment, asset transfers and VAT/foreign-currency acquisitions
+  remain follow-ups. Acquisitions require a bank payment in the organisation base
+  currency. Dedicated disposal gain/loss accounts remain a follow-up; the current
+  implementation uses existing sales and operating-expense roles.
+- Validation: full pytest suite on Python 3.12.14 passed: 677 passed and four
+  opt-in PostgreSQL tests skipped because `TEST_POSTGRES_URL` was not set.
+  Critical acquisition, group, depreciation and disposal browser flows passed
+  in all four locales. All 18 migrations match CI exactly and an immediate
+  rerun is empty. Compilation, JavaScript syntax, append-only locale and
+  staged diff/secret-pattern checks passed.
+
 ## 2026-10-12: Customer and supplier prepayments
 
 ### Added

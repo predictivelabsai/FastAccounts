@@ -987,6 +987,42 @@
           reviewTransaction(rows.find((x) => String(x.id) === b.dataset.id)),
       });
     },
+    "fixed-assets": async (c) => {
+      const groups = await api(c.url(`/asset-groups?locale=${encodeURIComponent(lang)}`));
+      const [register, schedule, runs] = await Promise.all([
+        api(c.url("/fixed-assets")), api(c.url("/fixed-assets/schedule")), api(c.url("/fixed-assets/runs")),
+      ]);
+      const totals = register.totals || {}, assets = register.assets || [];
+      const financialCells = (x) => [cash(x.acquisition_cost ?? x.cost), cash(x.accumulated_depreciation), cash(x.carrying_value)];
+      const groupName = (x) => x.group_name || groups.find((g) => g.id === x.group_id)?.name || "";
+      if (!c.mount(page(t("Fixed assets"), t("Track asset cost, depreciation and carrying value."),
+        button("Record asset acquisition", "acquireAsset", true, canExecutePush() ? "" : "disabled") +
+        button("Add asset group", "addAssetGroup", false, canExecutePush() ? "" : "disabled") +
+        button("Run depreciation", "runDepreciation", false, canExecutePush() ? "" : "disabled"),
+        `<section class="section"><h2>${tr("Fixed assets register")}</h2>${table(
+          ["Asset", "Asset group", "Acquisition date", "Acquisition cost", "Accumulated depreciation", "Carrying value", "Status", "Actions"],
+          assets.map((x) => row([td(esc(x.name)), td(esc(groupName(x))), td(date(x.acquisition_date)),
+            ...financialCells(x), td(pill(x.status)), td(x.status === "Active" ? button("Dispose asset", "disposeAsset", false,
+              `data-id="${esc(x.id)}" ${canExecutePush() ? "" : "disabled"}`) : "")])),
+          tr("Record an acquisition to start tracking depreciation."))}</section>` +
+        `<section class="section"><h2>${tr("Asset group totals")}</h2><p class="muted">${tr("Disposed assets retain historical cost and depreciation. Group totals include this history; carrying value is zero after disposal.")}</p>${table(
+          ["Asset group", "Annual depreciation percentage", "Frequency", "Acquisition cost", "Accumulated depreciation", "Carrying value"],
+          [...(register.groups || []).map((x) => row([td(esc(x.name || x.group_name)), td(esc(num(x.annual_percentage)) + "%"), td(tr(assetFrequencyLabel(x.frequency))), ...financialCells(x)])),
+            row([td(`<strong>${tr("Total")}</strong>`), td(""), td(""), ...financialCells(totals)])])}</section>` +
+        `<section class="section"><h2>${tr("Depreciation schedule")}</h2>${table(
+          ["Asset", "Frequency", "Next depreciation date", "Depreciation amount"],
+          schedule.map((x) => row([td(esc(x.name || x.asset_name)), td(tr(assetFrequencyLabel(x.frequency))),
+            td(date(x.next_due_date || x.next_due)), cash(x.amount ?? x.next_amount)])))}</section>` +
+        `<section class="section"><h2>${tr("Depreciation runs")}</h2>${table(
+          ["Period date", "Frequency", "Status", "Posting batch"],
+          runs.map((x) => row([td(date(x.period_date)), td(tr(assetFrequencyLabel(x.kind))), td(pill(x.status)),
+            td(esc(x.posting_batch_id || ""))])))}</section>`))) return;
+      bindActions(content, {
+        acquireAsset: () => fixedAssetAcquisitionDialog(groups), addAssetGroup: assetGroupDialog,
+        runDepreciation: depreciationRunDialog,
+        disposeAsset: (b) => assetDisposalDialog(assets.find((x) => String(x.id) === b.dataset.id)),
+      });
+    },
     accounting: async (c) => {
       if (
         !c.mount(
@@ -2319,6 +2355,73 @@
       if (await f.elements.opening_file.files[0].text() !== reviewedContent)
         throw new Error(t("The file changed. Preview it again before posting."));
       await post(base, { posting_date: data.posting_date, csv_content: reviewedContent });
+      await saved(d);
+    });
+  }
+
+  const assetFrequencyLabel = (value) => ({monthly: "Monthly", quarterly: "Quarterly", yearly: "Yearly"}[value] || value || "");
+  const assetFrequencyOptions = () => ["monthly", "quarterly", "yearly"].map((v) => [v, t(assetFrequencyLabel(v))]);
+
+  async function fixedAssetBanks(base) {
+    const banks = (await api(base + "/bank-accounts")).filter((x) => x.currency === org.base_currency);
+    if (!banks.length) toast(t("Add a bank account in the organisation base currency first."), "info");
+    return banks;
+  }
+
+  async function fixedAssetAcquisitionDialog(groups) {
+    const base = path(""), oid = org.id, key = prepaymentKey();
+    const banks = await fixedAssetBanks(base);
+    if (oid !== org.id || !banks.length) return;
+    const d = dialog("Record asset acquisition", form(
+      field("Asset name", "name", "", "text", 'required maxlength="240"') +
+      select("Asset group", "group_id", groups.map((x) => [x.id, x.name])) +
+      field("Acquisition date", "acquisition_date", today(), "date", "required") +
+      field("Acquisition cost", "acquisition_cost", "", "number", 'required min="0.01" step="0.01"') +
+      select("Bank account", "bank_account_id", banks.map((x) => [x.id, x.name])) +
+      `<p class="full-width muted">${tr("The acquisition is paid from the selected bank account and posted immediately.")}</p>`, "Record asset acquisition"));
+    bindForm(d, async (data) => {
+      await post(base + "/fixed-assets", {...data, idempotency_key: key});
+      await saved(d);
+    });
+  }
+
+  function assetGroupDialog() {
+    const base = path(""), d = dialog("Add asset group", form(
+      field("Asset group", "name", "", "text", 'required maxlength="240"') +
+      field("Annual depreciation percentage", "annual_percentage", "20", "number", 'required min="0.01" max="100" step="0.01"') +
+      select("Frequency", "frequency", assetFrequencyOptions(), "monthly"), "Add asset group"));
+    bindForm(d, async (data) => { await post(base + "/asset-groups", data); await saved(d); });
+  }
+
+  function depreciationRunDialog() {
+    const previousEnd = new Date(Number(today().slice(0, 4)), Number(today().slice(5, 7)) - 1, 0);
+    const periodDate = `${previousEnd.getFullYear()}-${String(previousEnd.getMonth() + 1).padStart(2, "0")}-${String(previousEnd.getDate()).padStart(2, "0")}`;
+    const base = path(""), d = dialog("Run depreciation", form(
+      field("Period date", "period_date", periodDate, "date", "required") +
+      select("Frequency", "kind", assetFrequencyOptions(), "monthly") +
+      `<p class="full-width muted">${tr("Use the last day of the month, quarter or year.")}</p>` +
+      `<p class="full-width muted">${tr("Each period is calculated once. Running it again returns the existing calculation.")}</p>`, "Run depreciation"));
+    d.querySelector('[name="kind"]').onchange = (event) => {
+      const year = Number(today().slice(0, 4)), month = Number(today().slice(5, 7)) - 1;
+      const boundaryMonth = event.target.value === "yearly" ? 0 : event.target.value === "quarterly" ? Math.floor(month / 3) * 3 : month;
+      const end = new Date(year, boundaryMonth, 0);
+      d.querySelector('[name="period_date"]').value = `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, "0")}-${String(end.getDate()).padStart(2, "0")}`;
+    };
+    bindForm(d, async (data) => { await post(base + "/fixed-assets/runs", data); await saved(d); });
+  }
+
+  async function assetDisposalDialog(asset) {
+    if (!asset) return;
+    const base = path(""), oid = org.id, banks = await fixedAssetBanks(base);
+    if (oid !== org.id || !banks.length) return;
+    const d = dialog("Dispose asset", form(
+      `<p class="full-width">${esc(asset.name)} · ${tr("Carrying value")}: ${esc(money(asset.carrying_value))}</p>` +
+      field("Disposal date", "disposal_date", today(), "date", `required min="${esc(asset.acquisition_date)}"`) +
+      field("Disposal proceeds", "disposal_amount", "0", "number", 'required min="0" step="0.01"') +
+      select("Bank account", "bank_account_id", banks.map((x) => [x.id, x.name])) +
+      `<p class="full-width muted">${tr("Disposal removes the asset cost and accumulated depreciation and posts any gain or loss.")}</p>`, "Dispose asset"));
+    bindForm(d, async (data) => {
+      await post(base + `/fixed-assets/${encodeURIComponent(asset.id)}/dispose`, data);
       await saved(d);
     });
   }

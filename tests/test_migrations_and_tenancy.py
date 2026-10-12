@@ -10,9 +10,9 @@ from organisations import AccessDenied, OrganisationService
 
 def test_empty_migration_is_idempotent(tmp_path):
     db = Database(path=str(tmp_path / "empty.sqlite"))
-    assert db.migrate() == ["0001_accounting_core", "0002_integrations", "0003_operations", "0004_document_immutability", "0005_payroll", "0006_payroll_part_time_hourly", "0007_automation", "0008_import_staging", "0009_local_accounts", "0010_tsd_export", "0011_account_mappings", "0012_external_gl", "0013_sync_review", "0014_sync_push", "0015_payment_orders", "0016_bank_feed_schedules", "0017_prepayments"]
+    assert db.migrate() == ["0001_accounting_core", "0002_integrations", "0003_operations", "0004_document_immutability", "0005_payroll", "0006_payroll_part_time_hourly", "0007_automation", "0008_import_staging", "0009_local_accounts", "0010_tsd_export", "0011_account_mappings", "0012_external_gl", "0013_sync_review", "0014_sync_push", "0015_payment_orders", "0016_bank_feed_schedules", "0017_prepayments", "0018_fixed_assets"]
     assert db.migrate() == []
-    assert db.scalar("SELECT COUNT(*) FROM schema_migrations") == 17
+    assert db.scalar("SELECT COUNT(*) FROM schema_migrations") == 18
     assert db.scalar(
         "SELECT COUNT(*) FROM sqlite_master WHERE type='table' "
         "AND name IN ('account_mappings','external_gl_entries')"
@@ -78,7 +78,7 @@ def test_organisation_entity_country_and_seed_data(db):
     uk = service.create(name="UK Sole", country_code="UK", entity_type="UK_SOLE_TRADER", owner_email="a@example.test")
     ee = service.create(name="EE FIE", country_code="EE", entity_type="EE_FIE", owner_email="a@example.test")
     assert uk["base_currency"] == "GBP" and ee["base_currency"] == "EUR"
-    assert db.scalar("SELECT COUNT(*) FROM accounts WHERE organisation_id=?", (uk["id"],)) == 12
+    assert db.scalar("SELECT COUNT(*) FROM accounts WHERE organisation_id=?", (uk["id"],)) == 15
     assert db.scalar("SELECT COUNT(*) FROM tax_codes WHERE organisation_id=?", (ee["id"],)) == 8
     assert db.scalar("SELECT COUNT(*) FROM fiscal_periods WHERE organisation_id=?", (uk["id"],)) == 24
     assert {row["code"]: row["name"] for row in db.rows(
@@ -149,3 +149,54 @@ def test_bank_feed_migration_preserves_previous_schema_data(tmp_path, monkeypatc
     assert db.migrate() == ['0016_bank_feed_schedules']
     assert {name: db.rows(f'SELECT * FROM {name} ORDER BY id') for name in tables} == before
     assert db.rows('SELECT * FROM bank_feed_schedules') == []
+
+
+@pytest.mark.parametrize("country", ["UK", "EE"])
+@pytest.mark.parametrize("existing_role", [False, True])
+def test_fixed_asset_upgrade_preserves_custom_charts_and_postings(tmp_path, monkeypatch, country, existing_role):
+    import shutil
+    import database
+    import organisations
+    from core_utils import new_id
+    from decimal import Decimal
+    from ledger import LedgerService, PostingLine
+
+    original = database.MIGRATIONS
+    previous = tmp_path / "previous" / "sqlite"
+    previous.mkdir(parents=True)
+    for path in (original / "sqlite").glob("*.sql"):
+        if path.stem < "0018":
+            shutil.copyfile(path, previous / path.name)
+    monkeypatch.setattr(database, "MIGRATIONS", previous.parent)
+    roles = {"FIXED_ASSETS", "ACCUMULATED_DEPRECIATION", "DEPRECIATION_EXPENSE"}
+    for chart in ["UK_ACCOUNTS", "EE_ACCOUNTS"]:
+        monkeypatch.setattr(organisations, chart, tuple(row for row in getattr(organisations, chart) if row[4] not in roles))
+    db = Database(path=str(tmp_path / "assets-upgrade.sqlite"))
+    db.migrate()
+    org = OrganisationService(db).create(name="Synthetic assets upgrade", country_code=country,
+        entity_type="UK_COMPANY" if country == "UK" else "EE_OU", owner_email="owner@example.test")
+    codes = [1500, 1550, 6500] if country == "UK" else [1410, 1419, 6410]
+    with db.transaction() as tx:
+        for base in codes:
+            for offset in range(2):
+                tx.execute("INSERT INTO accounts(id,organisation_id,code,name,account_type,normal_balance) VALUES (?,?,?,'Custom asset chart','Asset','Debit')",
+                           (new_id(), org["id"], str(base + offset)))
+        if existing_role:
+            tx.execute("INSERT INTO accounts(id,organisation_id,code,name,account_type,normal_balance,system_role) VALUES (?,?,'9998','Existing fixed assets','Asset','Debit','FIXED_ASSETS')",
+                       (new_id(), org["id"]))
+    accounts = {row["system_role"]: row["id"] for row in db.rows("SELECT * FROM accounts WHERE organisation_id=?", (org["id"],))}
+    LedgerService(db).post(organisation_id=org["id"], posting_date="2026-01-01", voucher_type="synthetic", voucher_id="upgrade", voucher_code="Synthetic preserved posting", currency=org["base_currency"],
+        lines=[PostingLine(accounts["BANK"], debit=Decimal("10")), PostingLine(accounts["CAPITAL"], credit=Decimal("10"))], actor="owner@example.test")
+    before = {table: db.rows(f"SELECT * FROM {table} ORDER BY id") for table in ["organisations", "accounts", "gl_entries", "posting_batches", "audit_events"]}
+    monkeypatch.setattr(database, "MIGRATIONS", original)
+    assert db.migrate() == ["0018_fixed_assets"]
+    assert db.migrate() == []
+    after_accounts = db.rows("SELECT * FROM accounts ORDER BY id")
+    assert all(row in after_accounts for row in before["accounts"])
+    for table in ["organisations", "gl_entries", "posting_batches", "audit_events"]:
+        assert db.rows(f"SELECT * FROM {table} ORDER BY id") == before[table]
+    assigned = {row["system_role"]: row for row in after_accounts if row["system_role"] in roles}
+    for role, code in zip(["FIXED_ASSETS", "ACCUMULATED_DEPRECIATION", "DEPRECIATION_EXPENSE"], codes):
+        assert assigned[role]["code"] == ("9998" if role == "FIXED_ASSETS" and existing_role else str(code + 2))
+    assert assigned["ACCUMULATED_DEPRECIATION"]["normal_balance"] == "Credit"
+    assert db.rows("SELECT * FROM asset_groups") == []
