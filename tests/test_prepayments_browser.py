@@ -106,7 +106,7 @@ def test_prepayment_create_allocate_refund_dialogs(monkeypatch, language, side):
         dialog.locator("[name=amount]").fill("40")
         submit.click()
         playwright.expect(page.get_by_role("dialog")).to_have_count(0)
-        playwright.expect(page.get_by_text(words["Part Paid"], exact=True)).to_be_visible()
+        playwright.expect(page.locator("#app-content tbody").get_by_text(words["Part Paid"], exact=True)).to_be_visible()
         page.get_by_role("button", name=words["Refund prepayment"], exact=True).click()
         dialog = page.get_by_role("dialog")
         playwright.expect(dialog.locator("[name=amount]")).to_have_value("160")

@@ -218,3 +218,38 @@ def vat_returns_workbook(organisation: dict, returns_: list[dict]) -> bytes:
                 value = json.dumps(value, ensure_ascii=False, sort_keys=True)
             _put(sheet, row, column, value)
     return _finish(workbook)
+
+
+DOCUMENT_LIST_HEADERS = (
+    "Number", "Reference", "Contact name", "Date", "Due date", "Currency",
+    "Net", "VAT", "Gross", "Paid", "Status",
+)
+
+
+def document_list_values(document: dict, kind: str) -> tuple:
+    sales = kind == "invoices"
+    return (
+        document.get("number" if sales else "supplier_number") or "",
+        document.get("reference") or "", document.get("contact_name") or "",
+        document.get("issue_date" if sales else "bill_date"), document.get("due_date"),
+        document.get("currency"),
+        *(_from_decimal(document.get(key)).quantize(Decimal("0.01"))
+          for key in ("subtotal", "tax_total", "total", "paid_total")),
+        document.get("status"),
+    )
+
+
+def document_list_workbook(organisation: dict, documents: list[dict], kind: str) -> bytes:
+    title = "Invoices" if kind == "invoices" else "Bills"
+    workbook = _book(organisation, title)
+    sheet = workbook.active
+    sheet.title = title
+    _header_row(sheet, DOCUMENT_LIST_HEADERS)
+    for document in documents:
+        row = sheet.max_row + 1
+        for column, value in enumerate(document_list_values(document, kind), 1):
+            _put(sheet, row, column, value)
+            if isinstance(value, str):
+                sheet.cell(row=row, column=column).data_type = "s"
+    # Currency is retained on each row; mixed currencies are never summed.
+    return _finish(workbook)

@@ -1746,5 +1746,18 @@
       "Active": "Active",
       "Inactive": "Inactive"
     }
+  },
+  "invoice_exports": {
+    "nav": {},
+    "views": {},
+    "workspace": {
+      "Date from": "Date from",
+      "Date to": "Date to",
+      "Search": "Search",
+      "Export Excel": "Export Excel",
+      "Document dates must use YYYY-MM-DD format": "Document dates must use YYYY-MM-DD format",
+      "Document date_from cannot be after date_to": "Document date_from cannot be after date_to",
+      "Document export not found": "Document export not found"
+    }
   }
 }

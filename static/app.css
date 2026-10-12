@@ -1612,3 +1612,16 @@ details[open] > summary {
   place-items: center;
   color: var(--muted);
 }
+
+.document-list-filters {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr));
+  margin-bottom: 12px;
+}
+.document-list-filters > *,
+.document-list-filters input,
+.document-list-filters select {
+  min-width: 0;
+}
+.document-list-filters + .actions {
+  margin-bottom: 16px;
+}

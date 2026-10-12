@@ -1226,3 +1226,32 @@ the entries below, plus one connector fix:
   existing PostgreSQL opt-in checks. JavaScript syntax, Python compilation,
   existing locale preservation, desktop/mobile visual review, diff and staged
   secret-pattern checks passed. All data used by the new tests is synthetic.
+
+## 2026-10-12: Invoice list exports and filters
+
+- Added shared read-only list selection in a tenant-scoped repository and
+  service. Existing invoice and bill GET endpoints accept all six filters,
+  with inclusive dates, literal search wildcards and clean unknown-value
+  results. Malformed dates and reversed ranges return 400 on these routes.
+- Added CSV and XLSX downloads for filtered sales invoices and purchase bills,
+  available to viewers and other book members. Downloads preserve two-place
+  money, row currencies and safe spreadsheet text. Existing invoice report
+  XLSX downloads now honour the same filters and preserve their layout.
+- Added labelled status, customer/supplier, date range, search and currency
+  controls above both SPA lists, plus downloads carrying the current query.
+  Retained the Overdue shortcut and appended new copy in all four locales.
+- Added synthetic tests for both countries and kinds, every filter and combined
+  selection, tenant isolation, CSV/Excel content, formula safety, date errors,
+  viewer/non-member gates and offline desktop/mobile browser controls in four
+  locales. Updated two existing locale-tail assertions for the required appended
+  section and scoped the existing prepayment status assertion to table rows,
+  avoiding the new filter option. No migration, dependency or live network calls
+  were introduced.
+- Deferred persisted preferences, large-list pagination/streaming and production
+  accountant UAT. Scope is synchronised with the roadmap and design note.
+- Validation: Python 3.12.14, `python -m pytest -q`:
+  `960 passed, 4 skipped in 858.84s (0:14:18)`. All 24 new checks passed,
+  including four-locale browser controls and both country/kind combinations.
+  The skips are the existing opt-in PostgreSQL checks. JavaScript syntax,
+  Python compilation, existing locale preservation and staged diff/copy/secret
+  checks passed. Tests used synthetic data and no live network calls.
