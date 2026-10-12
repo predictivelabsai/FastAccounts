@@ -36,7 +36,8 @@
     "recurring": "Periodiskie rēķini un atgādinājumi",
     "fixed_assets": "Pamatlīdzekļi",
     "cash_flow": "Naudas plūsmas pārskats",
-    "data_import": "Datu imports"
+    "data_import": "Datu imports",
+    "quotes": "Piedāvājumi"
   },
   "footer": {
     "tagline": "Atvērtā pirmkoda grāmatvedība Apvienotajai Karalistei un Igaunijai.",
@@ -1421,7 +1422,47 @@
     "Import batch not found": "Imports nav atrasts",
     "Only a staged batch can be committed or discarded": "Importēt vai atmest var tikai sagatavotus datus",
     "CSV columns must match the supported columns for contacts": "CSV kolonnām jāatbilst kontaktpersonu kolonnām",
-    "CSV columns must match the supported columns for items": "CSV kolonnām jāatbilst preču kolonnām"
+    "CSV columns must match the supported columns for items": "CSV kolonnām jāatbilst preču kolonnām",
+    "Quotes": "Piedāvājumi",
+    "Quote": "Piedāvājums",
+    "Quote lines": "Piedāvājuma rindas",
+    "Quote line": "Piedāvājuma rinda",
+    "Valid until": "Derīgs līdz",
+    "Quote date": "Piedāvājuma datums",
+    "New quote": "Jauns piedāvājums",
+    "Edit quote": "Rediģēt piedāvājumu",
+    "Accept": "Pieņemt",
+    "Decline": "Noraidīt",
+    "Expired": "Beidzies",
+    "Converted": "Pārvērsts rēķinā",
+    "Accepted": "Pieņemts",
+    "Declined": "Noraidīts",
+    "Mark sent": "Atzīmēt kā nosūtītu",
+    "Expire": "Atzīmēt kā beigušos",
+    "Convert": "Pārvērst rēķinā",
+    "Convert to invoice": "Pārvērst piedāvājumu rēķinā",
+    "Customer offers before invoicing.": "Piedāvājumi klientiem pirms rēķina izrakstīšanas.",
+    "Add line": "Pievienot rindu",
+    "Remove line": "Noņemt rindu",
+    "Amount type": "Summas veids",
+    "Exclusive": "Bez PVN",
+    "Inclusive": "Ar PVN",
+    "No tax": "Bez nodokļa",
+    "Mark this quote as sent. Email delivery is not available yet.": "Atzīmēt piedāvājumu kā nosūtītu. Nosūtīšana pa e-pastu vēl nav pieejama.",
+    "This creates and issues a sales invoice with an immutable ledger posting.": "Tiek izveidots un izrakstīts pārdošanas rēķins ar nemaināmu virsgrāmatas ierakstu.",
+    "Quote validity cannot precede the quote date": "Piedāvājuma derīguma termiņš nevar būt pirms piedāvājuma datuma",
+    "Quotes require the organisation base currency": "Piedāvājumiem jābūt organizācijas pamatvalūtā",
+    "Quote line amounts must be finite with at most four decimal places": "Piedāvājuma rindas summām jābūt galīgām ar ne vairāk kā četrām zīmēm aiz komata",
+    "Invalid quote line amount": "Nederīga piedāvājuma rindas summa",
+    "Quote total exceeds the supported amount": "Piedāvājuma kopsumma pārsniedz atļauto robežu",
+    "Only Draft quotes can be edited": "Rediģēt var tikai piedāvājumu melnrakstus",
+    "Invalid quote status transition": "Nederīga piedāvājuma statusa maiņa",
+    "Quote has expired": "Piedāvājuma derīguma termiņš ir beidzies",
+    "Quote is still valid": "Piedāvājums vēl ir derīgs",
+    "Only Accepted quotes can be converted": "Rēķinā var pārvērst tikai pieņemtus piedāvājumus",
+    "Quote not found": "Piedāvājums nav atrasts",
+    "Quote fields cannot be null": "Piedāvājuma laukiem nevar būt null vērtība",
+    "Notes": "Piezīmes"
   },
   "views": {
     "overview": "Overview",
@@ -1432,7 +1473,8 @@
     "accounting": "Accounting",
     "tax": "Tax",
     "payroll": "Payroll",
-    "integrations": "Integrations"
+    "integrations": "Integrations",
+    "quotes": "Piedāvājumi"
   },
   "actions": {
     "create_organisation": "Create organisation",
@@ -1452,7 +1494,12 @@
     "In bank": "In bank",
     "Overdue": "Overdue",
     "Active": "Active",
-    "Inactive": "Inactive"
+    "Inactive": "Inactive",
+    "Sent": "Nosūtīts",
+    "Accepted": "Pieņemts",
+    "Declined": "Noraidīts",
+    "Expired": "Beidzies",
+    "Converted": "Pārvērsts rēķinā"
   },
   "bureau": {
     "title": "Grāmatvedības birojiem",

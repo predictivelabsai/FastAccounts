@@ -689,6 +689,45 @@
           }),
       );
     },
+    quotes: async (c) => {
+      const rows = await api(c.url("/quotes"));
+      const actions = (x) => {
+        const attrs = `data-id="${esc(x.id)}"`;
+        const stale = x.valid_until < today();
+        return button("Quote", "viewQuote", false, attrs) +
+          (x.status === "Draft" ? button("Edit", "editQuote", false, attrs) +
+            (!stale ? button("Mark sent", "sendQuote", false, attrs) : "") : "") +
+          (x.status === "Sent" ? (!stale ? button("Accept", "acceptQuote", false, attrs) : "") +
+            button("Decline", "declineQuote", false, attrs) : "") +
+          (["Draft", "Sent"].includes(x.status) && stale ? button("Expire", "expireQuote", false, attrs) : "") +
+          (x.status === "Accepted" ? button("Convert", "convertQuote", false, attrs) : "") +
+          (x.status === "Converted" ? link("Invoice", "#invoices") : "");
+      };
+      if (!c.mount(page(t("Quotes"), t("Customer offers before invoicing."),
+        button("New quote", "newQuote", true), table(
+          ["Number", "Customer", "Quote date", "Valid until", "Status", ["Total"], "Actions"],
+          rows.map((x) => row([td(esc(x.quote_number)), td(esc(x.contact_name)), td(date(x.quote_date)),
+            td(date(x.valid_until)), td(pill(x.status)), td(esc(money(x.total, x.currency)), "numeric"), td(actions(x))])),
+          button("New quote", "newQuote"))))) return;
+      const transition = async (b, action) => {
+        await post(c.url(`/quotes/${b.dataset.id}/${action}`));
+        await render();
+      };
+      bindActions(content, {
+        newQuote: () => quoteDialog(),
+        editQuote: (b) => quoteDialog(b.dataset.id),
+        viewQuote: (b) => quoteDialog(b.dataset.id, true),
+        sendQuote: (b) => confirmAction("Mark sent", tr("Mark this quote as sent. Email delivery is not available yet."), () => transition(b, "send")),
+        acceptQuote: (b) => transition(b, "accept"),
+        declineQuote: (b) => transition(b, "decline"),
+        expireQuote: (b) => transition(b, "expire-status"),
+        convertQuote: (b) => confirmAction("Convert to invoice", tr("This creates and issues a sales invoice with an immutable ledger posting."), async () => {
+          const invoice = await post(c.url(`/quotes/${b.dataset.id}/convert`));
+          toast(`${t("Invoice issued")}: ${invoice.number}`);
+          await render();
+        }),
+      });
+    },
     recurring: async (c) => {
       const [schedules, reminders, invoices] = await Promise.all([
         api(c.url("/invoice-schedules")),
@@ -2248,6 +2287,70 @@
       await attachmentsSection(d, base, kind, record.id);
       toast(t("Saved successfully"));
       await render();
+    });
+  }
+  async function quoteDialog(quoteId = null, readOnly = false) {
+    const base = path("");
+    const [contacts, accounts, taxes, record] = await Promise.all([
+      api(base + "/contacts"), api(base + "/accounts"), api(base + "/tax-codes"),
+      quoteId ? api(base + `/quotes/${quoteId}`) : Promise.resolve(null),
+    ]);
+    if (base !== path("")) return;
+    if (readOnly || (record && record.status !== "Draft")) {
+      dialog("Quote", `<p>${esc(record.quote_number)} · ${esc(record.contact_name)} · ${pill(record.status)}</p>` +
+        `<p>${tr("Quote date")}: ${esc(date(record.quote_date))} · ${tr("Valid until")}: ${esc(date(record.valid_until))}</p>` +
+        `<h3>${tr("Quote lines")}</h3>` + table(["Description", "Quantity", "Unit price", ["Total"]], record.lines.map((x) =>
+          row([td(esc(x.description)), td(esc(num(x.quantity))), td(esc(money(x.unit_price, record.currency))), td(esc(money(x.gross_amount, record.currency)))]))) +
+        `<p>${tr("Total")}: ${esc(money(record.total, record.currency))}</p><p>${esc(record.notes)}</p>`);
+      return;
+    }
+    const customers = contacts.filter((x) => ["customer", "both"].includes(x.contact_type));
+    if (!customers.length) {
+      toast(t("Add a contact before creating a document."), "info");
+      return contactDialog("customer");
+    }
+    const d = dialog(record ? "Edit quote" : "New quote", form(
+      select("Customer", "contact_id", customers.map((x) => [x.id, x.name]), record?.contact_id) +
+      field("Quote date", "quote_date", record?.quote_date || today(), "date", "required") +
+      field("Valid until", "valid_until", record?.valid_until || today(), "date", "required") +
+      select("Amount type", "amount_type", [["exclusive", t("Exclusive")], ["inclusive", t("Inclusive")], ["no_tax", t("No tax")]], record?.line_amount_type || "exclusive") +
+      field("Notes", "notes", record?.notes || "") +
+      `<div class="full-width"><h3>${tr("Quote lines")}</h3><div data-quote-lines></div>${button("Add line", "addQuoteLine")}</div>`,
+      record ? "Save" : "Create draft"));
+    let nextLine = 0;
+    const addLine = (line = {}) => {
+      const index = nextLine++;
+      const fields = document.createElement("fieldset");
+      fields.className = "form-grid";
+      fields.dataset.quoteLine = index;
+      fields.innerHTML = `<legend>${tr("Quote line")}</legend>` +
+        field("Description", `description_${index}`, line.description || "", "text", "required") +
+        field("Quantity", `quantity_${index}`, line.quantity ?? 1, "number", 'required min="0.0001" step="0.0001"') +
+        field("Unit price", `unit_price_${index}`, line.unit_price ?? "", "number", 'required min="0" step="0.0001"') +
+        select("Income account", `account_id_${index}`, accounts.filter((x) => x.active && x.account_type === "Income").map((x) => [x.id, `${x.code} ${x.name}`]), line.account_id) +
+        select("Tax code", `tax_code_id_${index}`, [["", t("No tax")], ...taxes.filter((x) => x.active).map((x) => [x.id, `${x.code} · ${num(x.rate)}%`])], line.tax_code_id || "") +
+        button("Remove line", "removeQuoteLine");
+      d.querySelector("[data-quote-lines]").append(fields);
+      fields.querySelector(`[name=account_id_${index}]`).required = true;
+      fields.querySelector("[data-action=removeQuoteLine]").onclick = () => {
+        if (d.querySelectorAll("[data-quote-line]").length > 1) fields.remove();
+      };
+    };
+    (record?.lines || [{}]).forEach(addLine);
+    d.querySelector("[data-action=addQuoteLine]").onclick = () => addLine();
+    d.querySelector('[name=contact_id]').required = true;
+    bindForm(d, async (data) => {
+      const lines = [...d.querySelectorAll("[data-quote-line]")].map((fields) => {
+        const line = {}, index = fields.dataset.quoteLine;
+        ["description", "quantity", "unit_price", "account_id", "tax_code_id"].forEach((key) => {
+          line[key] = data[`${key}_${index}`];
+          delete data[`${key}_${index}`];
+        });
+        line.tax_code_id ||= null;
+        return line;
+      });
+      await post(base + (quoteId ? `/quotes/${quoteId}` : "/quotes"), { ...data, lines }, quoteId ? "PATCH" : "POST");
+      await saved(d);
     });
   }
   function eInvoiceImportDialog() {

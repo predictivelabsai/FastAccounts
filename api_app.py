@@ -21,6 +21,7 @@ from banking import BankingService
 from connectors.registry import provider_metadata
 from database import get_database
 from documents import DocumentService, EInvoiceAlreadyImported
+from quotes import QuoteService
 from statements import StatementService
 from cash_flow import CashFlowService
 from excel_export import (employees_workbook, general_ledger_workbook,
@@ -85,6 +86,33 @@ class InvoiceIn(BaseModel):
     document_type: Literal["invoice", "credit_note"] = "invoice"
     original_invoice_id: str | None = None
     lines: list[LineIn] = Field(min_length=1)
+
+
+class QuoteIn(BaseModel):
+    contact_id: str
+    quote_date: str
+    valid_until: str
+    currency: str | None = None
+    amount_type: Literal["exclusive", "inclusive", "no_tax"] = "exclusive"
+    notes: str = ""
+    lines: list[LineIn] = Field(min_length=1)
+
+
+class QuotePatch(BaseModel):
+    contact_id: str | None = None
+    quote_date: str | None = None
+    valid_until: str | None = None
+    currency: str | None = None
+    amount_type: Literal["exclusive", "inclusive", "no_tax"] | None = None
+    notes: str | None = None
+    lines: list[LineIn] | None = Field(default=None, min_length=1)
+
+    @field_validator('contact_id', 'quote_date', 'valid_until', 'amount_type', 'notes', 'lines')
+    @classmethod
+    def reject_null(cls, value):
+        if value is None:
+            raise ValueError('Quote fields cannot be null')
+        return value
 
 
 class BillIn(BaseModel):
@@ -467,6 +495,60 @@ def discard_master_data_import(organisation_id: str, batch_id: str, user: User =
 def create_contact(organisation_id: str, payload: ContactIn, user: User = Depends(require_csrf)):
     _require(organisation_id, user, WRITE_ROLES)
     return DocumentService().create_contact(organisation_id, **payload.model_dump())
+
+
+@api.get("/organisations/{organisation_id}/quotes")
+def list_quotes(organisation_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, {"owner", "administrator", "accountant", "approver", "viewer"})
+    return QuoteService().list(organisation_id)
+
+
+@api.get("/organisations/{organisation_id}/quotes/{quote_id}")
+def get_quote(organisation_id: str, quote_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, {"owner", "administrator", "accountant", "approver", "viewer"})
+    return QuoteService().get(organisation_id, quote_id)
+
+
+@api.post("/organisations/{organisation_id}/quotes", status_code=201)
+def create_quote(organisation_id: str, payload: QuoteIn, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return QuoteService().create(organisation_id, actor=user.email, **payload.model_dump())
+
+
+@api.patch("/organisations/{organisation_id}/quotes/{quote_id}")
+def update_quote(organisation_id: str, quote_id: str, payload: QuotePatch, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return QuoteService().update(organisation_id, quote_id, actor=user.email, **payload.model_dump(exclude_unset=True))
+
+
+@api.post("/organisations/{organisation_id}/quotes/{quote_id}/send")
+def send_quote(organisation_id: str, quote_id: str, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return QuoteService().send(organisation_id, quote_id, actor=user.email)
+
+
+@api.post("/organisations/{organisation_id}/quotes/{quote_id}/accept")
+def accept_quote(organisation_id: str, quote_id: str, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return QuoteService().accept(organisation_id, quote_id, actor=user.email)
+
+
+@api.post("/organisations/{organisation_id}/quotes/{quote_id}/decline")
+def decline_quote(organisation_id: str, quote_id: str, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return QuoteService().decline(organisation_id, quote_id, actor=user.email)
+
+
+@api.post("/organisations/{organisation_id}/quotes/{quote_id}/expire-status")
+def expire_quote(organisation_id: str, quote_id: str, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return QuoteService().expire(organisation_id, quote_id, actor=user.email)
+
+
+@api.post("/organisations/{organisation_id}/quotes/{quote_id}/convert")
+def convert_quote(organisation_id: str, quote_id: str, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return QuoteService().convert(organisation_id, quote_id, actor=user.email)
 
 
 @api.get("/organisations/{organisation_id}/invoices")

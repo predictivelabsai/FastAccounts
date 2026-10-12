@@ -192,7 +192,7 @@ def test_bank_role_on_fresh_and_upgraded_organisations(tmp_path, monkeypatch, co
     movement(db, org['id'], accounts, day, 'before-upgrade', 'CAPITAL', '25')
     before = CashFlowService(db).statement(org['id'], date_from=day, date_to=day)
     monkeypatch.setattr(database, 'MIGRATIONS', original)
-    assert db.migrate() == ['0016_bank_feed_schedules', '0017_prepayments', '0018_fixed_assets', '0019_master_data_import']
+    assert db.migrate() == ['0016_bank_feed_schedules', '0017_prepayments', '0018_fixed_assets', '0019_master_data_import', '0020_quotes']
     assert db.rows("SELECT * FROM accounts WHERE organisation_id=? AND system_role='BANK'", (org['id'],)) == liquid
     assert CashFlowService(db).statement(org['id'], date_from=day, date_to=day) == before
     assert before['closing_balance'] == 25

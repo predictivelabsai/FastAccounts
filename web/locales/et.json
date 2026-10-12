@@ -36,7 +36,8 @@
     "recurring": "Korduvad ja meeldetuletused",
     "fixed_assets": "Põhivarad",
     "cash_flow": "Rahavoo aruanne",
-    "data_import": "Andmete import"
+    "data_import": "Andmete import",
+    "quotes": "Pakkumised"
   },
   "footer": {
     "tagline": "Avatud lähtekoodiga raamatupidamine Ühendkuningriigis ja Eestis.",
@@ -1421,7 +1422,47 @@
     "Import batch not found": "Importi ei leitud",
     "Only a staged batch can be committed or discarded": "Ainult veel kinnitamata importi saab kinnitada või kustutada",
     "CSV columns must match the supported columns for contacts": "CSV veerud peavad vastama kontaktide veergudele",
-    "CSV columns must match the supported columns for items": "CSV veerud peavad vastama artiklite veergudele"
+    "CSV columns must match the supported columns for items": "CSV veerud peavad vastama artiklite veergudele",
+    "Quotes": "Pakkumised",
+    "Quote": "Pakkumine",
+    "Quote lines": "Pakkumise read",
+    "Quote line": "Pakkumise rida",
+    "Valid until": "Kehtiv kuni",
+    "Quote date": "Pakkumise kuupäev",
+    "New quote": "Uus pakkumine",
+    "Edit quote": "Muuda pakkumist",
+    "Accept": "Võta vastu",
+    "Decline": "Keeldu",
+    "Expired": "Aegunud",
+    "Converted": "Muudetud arveks",
+    "Accepted": "Vastu võetud",
+    "Declined": "Tagasi lükatud",
+    "Mark sent": "Märgi saadetuks",
+    "Expire": "Märgi aegunuks",
+    "Convert": "Muuda arveks",
+    "Convert to invoice": "Muuda pakkumine arveks",
+    "Customer offers before invoicing.": "Pakkumised klientidele enne arve esitamist.",
+    "Add line": "Lisa rida",
+    "Remove line": "Eemalda rida",
+    "Amount type": "Summa liik",
+    "Exclusive": "Käibemaksuta",
+    "Inclusive": "Käibemaksuga",
+    "No tax": "Maksuvaba",
+    "Mark this quote as sent. Email delivery is not available yet.": "Märgi pakkumine saadetuks. E-postiga saatmine ei ole veel saadaval.",
+    "This creates and issues a sales invoice with an immutable ledger posting.": "Luuakse ja väljastatakse müügiarve koos muutmatu pearaamatu kandega.",
+    "Quote validity cannot precede the quote date": "Pakkumise kehtivusaeg ei saa lõppeda enne pakkumise kuupäeva",
+    "Quotes require the organisation base currency": "Pakkumised peavad olema organisatsiooni põhivaluutas",
+    "Quote line amounts must be finite with at most four decimal places": "Pakkumise rea summad peavad olema lõplikud ja kuni nelja komakohaga",
+    "Invalid quote line amount": "Pakkumise rea summa on vigane",
+    "Quote total exceeds the supported amount": "Pakkumise kogusumma ületab lubatud piiri",
+    "Only Draft quotes can be edited": "Muuta saab ainult kavandi olekus pakkumisi",
+    "Invalid quote status transition": "Pakkumise olekut ei saa nii muuta",
+    "Quote has expired": "Pakkumine on aegunud",
+    "Quote is still valid": "Pakkumine on veel kehtiv",
+    "Only Accepted quotes can be converted": "Arveks saab muuta ainult vastu võetud pakkumisi",
+    "Quote not found": "Pakkumist ei leitud",
+    "Quote fields cannot be null": "Pakkumise väljad ei saa olla tühiväärtusega",
+    "Notes": "Märkused"
   },
   "views": {
     "overview": "Ülevaade",
@@ -1432,7 +1473,8 @@
     "accounting": "Raamatupidamine",
     "tax": "Maksud",
     "payroll": "Palgaarvestus",
-    "integrations": "Liidestused"
+    "integrations": "Liidestused",
+    "quotes": "Pakkumised"
   },
   "actions": {
     "create_organisation": "Lisa ettevõte",
@@ -1452,7 +1494,12 @@
     "In bank": "Pangas",
     "Overdue": "Tähtaja ületanud",
     "Active": "Aktiivne",
-    "Inactive": "Mitteaktiivne"
+    "Inactive": "Mitteaktiivne",
+    "Sent": "Saadetud",
+    "Accepted": "Vastu võetud",
+    "Declined": "Tagasi lükatud",
+    "Expired": "Aegunud",
+    "Converted": "Muudetud arveks"
   },
   "bureau": {
     "title": "Raamatupidajatele",

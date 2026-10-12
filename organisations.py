@@ -121,7 +121,7 @@ class OrganisationService:
             )
             self._seed_accounts(tx, organisation_id, country)
             self._seed_taxes(tx, organisation_id, country)
-            for document_type, prefix in (("invoice", "INV-"), ("credit_note", "CRN-")):
+            for document_type, prefix in (("invoice", "INV-"), ("credit_note", "CRN-"), ("quote", "QUO-")):
                 tx.execute(
                     "INSERT INTO document_sequences(organisation_id,document_type,prefix,next_number) VALUES (?,?,?,1)",
                     (organisation_id, document_type, prefix),
