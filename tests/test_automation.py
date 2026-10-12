@@ -274,7 +274,7 @@ def test_populated_upgrade_preserves_posted_data(tmp_path, monkeypatch):
     ledger = db.rows("SELECT * FROM gl_entries ORDER BY id")
     audits = db.rows("SELECT * FROM audit_events ORDER BY id")
     monkeypatch.setattr(database, "MIGRATIONS", original)
-    assert db.migrate() == ["0007_automation", "0008_import_staging", "0009_local_accounts", "0010_tsd_export", "0011_account_mappings", "0012_external_gl", "0013_sync_review", "0014_sync_push", "0015_payment_orders", "0016_bank_feed_schedules"]
+    assert db.migrate() == ["0007_automation", "0008_import_staging", "0009_local_accounts", "0010_tsd_export", "0011_account_mappings", "0012_external_gl", "0013_sync_review", "0014_sync_push", "0015_payment_orders", "0016_bank_feed_schedules", "0017_prepayments"]
     assert db.migrate() == []
     current = DocumentService(db).invoice(invoice["id"])
     assert current.pop("reminders_disabled") == 0

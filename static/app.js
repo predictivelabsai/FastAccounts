@@ -611,15 +611,18 @@
         .forEach((b) => (b.onclick = () => switchOrg(b.dataset.client)));
     },
     invoices: async (c) => {
-      const rows = await api(c.url("/invoices"));
+      const [rows, prepayments] = await Promise.all([
+        api(c.url("/invoices")), api(c.url("/prepayments?side=customer")),
+      ]);
       if (
         !c.mount(
           page(
             t("Invoices"),
             t("From first draft to final payment."),
             button("New contact", "newContact") +
+              button("Record customer prepayment", "newPrepayment", false, canExecutePush() ? "" : "disabled") +
               button("New invoice", "newInvoice", true),
-            `<div class="chips">${["All", "Draft", "Issued", "Overdue"].map((s) => `<button class="chip ${invoiceFilter === s ? "active" : ""}" data-filter="${s}">${tr(s)}</button>`).join("")}</div><div id="invoice-table"></div>`,
+            `<div class="chips">${["All", "Draft", "Issued", "Overdue"].map((s) => `<button class="chip ${invoiceFilter === s ? "active" : ""}" data-filter="${s}">${tr(s)}</button>`).join("")}</div><div id="invoice-table"></div>${prepaymentSection(prepayments, "customer")}`,
           ),
         )
       )
@@ -656,6 +659,7 @@
           button("New invoice", "newInvoice"),
         );
         bindActions(content, {
+          ...prepaymentActions(prepayments, "customer"),
           newInvoice: () => documentDialog("invoice"),
           newContact: () => contactDialog("customer"),
           invoiceAttachments: (b) => documentDialog("invoice", b.dataset.id),
@@ -794,13 +798,16 @@
       });
     },
     bills: async (c) => {
-      const [rows, orders] = await Promise.all([api(c.url("/bills")), api(c.url("/payment-orders"))]);
+      const [rows, orders, prepayments] = await Promise.all([
+        api(c.url("/bills")), api(c.url("/payment-orders")), api(c.url("/prepayments?side=supplier")),
+      ]);
       if (
         !c.mount(
           page(
             t("Bills"),
             t("Review supplier documents before posting."),
             button("New supplier", "supplier") +
+              button("Record supplier prepayment", "newPrepayment", false, canExecutePush() ? "" : "disabled") +
               button("Import e-invoice", "importEInvoice") +
               button("Create payment order", "paymentOrder") +
               button("New bill", "bill", true),
@@ -840,12 +847,13 @@
               orders.map((order) => row([td(date(order.execution_date)), td(esc(order.bill_count)),
                 cash(order.total, order.lines[0]?.currency),
                 td(link("Download XML", `/api${c.url(`/payment-orders/${order.id}.xml`)}`))])),
-            )}</section>`,
+            )}</section>${prepaymentSection(prepayments, "supplier")}`,
           ),
         )
       )
         return;
       bindActions(content, {
+        ...prepaymentActions(prepayments, "supplier"),
         bill: () => documentDialog("bill"),
         importEInvoice: () => eInvoiceImportDialog(),
         supplier: () => contactDialog("supplier"),
@@ -906,7 +914,8 @@
                 td(esc(x.email || "—")),
                 td(esc(x.country_code)),
                 td(esc(x.vat_no || "—")),
-                td(button("Statement of account", "statement", false, `data-id="${x.id}"`)),
+                td(button("Statement of account", "statement", false, `data-id="${x.id}"`) +
+                   button("Outstanding prepayments", "contactPrepayments", false, `data-id="${esc(x.id)}"`)),
               ]),
             ),
           button("New customer", "customer"),
@@ -915,6 +924,7 @@
           customer: () => contactDialog("customer"),
           supplier: () => contactDialog("supplier"),
           statement: (b) => statementDialog(rows.find((x) => x.id === b.dataset.id)),
+          contactPrepayments: (b) => contactPrepaymentsDialog(rows.find((x) => x.id === b.dataset.id)),
         });
       };
       draw();
@@ -2309,6 +2319,108 @@
       if (await f.elements.opening_file.files[0].text() !== reviewedContent)
         throw new Error(t("The file changed. Preview it again before posting."));
       await post(base, { posting_date: data.posting_date, csv_content: reviewedContent });
+      await saved(d);
+    });
+  }
+
+  const prepaymentKey = () => Array.from(crypto.getRandomValues(new Uint32Array(4)), (x) => x.toString(16)).join("-");
+
+  function prepaymentSection(rows, side) {
+    return `<section class="section"><h2>${tr(side === "customer" ? "Customer prepayments" : "Supplier prepayments")}</h2>${table(
+      [side === "customer" ? "Customer" : "Supplier", "Date", "Reference", ["Amount"], ["Unallocated balance"], "Actions"],
+      rows.map((x) => row([
+        td(esc(x.contact_name)), td(date(x.document_date), "numeric"), td(esc(x.reference)),
+        cash(x.amount, x.currency), cash(x.unallocated_balance, x.currency),
+        td(Number(x.unallocated_balance) > 0 ?
+          button("Allocate prepayment", "allocatePrepayment", false, `data-id="${esc(x.id)}" ${canExecutePush() ? "" : "disabled"}`) +
+          button("Refund prepayment", "refundPrepayment", false, `data-id="${esc(x.id)}" ${canExecutePush() ? "" : "disabled"}`) : ""),
+      ])),
+    )}</section>`;
+  }
+
+  function prepaymentActions(rows, side) {
+    return {
+      newPrepayment: () => prepaymentDialog(side),
+      allocatePrepayment: (b) => allocatePrepaymentDialog(rows.find((x) => x.id === b.dataset.id)),
+      refundPrepayment: (b) => refundPrepaymentDialog(rows.find((x) => x.id === b.dataset.id)),
+    };
+  }
+
+  async function contactPrepaymentsDialog(contact) {
+    const base = path(`/contacts/${encodeURIComponent(contact.id)}/prepayments/outstanding`), oid = org.id;
+    const result = await api(base);
+    if (oid !== org.id) return;
+    const d = dialog("Outstanding prepayments", `<p>${esc(contact.name)}</p>` +
+      ["customer", "supplier"].map((side) => prepaymentSection(result.items.filter((x) => x.side === side), side)).join(""));
+    bindActions(d, {
+      allocatePrepayment: (b) => {
+        closeDialog(d);
+        return allocatePrepaymentDialog(result.items.find((x) => x.id === b.dataset.id));
+      },
+      refundPrepayment: (b) => {
+        closeDialog(d);
+        return refundPrepaymentDialog(result.items.find((x) => x.id === b.dataset.id));
+      },
+    });
+  }
+
+  async function prepaymentDialog(side) {
+    const base = path(""), oid = org.id, currency = org.base_currency;
+    const [contacts, banks] = await Promise.all([api(base + "/contacts"), api(base + "/bank-accounts")]);
+    if (oid !== org.id) return;
+    const eligible = contacts.filter((x) => [side, "both"].includes(x.contact_type));
+    const bankAccounts = banks.filter((x) => x.currency === currency);
+    if (!eligible.length) return toast(t("Add a contact before recording a prepayment."), "info");
+    if (!bankAccounts.length) return toast(t("Add a bank account in the organisation base currency first."), "info");
+    const key = prepaymentKey();
+    const d = dialog(side === "customer" ? "Record customer prepayment" : "Record supplier prepayment", form(
+      select(side === "customer" ? "Customer" : "Supplier", "contact_id", eligible.map((x) => [x.id, x.name])) +
+      select("Bank account", "bank_account_id", bankAccounts.map((x) => [x.id, x.name])) +
+      field("Date", "document_date", today(), "date", "required") +
+      field("Amount", "amount", "", "number", 'required min="0.01" step="0.01"') +
+      field("Reference", "reference", "", "text", 'maxlength="240"') +
+      `<p class="full-width muted">${tr("The bank movement is posted now. Allocate this prepayment when the invoice or bill is ready.")}</p>`,
+      "Record prepayment"));
+    bindForm(d, async (data) => {
+      await post(base + "/prepayments", {...data, side, currency, idempotency_key: key});
+      await saved(d);
+    });
+  }
+
+  async function allocatePrepaymentDialog(prepayment) {
+    const base = path(""), oid = org.id, customer = prepayment.side === "customer";
+    const documents = await api(base + (customer ? "/invoices" : "/bills"));
+    if (oid !== org.id) return;
+    const candidates = documents.filter((x) => x.contact_id === prepayment.contact_id &&
+      x.currency === prepayment.currency && x.document_type === (customer ? "invoice" : "bill") &&
+      (customer ? ["Issued", "Part Paid"] : ["Approved", "Part Paid"]).includes(x.status));
+    if (!candidates.length) return toast(t("No open documents for this prepayment contact and currency."), "info");
+    const key = prepaymentKey();
+    const d = dialog("Allocate prepayment", form(
+      `<p class="full-width">${esc(prepayment.contact_name)} · ${tr("Unallocated balance")}: ${esc(money(prepayment.unallocated_balance, prepayment.currency))}</p>` +
+      select(customer ? "Invoice" : "Bill", "document_id", candidates.map((x) =>
+        [x.id, `${x.number || x.supplier_number} · ${money(Number(x.total) - Number(x.paid_total), x.currency)}`])) +
+      field("Allocation date", "allocation_date", today(), "date", `required min="${esc(prepayment.document_date)}"`) +
+      field("Amount", "amount", "", "number", `required min="0.01" step="0.01" max="${esc(prepayment.unallocated_balance)}"`) +
+      `<p class="full-width muted">${tr("This reduces the document balance without another bank movement.")}</p>`, "Allocate prepayment"));
+    bindForm(d, async (data) => {
+      await post(base + `/prepayments/${encodeURIComponent(prepayment.id)}/allocate`, {
+        ...data, document_type: customer ? "invoice" : "bill", idempotency_key: key,
+      });
+      await saved(d);
+    });
+  }
+
+  function refundPrepaymentDialog(prepayment) {
+    const base = path(`/prepayments/${encodeURIComponent(prepayment.id)}`), key = prepaymentKey();
+    const d = dialog("Refund prepayment", form(
+      `<p class="full-width">${esc(prepayment.contact_name)} · ${tr("Unallocated balance")}: ${esc(money(prepayment.unallocated_balance, prepayment.currency))}</p>` +
+      field("Refund date", "refund_date", today(), "date", `required min="${esc(prepayment.document_date)}"`) +
+      field("Amount", "amount", prepayment.unallocated_balance, "number", `required min="0.01" step="0.01" max="${esc(prepayment.unallocated_balance)}"`) +
+      field("Reference", "reference", "", "text", 'maxlength="240"') +
+      `<p class="full-width muted">${tr("Refund only the unallocated balance through the original bank account.")}</p>`, "Refund prepayment"));
+    bindForm(d, async (data) => {
+      await post(base + "/refund", {...data, idempotency_key: key});
       await saved(d);
     });
   }

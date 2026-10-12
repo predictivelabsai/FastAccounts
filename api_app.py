@@ -34,6 +34,7 @@ from payroll import PayrollConflict, PayrollService
 from tax import TaxService
 from tsd import TSDExportService
 from payment_orders import PaymentOrderService
+from prepayments import PrepaymentService
 from opening_balances import OpeningBalanceService, parse_open_items_csv
 
 
@@ -134,6 +135,32 @@ class PaymentOrderIn(BaseModel):
     execution_date: str
     due_before: str | None = None
     bill_ids: list[str] | None = None
+
+
+class PrepaymentIn(BaseModel):
+    side: Literal["customer", "supplier"]
+    contact_id: str
+    bank_account_id: str
+    document_date: str
+    amount: Decimal = Field(gt=0, allow_inf_nan=False)
+    currency: str | None = None
+    reference: str = Field(default="", max_length=240)
+    idempotency_key: str = Field(min_length=1, max_length=160)
+
+
+class PrepaymentAllocationIn(BaseModel):
+    document_type: Literal["invoice", "bill"]
+    document_id: str
+    allocation_date: str
+    amount: Decimal = Field(gt=0, allow_inf_nan=False)
+    idempotency_key: str = Field(min_length=1, max_length=160)
+
+
+class PrepaymentRefundIn(BaseModel):
+    refund_date: str
+    amount: Decimal = Field(gt=0, allow_inf_nan=False)
+    reference: str = Field(default="", max_length=240)
+    idempotency_key: str = Field(min_length=1, max_length=160)
 
 
 class ReconcileIn(BaseModel):
@@ -517,6 +544,50 @@ def approve_bill(organisation_id: str, bill_id: str, user: User = Depends(requir
     _require(organisation_id, user, APPROVE_ROLES)
     _object_in_org("bills", bill_id, organisation_id)
     return DocumentService().approve_bill(bill_id, actor=user.email)
+
+
+@api.get("/organisations/{organisation_id}/prepayments")
+def list_prepayments(organisation_id: str, side: Literal["customer", "supplier"] | None = None,
+                    contact_id: str | None = None, outstanding_only: bool = False,
+                    user: User = Depends(current_user)):
+    _require(organisation_id, user, {"owner", "administrator", "accountant", "approver", "viewer"})
+    return jsonable_encoder(PrepaymentService().list(organisation_id, side=side, contact_id=contact_id,
+                            outstanding_only=outstanding_only), custom_encoder={Decimal: str})
+
+
+@api.post("/organisations/{organisation_id}/prepayments", status_code=201)
+def create_prepayment(organisation_id: str, payload: PrepaymentIn, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return jsonable_encoder(PrepaymentService().create(organisation_id, actor=user.email, **payload.model_dump()),
+                            custom_encoder={Decimal: str})
+
+
+@api.get("/organisations/{organisation_id}/prepayments/{prepayment_id}")
+def get_prepayment(organisation_id: str, prepayment_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, {"owner", "administrator", "accountant", "approver", "viewer"})
+    return jsonable_encoder(PrepaymentService().get(organisation_id, prepayment_id), custom_encoder={Decimal: str})
+
+
+@api.post("/organisations/{organisation_id}/prepayments/{prepayment_id}/allocate")
+def allocate_prepayment(organisation_id: str, prepayment_id: str, payload: PrepaymentAllocationIn,
+                       user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return jsonable_encoder(PrepaymentService().allocate(organisation_id, prepayment_id, actor=user.email,
+                            **payload.model_dump()), custom_encoder={Decimal: str})
+
+
+@api.post("/organisations/{organisation_id}/prepayments/{prepayment_id}/refund")
+def refund_prepayment(organisation_id: str, prepayment_id: str, payload: PrepaymentRefundIn,
+                     user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return jsonable_encoder(PrepaymentService().refund(organisation_id, prepayment_id, actor=user.email,
+                            **payload.model_dump()), custom_encoder={Decimal: str})
+
+
+@api.get("/organisations/{organisation_id}/contacts/{contact_id}/prepayments/outstanding")
+def contact_prepayments_outstanding(organisation_id: str, contact_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, {"owner", "administrator", "accountant", "approver", "viewer"})
+    return jsonable_encoder(PrepaymentService().outstanding(organisation_id, contact_id), custom_encoder={Decimal: str})
 
 
 @api.get("/organisations/{organisation_id}/payment-orders/candidates")

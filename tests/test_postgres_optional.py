@@ -13,10 +13,49 @@ from organisations import OrganisationService
 def test_postgres_migrations_and_tenant_bootstrap():
     schema="fast_accounts_test_"+uuid4().hex[:10]
     db=Database(url=os.environ["TEST_POSTGRES_URL"],schema=schema)
-    assert db.migrate()==["0001_accounting_core","0002_integrations","0003_operations","0004_document_immutability", "0005_payroll", "0006_payroll_part_time_hourly", "0007_automation", "0008_import_staging", "0009_local_accounts", "0010_tsd_export", "0011_account_mappings", "0012_external_gl", "0013_sync_review", "0014_sync_push", "0015_payment_orders", "0016_bank_feed_schedules"]
+    assert db.migrate()==["0001_accounting_core","0002_integrations","0003_operations","0004_document_immutability", "0005_payroll", "0006_payroll_part_time_hourly", "0007_automation", "0008_import_staging", "0009_local_accounts", "0010_tsd_export", "0011_account_mappings", "0012_external_gl", "0013_sync_review", "0014_sync_push", "0015_payment_orders", "0016_bank_feed_schedules", "0017_prepayments"]
     assert db.migrate()==[]
     org=OrganisationService(db).create(name="Postgres Synthetic",country_code="UK",entity_type="UK_COMPANY",owner_email="pg@example.test")
-    assert db.scalar("SELECT COUNT(*) FROM accounts WHERE organisation_id=?",(org["id"],))==10
+    assert db.scalar("SELECT COUNT(*) FROM accounts WHERE organisation_id=?",(org["id"],))==12
+
+
+@pytest.mark.skipif(not os.getenv("TEST_POSTGRES_URL"), reason="set TEST_POSTGRES_URL for PostgreSQL integration")
+def test_postgres_prepayment_events():
+    from decimal import Decimal
+    from documents import DocumentService
+    from prepayments import PrepaymentService
+    schema = "fast_accounts_test_" + uuid4().hex[:10]
+    db = Database(url=os.environ["TEST_POSTGRES_URL"], schema=schema)
+    db.migrate()
+    org = OrganisationService(db).create(name="Postgres prepayment synthetic", country_code="EE",
+        entity_type="EE_OU", owner_email="pg@example.test")
+    docs, service = DocumentService(db), PrepaymentService(db)
+    contact = docs.create_contact(org["id"], name="Synthetic prepayment contact", country_code="EE")
+    bank = docs.create_bank_account(org["id"], name="Synthetic bank", currency="EUR")
+    day = db.scalar("SELECT starts_on FROM fiscal_periods WHERE organisation_id=? ORDER BY starts_on LIMIT 1", (org["id"],))
+    accounts = {r["system_role"]: r["id"] for r in db.rows("SELECT * FROM accounts WHERE organisation_id=?", (org["id"],))}
+    for side in ["customer", "supplier"]:
+        create = dict(side=side, contact_id=contact["id"], bank_account_id=bank["id"], document_date=day,
+                      amount="100.01", idempotency_key=side + "-create", actor="pg@example.test")
+        prepayment = service.create(org["id"], **create)
+        assert service.create(org["id"], **create) == prepayment
+        lines = [dict(unit_price="60.01", account_id=accounts["SALES" if side == "customer" else "EXPENSE"])]
+        if side == "customer":
+            document = docs.create_invoice(org["id"], contact_id=contact["id"], issue_date=day, actor="pg@example.test", lines=lines)
+            document = docs.issue_invoice(document["id"], actor="pg@example.test")
+        else:
+            document = docs.create_bill(org["id"], contact_id=contact["id"], bill_date=day, due_date=day,
+                supplier_number="SYN-PG", actor="pg@example.test", lines=lines)
+            document = docs.approve_bill(document["id"], actor="pg@example.test")
+        allocation = dict(document_type="invoice" if side == "customer" else "bill", document_id=document["id"],
+                          allocation_date=day, amount="60.01", idempotency_key=side + "-allocate", actor="pg@example.test")
+        first = service.allocate(org["id"], prepayment["id"], **allocation)
+        assert service.allocate(org["id"], prepayment["id"], **allocation) == first
+        refund = dict(refund_date=day, amount="40", idempotency_key=side + "-refund", actor="pg@example.test")
+        last = service.refund(org["id"], prepayment["id"], **refund)
+        assert service.refund(org["id"], prepayment["id"], **refund) == last
+        assert service.get(org["id"], prepayment["id"])["unallocated_balance"] == Decimal("0")
+    assert db.scalar("SELECT SUM(debit)-SUM(credit) FROM gl_entries") == Decimal("0")
 
 
 @pytest.mark.skipif(not os.getenv("TEST_POSTGRES_URL"),reason="set TEST_POSTGRES_URL for PostgreSQL integration")
@@ -36,7 +75,7 @@ def test_postgres_payroll_0006_upgrade_and_sample_run(tmp_path, monkeypatch):
     with db.transaction() as tx:
         tx.execute("INSERT INTO employees(id,organisation_id,name,gross_salary,funded_pension_percent,board_member,created_at) VALUES ('pg-board',?,'Old Board',1500,0,1,'2026-01-01')",(org["id"],))
     monkeypatch.setattr(database,"MIGRATIONS",original)
-    assert db.migrate()==["0006_payroll_part_time_hourly", "0007_automation", "0008_import_staging", "0009_local_accounts", "0010_tsd_export", "0011_account_mappings", "0012_external_gl", "0013_sync_review", "0014_sync_push", "0015_payment_orders", "0016_bank_feed_schedules"]
+    assert db.migrate()==["0006_payroll_part_time_hourly", "0007_automation", "0008_import_staging", "0009_local_accounts", "0010_tsd_export", "0011_account_mappings", "0012_external_gl", "0013_sync_review", "0014_sync_push", "0015_payment_orders", "0016_bank_feed_schedules", "0017_prepayments"]
     service=PayrollService(db)
     assert service.employees(org["id"])[0]["pay_basis"]=="board_fee"
     for employee in SAMPLE_PAYROLL_EMPLOYEES:
