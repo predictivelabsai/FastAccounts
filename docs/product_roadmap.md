@@ -1468,3 +1468,24 @@ pending.
 - Automated rate feeds/schedules, bank cash revaluation, historical as-of
   reconstruction, accountant UAT and live PostgreSQL validation remain outside
   this delivery. No prepayment scope deferral.
+
+
+### TOTP two-factor authentication: authentication slate P2 item 3 (2026-10-12)
+
+- Implemented optional personal MFA with RFC 6238 SHA1 TOTP and 10 single-use
+  recovery codes. Password and Google sign-ins use a CSRF-protected second step,
+  account/IP throttles, expiry and replay defence. Existing sessions remain valid.
+- Added `/mfa` for password-proved enrolment, activation, disable and code
+  regeneration, with a minimal workspace link and matching en/et/lt/lv copy.
+- Migration `0027_mfa` is additive with SQLite column guards for interrupted
+  upgrades; CI and upgrade expectations include 27 migrations.
+- Validation: focused MFA checks: 52 passed, 1 existing dependency warning.
+  Full `python -m pytest -q` on Windows/Python 3.14.6: 1271 passed,
+  4 skipped, 5 warnings in 1296.31s (0:21:36). The skips are existing
+  PostgreSQL opt-ins and the warnings are existing dependency deprecations.
+  FX migration regression checks: 126 passed, 1 existing dependency warning.
+  Acceptance includes offline browser flows and concurrency/replay checks.
+- The paired change log lists every new locale key with Estonian, Lithuanian
+  and Latvian strings for copy QA. Model and scope: `docs/specs/mfa.md`.
+- Deferred: email/OTP push, hardware keys, organisation-wide enforcement,
+  QR rendering, additional secret encryption and support recovery workflows.

@@ -641,7 +641,29 @@
     "mail_reset_subject": "FastAccounts slaptažodžio atkūrimas",
     "mail_reset_body": "Naudokite šią nuorodą naujam FastAccounts slaptažodžiui nustatyti:",
     "mail_reset_expiry": "Nuoroda galioja vieną valandą ir veikia vieną kartą.",
-    "mail_ignore": "Jei to neprašėte, šį laišką galite ignoruoti."
+    "mail_ignore": "Jei to neprašėte, šį laišką galite ignoruoti.",
+    "mfa_title": "Dviejų veiksnių autentifikavimas",
+    "mfa_code": "Autentifikavimo arba atkūrimo kodas",
+    "mfa_challenge": "Tęsti",
+    "mfa_challenge_intro": "Įveskite autentifikavimo programėlės kodą arba nepanaudotą atkūrimo kodą.",
+    "mfa_enroll": "Nustatyti dviejų veiksnių autentifikavimą",
+    "mfa_enroll_help": "Patvirtinkite slaptažodį, kad nustatytumėte autentifikavimo programėlę. Naudojant tik Google paskyrą, pirmiausia reikia nustatyti slaptažodį slaptažodžio atkūrimo formoje.",
+    "mfa_restart": "Pradėti nustatymą iš naujo",
+    "mfa_setup_help": "Pridėkite šį slaptą raktą prie autentifikavimo programėlės ir įveskite jos šešių skaitmenų kodą.",
+    "mfa_secret": "Slaptas nustatymo raktas",
+    "mfa_uri": "Autentifikavimo URI",
+    "mfa_activate": "Aktyvuoti",
+    "mfa_enabled": "Dviejų veiksnių autentifikavimas įjungtas.",
+    "mfa_disabled": "Dviejų veiksnių autentifikavimas išjungtas.",
+    "mfa_disable": "Išjungti dviejų veiksnių autentifikavimą",
+    "mfa_codes": "Sukurti naujus atkūrimo kodus",
+    "mfa_recovery_title": "Atkūrimo kodai",
+    "mfa_recovery_help": "Saugokite šiuos kodus saugioje vietoje. Kiekvienas galioja vieną kartą. Jie nebebus rodomi.",
+    "mfa_acknowledge": "Kodus išsaugojau saugiai",
+    "mfa_back": "Grįžti į darbo sritį",
+    "mfa_error_code": "Kodas neteisingas arba jau panaudotas.",
+    "mfa_error_state": "Nustatymas negalimas. Įkelkite puslapį iš naujo ir bandykite dar kartą.",
+    "mfa_error_expired": "Prisijungimo laikas baigėsi. Prisijunkite iš naujo."
   },
   "login": {
     "title": "Prisijungimas",
@@ -1462,7 +1484,8 @@
     "Only Accepted quotes can be converted": "Sąskaita galima paversti tik priimtus pasiūlymus",
     "Quote not found": "Pasiūlymas nerastas",
     "Quote fields cannot be null": "Pasiūlymo laukai negali turėti null reikšmės",
-    "Notes": "Pastabos"
+    "Notes": "Pastabos",
+    "Two-factor authentication": "Dviejų veiksnių autentifikavimas"
   },
   "views": {
     "overview": "Overview",

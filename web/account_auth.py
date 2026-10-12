@@ -32,7 +32,7 @@ from urllib.request import Request as UrlRequest, urlopen
 
 from core_utils import new_id, utc_now
 from database import get_database
-from web import i18n
+from web import i18n, totp
 from web.google_auth import access_allowed
 
 log = logging.getLogger("fastaccounts.auth")
@@ -44,6 +44,8 @@ VERIFY_TTL = 24 * 60 * 60
 
 # action: (attempts, window seconds)
 LIMITS: dict[str, tuple[int, int]] = {
+    "mfa_email": (10, 15 * 60),
+    "mfa_ip": (50, 15 * 60),
     "login": (10, 15 * 60),        # failed sign-ins per email (lockout)
     "login_ip": (50, 15 * 60),     # failed sign-ins per client address
     "register": (5, 60 * 60),
@@ -339,6 +341,82 @@ class AccountStore:
                        "password_changed_at=?,updated_at=? WHERE id=?",
                        (hash_password(password), now, now, account["id"]))
             return tx.one("SELECT * FROM user_accounts WHERE id=?", (account["id"],))
+
+    def _mfa_account(self, tx, email: str) -> dict:
+        # Serialise factor mutations per account, including recovery-code burns.
+        tx.execute("UPDATE user_accounts SET totp_enabled=totp_enabled WHERE email=?", (normalize_email(email),))
+        account = tx.one("SELECT * FROM user_accounts WHERE email=?", (normalize_email(email),))
+        if not account or not account["email_verified"]:
+            raise ValueError("mfa_error_state")
+        return account
+
+    def enroll(self, email: str, *, regenerate: bool = False) -> dict:
+        with self.db.transaction() as tx:
+            account = self._mfa_account(tx, email)
+            if account["totp_enabled"] or (account["totp_secret"] and not regenerate):
+                raise ValueError("mfa_error_state")
+            tx.execute("UPDATE user_accounts SET totp_secret=?,totp_last_step=NULL WHERE id=?",
+                       (totp.secret_new(), account["id"]))
+            return tx.one("SELECT * FROM user_accounts WHERE id=?", (account["id"],))
+
+    def _recovery_new(self, tx, account: dict) -> list[str]:
+        tx.execute("DELETE FROM mfa_recovery_codes WHERE account_id=? AND used_at IS NULL", (account["id"],))
+        codes = [secrets.token_hex(8) for _ in range(10)]
+        for value in codes:
+            tx.execute("INSERT INTO mfa_recovery_codes(id,account_id,code_hash,created_at) VALUES (?,?,?,?)",
+                       (new_id(), account["id"], token_digest(value), utc_now()))
+        return codes
+
+    def activate(self, email: str, code: str) -> list[str]:
+        with self.db.transaction() as tx:
+            account = self._mfa_account(tx, email)
+            if account["totp_enabled"] or not account["totp_secret"]:
+                raise ValueError("mfa_error_state")
+            matched = totp.verify(account["totp_secret"], code, account["totp_last_step"], time.time())
+            if matched is None:
+                raise ValueError("mfa_error_code")
+            tx.execute("UPDATE user_accounts SET totp_enabled=1,totp_last_step=? WHERE id=?", (matched, account["id"]))
+            return self._recovery_new(tx, account)
+
+    def _factor(self, tx, account: dict, value: str) -> bool:
+        if not account["totp_enabled"]:
+            return False
+        matched = totp.verify(account["totp_secret"], value, account["totp_last_step"], time.time())
+        if matched is not None:
+            tx.execute("UPDATE user_accounts SET totp_last_step=? WHERE id=?", (matched, account["id"]))
+            return True
+        row = tx.one("SELECT id FROM mfa_recovery_codes WHERE account_id=? AND code_hash=? AND used_at IS NULL",
+                     (account["id"], token_digest(value)))
+        if row:
+            tx.execute("UPDATE mfa_recovery_codes SET used_at=? WHERE id=? AND used_at IS NULL", (int(time.time()), row["id"]))
+            return True
+        return False
+
+    def challenge(self, email: str, code_or_recovery: str, *, session_version: int | None = None) -> dict | None:
+        with self.db.transaction() as tx:
+            account = self._mfa_account(tx, email)
+            if session_version is not None and account["session_version"] != session_version:
+                return None
+            return account if self._factor(tx, account, code_or_recovery) else None
+
+    def disable(self, email: str, code: str, password: str) -> None:
+        with self.db.transaction() as tx:
+            account = self._mfa_account(tx, email)
+            if not verify_password(password, account["password_hash"]):
+                raise ValueError("error_credentials")
+            if not self._factor(tx, account, code):
+                raise ValueError("mfa_error_code")
+            tx.execute("DELETE FROM mfa_recovery_codes WHERE account_id=? AND used_at IS NULL", (account["id"],))
+            tx.execute("UPDATE user_accounts SET totp_secret=NULL,totp_enabled=0,totp_last_step=NULL WHERE id=?", (account["id"],))
+
+    def codes(self, email: str, code: str, password: str) -> list[str]:
+        with self.db.transaction() as tx:
+            account = self._mfa_account(tx, email)
+            if not verify_password(password, account["password_hash"]):
+                raise ValueError("error_credentials")
+            if not self._factor(tx, account, code):
+                raise ValueError("mfa_error_code")
+            return self._recovery_new(tx, account)
 
     def link_google(self, email: str, name: str = "") -> dict | None:
         """Map a verified Google login to the same account as the email address."""

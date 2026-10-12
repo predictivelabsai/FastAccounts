@@ -749,7 +749,29 @@
     "mail_reset_subject": "Reset your FastAccounts password",
     "mail_reset_body": "Use this link to set a new FastAccounts password:",
     "mail_reset_expiry": "The link expires in one hour and works once.",
-    "mail_ignore": "If you did not ask for this, you can ignore this email."
+    "mail_ignore": "If you did not ask for this, you can ignore this email.",
+    "mfa_title": "Two-factor authentication",
+    "mfa_code": "Authenticator or recovery code",
+    "mfa_challenge": "Continue",
+    "mfa_challenge_intro": "Enter a code from your authenticator app or an unused recovery code.",
+    "mfa_enroll": "Set up two-factor authentication",
+    "mfa_enroll_help": "Confirm your password to set up an authenticator app. Google-only accounts must first set a password using the password reset form.",
+    "mfa_restart": "Start setup again",
+    "mfa_setup_help": "Add this secret to your authenticator app, then enter its six-digit code.",
+    "mfa_secret": "Setup secret",
+    "mfa_uri": "Authenticator URI",
+    "mfa_activate": "Activate",
+    "mfa_enabled": "Two-factor authentication is enabled.",
+    "mfa_disabled": "Two-factor authentication is disabled.",
+    "mfa_disable": "Disable two-factor authentication",
+    "mfa_codes": "Generate new recovery codes",
+    "mfa_recovery_title": "Recovery codes",
+    "mfa_recovery_help": "Save these codes somewhere safe. Each works once. They will not be shown again.",
+    "mfa_acknowledge": "I have stored the codes safely",
+    "mfa_back": "Back to workspace",
+    "mfa_error_code": "The code is invalid or has already been used.",
+    "mfa_error_state": "Setup is unavailable. Reload this page and try again.",
+    "mfa_error_expired": "Your sign-in has expired. Sign in again."
   },
   "login": {
     "title": "Sign in",
@@ -1570,7 +1592,8 @@
     "Only Accepted quotes can be converted": "Only Accepted quotes can be converted",
     "Quote not found": "Quote not found",
     "Quote fields cannot be null": "Quote fields cannot be null",
-    "Notes": "Notes"
+    "Notes": "Notes",
+    "Two-factor authentication": "Two-factor authentication"
   },
   "views": {
     "overview": "Overview",

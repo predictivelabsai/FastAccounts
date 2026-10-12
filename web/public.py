@@ -808,7 +808,9 @@ def login_page(error: str = "", lang: str = i18n.DEFAULT_LANG, *, tab: str = "si
                 H1(T("login.headline")),
                 P(T("login.body")),
                 *_auth_messages(message, notice),
-                A(T("login.continue_google") if google_auth.enabled() else T("login.not_configured"), href="/auth/google", cls="fs-btn fs-btn-ink google"),
+                A(T("login.continue_google") if google_auth.enabled() else T("login.not_configured"),
+                  href="/auth/google" + ("?next=" + quote(next_path, safe="") if next_path else ""),
+                  cls="fs-btn fs-btn-ink google"),
                 P(T("login.configuration_hint")) if not google_auth.enabled() else None,
                 Div(A_("or"), cls="auth-divider"),
                 tabs,
@@ -822,6 +824,52 @@ def login_page(error: str = "", lang: str = i18n.DEFAULT_LANG, *, tab: str = "si
         current="/login",
         lang=lang,
     )
+
+
+def mfa_page(account: dict | None = None, lang: str = "en", *, csrf: str = "",
+             pending: dict | None = None, secret: str = "", recovery: list[str] | None = None,
+             error: str = "", notice: str = ""):
+    from web.totp import uri
+    T = lambda key: i18n.t(f"auth.{key}", lang)
+
+    def form(action, *, password=False, factor=False, regenerate=False):
+        fields = [Input(type="hidden", name="csrf_token", value=csrf)]
+        if pending:
+            fields.append(Input(type="hidden", name="token", value=pending["token"]))
+        if regenerate:
+            fields.append(Input(type="hidden", name="regenerate", value="1"))
+        if password:
+            fields.append(_auth_field(f"mfa-{action}-password", "password", T("password"), type="password",
+                                      autocomplete="current-password", required=True, maxlength="1024"))
+        if factor:
+            fields.append(_auth_field(f"mfa-{action}-code", "code", T("mfa_code"), autocomplete="one-time-code",
+                                      required=True, maxlength="128"))
+        return Form(*fields, Button(T("mfa_" + ("restart" if regenerate else action)), type="submit",
+                                    cls="fs-btn fs-btn-ink auth-submit"),
+                    method="post", action=f"/auth/mfa/{action}", cls="auth-form")
+
+    content = []
+    if pending:
+        content = [P(T("mfa_challenge_intro")), form("challenge", factor=True)]
+    elif recovery is not None:
+        content = [H2(T("mfa_recovery_title")), P(T("mfa_recovery_help")),
+                   Ul(*[Li(Code(value), cls="mfa-recovery-code") for value in recovery]),
+                   A(T("mfa_acknowledge"), href="/mfa", cls="auth-link")]
+    elif account:
+        content.append(P(T("mfa_enabled" if account["totp_enabled"] else "mfa_disabled")))
+        if account["totp_enabled"]:
+            content += [form("disable", password=True, factor=True), form("codes", password=True, factor=True)]
+        elif secret:
+            content += [P(T("mfa_setup_help")),
+                        _auth_field("mfa-secret", "secret", T("mfa_secret"), value=secret, readonly=True),
+                        _auth_field("mfa-uri", "uri", T("mfa_uri"), value=uri(secret, account["email"]), readonly=True),
+                        form("activate", factor=True), form("enroll", password=True, regenerate=True)]
+        else:
+            content += [P(T("mfa_enroll_help")), form("enroll", password=True, regenerate=bool(account["totp_secret"]))]
+        content.append(A(T("mfa_back"), href="/app", cls="auth-link"))
+    return public_page(Section(Div(H1(T("mfa_title")), *_auth_messages(error, notice), *content,
+                                   cls="auth-card"), cls="auth-wrap"),
+                       title=T("mfa_title"), current="/mfa", lang=lang)
 
 
 def password_token_page(purpose: str, token: str, lang: str = i18n.DEFAULT_LANG, *, csrf: str = "",
@@ -894,6 +942,7 @@ def workspace_page(user: dict, lang: str = "en"):
                 ], cls="app-nav-list", aria_label=T("nav.workspace")),
                 Div(
                     A(T("nav.public_site"), href="/"),
+                    A(T("workspace.Two-factor authentication"), href="/mfa"),
                     Div(Span(display_name[:1].upper(), cls="user-avatar"), Div(Strong(display_name), A(T("nav.sign_out"), href="/logout")), cls="user-card"),
                     cls="app-side-links",
                 ), cls="app-sidebar",

@@ -641,7 +641,29 @@
     "mail_reset_subject": "FastAccounts paroles atiestatīšana",
     "mail_reset_body": "Izmantojiet šo saiti, lai iestatītu jaunu FastAccounts paroli:",
     "mail_reset_expiry": "Saite ir derīga vienu stundu un darbojas vienu reizi.",
-    "mail_ignore": "Ja jūs to nepieprasījāt, varat ignorēt šo e-pastu."
+    "mail_ignore": "Ja jūs to nepieprasījāt, varat ignorēt šo e-pastu.",
+    "mfa_title": "Divfaktoru autentifikācija",
+    "mfa_code": "Autentifikācijas vai atkopšanas kods",
+    "mfa_challenge": "Turpināt",
+    "mfa_challenge_intro": "Ievadiet autentifikācijas lietotnes kodu vai neizmantotu atkopšanas kodu.",
+    "mfa_enroll": "Iestatīt divfaktoru autentifikāciju",
+    "mfa_enroll_help": "Apstipriniet paroli, lai iestatītu autentifikācijas lietotni. Ja izmantojat tikai Google kontu, vispirms iestatiet paroli paroles atiestatīšanas veidlapā.",
+    "mfa_restart": "Sākt iestatīšanu no jauna",
+    "mfa_setup_help": "Pievienojiet šo slepeno atslēgu autentifikācijas lietotnei un ievadiet tās sešciparu kodu.",
+    "mfa_secret": "Slepenā iestatīšanas atslēga",
+    "mfa_uri": "Autentifikācijas URI",
+    "mfa_activate": "Aktivizēt",
+    "mfa_enabled": "Divfaktoru autentifikācija ir ieslēgta.",
+    "mfa_disabled": "Divfaktoru autentifikācija ir izslēgta.",
+    "mfa_disable": "Izslēgt divfaktoru autentifikāciju",
+    "mfa_codes": "Izveidot jaunus atkopšanas kodus",
+    "mfa_recovery_title": "Atkopšanas kodi",
+    "mfa_recovery_help": "Glabājiet šos kodus drošā vietā. Katrs darbojas vienu reizi. Tie vairs netiks rādīti.",
+    "mfa_acknowledge": "Kodi ir droši saglabāti",
+    "mfa_back": "Atgriezties darbvietā",
+    "mfa_error_code": "Kods nav derīgs vai jau ir izmantots.",
+    "mfa_error_state": "Iestatīšana nav pieejama. Pārlādējiet lapu un mēģiniet vēlreiz.",
+    "mfa_error_expired": "Pierakstīšanās laiks ir beidzies. Pierakstieties vēlreiz."
   },
   "login": {
     "title": "Pierakstīšanās",
@@ -1462,7 +1484,8 @@
     "Only Accepted quotes can be converted": "Rēķinā var pārvērst tikai pieņemtus piedāvājumus",
     "Quote not found": "Piedāvājums nav atrasts",
     "Quote fields cannot be null": "Piedāvājuma laukiem nevar būt null vērtība",
-    "Notes": "Piezīmes"
+    "Notes": "Piezīmes",
+    "Two-factor authentication": "Divfaktoru autentifikācija"
   },
   "views": {
     "overview": "Overview",

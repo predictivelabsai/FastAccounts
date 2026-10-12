@@ -4,6 +4,60 @@ Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as
 delivered.
 
+## 2026-10-12: TOTP two-factor authentication (authentication slate P2 item 3)
+
+- Added the standard-library RFC 6238 engine, migration `0027_mfa`, guarded
+  SQLite partial upgrades and CI/upgrade expectations for 27 migrations.
+- Added password-proved enrolment, activation, single-use recovery codes,
+  atomic replay protection, disable/regenerate operations and the `/mfa` page.
+  Password and Google sign-ins require the second step for enabled accounts.
+  Existing sessions remain valid. CSRF, account/IP throttles, a 10-minute
+  challenge lifetime and safe local return paths protect the routes.
+- Added a workspace sidebar link and 22 auth keys plus one workspace label
+  together in English, Estonian, Lithuanian and Latvian. The complete list
+  follows for copy QA, including every Estonian addition.
+- Validation: focused MFA checks: 52 passed, 1 existing dependency warning.
+  Full `python -m pytest -q` on Windows/Python 3.14.6: 1271 passed,
+  4 skipped, 5 warnings in 1296.31s (0:21:36). The skips are existing
+  PostgreSQL opt-ins and the warnings are existing dependency deprecations.
+  FX migration regression checks: 126 passed, 1 existing dependency warning.
+  Synthetic data only; Google and browser requests are handled offline.
+- Deferred: email/OTP push, hardware keys, organisation-wide enforcement,
+  QR rendering, secret encryption and support recovery workflows. No new
+  dependency, commit or push. See `docs/specs/mfa.md` for the threat model.
+
+### New locale keys and copy QA
+
+Every new auth key is listed below. English and the three translations are
+listed verbatim for review. Existing auth keys are reused for password, CSRF
+and rate-limit messages.
+
+| Key | English | Estonian | Lithuanian | Latvian |
+| --- | --- | --- | --- | --- |
+| `auth.mfa_title` | Two-factor authentication | Kaheastmeline autentimine | Dviejų veiksnių autentifikavimas | Divfaktoru autentifikācija |
+| `auth.mfa_code` | Authenticator or recovery code | Autentimisrakenduse kood või taastekood | Autentifikavimo arba atkūrimo kodas | Autentifikācijas vai atkopšanas kods |
+| `auth.mfa_challenge` | Continue | Jätka | Tęsti | Turpināt |
+| `auth.mfa_challenge_intro` | Enter a code from your authenticator app or an unused recovery code. | Sisesta autentimisrakenduse kood või kasutamata taastekood. | Įveskite autentifikavimo programėlės kodą arba nepanaudotą atkūrimo kodą. | Ievadiet autentifikācijas lietotnes kodu vai neizmantotu atkopšanas kodu. |
+| `auth.mfa_enroll` | Set up two-factor authentication | Seadista kaheastmeline autentimine | Nustatyti dviejų veiksnių autentifikavimą | Iestatīt divfaktoru autentifikāciju |
+| `auth.mfa_enroll_help` | Confirm your password to set up an authenticator app. Google-only accounts must first set a password using the password reset form. | Autentimisrakenduse seadistamiseks kinnita oma parool. Ainult Google'i kontoga kasutajad peavad esmalt parooli lähtestamise vormi kaudu parooli määrama. | Patvirtinkite slaptažodį, kad nustatytumėte autentifikavimo programėlę. Naudojant tik Google paskyrą, pirmiausia reikia nustatyti slaptažodį slaptažodžio atkūrimo formoje. | Apstipriniet paroli, lai iestatītu autentifikācijas lietotni. Ja izmantojat tikai Google kontu, vispirms iestatiet paroli paroles atiestatīšanas veidlapā. |
+| `auth.mfa_restart` | Start setup again | Alusta seadistamist uuesti | Pradėti nustatymą iš naujo | Sākt iestatīšanu no jauna |
+| `auth.mfa_setup_help` | Add this secret to your authenticator app, then enter its six-digit code. | Lisa see salajane võti autentimisrakendusse ja sisesta seejärel rakenduse kuuekohaline kood. | Pridėkite šį slaptą raktą prie autentifikavimo programėlės ir įveskite jos šešių skaitmenų kodą. | Pievienojiet šo slepeno atslēgu autentifikācijas lietotnei un ievadiet tās sešciparu kodu. |
+| `auth.mfa_secret` | Setup secret | Salajane seadistusvõti | Slaptas nustatymo raktas | Slepenā iestatīšanas atslēga |
+| `auth.mfa_uri` | Authenticator URI | Autentimisrakenduse URI | Autentifikavimo URI | Autentifikācijas URI |
+| `auth.mfa_activate` | Activate | Aktiveeri | Aktyvuoti | Aktivizēt |
+| `auth.mfa_enabled` | Two-factor authentication is enabled. | Kaheastmeline autentimine on lubatud. | Dviejų veiksnių autentifikavimas įjungtas. | Divfaktoru autentifikācija ir ieslēgta. |
+| `auth.mfa_disabled` | Two-factor authentication is disabled. | Kaheastmeline autentimine on keelatud. | Dviejų veiksnių autentifikavimas išjungtas. | Divfaktoru autentifikācija ir izslēgta. |
+| `auth.mfa_disable` | Disable two-factor authentication | Keela kaheastmeline autentimine | Išjungti dviejų veiksnių autentifikavimą | Izslēgt divfaktoru autentifikāciju |
+| `auth.mfa_codes` | Generate new recovery codes | Loo uued taastekoodid | Sukurti naujus atkūrimo kodus | Izveidot jaunus atkopšanas kodus |
+| `auth.mfa_recovery_title` | Recovery codes | Taastekoodid | Atkūrimo kodai | Atkopšanas kodi |
+| `auth.mfa_recovery_help` | Save these codes somewhere safe. Each works once. They will not be shown again. | Hoia neid koode turvalises kohas. Iga koodi saab kasutada ühe korra. Koode hiljem enam ei kuvata. | Saugokite šiuos kodus saugioje vietoje. Kiekvienas galioja vieną kartą. Jie nebebus rodomi. | Glabājiet šos kodus drošā vietā. Katrs darbojas vienu reizi. Tie vairs netiks rādīti. |
+| `auth.mfa_acknowledge` | I have stored the codes safely | Olen koodid turvaliselt salvestanud | Kodus išsaugojau saugiai | Kodi ir droši saglabāti |
+| `auth.mfa_back` | Back to workspace | Tagasi töölauale | Grįžti į darbo sritį | Atgriezties darbvietā |
+| `auth.mfa_error_code` | The code is invalid or has already been used. | Kood on vale või juba kasutatud. | Kodas neteisingas arba jau panaudotas. | Kods nav derīgs vai jau ir izmantots. |
+| `auth.mfa_error_state` | Setup is unavailable. Reload this page and try again. | Seadistamine pole võimalik. Laadi leht uuesti ja proovi veel kord. | Nustatymas negalimas. Įkelkite puslapį iš naujo ir bandykite dar kartą. | Iestatīšana nav pieejama. Pārlādējiet lapu un mēģiniet vēlreiz. |
+| `auth.mfa_error_expired` | Your sign-in has expired. Sign in again. | Sisselogimise aeg on lõppenud. Logi uuesti sisse. | Prisijungimo laikas baigėsi. Prisijunkite iš naujo. | Pierakstīšanās laiks ir beidzies. Pierakstieties vēlreiz. |
+| `workspace.Two-factor authentication` | Two-factor authentication | Kaheastmeline autentimine | Dviejų veiksnių autentifikavimas | Divfaktoru autentifikācija |
+
 ## 2026-10-12: Open-balance FX revaluation
 
 - Added rerun-safe migration `0026_fx_revaluations`, tenant-scoped run identity,
