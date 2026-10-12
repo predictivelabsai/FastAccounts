@@ -1779,7 +1779,7 @@
       "Remove logo": "Eemalda logo",
       "Remove the logo from sales invoice and credit note PDFs?": "Kas eemaldada logo müügiarvete ja kreeditarvete PDF-failidest?",
       "Logo must be no larger than 512 KB.": "Logo suurus ei tohi ületada 512 KB.",
-      "Accent colour must contain six hexadecimal digits after #": "Aktsentvärv peab koosnema märgist # ja kuuest kuueteistkümnendsüsteemi numbrist",
+      "Accent colour must contain six hexadecimal digits after #": "Aktsentvärv peab olema kujul #RRGGBB",
       "Invoice footer must contain at most 500 characters": "Arve jalus võib sisaldada kuni 500 märki",
       "Logo must be a PNG or JPEG image": "Logo peab olema PNG- või JPEG-pilt",
       "Logo must contain at most 512 KB": "Logo suurus võib olla kuni 512 KB",

@@ -342,6 +342,7 @@ def test_settings_offline_browser(monkeypatch, language, role):
 
 def test_jpeg_replacement_and_failed_upload_preserve_original(env, monkeypatch):
     from io import BytesIO
+    pytest.importorskip('PIL')
     from PIL import Image
     from document_settings import DocumentSettingsService
     d = env
