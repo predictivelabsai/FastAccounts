@@ -1127,3 +1127,38 @@ pending.
   in all four locales. All 18 migrations match CI exactly and an immediate
   rerun is empty. Compilation, JavaScript syntax, append-only locale and
   staged diff/secret-pattern checks passed.
+
+### Cash-flow statement and comparative reports (2026-10-12)
+
+- [x] Add a read-only direct-method cash-flow statement in base currency, using
+  tenant-scoped BANK-role accounts and Posted/Reversed journal batches. Opening
+  balances exclude the start date; movements include both endpoints. Show trade
+  receipts, supplier payments, payroll, VAT, revenue, expenses, financing and
+  Other, with memos and contact ids in liquid-account detail.
+- [x] Net opposing liquid lines as internal transfers and exclude their gross
+  amounts from headline inflows/outflows. Where journals have no explicit contra
+  pairing, match liquid sides first and allocate external amounts proportionally
+  over opposite contra lines, preserving every cent and the balance identity.
+- [x] Add optional previous-period, prior-year and YTD comparisons to P&L and
+  balance-sheet services and API routes. Whole calendar months, quarters and
+  years compare to preceding calendar periods; custom ranges use equal day
+  counts. Prior-year whole periods include the corresponding month end, including
+  leap days. YTD runs from 1 January through the selected end month and compares
+  with the same months of the prior calendar year. Balance sheets remain
+  cumulative snapshots at each period end; omitted comparison parameters retain
+  the existing single-period response.
+- [x] Add accounting date-range and period controls, comparison columns, and a
+  cash-flow navigation entry, statement and account detail. Append copy to all
+  four locales without changing existing terminology or values.
+- [ ] Follow-up: today's unique organisation/system_role constraint permits only
+  one BANK-role account. Bank accounts created by the payment service have no
+  BANK role and are excluded under this report's explicit role-based scope.
+  Supporting those accounts and assigning multiple distinct BANK roles requires
+  a separately agreed account-role/schema change. No migration is added here.
+- Validation: Python 3.12.14, `python -m pytest -q`: `724 passed, 4 skipped in 482.16s (0:08:02)`. The four skipped tests
+  are opt-in PostgreSQL checks. Synthetic service, API and all-four-locale
+  browser checks passed, including boundaries, status filtering, tenant
+  isolation, split allocation, internal transfer netting, calendar and
+  leap-year comparisons, and preservation of BANK roles through upgrades.
+  Existing locale keys and values remain unchanged; JavaScript syntax and
+  diff checks passed. No live provider calls were made.

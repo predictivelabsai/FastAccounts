@@ -22,6 +22,7 @@ from connectors.registry import provider_metadata
 from database import get_database
 from documents import DocumentService, EInvoiceAlreadyImported
 from statements import StatementService
+from cash_flow import CashFlowService
 from excel_export import (employees_workbook, general_ledger_workbook,
                           invoices_workbook, vat_returns_workbook)
 from governance import GovernanceService
@@ -823,15 +824,23 @@ def trial_balance(organisation_id: str, start: str, end: str, user: User = Depen
 
 
 @api.get("/organisations/{organisation_id}/reports/profit-and-loss")
-def profit_loss(organisation_id: str, start: str, end: str, user: User = Depends(current_user)):
+def profit_loss(organisation_id: str, start: str, end: str, user: User = Depends(current_user),
+                compare: str = "none"):
     _require(organisation_id, user, {"owner", "administrator", "accountant", "approver", "viewer"})
-    return LedgerService().profit_and_loss(organisation_id, start=start, end=end)
+    return LedgerService().profit_and_loss(organisation_id, start=start, end=end, compare=compare)
 
 
 @api.get("/organisations/{organisation_id}/reports/balance-sheet")
-def balance_sheet(organisation_id: str, as_at: str, user: User = Depends(current_user)):
+def balance_sheet(organisation_id: str, as_at: str, user: User = Depends(current_user),
+                  compare: str = "none", start: str | None = None):
     _require(organisation_id, user, {"owner", "administrator", "accountant", "approver", "viewer"})
-    return LedgerService().balance_sheet(organisation_id, as_at=as_at)
+    return LedgerService().balance_sheet(organisation_id, as_at=as_at, compare=compare, start=start)
+
+
+@api.get("/organisations/{organisation_id}/reports/cash-flow")
+def cash_flow(organisation_id: str, date_from: str, date_to: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, {"owner", "administrator", "accountant", "approver", "viewer"})
+    return CashFlowService().statement(organisation_id, date_from=date_from, date_to=date_to)
 
 
 @api.get("/organisations/{organisation_id}/reports/general-ledger")

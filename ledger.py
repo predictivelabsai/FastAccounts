@@ -2,10 +2,52 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from calendar import monthrange
+from datetime import date, timedelta
 from decimal import Decimal
 
 from core_utils import audit, db_number, decimal, money, new_id, utc_now
 from database import Database, get_database
+
+
+def comparison_periods(start: str, end: str, compare: str) -> tuple[str, str, str, str]:
+    """Calendar-aligned whole periods; equal day counts for arbitrary ranges."""
+    first, last = date.fromisoformat(start), date.fromisoformat(end)
+    if first > last:
+        raise ValueError("Report start must be on or before its end")
+    if compare not in {"none", "previous", "prior_year", "ytd"}:
+        raise ValueError("Invalid comparison mode")
+
+    def prior_year(day):
+        return day.replace(year=day.year - 1, day=min(day.day, monthrange(day.year - 1, day.month)[1]))
+
+    if compare == "ytd":
+        first = date(last.year, 1, 1)
+        last = date(last.year, last.month, monthrange(last.year, last.month)[1])
+        before_first, before_last = prior_year(first), prior_year(last)
+        before_last = before_last.replace(day=monthrange(before_last.year, before_last.month)[1])
+    elif compare == "prior_year":
+        before_first, before_last = prior_year(first), prior_year(last)
+        if first.day == 1 and last.day == monthrange(last.year, last.month)[1]:
+            before_last = before_last.replace(day=monthrange(before_last.year, before_last.month)[1])
+    else:
+        before_last = first - timedelta(days=1)
+        if first.day == 1 and last.day == monthrange(last.year, last.month)[1]:
+            months = (last.year - first.year) * 12 + last.month - first.month + 1
+            month_index = first.year * 12 + first.month - 1 - months
+            before_first = date(month_index // 12, month_index % 12 + 1, 1)
+        else:
+            before_first = first - (last - first + timedelta(days=1))
+    return tuple(day.isoformat() for day in (first, last, before_first, before_last))
+
+
+def _add_comparison(report: dict, comparative: dict, compare: str) -> dict:
+    report["compare"] = compare
+    report["comparative"] = comparative
+    by_code = {row["code"]: row for row in comparative["accounts"]}
+    for row in report["accounts"]:
+        row["comparative_balance"] = by_code[row["code"]]["balance"]
+    return report
 
 
 @dataclass(frozen=True)
@@ -143,7 +185,9 @@ class LedgerService:
         rows = self.db.rows(
             "SELECT a.code,a.name,a.account_type,COALESCE(SUM(g.debit),0) debit,COALESCE(SUM(g.credit),0) credit "
             "FROM accounts a LEFT JOIN gl_entries g ON g.account_id=a.id AND g.entry_date BETWEEN ? AND ? "
-            "AND EXISTS (SELECT 1 FROM posting_batches p WHERE p.id=g.posting_batch_id AND p.status IN ('Posted','Reversed')) "
+            "AND g.organisation_id=a.organisation_id "
+            "AND EXISTS (SELECT 1 FROM posting_batches p WHERE p.id=g.posting_batch_id "
+            "AND p.organisation_id=g.organisation_id AND p.status IN ('Posted','Reversed')) "
             "WHERE a.organisation_id=? GROUP BY a.id,a.code,a.name,a.account_type ORDER BY a.code",
             (start, end, organisation_id),
         )
@@ -153,7 +197,12 @@ class LedgerService:
             row["balance"] = money(row["debit"] - row["credit"])
         return rows
 
-    def profit_and_loss(self, organisation_id: str, *, start: str, end: str) -> dict:
+    def profit_and_loss(self, organisation_id: str, *, start: str, end: str, compare: str = "none") -> dict:
+        if compare != "none":
+            start, end, before_start, before_end = comparison_periods(start, end, compare)
+            return _add_comparison(
+                self.profit_and_loss(organisation_id, start=start, end=end),
+                self.profit_and_loss(organisation_id, start=before_start, end=before_end), compare)
         rows = [r for r in self.trial_balance(organisation_id, start=start, end=end)
                 if r["account_type"] in {"Income", "Expense"}]
         income = sum((-r["balance"] for r in rows if r["account_type"] == "Income"), Decimal("0"))
@@ -161,7 +210,16 @@ class LedgerService:
         return {"start": start, "end": end, "income": money(income),
                 "expenses": money(expenses), "profit": money(income - expenses), "accounts": rows}
 
-    def balance_sheet(self, organisation_id: str, *, as_at: str) -> dict:
+    def balance_sheet(self, organisation_id: str, *, as_at: str, compare: str = "none",
+                      start: str | None = None) -> dict:
+        if compare != "none":
+            start = start or as_at[:7] + "-01"
+            current_start, current_end, before_start, before_end = comparison_periods(start, as_at, compare)
+            result = _add_comparison(self.balance_sheet(organisation_id, as_at=current_end),
+                                    self.balance_sheet(organisation_id, as_at=before_end), compare)
+            result["comparison_period"] = {"start": current_start, "end": current_end,
+                                           "comparative_start": before_start, "comparative_end": before_end}
+            return result
         rows = [r for r in self.trial_balance(organisation_id, start="0001-01-01", end=as_at)
                 if r["account_type"] in {"Asset", "Liability", "Equity"}]
         assets = sum((r["balance"] for r in rows if r["account_type"] == "Asset"), Decimal("0"))
