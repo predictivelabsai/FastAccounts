@@ -1375,7 +1375,7 @@ pending.
 - Defer configurable pre-due timing, longer horizons, additional stages,
   template editing, retry changes and production accountant UAT. PostgreSQL
   execution remains opt-in. See `docs/specs/reminder-rules.md`.
-- Validation: Python 3.12.14, `python -m pytest -q`: `1042 passed, 4 skipped
+- Validation: Python 3.14.6, `python -m pytest -q`: `1042 passed, 4 skipped
   in 904.55s (0:15:04)`. All 55 new offline checks passed, including owner/viewer
   browser flows in all four locales. The skips are the existing PostgreSQL opt-in
   checks. `node --check static/app.js`, Python compilation, catalogue preservation,

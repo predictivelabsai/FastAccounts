@@ -1681,7 +1681,7 @@
       "Reminders": "Meeldetuletused",
       "Reminder rules": "Meeldetuletusreeglid",
       "Configure automatic invoice reminders for this organisation.": "Seadista selle organisatsiooni automaatsed arvemeeldetuletused.",
-      "Stage 0 stays three days before due. Overdue stages must increase within 1 to 14 days.": "Etapp 0 jääb kolm päeva enne maksetähtaega. Tähtajajärgsete etappide vahed peavad kasvama 1 kuni 14 päeva piires.",
+      "Stage 0 stays three days before due. Overdue stages must increase within 1 to 14 days.": "Etapp 0 jääb kolm päeva enne maksetähtaega. Maksetähtaega ületanud etappide vahed peavad kasvama 1 kuni 14 päeva piires.",
       "Current effective reminders": "Praegu kehtivad meeldetuletused",
       "Enable automatic reminders": "Luba automaatsed meeldetuletused",
       "Stage 1: days after due": "Etapp 1: päevi pärast maksetähtaega",
