@@ -1,5 +1,6 @@
 """Tenant-scoped purchase schedules in the caller's accounting transaction."""
 from core_utils import db_number, new_id, utc_now
+from objects_repository import ObjectRepository
 
 
 class PeriodisationRepository:
@@ -19,6 +20,8 @@ class PeriodisationRepository:
             'SELECT l.*,a.account_type FROM bill_lines l JOIN bills b ON b.id=l.bill_id '
             'JOIN accounts a ON a.id=l.account_id AND a.organisation_id=b.organisation_id '
             'WHERE b.organisation_id=? AND b.id=? ORDER BY l.line_number', (self.oid, bill_id))
+        tags = {l['id']: l for l in ObjectRepository(self.tx, self.oid).document_lines('bill', bill_id)}
+        row['lines'] = [tags[l['id']] | {'account_type': l['account_type']} for l in row['lines']]
         return row
 
     def account(self, account_id):

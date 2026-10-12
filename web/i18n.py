@@ -16,7 +16,7 @@ LANGUAGES: dict[str, dict[str, str]] = {
 }
 SUPPORTED_LANGS = frozenset(LANGUAGES)
 LOCALES_DIR = Path(__file__).resolve().parent / "locales"
-APPEND_SECTIONS = ('periodisation', 'payment_links')
+APPEND_SECTIONS = ('periodisation', 'payment_links', 'analytical_objects')
 
 
 @lru_cache(maxsize=None)

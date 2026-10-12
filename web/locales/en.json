@@ -1714,5 +1714,37 @@
       "Enabled": "Enabled",
       "Custom": "Custom"
     }
+  },
+  "analytical_objects": {
+    "nav": {
+      "objects": "Objects"
+    },
+    "workspace": {
+      "Objects": "Objects",
+      "Object": "Object",
+      "Project": "Project",
+      "Location": "Location",
+      "Person": "Person",
+      "Object type": "Object type",
+      "Add object": "Add object",
+      "Edit object": "Edit object",
+      "Delete object": "Delete object",
+      "Tag income and costs by project, location, person or object.": "Tag income and costs by project, location, person or object.",
+      "Delete this object? Objects in use must be deactivated instead.": "Delete this object? Objects in use must be deactivated instead.",
+      "Object filter": "Object filter",
+      "All objects": "All objects",
+      "No object": "No object",
+      "Object not found": "Object not found",
+      "Valid object type and active boolean are required": "Valid object type and active boolean are required",
+      "Invalid object fields": "Invalid object fields",
+      "An object requires a code and name within the length limits": "An object requires a code and name within the length limits",
+      "Object code already exists for this type": "Object code already exists for this type",
+      "A referenced object cannot change type": "A referenced object cannot change type",
+      "This object is in use. Deactivate it instead.": "This object is in use. Deactivate it instead.",
+      "Object dimension must match its type and be active": "Object dimension must match its type and be active",
+      "Object fields cannot be null": "Object fields cannot be null",
+      "Active": "Active",
+      "Inactive": "Inactive"
+    }
   }
 }

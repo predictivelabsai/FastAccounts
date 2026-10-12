@@ -24,6 +24,7 @@ from documents import DocumentService, EInvoiceAlreadyImported
 from quotes import QuoteService
 from periodisation import PeriodisationService
 from payment_links import PaymentLinkService
+from objects import ObjectService
 from statements import StatementService
 from cash_flow import CashFlowService
 from excel_export import (employees_workbook, general_ledger_workbook,
@@ -77,6 +78,42 @@ class LineIn(BaseModel):
     tax_code_id: str | None = None
 
 
+class DimensionIn(BaseModel):
+    projects_project_id: str | None = None
+    projects_location_id: str | None = None
+    projects_person_id: str | None = None
+    projects_object_id: str | None = None
+
+
+class ObjectLineIn(LineIn, DimensionIn):
+    pass
+
+
+class ObjectIn(BaseModel):
+    model_config = {'extra': 'forbid'}
+    object_type: Literal['project', 'location', 'person', 'object']
+    code: str = Field(min_length=1, max_length=40)
+    name: str = Field(min_length=1, max_length=180)
+    active: bool = Field(default=True, strict=True)
+    notes: str = Field(default='', max_length=2000)
+
+
+class ObjectPatch(BaseModel):
+    model_config = {'extra': 'forbid'}
+    object_type: Literal['project', 'location', 'person', 'object'] | None = None
+    code: str | None = Field(default=None, min_length=1, max_length=40)
+    name: str | None = Field(default=None, min_length=1, max_length=180)
+    active: bool | None = Field(default=None, strict=True)
+    notes: str | None = Field(default=None, max_length=2000)
+
+    @field_validator('object_type', 'code', 'name', 'active', 'notes')
+    @classmethod
+    def reject_null(cls, value):
+        if value is None:
+            raise ValueError('Object fields cannot be null')
+        return value
+
+
 class InvoiceIn(BaseModel):
     contact_id: str
     issue_date: str
@@ -87,7 +124,7 @@ class InvoiceIn(BaseModel):
     notes: str = ""
     document_type: Literal["invoice", "credit_note"] = "invoice"
     original_invoice_id: str | None = None
-    lines: list[LineIn] = Field(min_length=1)
+    lines: list[ObjectLineIn] = Field(min_length=1)
 
 
 class QuoteIn(BaseModel):
@@ -182,7 +219,7 @@ class BillIn(BaseModel):
     reference: str = ""
     notes: str = ""
     document_type: Literal["bill", "supplier_credit"] = "bill"
-    lines: list[LineIn] = Field(min_length=1)
+    lines: list[ObjectLineIn] = Field(min_length=1)
 
 
 class InvoiceScheduleIn(BaseModel):
@@ -359,11 +396,15 @@ class AccountMappingUpdateIn(BaseModel):
     is_default: bool
 
 
-class JournalLineIn(BaseModel):
+class BasicJournalLineIn(BaseModel):
     account_id: str
     debit: Decimal = Decimal("0")
     credit: Decimal = Decimal("0")
     memo: str = ""
+
+
+class JournalLineIn(BasicJournalLineIn, DimensionIn):
+    pass
 
 
 class JournalIn(BaseModel):
@@ -376,7 +417,7 @@ class JournalIn(BaseModel):
 
 class OpeningBalanceIn(BaseModel):
     posting_date: str
-    lines: list[JournalLineIn]
+    lines: list[BasicJournalLineIn]
 
 
 class OpeningCSVIn(BaseModel):
@@ -658,6 +699,36 @@ def list_invoices(organisation_id: str, user: User = Depends(current_user)):
 def list_payment_methods(organisation_id: str, user: User = Depends(current_user)):
     _require(organisation_id, user, {'owner', 'administrator', 'accountant', 'approver', 'viewer'})
     return PaymentLinkService().list_configs(organisation_id)
+
+
+@api.get('/organisations/{organisation_id}/objects')
+def list_objects(organisation_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, {'owner', 'administrator', 'accountant', 'approver', 'viewer'})
+    return ObjectService().list(organisation_id)
+
+
+@api.get('/organisations/{organisation_id}/objects/{object_id}')
+def get_object(organisation_id: str, object_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, {'owner', 'administrator', 'accountant', 'approver', 'viewer'})
+    return ObjectService().get(organisation_id, object_id)
+
+
+@api.post('/organisations/{organisation_id}/objects', status_code=201)
+def create_object(organisation_id: str, payload: ObjectIn, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES & {'owner', 'administrator'})
+    return ObjectService().create(organisation_id, **payload.model_dump(), actor=user.email)
+
+
+@api.patch('/organisations/{organisation_id}/objects/{object_id}')
+def update_object(organisation_id: str, object_id: str, payload: ObjectPatch, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES & {'owner', 'administrator'})
+    return ObjectService().update(organisation_id, object_id, **payload.model_dump(exclude_unset=True), actor=user.email)
+
+
+@api.delete('/organisations/{organisation_id}/objects/{object_id}')
+def delete_object(organisation_id: str, object_id: str, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES & {'owner', 'administrator'})
+    return ObjectService().delete(organisation_id, object_id, actor=user.email)
 
 
 @api.post('/organisations/{organisation_id}/payment-methods', status_code=201)
@@ -1053,16 +1124,16 @@ def export_tax(organisation_id: str, return_id: str, user: User = Depends(curren
 
 
 @api.get("/organisations/{organisation_id}/reports/trial-balance")
-def trial_balance(organisation_id: str, start: str, end: str, user: User = Depends(current_user)):
+def trial_balance(organisation_id: str, start: str, end: str, user: User = Depends(current_user), object_id: str | None = None):
     _require(organisation_id, user, {"owner", "administrator", "accountant", "approver", "viewer"})
-    return LedgerService().trial_balance(organisation_id, start=start, end=end)
+    return LedgerService().trial_balance(organisation_id, start=start, end=end, object_id=object_id)
 
 
 @api.get("/organisations/{organisation_id}/reports/profit-and-loss")
 def profit_loss(organisation_id: str, start: str, end: str, user: User = Depends(current_user),
-                compare: str = "none"):
+                compare: str = "none", object_id: str | None = None):
     _require(organisation_id, user, {"owner", "administrator", "accountant", "approver", "viewer"})
-    return LedgerService().profit_and_loss(organisation_id, start=start, end=end, compare=compare)
+    return LedgerService().profit_and_loss(organisation_id, start=start, end=end, compare=compare, object_id=object_id)
 
 
 @api.get("/organisations/{organisation_id}/reports/balance-sheet")
@@ -1079,9 +1150,9 @@ def cash_flow(organisation_id: str, date_from: str, date_to: str, user: User = D
 
 
 @api.get("/organisations/{organisation_id}/reports/general-ledger")
-def general_ledger(organisation_id: str, start: str, end: str, user: User = Depends(current_user)):
+def general_ledger(organisation_id: str, start: str, end: str, user: User = Depends(current_user), object_id: str | None = None):
     _require(organisation_id, user, {"owner", "administrator", "accountant", "viewer"})
-    return LedgerService().general_ledger(organisation_id, start=start, end=end)
+    return LedgerService().general_ledger(organisation_id, start=start, end=end, object_id=object_id)
 
 
 def _iso_date_bound(value: str | None, default: str) -> str:
@@ -1185,8 +1256,7 @@ def cash_summary(organisation_id: str, start: str, end: str, user: User = Depend
 @api.post("/organisations/{organisation_id}/journals", status_code=201)
 def create_journal(organisation_id: str, payload: JournalIn, user: User = Depends(require_csrf)):
     _require(organisation_id, user, {"owner", "administrator", "accountant"})
-    lines = [PostingLine(account_id=line.account_id, debit=line.debit, credit=line.credit, memo=line.memo)
-             for line in payload.lines]
+    lines = [PostingLine(**line.model_dump()) for line in payload.lines]
     return LedgerService().post(
         organisation_id=organisation_id, voucher_type="manual_journal",
         voucher_id=payload.idempotency_key, voucher_code=payload.voucher_code,

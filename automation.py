@@ -15,6 +15,8 @@ from psycopg import IntegrityError as PostgresIntegrityError
 from core_utils import audit, db_number, decimal, money, new_id, utc_now
 from database import Database, get_database
 from documents import DocumentService
+from objects import dimensions
+from objects_repository import ObjectRepository
 from fixed_assets import FixedAssetService
 from open_banking import OpenBankingService
 
@@ -176,6 +178,9 @@ class AutomationService:
         if not contact or contact["contact_type"] not in {"customer", "both"}:
             raise ValueError("A customer in this organisation is required")
         items = tx.rows("SELECT * FROM invoice_schedule_lines WHERE schedule_id=? ORDER BY line_number", (schedule["id"],))
+        objects = ObjectRepository(tx, org_id)
+        template_tags = {line['line_number']: dimensions(line)
+                         for line in objects.document_lines('invoice', schedule['template_invoice_id'])}
         lines, subtotal, tax_total, total = self.documents._document_lines(tx, org_id, items, schedule["amount_type"])
         invoice_id, now = new_id(), utc_now()
         currency = schedule["currency"] or tx.scalar("SELECT base_currency FROM organisations WHERE id=?", (org_id,))
@@ -188,6 +193,7 @@ class AutomationService:
                        (line["id"], invoice_id, line["line_number"], line["description"], db_number(line["quantity"]),
                         db_number(line["unit_price"]), line["account_id"], line["tax_code_id"], db_number(line["tax_rate"]),
                         db_number(line["net_amount"]), db_number(line["tax_amount"]), db_number(line["gross_amount"])))
+            objects.save_dimensions('invoice', invoice_id, line['id'], template_tags.get(line['line_number'], dimensions({})))
         audit(tx, org_id, actor, "invoice.created", "invoice", invoice_id, {"document_type": "invoice", "total": str(total)})
         return invoice_id
 

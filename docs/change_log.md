@@ -1200,3 +1200,29 @@ the entries below, plus one connector fix:
   opt-in PostgreSQL checks. Tests used synthetic data and no live provider calls.
   JavaScript syntax, focused Python compilation, existing locale preservation,
   diff and staged secret-pattern checks passed.
+
+## 2026-10-12: Analytical objects
+
+- Added the missing analytical object catalogue and tenant-scoped service/API,
+  with four semantic types, audited admin CRUD and deactivation of used objects.
+  No project/dimension primitive existed on the payment-links base branch.
+- Added optional invoice, bill and journal line dimensions, persisted alongside
+  their immutable parent lines through additive migration 0023. Composite foreign
+  keys enforce tenant, parent and type. Posted tags cannot be inserted, edited
+  or deleted; reversals preserve historical tags, including inactive objects.
+- Kept tagged revenue groups separate and carried expense/non-recoverable tax
+  tags into postings. Purchase deferrals and rounded portions retain exact
+  dimension totals; recurring invoices inherit their source invoice's tags.
+- Added object filters to general ledger, trial balance and P&L with matching
+  comparison filters. Added Settings object management, invoice/bill selectors,
+  report controls and appended English, Estonian, Lithuanian and Latvian copy.
+  Updated CI and every migration count/list assertion.
+- Documented deferred merging, multiple/combined dimensions, journal SPA editing,
+  quote/schedule dimension authoring, dimension exports and production UAT.
+  Existing historical rows are preserved and PostgreSQL checks remain opt-in.
+- Validation: Python 3.12.14, `python -m pytest -q`:
+  `936 passed, 4 skipped in 741.21s (0:12:21)`. All 20 new analytical object
+  checks passed, including browser flows in all four locales. The skips are the
+  existing PostgreSQL opt-in checks. JavaScript syntax, Python compilation,
+  existing locale preservation, desktop/mobile visual review, diff and staged
+  secret-pattern checks passed. All data used by the new tests is synthetic.

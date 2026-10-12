@@ -16,6 +16,8 @@ from core_utils import audit, decimal, four_dp, money, new_id, today as current_
 from database import get_database
 from ledger import LedgerService, PostingLine
 from periodisation_repository import PeriodisationRepository
+from objects import dimensions
+from objects_repository import DIMENSIONS
 
 
 class PeriodisationService:
@@ -105,12 +107,17 @@ class PeriodisationService:
                     raise ValueError('The original bill posting must be unreversed')
                 grouped = defaultdict(Decimal)
                 for line in bill['lines']:
-                    grouped[line['account_id']] += money(line['net_amount'])
-                lines = [PostingLine(deferred['id'], debit=total)]
-                lines.extend(PostingLine(a, credit=v) for a, v in grouped.items() if v)
+                    grouped[(line['account_id'], *dimensions(line).values())] += money(line['net_amount'])
+                lines = []
+                for (account_id, *tags), value in grouped.items():
+                    if value:
+                        values = dict(zip(DIMENSIONS, tags))
+                        lines.extend([PostingLine(deferred['id'], debit=value, **values),
+                                      PostingLine(account_id, credit=value, **values)])
                 batch = self.ledger.post(organisation_id=organisation_id, voucher_type='purchase_deferral',
                     voucher_id=schedule_id, voucher_code='DEFER-' + bill['supplier_number'],
-                    posting_date=bill['bill_date'], lines=lines, actor=actor, currency=bill['currency'], tx=tx)
+                    posting_date=bill['bill_date'], lines=lines, actor=actor, currency=bill['currency'], tx=tx,
+                    allow_inactive_objects=True)
                 repo.funding(schedule_id, batch['id'])
             audit(tx, organisation_id, actor, 'periodisation.created', 'purchase_schedule', schedule_id)
             return self._progress(repo.get(schedule_id))
@@ -154,11 +161,26 @@ class PeriodisationService:
                         raise ValueError('Purchase period is not due')
                     continue
                 amount = money(period['net_amount'])
+                # Allocate against remaining dimension totals to preserve pennies and tags.
+                groups = defaultdict(Decimal)
+                for line in bill['lines']:
+                    groups[tuple(dimensions(line).values())] += money(line['net_amount'])
+                for scheduled in schedule['periods']:
+                    current = self._allocate_objects(money(scheduled['net_amount']), groups)
+                    if scheduled['id'] == period['id']:
+                        break
+                    groups = {tags: value - current[tags] for tags, value in groups.items()}
+                lines = []
+                for tags, portion in current.items():
+                    if portion:
+                        values = dict(zip(DIMENSIONS, tags))
+                        lines.extend([
+                            PostingLine(schedule['expense_account_id'], debit=portion, source_line_type='purchase_period', source_line_id=period['id'], **values),
+                            PostingLine(schedule['deferred_account_id'], credit=portion, source_line_type='purchase_period', source_line_id=period['id'], **values)])
                 batch = self.ledger.post(organisation_id=organisation_id, voucher_type='purchase_period',
                     voucher_id=period['id'], voucher_code='PER-' + bill['supplier_number'] + '-' + period['period_date'],
                     posting_date=period['period_date'], currency=schedule['currency'], actor=actor, tx=tx,
-                    lines=[PostingLine(schedule['expense_account_id'], debit=amount, source_line_type='purchase_period', source_line_id=period['id']),
-                           PostingLine(schedule['deferred_account_id'], credit=amount, source_line_type='purchase_period', source_line_id=period['id'])])
+                    lines=lines, allow_inactive_objects=True)
                 repo.posted(schedule_id, period['id'], batch['id'])
                 audit(tx, organisation_id, actor, 'periodisation.posted', 'purchase_schedule_period', period['id'], {'posting_batch_id': batch['id']})
             result = repo.get(schedule_id)
@@ -166,6 +188,18 @@ class PeriodisationService:
                 repo.transition(schedule_id, 'Completed', schedule['notes'])
                 result = repo.get(schedule_id)
             return self._progress(result)
+
+    @staticmethod
+    def _allocate_objects(amount, groups):
+        total = sum(groups.values(), Decimal('0'))
+        result = {tags: (amount * weight / total).quantize(Decimal('0.01'), rounding=ROUND_DOWN)
+                  for tags, weight in groups.items()}
+        remaining = amount - sum(result.values(), Decimal('0'))
+        for tags, weight in sorted(groups.items(), key=lambda pair: pair[1], reverse=True):
+            addition = min(remaining, weight - result[tags])
+            result[tags] += addition
+            remaining -= addition
+        return result
 
     def cancel(self, organisation_id, schedule_id, *, actor):
         with self.db.transaction() as tx:

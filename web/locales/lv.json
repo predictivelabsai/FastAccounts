@@ -1606,5 +1606,37 @@
       "Enabled": "Iespējots",
       "Custom": "Pielāgots"
     }
+  },
+  "analytical_objects": {
+    "nav": {
+      "objects": "Objekti"
+    },
+    "workspace": {
+      "Objects": "Objekti",
+      "Object": "Objekts",
+      "Project": "Projekts",
+      "Location": "Vieta",
+      "Person": "Persona",
+      "Object type": "Objekta veids",
+      "Add object": "Pievienot objektu",
+      "Edit object": "Rediģēt objektu",
+      "Delete object": "Dzēst objektu",
+      "Tag income and costs by project, location, person or object.": "Atzīmējiet ieņēmumus un izmaksas pēc projekta, vietas, personas vai objekta.",
+      "Delete this object? Objects in use must be deactivated instead.": "Vai dzēst šo objektu? Lietotus objektus jāpadara neaktīvus.",
+      "Object filter": "Objekta filtrs",
+      "All objects": "Visi objekti",
+      "No object": "Bez objekta",
+      "Object not found": "Objekts nav atrasts",
+      "Valid object type and active boolean are required": "Nepieciešams derīgs objekta veids un aktivitātes loģiskā vērtība",
+      "Invalid object fields": "Nederīgi objekta lauki",
+      "An object requires a code and name within the length limits": "Objektam vajadzīgs kods un nosaukums ar atļauto garumu",
+      "Object code already exists for this type": "Šī veida objekta kods jau pastāv",
+      "A referenced object cannot change type": "Lietota objekta veidu nevar mainīt",
+      "This object is in use. Deactivate it instead.": "Šis objekts tiek lietots. Padariet to neaktīvu.",
+      "Object dimension must match its type and be active": "Objektam jāatbilst dimensijas veidam un jābūt aktīvam",
+      "Object fields cannot be null": "Objekta lauki nedrīkst būt tukši",
+      "Active": "Active",
+      "Inactive": "Inactive"
+    }
   }
 }

@@ -728,6 +728,23 @@
         }),
       });
     },
+    objects: async (c) => {
+      const rows = await api(c.url('/objects'));
+      if (!c.mount(page(t('Objects'), t('Tag income and costs by project, location, person or object.'),
+        button('Add object', 'newObject', true, canEditMappings() ? '' : 'disabled'),
+        table(['Code', 'Name', 'Object type', 'Status', 'Actions'], rows.map((x) => row([
+          td(esc(x.code)), td(esc(x.name)), td(tr(objectTypeLabel(x.object_type))), td(tr(x.active ? 'Active' : 'Inactive')),
+          td(button('Edit object', 'editObject', false, `data-id="${esc(x.id)}" ${canEditMappings() ? '' : 'disabled'}`) +
+            button('Delete object', 'deleteObject', false, `data-id="${esc(x.id)}" ${canEditMappings() ? '' : 'disabled'}`))])))))) return;
+      bindActions(content, {
+        newObject: () => objectDialog(),
+        editObject: (b) => objectDialog(rows.find((x) => x.id === b.dataset.id)),
+        deleteObject: (b) => confirmAction('Delete object', tr('Delete this object? Objects in use must be deactivated instead.'), async () => {
+          await post(c.url(`/objects/${b.dataset.id}`), {}, 'DELETE');
+          await render();
+        }),
+      });
+    },
     "payment-methods": async (c) => {
       const rows = await api(c.url('/payment-methods'));
       if (!c.mount(page(t('Payment methods'), t('Configure payment URLs without a provider connection.'),
@@ -1136,6 +1153,7 @@
       await views.accounting(c);
     },
     accounting: async (c) => {
+      const objects = await api(c.url('/objects'));
       if (
         !c.mount(
           page(
@@ -1161,6 +1179,11 @@
         openingBalances: openingBalancesDialog,
         openingItems: openingItemsDialog,
       });
+      const objectControl = document.createElement('span');
+      objectControl.id = 'report-object';
+      objectControl.innerHTML = select('Object filter', 'object_id', [['', t('All objects')],
+        ...objects.map((x) => [x.id, `${t(objectTypeLabel(x.object_type))}: ${x.code} ${x.name}`])]);
+      document.getElementById('report-dates').querySelector('button').before(objectControl);
       let request = 0;
       const f = document.getElementById("report-dates"),
         asAt = () =>
@@ -1178,6 +1201,7 @@
       };
       const comparative = () => ["profit-and-loss", "balance-sheet"].includes(reportTab);
       const updateControls = () => {
+        objectControl.hidden = !['trial-balance', 'general-ledger', 'profit-and-loss'].includes(reportTab);
         document.getElementById("report-comparison").hidden = !comparative();
         document.getElementById("report-period").hidden = !comparative();
         document.getElementById("report-start-label").hidden = asAt() &&
@@ -1210,6 +1234,7 @@
             q.set("compare", f.elements.compare.value);
             if (asAt()) q.set("start", f.elements.start.value);
           }
+          if (!objectControl.hidden && f.elements.object_id.value) q.set('object_id', f.elements.object_id.value);
           const data = await api(c.url(`/reports/${tab}?${q}`));
           if (ticket !== request || !result.isConnected) return;
           result.innerHTML = `<div class="report-heading"><h2>${tr(reportNames[tab])}</h2><p>${esc(org.name)} · ${date(f.elements.end.value)}</p></div>${renderReport(tab, data)}`;
@@ -2263,10 +2288,11 @@
       await attachmentsSection(d, base, kind, documentId);
       return;
     }
-    const [contacts, accounts, taxes] = await Promise.all([
+    const [contacts, accounts, taxes, objects] = await Promise.all([
       api(base + "/contacts"),
       api(base + "/accounts"),
       api(base + "/tax-codes"),
+      api(base + '/objects'),
     ]);
     if (base !== path("")) return;
     const invoice = kind === "invoice",
@@ -2325,7 +2351,7 @@
             "tax_code_id",
             taxes.map((x) => [x.id, `${x.code} · ${num(x.rate)}%`]),
             taxes.find((x) => x.kind === "standard")?.id,
-          ),
+          ) + objectSelectors(objects),
         "Create draft",
       ),
     );
@@ -2337,8 +2363,9 @@
         "unit_price",
         "account_id",
         "tax_code_id",
+        'projects_project_id', 'projects_location_id', 'projects_person_id', 'projects_object_id',
       ].forEach((k) => {
-        line[k] = data[k];
+        line[k] = k.startsWith('projects_') ? data[k] || null : data[k];
         delete data[k];
       });
       data.lines = [line];
@@ -2349,6 +2376,25 @@
       await render();
     });
   }
+  const objectTypeLabel = (kind) => ({project: 'Project', location: 'Location', person: 'Person', object: 'Object'})[kind];
+  const objectSelectors = (objects) => ['project', 'location', 'person', 'object'].map((kind) =>
+    select(objectTypeLabel(kind), `projects_${kind}_id`, [['', t('No object')],
+      ...objects.filter((x) => x.active && x.object_type === kind).map((x) => [x.id, `${x.code} ${x.name}`])])).join('');
+
+  async function objectDialog(record = null) {
+    const base = path('');
+    const d = dialog(record ? 'Edit object' : 'Add object', form(
+      select('Object type', 'object_type', ['project', 'location', 'person', 'object'].map((kind) => [kind, t(objectTypeLabel(kind))]), record?.object_type || 'project') +
+      field('Code', 'code', record?.code || '', 'text', 'required maxlength="40"') +
+      field('Name', 'name', record?.name || '', 'text', 'required maxlength="180"') +
+      field('Notes', 'notes', record?.notes || '', 'text', 'maxlength="2000"') + check('Active', 'active', record ? !!record.active : true)));
+    bindForm(d, async (data) => {
+      await post(base + '/objects' + (record ? `/${record.id}` : ''),
+        {...data, active: d.querySelector('[name=active]').checked}, record ? 'PATCH' : 'POST');
+      await saved(d);
+    });
+  }
+
   async function paymentMethodDialog(record = null) {
     const base = path('');
     const d = dialog(record ? 'Edit payment method' : 'Add payment method', form(

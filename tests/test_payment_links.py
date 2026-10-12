@@ -231,7 +231,7 @@ def test_upgrade_and_rerun_preserve_existing_data(tmp_path, monkeypatch):
     tables = ['organisations', 'accounts', 'contacts', 'invoices', 'invoice_lines', 'posting_batches', 'gl_entries', 'audit_events']
     before = {table: db.rows(f'SELECT * FROM {table} ORDER BY id') for table in tables}
     monkeypatch.setattr(database, 'MIGRATIONS', original)
-    assert db.migrate() == ['0022_payment_links'] and db.migrate() == []
+    assert db.migrate() == ['0022_payment_links', '0023_analytical_objects'] and db.migrate() == []
     service = PaymentLinkService(db)
     method = service.create_config(org['id'], actor=ACTOR, **CONFIG)
     link = service.generate(org['id'], invoice['id'], method['id'])
@@ -249,7 +249,7 @@ def test_append_only_locale_merge(language):
     path = f'web/locales/{language}.json'
     raw = Path(path).read_text(encoding='utf-8')
     data = json.loads(raw)
-    assert list(data)[-1] == 'payment_links'
+    assert list(data)[-2:] == ['payment_links', 'analytical_objects']
     for section, additions in data['payment_links'].items():
         assert not additions.keys() & data[section].keys()
         for key, value in additions.items():
