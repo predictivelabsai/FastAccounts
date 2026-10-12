@@ -1449,7 +1449,7 @@
     "Inclusive": "Käibemaksuga",
     "No tax": "Maksuvaba",
     "Mark this quote as sent. Email delivery is not available yet.": "Märgi pakkumine saadetuks. E-postiga saatmine ei ole veel saadaval.",
-    "This creates and issues a sales invoice with an immutable ledger posting.": "Luuakse ja väljastatakse müügiarve koos muutmatu pearaamatu kandega.",
+    "This creates and issues a sales invoice with an immutable ledger posting.": "Luuakse ja väljastatakse müügiarve koos muutumatu pearaamatu kandega.",
     "Quote validity cannot precede the quote date": "Pakkumise kehtivusaeg ei saa lõppeda enne pakkumise kuupäeva",
     "Quotes require the organisation base currency": "Pakkumised peavad olema organisatsiooni põhivaluutas",
     "Quote line amounts must be finite with at most four decimal places": "Pakkumise rea summad peavad olema lõplikud ja kuni nelja komakohaga",
