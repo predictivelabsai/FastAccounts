@@ -883,6 +883,34 @@
           ),
       });
     },
+    imports: async (c) => {
+      if (!c.route[0]) {
+        if (c.mount(page(t("Data import"), t("Upload CSV, review each row, then import valid rows."),
+          button("Import", "masterImport", true), "")))
+          bindActions(content, { masterImport: () => masterDataImportDialog() });
+        return;
+      }
+      const base = c.url(`/imports/${encodeURIComponent(c.route[0])}`);
+      const batch = await api(`${base}?limit=10000`);
+      const issue = (value) => value.split("; ").map((x) => tr(x)).join("; ");
+      if (!c.mount(page(t("Data import"), t("Upload CSV, review each row, then import valid rows."),
+        batch.status === "staged" ? button("Import valid rows", "commitImport", true) + button("Discard import", "discardImport") : "",
+        `<p>${tr("Status")}: ${tr({staged: "Staged import", committed: "Import committed", discarded: "Import discarded"}[batch.status])}</p>
+        <p>${tr("Errors")}: ${num(batch.error_count)} · ${tr("Warnings")}: ${num(batch.warning_count)} · ${tr("Rows")}: ${num(batch.total_rows)}</p>
+        <p class="muted">${tr("Existing records are skipped. Discarded rows are retained for audit.")}</p>` + table(
+          ["Row", "Name", "Errors", "Warnings", "Created record"], batch.rows.map((x) => row([
+            td(num(x.row_number)), td(esc(x.parsed.name || "")), td(issue(x.error)), td(issue(x.warning)), td(esc(x.entity_id || ""))])))))) return;
+      bindActions(content, {
+        commitImport: async (b) => {
+          b.disabled = true;
+          try { await post(`${base}/commit`); await render(); } finally { b.disabled = false; }
+        },
+        discardImport: async (b) => {
+          b.disabled = true;
+          try { await post(`${base}/discard`); await render(); } finally { b.disabled = false; }
+        },
+      });
+    },
     contacts: async (c) => {
       const rows = await api(c.url("/contacts"));
       if (
@@ -891,7 +919,7 @@
             t("Contacts"),
             t("Customers and suppliers for this organisation."),
             button("New customer", "customer", true) +
-              button("New supplier", "supplier"),
+              button("New supplier", "supplier") + button("Data import", "masterImport"),
             `<div class="chips">${["All", "customer", "supplier", "both"].map((x) => `<button class="chip ${contactFilter === x ? "active" : ""}" data-contact-filter="${x}">${tr(x)}</button>`).join("")}</div><div id="contacts-table"></div>`,
           ),
         )
@@ -923,6 +951,7 @@
         bindActions(content, {
           customer: () => contactDialog("customer"),
           supplier: () => contactDialog("supplier"),
+          masterImport: () => masterDataImportDialog("contacts"),
           statement: (b) => statementDialog(rows.find((x) => x.id === b.dataset.id)),
           contactPrepayments: (b) => contactPrepaymentsDialog(rows.find((x) => x.id === b.dataset.id)),
         });
@@ -2640,6 +2669,33 @@
       data.due_before ||= null;
       await post(base + "/payment-orders", data);
       await saved(d);
+    });
+  }
+
+  function masterDataImportDialog(kind = "contacts") {
+    const base = path("/imports"), oid = org.id;
+    const d = dialog("Data import", form(
+      select("Import kind", "kind", [["contacts", t("Contacts")], ["items", t("Items")]], kind) +
+      `<p class="full-width muted">${tr("Prices use the organisation's base currency.")}</p>
+      <p class="full-width muted">${tr("Required columns: contacts need name and contact_type; items need code and name. Other columns are optional. Use account codes or leave blank for standard accounts.")}</p>
+      <p class="full-width" data-import-columns></p>
+      <label>${tr("CSV file")}<input name="csv_file" type="file" accept=".csv,text/csv"></label>
+      <label>${tr("CSV contents")}<textarea name="csv_content" rows="8" maxlength="2000000"></textarea></label>`, "Stage import"));
+    const columns = () => {
+      d.querySelector("[data-import-columns]").textContent = t("CSV columns") + ": " +
+        (d.querySelector("[name=kind]").value === "contacts"
+          ? "name, contact_type, email, phone, address, registry_code, vat_number, bank_account"
+          : "code, name, sale_account, purchase_account, unit, sale_price, purchase_price");
+    };
+    columns();
+    d.querySelector("[name=kind]").onchange = columns;
+    bindForm(d, async (data) => {
+      const file = d.querySelector("[name=csv_file]").files[0];
+      if (file && file.size > 2000000) throw new Error(t("CSV file is too large"));
+      const csv_content = file ? await file.text() : data.csv_content;
+      const batch = await post(base, {kind: data.kind, csv_content});
+      closeDialog(d);
+      if (org?.id === oid) location.hash = `imports/${encodeURIComponent(batch.id)}`;
     });
   }
 

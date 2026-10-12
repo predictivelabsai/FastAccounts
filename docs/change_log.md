@@ -4,6 +4,28 @@ Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as
 delivered.
 
+## 2026-10-12: Staged contact and item CSV import
+
+- Added a shared master-data CSV pipeline with contact and item validators,
+  tenant-scoped batches and rows, row-level errors and warnings, explicit commit
+  and discard, created entity ids and audit events. Discard retains staged rows
+  for audit. Existing records are skipped without updating local data.
+- Commits apply valid rows atomically and serialise per organisation, preventing
+  duplicate natural keys across concurrent batches and rejecting double commits.
+  Contacts match by name or registry/personal code; items match by code.
+- Migration `0019_master_data_import` adds staging tables, item unit and purchase
+  price fields. The existing item unit price stores the imported sale price.
+  Prices are exact decimals in the organisation's base currency; missing item
+  accounts default to the standard sales and cost-of-sales roles.
+- Added viewer-readable, write-role and CSRF-protected API routes, a settings
+  import entry and a contact import action. Upload or paste CSV, inspect all
+  row issues, then commit valid rows or discard. All four locales are updated.
+- Verified with offline pytest service, API, migration and browser regressions,
+  including rollback, concurrent batches, tenant isolation, malformed CSV,
+  idempotency and all four locales. Python 3.12.14, `python -m pytest -q`:
+  `764 passed, 4 skipped in 528.45s (0:08:48)`. The four skips are opt-in
+  PostgreSQL checks. Production UAT remains pending.
+
 ## 2026-10-12: Cash-flow statement and comparative reports
 
 - Added a read-only, tenant-scoped direct-method cash-flow service and authorised

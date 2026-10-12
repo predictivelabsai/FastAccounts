@@ -1162,3 +1162,27 @@ pending.
   leap-year comparisons, and preservation of BANK roles through upgrades.
   Existing locale keys and values remain unchanged; JavaScript syntax and
   diff checks passed. No live provider calls were made.
+
+### Staged contact and item CSV import (2026-10-12)
+
+- [x] Add a reusable master-data pipeline with per-kind column sets and validators,
+  row-level issues, tenant-scoped staging, created entity ids and audit events.
+  CSV parsing uses the Python standard library. Discard retains rows for audit.
+- [x] Commit valid rows atomically, reject repeated commits and serialise imports
+  per organisation. Skip existing contacts by name or registry/personal code and
+  items by code, preserving existing data and reporting warnings.
+- [x] Add migration `0019_master_data_import` with constrained batches, tenant
+  foreign keys, staging rows, item unit and purchase price fields. Sale prices
+  use the existing unit price field. Prices remain in base currency, with exact
+  decimal validation and standard sales/cost-of-sales account defaults.
+- [x] Add viewer-readable status and write-role, CSRF-protected stage, commit and
+  discard API routes. Provide settings and contacts import actions, file upload
+  or pasted CSV, review with row errors/warnings, commit and discard controls in
+  English, Estonian, Lithuanian and Latvian.
+- Validation: offline pytest service, API, migration and browser checks cover
+  idempotency, isolated errors, malformed CSV, rollback, concurrent batches,
+  account changes, tenant isolation and all four locales. Python 3.12.14,
+  `python -m pytest -q`: `764 passed, 4 skipped in 528.45s (0:08:48)`.
+  The four skipped tests are opt-in PostgreSQL checks.
+- [ ] Production UAT remains pending. Spreadsheet workbook parsing and updates
+  to existing master data are outside this CSV import scope.
