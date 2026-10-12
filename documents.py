@@ -17,6 +17,7 @@ import einvoice
 
 from core_utils import audit, db_number, decimal, money, new_id, sha256_bytes, utc_now
 from database import Database, get_database
+from delivery_repository import DeliveryRepository
 from ledger import LedgerService, PostingLine
 from periodisation_repository import PeriodisationRepository
 from objects import dimensions, validate_dimensions
@@ -25,6 +26,13 @@ from objects_repository import ObjectRepository, DIMENSIONS
 
 class EInvoiceAlreadyImported(ValueError):
     """A supplier invoice number already exists within this organisation."""
+
+
+class InvoiceDeliveryFailed(RuntimeError):
+    def __init__(self, delivery):
+        self.delivery = delivery
+        super().__init__(delivery.get('error_message') or
+                         'Delivery outcome is unknown. Review delivery history before retrying.')
 
 
 class DocumentService:
@@ -203,7 +211,7 @@ class DocumentService:
         condition = "i.id=? AND i.organisation_id=?" if organisation_id else "i.id=?"
         row = self.db.one(
             "SELECT i.*,c.name contact_name,c.email contact_email,c.address contact_address,c.vat_no contact_vat_no "
-            "FROM invoices i JOIN contacts c ON c.id=i.contact_id WHERE " + condition, params,
+            "FROM invoices i JOIN contacts c ON c.id=i.contact_id AND c.organisation_id=i.organisation_id WHERE " + condition, params,
         )
         if not row:
             raise KeyError("Invoice not found")
@@ -767,51 +775,102 @@ class DocumentService:
         SubElement(totals, "Gross").text = str(invoice["total"])
         return tostring(root, encoding="utf-8", xml_declaration=True)
 
+    def invoice_deliveries(self, organisation_id, invoice_id):
+        self.invoice(invoice_id, organisation_id)
+        with self.db.transaction() as tx:
+            return [{k: v for k, v in row.items() if k != 'request_key'}
+                    for row in DeliveryRepository(tx, organisation_id).history(invoice_id)]
+
     def send_invoice_email(self, invoice_id: str, *, actor: str, client=None,
-                           subject=None, text_body=None) -> dict:
-        """Send after posting through Postmark and retain a delivery audit record."""
+                           subject=None, text_body=None, organisation_id=None,
+                           bulk=False, idempotency_key=None) -> dict:
+        """Reserve evidence and audit before Postmark, then commit its outcome."""
         import httpx
 
-        invoice = self.invoice(invoice_id)
-        if invoice["status"] not in {"Issued", "Part Paid", "Paid"}:
-            raise ValueError("Only issued invoices can be emailed")
-        recipient = (invoice.get("contact_email") or "").strip()
-        token = os.getenv("POSTMARK_API_TOKEN", "").strip()
-        from_email = os.getenv("FROM_EMAIL", "").strip()
-        if not recipient or not token or not from_email:
-            raise RuntimeError("Recipient email, POSTMARK_API_TOKEN, and FROM_EMAIL are required")
-        organisation = self.db.one("SELECT * FROM organisations WHERE id=?", (invoice["organisation_id"],)) or {}
-        delivery_id, now = new_id(), utc_now()
+        invoice = self.invoice(invoice_id, organisation_id)
+        oid = invoice['organisation_id']
+        request_key = sha256_bytes(f'{actor}:{idempotency_key}'.encode()) if idempotency_key else None
+        attachment = None
+        new_attachment = False
+        try:
+            with self.db.transaction() as tx:
+                repo = DeliveryRepository(tx, oid)
+                repo.lock()
+                if request_key:
+                    previous = next((row for row in repo.history(invoice_id)
+                                     if row['request_key'] == request_key), None)
+                    if previous:
+                        if previous['status'] != 'Sent':
+                            raise InvoiceDeliveryFailed(previous)
+                        return previous
+                # Re-read under the reservation lock so payment/status changes are
+                # reflected before reserving a new send.
+                invoice = tx.one(
+                    'SELECT i.*,c.email contact_email FROM invoices i JOIN contacts c '
+                    'ON c.id=i.contact_id AND c.organisation_id=i.organisation_id '
+                    'WHERE i.id=? AND i.organisation_id=?', (invoice_id, oid))
+                if not invoice:
+                    raise KeyError('Invoice not found')
+                if bulk and invoice['document_type'] != 'invoice':
+                    raise ValueError('Only sales invoices can be sent in bulk')
+                allowed = {'Issued', 'Part Paid'} if bulk else {'Issued', 'Part Paid', 'Paid'}
+                if invoice['status'] not in allowed:
+                    raise ValueError('Only Issued or Part Paid invoices can be sent in bulk' if bulk
+                                     else 'Only issued invoices can be emailed')
+                recipient = (invoice.get('contact_email') or '').strip()
+                if not recipient:
+                    raise ValueError('Contact has no email address')
+                token = os.getenv('POSTMARK_API_TOKEN', '').strip()
+                from_email = os.getenv('FROM_EMAIL', '').strip()
+                if not token or not from_email:
+                    raise RuntimeError('Email delivery is not connected')
+                organisation = tx.one('SELECT * FROM organisations WHERE id=?', (oid,)) or {}
+                pdf = self.invoice_pdf(invoice_id)
+                attachment = tx.one(
+                    "SELECT * FROM attachments WHERE organisation_id=? AND owner_type='invoice' AND owner_id=? AND sha256=?",
+                    (oid, invoice_id, sha256_bytes(pdf)))
+                if not attachment:
+                    attachment = self.attach_evidence(
+                        oid, owner_type='invoice', owner_id=invoice_id,
+                        filename=f"{invoice['number']}.pdf", content_type='application/pdf',
+                        content=pdf, actor=actor, tx=tx)
+                    new_attachment = True
+                delivery_id = repo.reserve(invoice, recipient, actor, attachment['id'], request_key)
+        except Exception:
+            if new_attachment:
+                Path(attachment['storage_path']).unlink(missing_ok=True)
+            raise
         payload = {
-            "From": from_email, "To": recipient,
-            "Subject": subject if subject is not None else f"Invoice {invoice['number']} from {organisation.get('name', 'FastAccounts')}",
-            "TextBody": text_body if text_body is not None else f"Please find invoice {invoice['number']} for {invoice['currency']} {money(invoice['total']):.2f} attached.",
-            "MessageStream": "outbound",
-            "Attachments": [{"Name": f"{invoice['number']}.pdf", "Content": base64.b64encode(self.invoice_pdf(invoice_id)).decode(),
-                             "ContentType": "application/pdf"}],
+            'From': from_email, 'To': recipient,
+            'Subject': subject if subject is not None else f"Invoice {invoice['number']} from {organisation.get('name', 'FastAccounts')}",
+            'TextBody': text_body if text_body is not None else f"Please find invoice {invoice['number']} for {invoice['currency']} {money(invoice['total']):.2f} attached.",
+            'MessageStream': 'outbound',
+            'Attachments': [{'Name': f"{invoice['number']}.pdf", 'Content': base64.b64encode(pdf).decode(),
+                             'ContentType': 'application/pdf'}],
         }
         http = client or httpx.Client(timeout=20)
         try:
-            response = http.post("https://api.postmarkapp.com/email", json=payload,
-                                 headers={"X-Postmark-Server-Token": token, "Accept": "application/json"})
+            response = http.post('https://api.postmarkapp.com/email', json=payload,
+                                 headers={'X-Postmark-Server-Token': token, 'Accept': 'application/json'})
             response.raise_for_status()
             result = response.json()
-            status, provider_id, error = "Sent", result.get("MessageID"), None
+            if result.get('ErrorCode', 0):
+                raise RuntimeError(result.get('Message') or 'Email provider rejected the message')
+            status, provider_id, error = 'Sent', result.get('MessageID'), None
         except Exception as exc:
-            status, provider_id, error = "Failed", None, str(exc)[:500]
+            status, provider_id, error = 'Failed', None, str(exc)[:500]
+        finally:
+            if client is None:
+                http.close()
         with self.db.transaction() as tx:
-            tx.execute(
-                "INSERT INTO invoice_deliveries(id,organisation_id,invoice_id,channel,recipient,status,provider,provider_message_id,error_message,created_by,created_at) "
-                "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-                (delivery_id, invoice["organisation_id"], invoice_id, "email", recipient,
-                 status, "postmark", provider_id, error, actor, now),
-            )
-            audit(tx, invoice["organisation_id"], actor, "invoice.delivery", "invoice_delivery", delivery_id,
-                  {"invoice_id": invoice_id, "status": status, "recipient": recipient})
-        delivery = self.db.one("SELECT * FROM invoice_deliveries WHERE id=?", (delivery_id,)) or {}
-        if status == "Failed":
-            raise RuntimeError(f"Invoice delivery failed: {error}")
+            repo = DeliveryRepository(tx, oid)
+            repo.finish(delivery_id, invoice_id, actor, status, recipient, attachment['id'],
+                        request_key, provider_id, error)
+            delivery = next(row for row in repo.history(invoice_id) if row['id'] == delivery_id)
+        if status == 'Failed':
+            raise InvoiceDeliveryFailed(delivery)
         return delivery
+
 
 
 def locate_pdf_font(bold: bool = False) -> Path | None:

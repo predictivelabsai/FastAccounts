@@ -1651,5 +1651,25 @@
       "Document date_from cannot be after date_to": "Alguskuupäev ei või olla lõppkuupäevast hilisem",
       "Document export not found": "Dokumendieksporti ei leitud"
     }
+  },
+  "bulk_sending": {
+    "nav": {},
+    "views": {},
+    "workspace": {
+      "Send emails": "Saada e-kirjad",
+      "Select invoices": "Vali arved",
+      "Select invoice {number}": "Vali arve {number}",
+      "Send invoice PDFs to {count} customers?": "Kas saata arvete PDF-id {count} kliendile?",
+      "Email results": "Saatmise tulemused",
+      "Email history": "E-kirjade ajalugu",
+      "No emails sent yet.": "E-kirju pole veel saadetud.",
+      "Only sales invoices can be sent in bulk": "Korraga saab saata ainult müügiarveid",
+      "Only Issued or Part Paid invoices can be sent in bulk": "Korraga saab saata ainult väljastatud või osaliselt tasutud arveid",
+      "Contact has no email address": "Kontaktil puudub e-posti aadress",
+      "Email delivery is not connected": "E-kirjade saatmine pole ühendatud",
+      "Duplicate invoice ID in this request": "Selles päringus on korduv arve ID",
+      "Delivery outcome is unknown. Review delivery history before retrying.": "Saatmise tulemus pole teada. Enne uuesti saatmist vaata saatmisajalugu.",
+      "Email provider rejected the message": "E-posti teenusepakkuja lükkas kirja tagasi"
+    }
   }
 }

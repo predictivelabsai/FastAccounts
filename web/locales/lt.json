@@ -1651,5 +1651,25 @@
       "Document date_from cannot be after date_to": "Pradžios data negali būti vėlesnė už pabaigos datą",
       "Document export not found": "Dokumento eksportas nerastas"
     }
+  },
+  "bulk_sending": {
+    "nav": {},
+    "views": {},
+    "workspace": {
+      "Send emails": "Siųsti el. laiškus",
+      "Select invoices": "Pasirinkti sąskaitas",
+      "Select invoice {number}": "Pasirinkti sąskaitą {number}",
+      "Send invoice PDFs to {count} customers?": "Siųsti sąskaitų PDF failus {count} klientams?",
+      "Email results": "Siuntimo rezultatai",
+      "Email history": "El. laiškų istorija",
+      "No emails sent yet.": "El. laiškų dar neišsiųsta.",
+      "Only sales invoices can be sent in bulk": "Kartu galima siųsti tik pardavimo sąskaitas",
+      "Only Issued or Part Paid invoices can be sent in bulk": "Kartu galima siųsti tik išrašytas arba iš dalies apmokėtas sąskaitas",
+      "Contact has no email address": "Kontaktas neturi el. pašto adreso",
+      "Email delivery is not connected": "El. laiškų siuntimas neprijungtas",
+      "Duplicate invoice ID in this request": "Šioje užklausoje kartojasi sąskaitos ID",
+      "Delivery outcome is unknown. Review delivery history before retrying.": "Siuntimo rezultatas nežinomas. Prieš bandydami dar kartą peržiūrėkite siuntimo istoriją.",
+      "Email provider rejected the message": "El. pašto paslaugos teikėjas atmetė laišką"
+    }
   }
 }

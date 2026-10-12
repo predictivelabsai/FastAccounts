@@ -125,4 +125,5 @@ class PaymentLinkService:
         from documents import DocumentService
         row = DocumentService(self.db).invoice(invoice_id, organisation_id)
         row['payment_links'] = self.invoice_links(organisation_id, invoice_id)
+        row['deliveries'] = DocumentService(self.db).invoice_deliveries(organisation_id, invoice_id)
         return row

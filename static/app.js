@@ -640,12 +640,14 @@
       const [rows, prepayments, contacts] = await Promise.all([
         api(c.url("/invoices") + listQuery(c, "invoices")), api(c.url("/prepayments?side=customer")), api(c.url("/contacts")),
       ]);
+      const selected = new Set();
       if (
         !c.mount(
           page(
             t("Invoices"),
             t("From first draft to final payment."),
             button("New contact", "newContact") +
+              button("Send emails", "sendBulk", false, "disabled") +
               button("Record customer prepayment", "newPrepayment", false, canExecutePush() ? "" : "disabled") +
               button("New invoice", "newInvoice", true),
             documentFilterControls(c, "invoices", contacts) + `<div id="invoice-table"></div>${prepaymentSection(prepayments, "customer")}`,
@@ -655,9 +657,10 @@
         return;
       const draw = () => {
         document.getElementById("invoice-table").innerHTML = table(
-          ["Number", "Customer", "Date", "Status", ["Paid / total"], "Actions"],
+          ["Select invoices", "Number", "Customer", "Date", "Status", ["Paid / total"], "Actions"],
           rows.map((x) =>
             row([
+              td(`<input type="checkbox" data-select-invoice="${esc(x.id)}" aria-label="${esc(t('Select invoice {number}').replace('{number}', x.number || t('Draft')))}" ${canExecutePush() && x.document_type === 'invoice' && ['Issued', 'Part Paid'].includes(x.status) ? '' : 'disabled'}>`),
               td(esc(x.number || t("Draft"))),
               td(esc(x.contact_name)),
               td(date(x.issue_date), "numeric"),
@@ -681,6 +684,24 @@
           newInvoice: () => documentDialog("invoice"),
           newContact: () => contactDialog("customer"),
           invoiceAttachments: (b) => documentDialog("invoice", b.dataset.id),
+          sendBulk: () => {
+            const ids = [...selected], requestKey = Array.from(crypto.getRandomValues(new Uint32Array(4)), (n) => n.toString(16)).join('-');
+            confirmAction('Send emails', esc(t('Send invoice PDFs to {count} customers?').replace('{count}', num(ids.length))), async () => {
+              const outcome = await api(c.url('/invoices/send-bulk'), {
+                method: 'POST', body: JSON.stringify({invoice_ids: ids}),
+                headers: {'Idempotency-Key': requestKey},
+              });
+              if (org?.id !== c.oid) return;
+              selected.clear();
+              content.querySelectorAll('[data-select-invoice]').forEach((input) => { input.checked = false; });
+              content.querySelector('[data-action=sendBulk]').disabled = true;
+              dialog('Email results', table(['Number', 'Status', 'Reason'], outcome.results.map((item) => row([
+                td(esc(rows.find((invoice) => invoice.id === item.invoice_id)?.number || item.invoice_id)),
+                td(pill(item.status === 'sent' ? 'Sent' : 'Failed')),
+                td(item.reason ? tr(item.reason) : ''),
+              ]))));
+            });
+          },
           issue: (b) =>
             confirmAction(
               "Issue invoice",
@@ -693,6 +714,13 @@
                 await render();
               },
             ),
+        });
+        content.querySelectorAll('[data-select-invoice]').forEach((input) => {
+          input.onchange = () => {
+            if (input.checked) selected.add(input.dataset.selectInvoice);
+            else selected.delete(input.dataset.selectInvoice);
+            content.querySelector('[data-action=sendBulk]').disabled = !selected.size || selected.size > 50;
+          };
         });
       };
       draw();
@@ -2276,6 +2304,14 @@
       const d = dialog(kind === "invoice" ? "Invoice" : "Bill",
         `<p>${esc(record.number || record.supplier_number || t("Draft"))} · ${esc(record.contact_name)}</p>`);
       if (kind === 'invoice') {
+        const history = document.createElement('section');
+        history.innerHTML = `<h3>${tr('Email history')}</h3>` + ((record.deliveries || []).length
+          ? table(['Date', 'Email', 'Status', 'Reason', 'PDF'], record.deliveries.map((item) => row([
+              td(esc(item.created_at)), td(esc(item.recipient)), td(pill(item.status)),
+              td(item.error_message ? esc(translateError(item.error_message)) : ''),
+              td(item.attachment_id ? link('PDF', `/api${base}/attachments/${item.attachment_id}/download`) : ''),
+            ]))) : `<p>${tr('No emails sent yet.')}</p>`);
+        d.querySelector('.dialog-card').append(history);
         const section = document.createElement('section');
         const links = record.payment_links || [];
         section.innerHTML = `<h3>${tr('Payment links')}</h3>` + (links.length ? links.map((x, i) =>
