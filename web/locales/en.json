@@ -1362,7 +1362,19 @@
     "GoCardless request failed. Try again later.": "GoCardless request failed. Try again later.",
     "GoCardless credentials verified; link a bank to approve access": "GoCardless credentials verified; link a bank to approve access",
     "GoCardless connection failed": "GoCardless connection failed",
-    "GoCardless secret ID and secret key are required": "GoCardless secret ID and secret key are required"
+    "GoCardless secret ID and secret key are required": "GoCardless secret ID and secret key are required",
+    "Daily bank feed": "Daily bank feed",
+    "Mapped bank accounts are pulled once daily.": "Mapped bank accounts are pulled once daily.",
+    "Daily bank feed worker is disabled.": "Daily bank feed worker is disabled.",
+    "Last scheduled pull": "Last scheduled pull",
+    "Last pull result": "Last pull result",
+    "Not yet pulled": "Not yet pulled",
+    "Link a bank account to enable daily pulls.": "Link a bank account to enable daily pulls.",
+    "Pull now": "Pull now",
+    "Bank consent has expired. Re-link the bank to resume daily pulls.": "Bank consent has expired. Re-link the bank to resume daily pulls.",
+    "Scheduled bank feed pull failed. Try again or check the bank connection.": "Scheduled bank feed pull failed. Try again or check the bank connection.",
+    "Bank feed scheduling failed": "Bank feed scheduling failed",
+    "Success": "Success"
   },
   "views": {
     "overview": "Overview",

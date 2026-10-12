@@ -1254,7 +1254,19 @@
     "GoCardless request failed. Try again later.": "GoCardlessi päring ebaõnnestus. Proovi hiljem uuesti.",
     "GoCardless credentials verified; link a bank to approve access": "GoCardlessi pääsuandmed on kontrollitud. Juurdepääsu kinnitamiseks ühenda pank.",
     "GoCardless connection failed": "GoCardlessiga ühendamine ebaõnnestus",
-    "GoCardless secret ID and secret key are required": "GoCardlessi salajane ID ja võti on nõutud"
+    "GoCardless secret ID and secret key are required": "GoCardlessi salajane ID ja võti on nõutud",
+    "Daily bank feed": "Igapäevane pangafeed",
+    "Mapped bank accounts are pulled once daily.": "Seotud pangakontode tehingud imporditakse kord päevas.",
+    "Daily bank feed worker is disabled.": "Igapäevase pangafeedi automaatne import on välja lülitatud.",
+    "Last scheduled pull": "Viimane automaatne import",
+    "Last pull result": "Viimase impordi tulemus",
+    "Not yet pulled": "Veel importimata",
+    "Link a bank account to enable daily pulls.": "Igapäevase impordi lubamiseks seo pangakonto.",
+    "Pull now": "Impordi kohe",
+    "Bank consent has expired. Re-link the bank to resume daily pulls.": "Panga nõusolek on aegunud. Igapäevase impordi jätkamiseks ühenda pank uuesti.",
+    "Scheduled bank feed pull failed. Try again or check the bank connection.": "Pangafeedi automaatne import ebaõnnestus. Proovi uuesti või kontrolli pangaühendust.",
+    "Bank feed scheduling failed": "Pangafeedi impordi ajastamine ebaõnnestus",
+    "Success": "Õnnestus"
   },
   "views": {
     "overview": "Ülevaade",

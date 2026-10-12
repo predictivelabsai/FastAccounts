@@ -890,6 +890,12 @@ def open_banking_mapping(organisation_id: str, payload: BankFeedMappingIn, user:
     return OpenBankingService().link_account(organisation_id, actor=user.email, **payload.model_dump())
 
 
+@api.get("/organisations/{organisation_id}/integrations/open_banking/pull-status")
+def open_banking_pull_status(organisation_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {"viewer"})
+    return OpenBankingService().pull_status(organisation_id)
+
+
 @api.post("/organisations/{organisation_id}/integrations/open_banking/pull")
 def open_banking_pull(organisation_id: str, payload: BankFeedAccountIn, user: User = Depends(require_csrf)):
     _require(organisation_id, user, WRITE_ROLES)

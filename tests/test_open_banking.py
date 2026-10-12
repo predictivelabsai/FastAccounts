@@ -407,3 +407,191 @@ def test_new_card_copy_exists_in_all_four_locales():
     for lang in ("en", "et", "lt", "lv"):
         assert keys <= i18n.catalog(lang)["workspace"].keys()
     assert i18n.catalog("et")["workspace"]["Pull transactions"] == "Impordi tehingud"
+
+
+def worker_for(service, db, monkeypatch):
+    import automation
+    monkeypatch.setattr(automation, "OpenBankingService", lambda database: service)
+    return automation.AutomationService(db)
+
+
+def test_daily_worker_due_today_and_overdue_catchup(feed, db, monkeypatch):
+    service, fake, oid, bank = mapped(feed, db)
+    worker = worker_for(service, db, monkeypatch)
+    day = date.today()
+    result = worker.worker_tick(today=day)
+    assert result["bank_feeds"][0]["status"] == "Success"
+    assert result["bank_feeds"][0]["summary"]["imported"] == 2
+    assert worker.worker_tick(today=day)["bank_feeds"] == []
+    # One import covers several missed days; no daily network replay is needed.
+    late = day + timedelta(days=4)
+    result = worker.worker_tick(today=late)
+    assert len(result["bank_feeds"]) == 1
+    assert result["bank_feeds"][0]["summary"]["skipped"] == 2
+    row = service.pull_status(oid)["schedules"][0]
+    assert row["next_run_date"] == (late + timedelta(days=1)).isoformat()
+    assert row["last_run_date"] == late.isoformat()
+    assert row["last_result"] == "Success" and row["last_error_message"] is None
+    assert row["last_pull_at"]
+    assert len([c for c in fake.calls if c[0] == "transactions"]) == 2
+    assert db.scalar("SELECT COUNT(*) FROM bank_transactions WHERE organisation_id=?", (oid,)) == 2
+    assert db.scalar("SELECT imported_by FROM bank_imports WHERE organisation_id=? LIMIT 1", (oid,)) == "system"
+
+
+def test_future_and_already_successful_feed_are_not_pulled(feed, db):
+    service, fake, oid, bank = mapped(feed, db)
+    day = date.today()
+    assert service.pull_due(oid, today=day - timedelta(days=1)) == []
+    service.pull_due(oid, today=day)
+    with db.transaction() as tx:
+        tx.execute("UPDATE bank_feed_schedules SET next_run_date=? WHERE organisation_id=?", (day.isoformat(), oid))
+    assert service.pull_due(oid, today=day) == []
+    assert len([c for c in fake.calls if c[0] == "transactions"]) == 1
+
+
+def test_worker_discovers_existing_mappings_and_respects_tenants(feed, db, uk_org):
+    service, fake, oid, bank = mapped(feed, db)
+    with db.transaction() as tx:
+        tx.execute("DELETE FROM bank_feed_schedules WHERE organisation_id=?", (oid,))
+    assert service.pull_due(uk_org["id"]) == []
+    assert service.pull_status(uk_org["id"])["schedules"] == []
+    assert service.pull_due(oid)[0]["status"] == "Success"
+    # A mapping into another tenant cannot create an active schedule or import.
+    other_bank = DocumentService(db).create_bank_account(uk_org["id"], name="Other tenant", currency="GBP")
+    connection = service.integrations.connection_for_provider(oid, "open_banking")
+    config = dict(connection["config"])
+    config["account_mappings"] = {"gc-account": other_bank["id"]}
+    service._save(connection, config, ACTOR)
+    assert service.pull_due(oid, today=date.today() + timedelta(days=1)) == []
+    assert service.pull_status(oid)["schedules"][0]["active"] == 0
+    assert db.scalar("SELECT COUNT(*) FROM bank_transactions WHERE organisation_id=?", (uk_org["id"],)) == 0
+
+
+@pytest.mark.parametrize("http_status,expected", [(500, "Error"), (401, "Reauth Required"), (403, "Reauth Required")])
+def test_worker_captures_provider_error_and_surfaces_reauth(feed, db, monkeypatch, http_status, expected):
+    service, fake, oid, bank = mapped(feed, db)
+    original = fake.transactions
+    def fail(*args, **kwargs):
+        request = httpx.Request("GET", "https://bank.example.test/transactions")
+        try:
+            httpx.Response(http_status, request=request).raise_for_status()
+        except httpx.HTTPStatusError as cause:
+            raise ProviderError("synthetic-secret") from cause
+    monkeypatch.setattr(fake, "transactions", fail)
+    worker = worker_for(service, db, monkeypatch)
+    day = date.today()
+    result = worker.worker_tick(today=day)
+    assert result["bank_feeds"][0]["status"] == expected
+    status = service.pull_status(oid)
+    assert status["connection_status"] == expected
+    assert status["schedules"][0]["last_result"] == expected
+    assert "synthetic-secret" not in json.dumps(status)
+    assert db.scalar("SELECT COUNT(*) FROM bank_transactions WHERE organisation_id=?", (oid,)) == 0
+    assert worker.worker_tick(today=day)["bank_feeds"] == []
+    monkeypatch.setattr(fake, "transactions", original)
+    next_result = worker.worker_tick(today=day + timedelta(days=1))["bank_feeds"][0]
+    if expected == "Error":
+        assert next_result["status"] == "Success"
+    else:
+        assert next_result["status"] == "Reauth Required"
+        assert not [c for c in fake.calls if c[0] == "transactions"]
+        complete(service, oid)
+        service.link_account(oid, gocardless_account_id="gc-account", bank_account_id=bank["id"], actor=ACTOR)
+        assert worker.worker_tick(today=day + timedelta(days=2))["bank_feeds"][0]["status"] == "Success"
+
+
+def test_account_failure_does_not_break_other_accounts(feed, db, monkeypatch):
+    service, fake, oid, bank = mapped(feed, db)
+    fake.account_ids.append("gc-second")
+    service.complete_link(oid, actor=ACTOR)
+    service.link_account(oid, gocardless_account_id="gc-second", bank_account_id=bank["id"], actor=ACTOR)
+    original = fake.transactions
+    def transactions(account_id, **kwargs):
+        if account_id == "gc-account":
+            raise RuntimeError("Synthetic unexpected error with private payload")
+        return original(account_id, **kwargs)
+    monkeypatch.setattr(fake, "transactions", transactions)
+    results = worker_for(service, db, monkeypatch).worker_tick()["bank_feeds"]
+    assert [r["status"] for r in results] == ["Error", "Success"]
+    assert [r["last_result"] for r in service.pull_status(oid)["schedules"]] == ["Error", "Success"]
+    assert "private payload" not in json.dumps(results)
+
+
+def test_feed_failure_does_not_break_other_organisations(feed, db, uk_org, monkeypatch):
+    service, fake, oid, bank = mapped(feed, db)
+    other = OpenBankingService(db, FakeProvider())
+    other.configure(uk_org["id"], "other-id", "other-key", ACTOR)
+    complete(other, uk_org["id"])
+    other_bank = DocumentService(db).create_bank_account(uk_org["id"], name="Other bank", currency="EUR")
+    other.link_account(uk_org["id"], gocardless_account_id="gc-account", bank_account_id=other_bank["id"], actor=ACTOR)
+    def fail(*args, **kwargs):
+        raise RuntimeError("Synthetic failure")
+    monkeypatch.setattr(fake, "transactions", fail)
+    import automation
+    class Feeds:
+        def pull_due(self, org_id, **kwargs):
+            return (service if org_id == oid else other).pull_due(org_id, **kwargs)
+    monkeypatch.setattr(automation, "OpenBankingService", lambda database: Feeds())
+    results = automation.AutomationService(db).worker_tick()["bank_feeds"]
+    assert {r["organisation_id"]: r["status"] for r in results} == {oid: "Error", uk_org["id"]: "Success"}
+
+
+def test_concurrent_bank_feed_claim_pulls_once(feed, db):
+    from concurrent.futures import ThreadPoolExecutor
+    service, fake, oid, bank = mapped(feed, db)
+    schedule = db.one("SELECT * FROM bank_feed_schedules WHERE organisation_id=?", (oid,))
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        results = list(executor.map(lambda _: service._pull_scheduled(schedule, date.today()), range(2)))
+    assert sorted(r["status"] for r in results) == ["Skipped", "Success"]
+    assert len([c for c in fake.calls if c[0] == "transactions"]) == 1
+
+
+@pytest.mark.parametrize("status", ["Disconnected", "Configured"])
+def test_unconnected_feeds_never_pull(feed, db, status):
+    service, fake, oid, bank = mapped(feed, db)
+    with db.transaction() as tx:
+        tx.execute("UPDATE integration_connections SET status=? WHERE organisation_id=?", (status, oid))
+    assert all(r["status"] == "Skipped" for r in service.pull_due(oid))
+    assert not [c for c in fake.calls if c[0] == "transactions"]
+
+
+def test_pull_status_route_is_local_safe_and_authorised(route_client, db):
+    client, service, fake, base = route_client
+    oid = base.split('/')[2]
+    complete(service, oid)
+    bank = DocumentService(db).create_bank_account(oid, name="Local status bank", currency="EUR")
+    service.link_account(oid, gocardless_account_id="gc-account", bank_account_id=bank["id"], actor=ACTOR)
+    service.pull_due(oid)
+    calls = list(fake.calls)
+    response = client.get(base + "/pull-status")
+    assert response.status_code == 200 and response.json()["schedules"][0]["last_result"] == "Success"
+    assert fake.calls == calls
+    assert "encrypted" not in response.text and "synthetic-access-token" not in response.text
+    with db.transaction() as tx:
+        tx.execute("UPDATE integration_connections SET status='Reauth Required' WHERE organisation_id=?", (oid,))
+        tx.execute("UPDATE memberships SET role='viewer' WHERE organisation_id=?", (oid,))
+    assert client.get(base + "/pull-status").json()["connection_status"] == "Reauth Required"
+    client.headers["X-Test-User"] = "outsider@example.test"
+    assert client.get(base + "/pull-status").status_code == 403
+
+
+def test_interrupted_bank_feed_attempt_is_retried_next_day(feed, db):
+    service, fake, oid, bank = mapped(feed, db)
+    day = date.today()
+    with db.transaction() as tx:
+        tx.execute("UPDATE bank_feed_schedules SET next_run_date=?,last_run_date=?,last_result='Running' WHERE organisation_id=?",
+                   ((day + timedelta(days=1)).isoformat(), day.isoformat(), oid))
+    assert service.pull_due(oid, today=day) == []
+    assert service.pull_due(oid, today=day + timedelta(days=1))[0]['status'] == 'Success'
+    assert len([c for c in fake.calls if c[0] == 'transactions']) == 1
+
+
+def test_inactive_bank_feed_is_preserved_until_explicit_link(feed, db):
+    service, fake, oid, bank = mapped(feed, db)
+    with db.transaction() as tx:
+        tx.execute('UPDATE bank_feed_schedules SET active=0 WHERE organisation_id=?', (oid,))
+    assert service.pull_due(oid) == []
+    assert service.pull_status(oid)['schedules'][0]['active'] == 0
+    assert not [c for c in fake.calls if c[0] == 'transactions']
+    service.link_account(oid, gocardless_account_id='gc-account', bank_account_id=bank['id'], actor=ACTOR)
+    assert service.pull_due(oid)[0]['status'] == 'Success'

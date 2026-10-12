@@ -1,6 +1,7 @@
-"""Tenant-scoped GoCardless consent links and manual, idempotent bank feeds."""
+"""Tenant-scoped GoCardless consent links and idempotent bank feeds."""
 from __future__ import annotations
 
+import os
 from datetime import date, timedelta
 from decimal import Decimal
 from urllib.parse import urlparse
@@ -10,7 +11,7 @@ import httpx
 from banking import BankingService
 from connectors.providers import OpenBankingProvider, ProviderError
 from connectors.registry import connector_for
-from core_utils import audit, canonical_json, utc_now
+from core_utils import audit, canonical_json, new_id, utc_now
 from database import get_database
 from integration_service import IntegrationService
 
@@ -112,7 +113,112 @@ class OpenBankingService:
         config = dict(connection["config"])
         config.setdefault("account_mappings", {})[gocardless_account_id] = bank_account_id
         self._save(connection, config, actor)
+        self._sync_schedules(organisation_id, date.today())
+        with self.db.transaction() as tx:
+            tx.execute("UPDATE bank_feed_schedules SET active=1,updated_at=? "
+                       "WHERE organisation_id=? AND gocardless_account_id=?", (utc_now(), organisation_id, gocardless_account_id))
         return {"gocardless_account_id": gocardless_account_id, "bank_account_id": bank_account_id}
+
+    def _sync_schedules(self, organisation_id, day):
+        """Discover existing mappings too, without contacting the provider."""
+        connection = self.integrations.connection_for_provider(organisation_id, "open_banking")
+        config = connection["config"]
+        mappings = config.get("account_mappings", {})
+        accounts = set(config.get("account_ids", []))
+        now = utc_now()
+        with self.db.transaction() as tx:
+            valid = set()
+            for account_id, bank_id in mappings.items():
+                if account_id not in accounts or not tx.one(
+                    "SELECT id FROM bank_accounts WHERE id=? AND organisation_id=?", (bank_id, organisation_id)
+                ) or connection["status"] == "Disconnected":
+                    continue
+                valid.add(account_id)
+                tx.execute(
+                    "INSERT INTO bank_feed_schedules(id,organisation_id,gocardless_account_id,next_run_date,created_at,updated_at) "
+                    "VALUES (?,?,?,?,?,?) ON CONFLICT (organisation_id,gocardless_account_id) DO NOTHING",
+                    (new_id(), organisation_id, account_id, day.isoformat(), now, now))
+            # Preserve inactive schedules. Explicit account linking enables them;
+            # mapping removal or disconnection disables them without losing history.
+            for schedule in tx.rows("SELECT id,gocardless_account_id FROM bank_feed_schedules "
+                                    "WHERE organisation_id=? AND active=1", (organisation_id,)):
+                if schedule["gocardless_account_id"] not in valid:
+                    tx.execute("UPDATE bank_feed_schedules SET active=0,updated_at=? WHERE id=? AND organisation_id=?",
+                               (now, schedule["id"], organisation_id))
+
+    def pull_status(self, organisation_id):
+        """Local status is available even when bank consent has expired."""
+        connection = self.db.one(
+            "SELECT status FROM integration_connections WHERE organisation_id=? AND provider='open_banking'",
+            (organisation_id,))
+        return {"connection_status": connection["status"] if connection else "Disconnected",
+                "worker_enabled": os.getenv("FASTACCOUNTS_AUTOMATION_WORKER") == "true",
+                "schedules": self.db.rows(
+                    "SELECT gocardless_account_id,interval_kind,active,next_run_date,last_run_date,last_pull_at,"
+                    "last_result,last_error_message FROM bank_feed_schedules WHERE organisation_id=? "
+                    "ORDER BY gocardless_account_id", (organisation_id,))}
+
+    def pull_due(self, organisation_id, *, today=None):
+        day = today if isinstance(today, date) else date.fromisoformat(today) if today else date.today()
+        if not self.db.one("SELECT id FROM integration_connections WHERE organisation_id=? AND provider='open_banking'",
+                           (organisation_id,)):
+            return []
+        self._sync_schedules(organisation_id, day)
+        results = []
+        for schedule in self.db.rows(
+            "SELECT * FROM bank_feed_schedules WHERE organisation_id=? AND active=1 AND next_run_date<=? "
+            "AND (last_run_date IS NULL OR last_run_date<>? OR last_result IS NULL OR last_result<>'Success') "
+            "ORDER BY gocardless_account_id",
+            (organisation_id, day.isoformat(), day.isoformat())):
+            try:
+                results.append(self._pull_scheduled(schedule, day))
+            except Exception:
+                results.append({"organisation_id": organisation_id, "gocardless_account_id": schedule["gocardless_account_id"],
+                                "status": "Error", "error_message": "Bank feed scheduling failed"})
+        return results
+
+    def _pull_scheduled(self, schedule, day):
+        org_id, account_id = schedule["organisation_id"], schedule["gocardless_account_id"]
+        result = {"organisation_id": org_id, "gocardless_account_id": account_id}
+        try:
+            connection = self.integrations.connection_for_provider(org_id, "open_banking")
+            if connection["status"] not in {"Connected", "Error", "Reauth Required"}:
+                return result | {"status": "Skipped"}
+            now = utc_now()
+            # Claim outside the network call. A missed day needs one overlapping
+            # 90-day import, not a request for each missed calendar day.
+            with self.db.transaction() as tx:
+                claim = tx.execute(
+                    "UPDATE bank_feed_schedules SET next_run_date=?,last_run_date=?,last_pull_at=?,"
+                    "last_result='Running',last_error_message=NULL,updated_at=? "
+                    "WHERE id=? AND organisation_id=? AND active=1 AND next_run_date=?",
+                    ((day + timedelta(days=1)).isoformat(), day.isoformat(), now, now,
+                     schedule["id"], org_id, schedule["next_run_date"]))
+                if claim.rowcount != 1:
+                    return result | {"status": "Skipped"}
+            # An Error connection can be checked again on the next daily run.
+            # Consent must be confirmed before pull(), never bypass its gates.
+            if connection["status"] == "Error":
+                self.complete_link(org_id, actor="system")
+                connection = self.integrations.connection_for_provider(org_id, "open_banking")
+            if connection["status"] == "Reauth Required":
+                raise ValueError("Bank consent needs renewal")
+            self._accepted(connection, account_id)
+            summary = self.pull(org_id, gocardless_account_id=account_id, actor="system")
+            status, error = "Success", None
+            result["summary"] = summary
+        except Exception:
+            connection = self.db.one(
+                "SELECT status FROM integration_connections WHERE organisation_id=? AND provider='open_banking'", (org_id,))
+            status = "Reauth Required" if connection and connection["status"] == "Reauth Required" else "Error"
+            # Provider exceptions may contain credentials or bank payloads.
+            error = ("Bank consent has expired. Re-link the bank to resume daily pulls." if status == "Reauth Required"
+                     else "Scheduled bank feed pull failed. Try again or check the bank connection.")
+        with self.db.transaction() as tx:
+            tx.execute("UPDATE bank_feed_schedules SET last_result=?,last_error_message=?,updated_at=? "
+                       "WHERE id=? AND organisation_id=? AND last_run_date=?",
+                       (status, error, utc_now(), schedule["id"], org_id, day.isoformat()))
+        return result | {"status": status, "error_message": error}
 
     def institutions(self, country, *, organisation_id=None):
         country = country.upper()

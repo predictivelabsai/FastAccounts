@@ -410,7 +410,8 @@ open AR/AP reconcile; no silent overwrite or duplicate posting is possible.
 - [x] Select GoCardless Bank Account Data as the first technical candidate,
   subject to GB/EE coverage, commercial, and legal review;
 - [x] Sandbox-capable consent/requisition and read-only normalized transaction adapter;
-- [ ] Production reconnect, scheduled pull and operational monitoring after legal review;
+- [x] Daily scheduled GoCardless pulls with tenant-scoped status and consent warnings;
+- [ ] Production reconnect UAT and operational monitoring after legal review;
 - [x] Deterministic import fingerprinting and explainable match confidence;
 - [ ] Optional AI field/match suggestions remain a post-UAT roadmap item behind human approval;
 - [x] Demo-scope recurring invoices and the payment-reminder ladder (see section 15).
@@ -939,7 +940,8 @@ pending.
   excluded. Amounts retain their signs, and reconciliation remains review-first.
 - The integration card supports bank selection, consent completion, account
   balances, local account mapping and per-account pulls in all four locales.
-- No schema migration or background worker. Scheduled pulls remain a follow-up.
+- The initial slice had no schema migration or background worker. Daily pulls
+  are now implemented in the worker entry below.
 - Consent may last around 180 days depending on the bank and agreement; re-link
   to renew it. GoCardless's documented default agreement currently gives 90 days
   of account access. API access tokens expire separately, typically after one day,
@@ -997,3 +999,41 @@ pending.
 - Validation: seven relevant pytest files passed with 106 tests and one existing
   dependency warning on Python 3.14.6. Compilation, JavaScript syntax and diff
   checks passed; a synthetic nine-page PDF was rendered and visually reviewed.
+
+## Daily GoCardless bank feed worker (2026-10-12)
+
+- [x] Add additive migration `0016_bank_feed_schedules` and the matching CI
+  migration-list entry. Keep one daily schedule per organisation and mapped
+  GoCardless account, with last attempt, result, safe error and timestamps.
+  Preserve inactive schedules; explicit account linking enables them again.
+- [x] Discover existing valid mappings and schedule newly linked accounts for
+  today. The existing automation worker claims each due account before network
+  access and calls the idempotent pull with actor `system`. The cadence follows
+  the server's calendar date; timestamps are UTC. Enable the existing
+  `FASTACCOUNTS_AUTOMATION_WORKER=true` switch on one deployment instance;
+  polling defaults to 60 seconds and remains disabled by default.
+- [x] Catch up an overdue schedule with one overlapping 90-day import, then
+  advance to tomorrow. Failures also advance to tomorrow to avoid repeated
+  requests each polling tick. Transient Error connections recheck consent before
+  the next daily pull. Reauth Required connections make no bank requests until
+  consent is renewed and accounts are mapped again. Interrupted Running attempts
+  are retried on the next day; no ledger reconciliation is automated.
+- [x] Show local last scheduled pull, result and renewal warnings on the existing
+  integration card through an authorised, tenant-scoped status GET route. Status
+  remains available when account/balance requests fail. Add English, Estonian,
+  Lithuanian and Latvian copy without changing existing translations; Estonian
+  uses pangafeed and "Impordi kohe" for "Pull now".
+- [x] Cover daily and overdue cadence, same-day deduplication, concurrent claims,
+  account and organisation failure isolation, transient recovery, consent expiry,
+  tenant ownership, safe status routes and data-preserving migration upgrades.
+  Browser checks intercept every request and cover all four locales, mobile
+  layout, manual pull refresh and consent expiry while loading accounts.
+- [ ] Live GoCardless consent UAT, GB/EE bank coverage and regulatory/commercial
+  acceptance remain pending. PostgreSQL integration checks require an explicit
+  test database; Python 3.12 is unavailable locally, so validation uses 3.14.6.
+- Validation: `python -m pytest tests/ -q` passed with 582 tests, three optional
+  PostgreSQL skips and one existing dependency warning. The final focused run
+  passed 101 tests, including all 12 browser cases. The fresh migration list
+  matches CI exactly and reruns are idempotent.
+  Python compilation, JavaScript syntax and diff checks passed. No live bank
+  requests or real accounting data were used.
