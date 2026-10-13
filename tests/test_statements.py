@@ -10,6 +10,7 @@ from documents import DocumentService
 from ledger import LedgerService, PostingLine
 from opening_balances import OpeningBalanceService
 from statements import StatementService
+from prepayments import PrepaymentService
 
 
 @pytest.fixture
@@ -108,6 +109,49 @@ def test_real_invoice_bill_and_payment_movements(db, ee_org, statement_data):
         assert len(report['movements']) == 2
         assert {r['document_number'] for r in report['movements']} == {
             invoice['number'] if side == 'customer' else 'SUP-1', 'PAY-TEST'}
+
+
+@pytest.mark.parametrize('side', ['customer', 'supplier'])
+def test_prepayment_allocation_statement_and_ageing(db, ee_org, statement_data, side):
+    docs, contact, accounts, start = statement_data
+    day, next_day = start.isoformat(), (start+timedelta(days=1)).isoformat()
+    service = PrepaymentService(db)
+    bank = docs.create_bank_account(ee_org['id'], name='Synthetic prepayment bank', currency='EUR')
+    prepayment = service.create(ee_org['id'], side=side, contact_id=contact['id'], bank_account_id=bank['id'],
+        document_date=day, amount='120', idempotency_key='create', actor='owner@example.test')
+    # Unallocated money is outside AR/AP and does not create a trade statement movement.
+    statements = StatementService(db)
+    assert statements.statement(ee_org['id'], contact['id'], date_from=day, date_to=day, side=side)['closing_balance'] == 0
+    if side == 'customer':
+        document = docs.create_invoice(ee_org['id'], contact_id=contact['id'], issue_date=day, due_date=day,
+            actor='owner@example.test', lines=[dict(unit_price='100', account_id=accounts['SALES'])])
+        document = docs.issue_invoice(document['id'], actor='owner@example.test')
+        ageing = LedgerService(db).receivables_aging
+    else:
+        document = docs.create_bill(ee_org['id'], contact_id=contact['id'], bill_date=day, due_date=day,
+            supplier_number='PRE-SUP', actor='owner@example.test',
+            lines=[dict(unit_price='100', account_id=accounts['EXPENSE'])])
+        document = docs.approve_bill(document['id'], actor='owner@example.test')
+        ageing = LedgerService(db).payables_aging
+    allocation = dict(document_type='invoice' if side == 'customer' else 'bill', document_id=document['id'],
+        amount='40', allocation_date=next_day, actor='owner@example.test', idempotency_key='allocate')
+    service.allocate(ee_org['id'], prepayment['id'], **allocation)
+    before = statements.statement(ee_org['id'], contact['id'], date_from=day, date_to=day, side=side)
+    assert before['closing_balance'] == 100 and len(before['movements']) == 1
+    report = statements.statement(ee_org['id'], contact['id'], date_from=next_day, date_to=next_day, side=side)
+    assert report['opening_balance'] == 100 and report['closing_balance'] == 60
+    assert len(report['movements']) == 1
+    assert report['movements'][0]['voucher_type'] == 'prepayment_allocation'
+    assert report['movements'][0]['amount'] == -40
+    assert report['currencies']['EUR']['closing_balance'] == ageing(ee_org['id'], as_at=next_day)['total'] == 60
+    # Refunding the remaining prepayment has no AR/AP effect.
+    service.refund(ee_org['id'], prepayment['id'], refund_date=next_day, amount='20',
+        idempotency_key='refund', actor='owner@example.test')
+    assert statements.statement(ee_org['id'], contact['id'], date_from=next_day, date_to=next_day, side=side) == report
+    service.allocate(ee_org['id'], prepayment['id'], **{**allocation, 'amount': '60', 'idempotency_key': 'allocate-2'})
+    final = statements.statement(ee_org['id'], contact['id'], date_from=day, date_to=next_day, side=side)
+    assert final['closing_balance'] == ageing(ee_org['id'], as_at=next_day)['total'] == 0
+    assert ageing(ee_org['id'], as_at=next_day)['items'] == []
 
 
 def test_eur_conversion_is_explicit_and_rounds_per_movement(db, uk_org):

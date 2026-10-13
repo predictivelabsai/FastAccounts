@@ -1037,3 +1037,45 @@ pending.
   matches CI exactly and reruns are idempotent.
   Python compilation, JavaScript syntax and diff checks passed. No live bank
   requests or real accounting data were used.
+
+## Customer and supplier prepayments (2026-10-12)
+
+- [x] Add additive migration `0017_prepayments`, CI migration-list parity,
+  prepayments, allocation/refund events and tenant-scoped contact indexes.
+  Seed asset `SUPPLIER_PREPAYMENTS` and liability `CUSTOMER_PREPAYMENTS` roles
+  in both charts and add missing roles to existing organisations, preserving
+  custom accounts, occupied codes, existing roles and posted books.
+- [x] Post customer advances as debit bank / credit customer prepayments, and
+  supplier advances as debit supplier prepayments / credit bank. Keep each
+  creation, allocation and refund balanced, immutable and atomic with its event
+  record. Require stable idempotency keys and serialise concurrent retries.
+- [x] Allocate customer advances to issued invoices as debit customer prepayments
+  / credit contact AR; allocate supplier advances to approved bills as debit
+  contact AP / credit supplier prepayments. Update paid totals and Part Paid/Paid
+  status without another bank leg. Reject closed/draft/credit documents, wrong
+  contacts or tenants, over-allocation, invalid dates and locked periods.
+- [x] Refund only remaining unallocated funds through the original bank account,
+  linking compensating entries and their batch to the original prepayment. Keep
+  allocation history intact and track the remaining balance per contact.
+- [x] Provide authorised list/create/get/allocate/refund API routes and a contact
+  outstanding route through the existing web API mount. Add sales/purchases
+  tables and dialogs and a contact outstanding view, with append-only copy in
+  all four locales. Encode exact amounts as decimal strings in API responses.
+- [x] Verify both sides/country charts, event balances, retries/concurrent writes,
+  status transitions, rollback after posting, tenant isolation, refunds and
+  data-preserving upgrades. Verify contact-statement movements and current ageing
+  after allocation. Intercept browser traffic and verify all four languages,
+  error correction, stable retry keys, refreshed balances and mobile dialogs.
+- [ ] Accountant UAT, allocation reversal, foreign-currency advances/FX differences,
+  bank-feed matching and VAT-on-advance/cash-VAT treatment remain follow-ups.
+  The first implementation uses the organisation base currency. Existing
+  historical document-ageing behaviour is unchanged; statements remain dated
+  ledger views. PostgreSQL integration checks require `TEST_POSTGRES_URL`;
+  Python 3.12 is unavailable locally, so validation uses Python 3.14.6.
+- Validation: `python -m pytest tests/ -q --tb=short` passed with 627 tests,
+  four optional PostgreSQL skips and five dependency deprecation warnings.
+  The focused run passed 77 tests; the final eight browser cases passed, including
+  the contact outstanding view. Fresh `db.migrate()` matches CI's 17 migrations
+  exactly and reruns apply nothing. Compilation, JavaScript syntax, diff checks
+  and append-only locale verification passed. Tests used synthetic data and
+  intercepted browser requests on Python 3.14.6.

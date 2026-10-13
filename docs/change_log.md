@@ -4,6 +4,53 @@ Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as
 delivered.
 
+## 2026-10-12: Customer and supplier prepayments
+
+### Added
+
+- Added additive migration `0017_prepayments` with tenant-scoped prepayments,
+  allocations and refunds, per-contact indexes, event idempotency keys and
+  posting-batch links. Added the same migration to CI and migration expectations.
+  Both seeded charts now contain supplier prepayments as an asset and customer
+  prepayments as a liability. Existing organisations receive missing roles;
+  custom accounts and existing roles are preserved, including code collisions.
+- Added a repository and service for creating, listing, allocating and refunding
+  prepayments, with an outstanding view per contact. Each event posts one balanced
+  immutable batch in the same transaction as its records and balances. Customer
+  receipts debit bank and credit customer prepayments; supplier advances debit
+  supplier prepayments and credit bank. Allocation offsets the prepayment against
+  contact-tagged AR/AP, without another bank movement, and updates document paid
+  totals and Part Paid/Paid status. Refunds compensate only the unallocated amount
+  through the original bank account, with links to the original batch and entries.
+- Added authorised list/create/get/allocate/refund API routes and a contact
+  outstanding route through the existing web API mount. Exact monetary responses
+  use decimal strings. Sales and purchases have prepayment tables and dialogs;
+  Contacts has an outstanding-prepayments dialog. Added append-only English,
+  Estonian, Lithuanian and Latvian workspace copy.
+
+### Validation and boundaries
+
+- Tests cover both sides and country charts, balanced events and retries,
+  concurrent allocation, status transitions, over-allocation, draft/credit/closed
+  documents, locked periods, transaction rollback after posting, tenant/contact
+  isolation, exact amounts, refunds and preservation of existing charts and books.
+  Statement tests confirm allocation-only AR/AP movements and matching current
+  ageing balances. Browser tests intercept every request and cover all four
+  languages, validation errors, stable retry keys, refreshes and mobile dialogs.
+- Prepayments currently require the organisation base currency. Reversing an
+  allocation, foreign-currency advances/FX differences, bank-feed matching and
+  VAT-on-advance/cash-VAT treatment remain follow-ups for accountant UAT. Refunds
+  cannot consume an allocated amount. Existing historical document-ageing
+  behaviour is unchanged; contact statements use dated immutable ledger entries.
+- Validation: `python -m pytest tests/ -q --tb=short` passed with 627 tests,
+  four optional PostgreSQL skips and five dependency deprecation warnings.
+  The focused run passed 77 tests; the final eight browser cases passed, including
+  the contact outstanding view. Fresh `db.migrate()` matches CI's 17 migrations
+  exactly and reruns apply nothing. Compilation, JavaScript syntax, diff checks
+  and append-only locale verification passed. Tests use synthetic data and
+  intercepted browser requests. PostgreSQL checks require `TEST_POSTGRES_URL`;
+  local validation used Python 3.14.6 because Python 3.12 is unavailable.
+
 ## 2026-10-12: Daily GoCardless bank feed worker
 
 ### Added
