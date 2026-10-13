@@ -16,6 +16,7 @@ LANGUAGES: dict[str, dict[str, str]] = {
 }
 SUPPORTED_LANGS = frozenset(LANGUAGES)
 LOCALES_DIR = Path(__file__).resolve().parent / "locales"
+APPEND_SECTIONS = ('periodisation', 'payment_links')
 
 
 @lru_cache(maxsize=None)
@@ -31,8 +32,9 @@ def catalog(lang: str) -> dict[str, Any]:
     if not isinstance(data, dict):
         return {}
     # Feature copy appended at the end of each JSON file extends existing sections.
-    for section, additions in data.get('periodisation', {}).items():
-        data.setdefault(section, {}).update(additions)
+    for feature in APPEND_SECTIONS:
+        for section, additions in data.get(feature, {}).items():
+            data.setdefault(section, {}).update(additions)
     return data
 
 

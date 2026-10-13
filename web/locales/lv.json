@@ -1583,5 +1583,28 @@
       "Purchase period is no longer pending": "Pirkuma periods vairs nav gaidīšanā",
       "Purchase periodisation failed": "Pirkuma periodizācija neizdevās"
     }
+  },
+  "payment_links": {
+    "nav": {
+      "payment_methods": "Maksājumu veidi"
+    },
+    "workspace": {
+      "Payment methods": "Maksājumu veidi",
+      "Payment links": "Maksājumu saites",
+      "Payment link": "Maksājuma saite",
+      "Copy link": "Kopēt saiti",
+      "Link copied": "Saite nokopēta",
+      "Add payment method": "Pievienot maksājuma veidu",
+      "Edit payment method": "Rediģēt maksājuma veidu",
+      "Configure payment URLs without a provider connection.": "Konfigurējiet maksājumu URL bez savienojuma ar pakalpojuma sniedzēju.",
+      "No payment links are available for this invoice.": "Šim rēķinam nav pieejamu maksājumu saišu.",
+      "Select and copy the payment link.": "Atlasiet un kopējiet maksājuma saiti.",
+      "URL template": "URL veidne",
+      "Currency (blank for any)": "Valūta (tukšs lauks atļauj visas)",
+      "Any currency": "Jebkura valūta",
+      "Use an HTTPS URL. Placeholders: {invoice_total}, {invoice_due}, {invoice_number}, {invoice_id}, {token}, {currency}.": "Izmantojiet HTTPS adresi. Vietturi: {invoice_total}, {invoice_due}, {invoice_number}, {invoice_id}, {token}, {currency}.",
+      "Enabled": "Iespējots",
+      "Custom": "Pielāgots"
+    }
   }
 }

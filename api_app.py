@@ -23,6 +23,7 @@ from database import get_database
 from documents import DocumentService, EInvoiceAlreadyImported
 from quotes import QuoteService
 from periodisation import PeriodisationService
+from payment_links import PaymentLinkService
 from statements import StatementService
 from cash_flow import CashFlowService
 from excel_export import (employees_workbook, general_ledger_workbook,
@@ -126,6 +127,31 @@ class PurchaseScheduleIn(BaseModel):
     split_rule: Literal['equal_first', 'equal_last'] = 'equal_first'
     status: Literal['Draft', 'Active'] = 'Active'
     notes: str = ''
+
+
+class PaymentMethodIn(BaseModel):
+    model_config = {'extra': 'forbid'}
+    provider: Literal['everypay', 'linkpay', 'custom']
+    name: str = Field(min_length=1, max_length=120)
+    url_template: str = Field(min_length=1, max_length=2000)
+    enabled: bool = Field(default=False, strict=True)
+    currency: str = Field(default='', max_length=3)
+
+
+class PaymentMethodPatch(BaseModel):
+    model_config = {'extra': 'forbid'}
+    provider: Literal['everypay', 'linkpay', 'custom'] | None = None
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    url_template: str | None = Field(default=None, min_length=1, max_length=2000)
+    enabled: bool | None = Field(default=None, strict=True)
+    currency: str | None = Field(default=None, max_length=3)
+
+    @field_validator('provider', 'name', 'url_template', 'enabled', 'currency')
+    @classmethod
+    def reject_null(cls, value):
+        if value is None:
+            raise ValueError('Payment method fields cannot be null')
+        return value
 
 
 class PurchaseSchedulePatch(BaseModel):
@@ -628,6 +654,30 @@ def list_invoices(organisation_id: str, user: User = Depends(current_user)):
     )
 
 
+@api.get('/organisations/{organisation_id}/payment-methods')
+def list_payment_methods(organisation_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, {'owner', 'administrator', 'accountant', 'approver', 'viewer'})
+    return PaymentLinkService().list_configs(organisation_id)
+
+
+@api.post('/organisations/{organisation_id}/payment-methods', status_code=201)
+def create_payment_method(organisation_id: str, payload: PaymentMethodIn, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES & {'owner', 'administrator'})
+    return PaymentLinkService().create_config(organisation_id, **payload.model_dump(), actor=user.email)
+
+
+@api.patch('/organisations/{organisation_id}/payment-methods/{method_id}')
+def update_payment_method(organisation_id: str, method_id: str, payload: PaymentMethodPatch, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES & {'owner', 'administrator'})
+    return PaymentLinkService().update_config(organisation_id, method_id, **payload.model_dump(exclude_unset=True), actor=user.email)
+
+
+@api.get('/organisations/{organisation_id}/invoices/{invoice_id}/payment-links')
+def get_invoice_payment_links(organisation_id: str, invoice_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, {'owner', 'administrator', 'accountant', 'approver', 'viewer'})
+    return PaymentLinkService().invoice_links(organisation_id, invoice_id)
+
+
 @api.post("/organisations/{organisation_id}/invoices", status_code=201)
 def create_invoice(organisation_id: str, payload: InvoiceIn, user: User = Depends(require_csrf)):
     _require(organisation_id, user, WRITE_ROLES)
@@ -657,6 +707,12 @@ def invoice_xml(organisation_id: str, invoice_id: str, user: User = Depends(curr
     _require(organisation_id, user, {"owner", "administrator", "accountant", "approver", "viewer"})
     DocumentService().invoice(invoice_id, organisation_id)
     return Response(DocumentService().invoice_xml(invoice_id), media_type="application/xml")
+
+
+@api.get('/organisations/{organisation_id}/invoices/{invoice_id}')
+def get_invoice(organisation_id: str, invoice_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, {'owner', 'administrator', 'accountant', 'approver', 'viewer'})
+    return PaymentLinkService().invoice_payload(organisation_id, invoice_id)
 
 
 @api.post("/organisations/{organisation_id}/invoice-schedules", status_code=201)

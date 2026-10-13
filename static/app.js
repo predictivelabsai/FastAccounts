@@ -649,7 +649,7 @@
                 "numeric",
               ),
               td(
-                button("Attachments", "invoiceAttachments", false, `data-id="${esc(x.id)}"`) + (x.status === "Draft"
+                button("Invoice", "invoiceAttachments", false, `data-id="${esc(x.id)}"`) + (x.status === "Draft"
                   ? button("Issue", "issue", false, `data-id="${esc(x.id)}"`)
                   : link("PDF", `/api${c.url(`/invoices/${x.id}.pdf`)}`) +
                       link("XML", `/api${c.url(`/invoices/${x.id}.xml`)}`)),
@@ -726,6 +726,19 @@
           toast(`${t("Invoice issued")}: ${invoice.number}`);
           await render();
         }),
+      });
+    },
+    "payment-methods": async (c) => {
+      const rows = await api(c.url('/payment-methods'));
+      if (!c.mount(page(t('Payment methods'), t('Configure payment URLs without a provider connection.'),
+        button('Add payment method', 'newPaymentMethod', true, canEditMappings() ? '' : 'disabled'),
+        table(['Name', 'Provider', 'Currency', 'Enabled', 'Actions'], rows.map((x) => row([
+          td(esc(x.name)), td(esc(x.provider)), td(esc(x.currency || t('Any currency'))),
+          td(tr(x.enabled ? 'Yes' : 'No')),
+          td(button('Edit payment method', 'editPaymentMethod', false, `data-id="${esc(x.id)}" ${canEditMappings() ? '' : 'disabled'}`))])))))) return;
+      bindActions(content, {
+        newPaymentMethod: () => paymentMethodDialog(),
+        editPaymentMethod: (b) => paymentMethodDialog(rows.find((x) => x.id === b.dataset.id)),
       });
     },
     periodised: async (c) => {
@@ -2221,12 +2234,32 @@
   async function documentDialog(kind, documentId = null) {
     const base = path("");
     if (documentId) {
-      const rows = await api(base + (kind === "invoice" ? "/invoices" : "/bills"));
+      const rows = kind === 'invoice' ? [await api(base + `/invoices/${documentId}`)] : await api(base + '/bills');
       if (base !== path("")) return;
       const record = rows.find((x) => x.id === documentId);
       if (!record) return;
       const d = dialog(kind === "invoice" ? "Invoice" : "Bill",
         `<p>${esc(record.number || record.supplier_number || t("Draft"))} · ${esc(record.contact_name)}</p>`);
+      if (kind === 'invoice') {
+        const section = document.createElement('section');
+        const links = record.payment_links || [];
+        section.innerHTML = `<h3>${tr('Payment links')}</h3>` + (links.length ? links.map((x, i) =>
+          `<p><a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer">${esc(x.name)}</a></p>` +
+          field('Payment link', `payment_link_${i}`, x.url, 'text', 'readonly') +
+          button('Copy link', 'copyPaymentLink', false, `data-index="${i}"`)).join('') :
+          `<p>${tr('No payment links are available for this invoice.')}</p>${button('Copy link', 'copyPaymentLink', false, 'disabled')}`);
+        d.querySelector('.dialog-card').append(section);
+        bindActions(section, {copyPaymentLink: async (b) => {
+          const input = section.querySelector(`[name=payment_link_${b.dataset.index}]`);
+          input.focus(); input.select();
+          try {
+            await navigator.clipboard.writeText(input.value);
+            toast(t('Link copied'));
+          } catch (_) {
+            toast(t('Select and copy the payment link.'), 'info');
+          }
+        }});
+      }
       await attachmentsSection(d, base, kind, documentId);
       return;
     }
@@ -2314,6 +2347,21 @@
       await attachmentsSection(d, base, kind, record.id);
       toast(t("Saved successfully"));
       await render();
+    });
+  }
+  async function paymentMethodDialog(record = null) {
+    const base = path('');
+    const d = dialog(record ? 'Edit payment method' : 'Add payment method', form(
+      `<p class="full-width">${tr('Use an HTTPS URL. Placeholders: {invoice_total}, {invoice_due}, {invoice_number}, {invoice_id}, {token}, {currency}.')}</p>` +
+      select('Provider', 'provider', [['everypay', 'EveryPay'], ['linkpay', 'LinkPay'], ['custom', t('Custom')]], record?.provider || 'custom') +
+      field('Name', 'name', record?.name || '', 'text', 'required maxlength="120"') +
+      field('URL template', 'url_template', record?.url_template || '', 'text', 'required maxlength="2000"') +
+      field('Currency (blank for any)', 'currency', record?.currency || '', 'text', 'maxlength="3"') +
+      check('Enabled', 'enabled', record?.enabled || false)));
+    bindForm(d, async (data) => {
+      await post(base + '/payment-methods' + (record ? `/${record.id}` : ''),
+        {...data, enabled: d.querySelector('[name=enabled]').checked}, record ? 'PATCH' : 'POST');
+      await saved(d);
     });
   }
   async function purchaseScheduleDialog(scheduleId = null) {

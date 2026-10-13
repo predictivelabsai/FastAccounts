@@ -1583,5 +1583,28 @@
       "Purchase period is no longer pending": "Ostuperiood ei ole enam ootel",
       "Purchase periodisation failed": "Ostu periodiseerimine ebaõnnestus"
     }
+  },
+  "payment_links": {
+    "nav": {
+      "payment_methods": "Makseviisid"
+    },
+    "workspace": {
+      "Payment methods": "Makseviisid",
+      "Payment links": "Makselingid",
+      "Payment link": "Makselink",
+      "Copy link": "Kopeeri link",
+      "Link copied": "Link kopeeritud",
+      "Add payment method": "Lisa makseviis",
+      "Edit payment method": "Muuda makseviisi",
+      "Configure payment URLs without a provider connection.": "Seadista makselingid ilma makseteenusega ühendamata.",
+      "No payment links are available for this invoice.": "Selle arve jaoks pole makselinke saadaval.",
+      "Select and copy the payment link.": "Vali ja kopeeri makselink.",
+      "URL template": "URL-i mall",
+      "Currency (blank for any)": "Valuuta (tühi lubab kõik valuutad)",
+      "Any currency": "Kõik valuutad",
+      "Use an HTTPS URL. Placeholders: {invoice_total}, {invoice_due}, {invoice_number}, {invoice_id}, {token}, {currency}.": "Kasuta HTTPS-aadressi. Kohatäitjad: {invoice_total}, {invoice_due}, {invoice_number}, {invoice_id}, {token}, {currency}.",
+      "Enabled": "Lubatud",
+      "Custom": "Kohandatud"
+    }
   }
 }

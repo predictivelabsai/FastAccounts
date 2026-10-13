@@ -866,7 +866,7 @@ def workspace_page(user: dict, lang: str = "en"):
         ("money", [("banking", "banking")]),
         ("accounting", [("accounting", "accounting"), ("cash-flow", "cash_flow"), ("fixed-assets", "fixed_assets"), ("tax", "tax")]),
         ("payroll", [("payroll", "payroll")]),
-        ("settings", [("integrations", "integrations"), ("imports", "data_import")]),
+        ("settings", [("integrations", "integrations"), ("imports", "data_import"), ("payment-methods", "payment_methods")]),
     ]
     # Escape script delimiters even when catalogue copy contains HTML punctuation.
     dictionary = {**i18n.catalog("en"), **i18n.catalog(lang)}

@@ -1583,5 +1583,28 @@
       "Purchase period is no longer pending": "Pirkimo laikotarpis nebelaukia",
       "Purchase periodisation failed": "Pirkimo periodizacija nepavyko"
     }
+  },
+  "payment_links": {
+    "nav": {
+      "payment_methods": "Mokėjimo būdai"
+    },
+    "workspace": {
+      "Payment methods": "Mokėjimo būdai",
+      "Payment links": "Mokėjimo nuorodos",
+      "Payment link": "Mokėjimo nuoroda",
+      "Copy link": "Kopijuoti nuorodą",
+      "Link copied": "Nuoroda nukopijuota",
+      "Add payment method": "Pridėti mokėjimo būdą",
+      "Edit payment method": "Redaguoti mokėjimo būdą",
+      "Configure payment URLs without a provider connection.": "Konfigūruokite mokėjimo URL be ryšio su paslaugos teikėju.",
+      "No payment links are available for this invoice.": "Šiai sąskaitai mokėjimo nuorodų nėra.",
+      "Select and copy the payment link.": "Pasirinkite ir nukopijuokite mokėjimo nuorodą.",
+      "URL template": "URL šablonas",
+      "Currency (blank for any)": "Valiuta (tuščia reiškia bet kurią)",
+      "Any currency": "Bet kuri valiuta",
+      "Use an HTTPS URL. Placeholders: {invoice_total}, {invoice_due}, {invoice_number}, {invoice_id}, {token}, {currency}.": "Naudokite HTTPS adresą. Vietos rezervavimo ženklai: {invoice_total}, {invoice_due}, {invoice_number}, {invoice_id}, {token}, {currency}.",
+      "Enabled": "Įjungta",
+      "Custom": "Pasirinktinis"
+    }
   }
 }

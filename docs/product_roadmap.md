@@ -1245,3 +1245,34 @@ pending.
   explicit irregular period lists, monetary schedule editing and coordinated
   bill/deferral/portion reversals or cancellation settlement. See
   `docs/specs/purchase-periodisation.md` for the ledger and VAT decisions.
+
+### Payment links (2026-10-12)
+
+- [x] Deliver the offline configuration slice of P1 item 9 with additive, rerunnable
+  migration `0022_payment_links`, organisation-owned URL templates and stable
+  random per-invoice/per-method tokens. Composite tenant foreign keys and an
+  organisation lock preserve isolation and concurrent generation idempotency.
+- Support EveryPay, LinkPay and custom provider labels without HTTP adapters or
+  live provider calls. Format totals and remaining balances with Decimal to two
+  places and URL-encode placeholder values. Refuse disabled methods, drafts,
+  paid invoices, credit notes and explicit currency mismatches; an empty method
+  currency allows any invoice currency without conversion.
+- Add owner/administrator configuration writes with WRITE_ROLES restriction and
+  CSRF protection, plus viewer-readable method and invoice-link GET endpoints.
+  Invoice detail includes generated links. Reads materialise local URLs only,
+  with no payment initiation, ledger posting or payment-status change.
+- Add Payment methods under Settings and a tiny create/edit dialog. The existing
+  authenticated invoice dialog shows clickable payment links, read-only URL
+  fields and copy controls. Append translations in all four locales and merge
+  both periodisation and payment-link additions into their explicit root sections.
+- No public invoice view exists. A new unauthenticated share page, actual
+  EveryPay/LinkPay sessions and callbacks, verification, automatic reconciliation,
+  provider-side revocation and production UAT remain deferred. Already shared
+  external URLs depend on the merchant service for current balance and expiry.
+  See `docs/specs/payment-links.md` for the template and token contract.
+- Validation: Python 3.12.14, `python -m pytest -q`:
+  `916 passed, 4 skipped in 674.84s (0:11:14)`. All 35 new service, API,
+  migration, locale and four-locale browser checks passed. The skips are existing
+  opt-in PostgreSQL checks. Tests used synthetic data and no live provider calls.
+  JavaScript syntax, focused Python compilation, existing locale preservation,
+  diff and staged secret-pattern checks passed.
