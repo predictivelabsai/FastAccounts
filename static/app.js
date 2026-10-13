@@ -743,7 +743,7 @@
           (x.status === "Converted" ? link("Invoice", "#invoices") : "");
       };
       if (!c.mount(page(t("Quotes"), t("Customer offers before invoicing."),
-        button("New quote", "newQuote", true), table(
+        button("New quote", "newQuote", true) + link("Export CSV", `/api${c.url('/quotes/export.csv')}`), table(
           ["Number", "Customer", "Quote date", "Valid until", "Status", ["Total"], "Actions"],
           rows.map((x) => row([td(esc(x.quote_number)), td(esc(x.contact_name)), td(date(x.quote_date)),
             td(date(x.valid_until)), td(pill(x.status)), td(esc(money(x.total, x.currency)), "numeric"), td(actions(x))])),
@@ -770,7 +770,8 @@
     objects: async (c) => {
       const rows = await api(c.url('/objects'));
       if (!c.mount(page(t('Objects'), t('Tag income and costs by project, location, person or object.'),
-        button('Add object', 'newObject', true, canEditMappings() ? '' : 'disabled'),
+        button('Add object', 'newObject', true, canEditMappings() ? '' : 'disabled') +
+          link('Export CSV', `/api${c.url('/objects/export.csv')}`),
         table(['Code', 'Name', 'Object type', 'Status', 'Actions'], rows.map((x) => row([
           td(esc(x.code)), td(esc(x.name)), td(tr(objectTypeLabel(x.object_type))), td(tr(x.active ? 'Active' : 'Inactive')),
           td(button('Edit object', 'editObject', false, `data-id="${esc(x.id)}" ${canEditMappings() ? '' : 'disabled'}`) +
@@ -1154,7 +1155,8 @@
             t("Contacts"),
             t("Customers and suppliers for this organisation."),
             button("New customer", "customer", true) +
-              button("New supplier", "supplier") + button("Data import", "masterImport"),
+              button("New supplier", "supplier") + button("Data import", "masterImport") +
+              link("Export CSV", `/api${c.url('/contacts/export.csv')}`),
             `<div class="chips">${["All", "customer", "supplier", "both"].map((x) => `<button class="chip ${contactFilter === x ? "active" : ""}" data-contact-filter="${x}">${tr(x)}</button>`).join("")}</div><div id="contacts-table"></div>`,
           ),
         )
@@ -1214,7 +1216,8 @@
             t("Banking"),
             t("Explainable matches. Every posting reviewed."),
             button("Add account", "account") +
-              button("Import statement", "import", true),
+              button("Import statement", "import", true) +
+              link("Export CSV", `/api${c.url('/bank-transactions/export.csv')}`),
             `<div class="account-cards">${accounts.map((x) => `<article class="card"><div class="section-head">${icon("bank")}<span class="country-badge">${esc(x.currency)}</span></div><h2>${esc(x.name)}</h2><p class="muted">${esc(x.iban_masked || x.masked_iban || "")}</p></article>`).join("")}</div>${table(
               [
                 "Date",
@@ -1300,7 +1303,7 @@
             t("Reports from your posted ledger."),
             button("Opening balances", "openingBalances") +
               button("Opening receivables/payables", "openingItems") +
-              button("Print / save PDF", "print"),
+              button("Print / save PDF", "print") + '<span id="report-exports" class="actions"></span>',
             `<div class="tabs" role="tablist">${Object.entries(reportNames)
               .map(
                 ([key, label]) =>
@@ -1362,6 +1365,8 @@
           return;
         }
         const result = document.getElementById("report-result");
+        const exports = document.getElementById('report-exports');
+        exports.innerHTML = '';
         result.innerHTML = skeleton();
         const tab = reportTab;
         try {
@@ -1376,6 +1381,13 @@
           if (!objectControl.hidden && f.elements.object_id.value) q.set('object_id', f.elements.object_id.value);
           const data = await api(c.url(`/reports/${tab}?${q}`));
           if (ticket !== request || !result.isConnected) return;
+          if (tab !== 'cash-summary') {
+            exports.innerHTML = link('Export CSV', `/api${c.url(`/reports/${tab}.csv?${q}`)}`);
+            if (tab === 'general-ledger') {
+              const bounds = new URLSearchParams({date_from: q.get('start'), date_to: q.get('end')});
+              exports.innerHTML += link('Export Excel', `/api${c.url(`/reports/general_ledger.xlsx?${bounds}`)}`);
+            }
+          }
           result.innerHTML = `<div class="report-heading"><h2>${tr(reportNames[tab])}</h2><p>${esc(org.name)} · ${date(f.elements.end.value)}</p></div>${renderReport(tab, data)}`;
         } catch (e) {
           if (ticket === request && result.isConnected) {
@@ -1466,7 +1478,7 @@
             t("People, payslips and postings for this client."),
             button("Add employee", "employee") +
               button("Run payroll for month", "run", true),
-            `${unavailable ? `<div class="notice">${tr("Payroll is not available yet.")}</div>` : ""}<section class="section"><div class="section-head"><h2>${tr("Employees")}</h2><span class="muted">${num(employees?.length)} ${tr("employees")}</span></div>${table(
+            `${unavailable ? `<div class="notice">${tr("Payroll is not available yet.")}</div>` : ""}<section class="section"><div class="section-head"><h2>${tr("Employees")}</h2><span class="muted">${num(employees?.length)} ${tr("employees")}</span>${employees === null ? '' : link('Export Excel', `/api${c.url('/reports/employees.xlsx')}`)}</div>${table(
               [
                 "Name",
                 ["Gross salary"],

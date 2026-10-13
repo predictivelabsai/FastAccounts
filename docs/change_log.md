@@ -45,6 +45,38 @@ delivered.
   The full suite was not repeated after the assertion-only correction.
 - Product scope and roadmap status are unchanged. No accounting workflows,
   migration logic or document appearance settings changed.
+## 2026-10-12: CSV exports across lists and reports (parity slate P2 item 5)
+
+- Added read-only CSV attachments at
+  `/organisations/{organisation_id}/contacts/export.csv`, `quotes/export.csv`,
+  `bank-transactions/export.csv` and `objects/export.csv` with member-readable
+  roles, matching the invoice/bill list exports: UTF-8 BOM, explicit header row
+  that stays useful on empty lists, spreadsheet formula-injection guard for
+  user text and money rendered as plain two-decimal strings.
+- Added `/organisations/{organisation_id}/reports/{tab}.csv` for trial balance,
+  profit and loss, balance sheet, general ledger, cash-flow statement and the
+  receivables/payables aging. Exports reuse exactly the JSON routes' services
+  and query parameters, ignore the comparison option and mirror each JSON
+  route's role matrix (general-ledger and aging read-only roles stay aligned).
+  Missing or malformed dates and unknown tabs fail exactly like the JSON API.
+- Linked exports in the workspace: buttons in Contacts, Quotes, Banking,
+  Objects and Quotes lists; an accounting export control that follows the
+  active tab and currently applied date/object filters; the existing
+  general-ledger Excel workbook book route surfaced on its tab; and the
+  employees Excel workbook linked from the payroll view. The cash summary tab
+  keeps only its own summary view. No new catalogue keys were introduced:
+  existing keys are reused in all four languages.
+- Validation: focused exports checks: 44 passed, 1 existing dependency warning
+  in 79.42s, covering CSV contracts and content per list and report tab, JSON
+  parity for every report, date filters, read-only behaviour verified against a
+  whole-database snapshot, tenant isolation, viewer/outsider roles and a
+  four-language offline browser pass over every new link. Full
+  `python -m pytest -q` on Windows/Python 3.14.6: 1357 passed, 4 skipped.
+  JavaScript syntax, whitespace, em-dash and attribution checks passed. No
+  migration accompanied this change, so CI stays at 28 migrations.
+- Open follow-ups: independent native-language copy review, live PostgreSQL
+  validation and XLSX renderers for the remaining lists remain out of scope;
+  objects/bank CSV column sets are intentionally minimal.
 
 ## 2026-10-12: Document appearance settings (parity slate P2 item 4)
 
