@@ -489,7 +489,7 @@
     "banking_candidate": "Planned",
     "direction": "Direction",
     "ownership": "Record ownership",
-    "docs": "Read provider documentation ↗",
+    "docs": "Read provider documentation",
     "review_gate": "Review required: ",
     "review_notice": "Imports and exports produce reconciliation records. Direct tax filing is Planned; current VAT capability is limited to workpapers and export.",
     "items": {

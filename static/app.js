@@ -121,22 +121,49 @@
       : "–";
   const num = (v) => new Intl.NumberFormat(lang).format(Number(v || 0)),
     path = (s) => `/organisations/${encodeURIComponent(org.id)}${s}`;
-  const icon = (name = "document") => {
-    const p = {
-      document: "M7 3h7l4 4v14H7z M14 3v5h5 M10 12h5 M10 16h5",
-      home: "M3 10l9-7 9 7 M5 9v12h14V9 M9 21v-8h6v8",
-      bank: "M3 9h18L12 3z M5 12v6 M12 12v6 M19 12v6 M3 21h18",
-      people:
-        "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2 M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8 M18 8a3 3 0 0 1 0 6 M20 17a4 4 0 0 1 2 4",
-      chart: "M4 3v18h17 M8 17v-5 M13 17V7 M18 17v-8",
-      plus: "M12 5v14 M5 12h14",
-      close: "M6 6l12 12 M6 18L18 6",
-      menu: "M4 6h16 M4 12h16 M4 18h16",
-      external: "M14 3h7v7 M21 3L10 14 M10 3H3v18h18v-7",
-      shield: "M12 3l8 3v6c0 5-8 9-8 9s-8-4-8-9V6z M8 12l3 3 5-6",
-    };
-    return `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${p[name] || p.document}"/></svg>`;
+  // FastAccounts line icons: 24px grid, 1.75 stroke, round caps and joins (docs/brand/icons.md).
+  const ICONS = {
+    home: "M4 10.5 12 4l8 6.5V20H4z M10 20v-5h4v5",
+    invoice: "M6 3h8l4 4v14H6z M14 3v4h4 M9 11h6 M9 14.5h6 M9 18h3",
+    quote: "M4 5h16v11H10l-4.5 3.5V16H4z M8 9h8 M8 12.5h5",
+    bill: "M6 3h12v18l-2-1.5-2 1.5-2-1.5-2 1.5-2-1.5L6 21z M9 8h6 M9 11.5h6 M9 15h3",
+    periodised: "M4 6h16v14H4z M4 10h16 M8 3.5V7 M16 3.5V7 M8 15h7.5 M13.5 13l2 2-2 2",
+    contacts:
+      "M15.5 20v-1.5a4 4 0 0 0-4-4h-5a4 4 0 0 0-4 4V20 M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7 M16 4.3a3.5 3.5 0 0 1 0 6.4 M21.5 20v-1.5a4 4 0 0 0-3-3.9",
+    recurring:
+      "M4.5 12a7.5 7.5 0 0 1 13-5.1L19.5 9 M19.5 4.5V9H15 M19.5 12a7.5 7.5 0 0 1-13 5.1L4.5 15 M4.5 19.5V15H9",
+    bank: "M3.5 9.5 12 4l8.5 5.5z M5.5 12.5v5 M10 12.5v5 M14 12.5v5 M18.5 12.5v5 M3.5 20.5h17",
+    ledger: "M12 4v16 M8.5 20h7 M5 7h14 M7 7l-3 6a3 3 0 0 0 6 0z M17 7l-3 6a3 3 0 0 0 6 0z",
+    "cash-flow": "M7.5 20V4 M4 7.5 7.5 4 11 7.5 M16.5 4v16 M13 16.5l3.5 3.5 3.5-3.5",
+    asset: "M12 3 20 7.5v9L12 21l-8-4.5v-9z M4 7.5l8 4.5 8-4.5 M12 12v9",
+    tax: "M6 3h8l4 4v14H6z M14 3v4h4 M9 17.5l6-7 M9.5 11h.01 M14.5 17h.01",
+    payroll: "M3 7h18v10H3z M12 14.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5 M6.5 10v4 M17.5 10v4",
+    link: "M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1 M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1",
+    import: "M12 4v10 M8 10.5l4 4 4-4 M4 14v4.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V14",
+    card: "M3 6h18v12H3z M3 10h18 M7 14.5h3",
+    bell: "M6 16v-5a6 6 0 0 1 12 0v5l1.5 2h-15z M10 20.5a2 2 0 0 0 4 0",
+    exchange: "M4 8h14 M14.5 4.5 18 8l-3.5 3.5 M20 16H6 M9.5 12.5 6 16l3.5 3.5",
+    tag: "M3.5 11.5V4h7.5l9 9-7.5 7.5z M8 8.5h.01",
+    appearance: "M4 7h9 M17 7h3 M4 17h3 M11 17h9 M15 4.5v5 M9 14.5v5",
+    document: "M6 3h8l4 4v14H6z M14 3v4h4",
+    plus: "M12 5v14 M5 12h14",
+    close: "M6 6l12 12 M18 6 6 18",
+    menu: "M4 7h16 M4 12h16 M4 17h16",
+    external: "M13.5 4H20v6.5 M20 4l-9 9 M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5",
+    shield: "M12 3.5 19 6v5.5c0 4.5-3 7.6-7 9-4-1.4-7-4.5-7-9V6z M9 12l2 2 4-4",
+    check: "M5 12.5l4.5 4.5L19 7.5",
+    "chevron-down": "M6 9l6 6 6-6",
   };
+  const NAV_ICONS = {
+    overview: "home", invoices: "invoice", quotes: "quote", bills: "bill",
+    periodised: "periodised", contacts: "contacts", recurring: "recurring",
+    banking: "bank", accounting: "ledger", "cash-flow": "cash-flow",
+    "fixed-assets": "asset", tax: "tax", payroll: "payroll", integrations: "link",
+    imports: "import", "payment-methods": "card", "reminder-rules": "bell",
+    "exchange-rates": "exchange", objects: "tag", documents: "appearance",
+  };
+  const icon = (name = "document") =>
+    `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${ICONS[name] || ICONS.document}"/></svg>`;
   const button = (label, action, primary = false, attrs = "") =>
     `<button type="button" class="button${primary ? " primary" : ""}" data-action="${action}" ${attrs}>${tr(label)}</button>`;
   const link = (label, href) =>
@@ -1012,7 +1039,7 @@
             td(esc(x.contact_name)), td(esc(x.name)),
             td(esc(x.interval_kind === "custom_days" ? t("Every {days} days").replace("{days}", num(x.interval_days)) : t(intervals[x.interval_kind]))),
             td(date(x.next_run_date)), td(date(x.end_date)),
-            td(x.auto_email ? `<span aria-label="${tr("Auto-email")}">✓</span>` : "–"),
+            td(x.auto_email ? `<span class="cell-check" role="img" aria-label="${tr("Auto-email")}">${icon("check")}</span>` : "–"),
             td(pill(x.active ? "Active" : "Paused")),
             td(button(x.active ? "Pause" : "Resume", "toggleSchedule", false, `data-id="${esc(x.id)}"`) +
               button("Run now", "runSchedule", false, `data-id="${esc(x.id)}" ${!x.active || x.next_run_date > today() ? "disabled" : ""}`) +
@@ -3639,19 +3666,7 @@
     }
   });
   document.querySelectorAll(".app-nav").forEach((a) =>
-    a.insertAdjacentHTML(
-      "afterbegin",
-      icon(
-        {
-          overview: "home",
-          banking: "bank",
-          contacts: "people",
-          payroll: "people",
-          recurring: "document",
-          accounting: "chart",
-        }[a.dataset.view],
-      ),
-    ),
+    a.insertAdjacentHTML("afterbegin", icon(NAV_ICONS[a.dataset.view])),
   );
   document.querySelectorAll(".app-side-link[data-icon]").forEach((a) =>
     a.insertAdjacentHTML("afterbegin", icon(a.dataset.icon)),

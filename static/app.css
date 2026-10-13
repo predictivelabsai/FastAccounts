@@ -1753,3 +1753,11 @@ tr.total .numeric{background-image:linear-gradient(var(--line-strong),var(--line
 .toast{background:var(--positive-soft);color:var(--positive);border-radius:var(--radius-md)}
 input,select,textarea{color:var(--text);background:var(--surface);border-color:var(--line-strong);border-radius:var(--radius-sm);font:450 14px var(--font-body)}
 input::placeholder,textarea::placeholder{color:var(--text-muted)}
+
+/* ---------- icons ---------- */
+.cell-check{display:inline-flex;color:var(--positive)}
+.cell-check .icon{width:18px;height:18px}
+.menu-toggle .icon{width:20px;height:20px}
+/* Official third-party logos keep their own colours; give them a light plate in dark mode. */
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) img[src$="merit-aktiva.svg"]{background:#ffffff;border-radius:var(--radius-sm);padding:4px 6px}}
+:root[data-theme="dark"] img[src$="merit-aktiva.svg"]{background:#ffffff;border-radius:var(--radius-sm);padding:4px 6px}

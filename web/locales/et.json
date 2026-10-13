@@ -489,7 +489,7 @@
     "banking_candidate": "Kavandatud",
     "direction": "Andmesuund",
     "ownership": "Andmete omanik",
-    "docs": "Loe teenusepakkuja dokumentatsiooni ↗",
+    "docs": "Loe teenusepakkuja dokumentatsiooni",
     "review_gate": "Vajab ülevaatust: ",
     "review_notice": "Import ja eksport loovad kooskõlastuskirjed. Maksudeklaratsioonide otse esitamine on Kavandatud; praegune käibemaksuvõimalus piirdub tööpaberite ja ekspordiga.",
     "items": {
