@@ -61,8 +61,12 @@ Use this system for the public site (`web/public.py`, `web/design.py`) and the s
 
 ## Iconography
 
-- Line icons at 20px, 1.75px stroke, round caps, drawn in `currentColor` inline in `static/app.js`. Keep new icons on the same grid.
-- Third-party logos in `static/integrations/` stay as their owners publish them; see `static/integrations/NOTICE.md`.
+- One line set of 28 icons (`assets/Icons`): 24px grid, live area 3 to 21px, 1.75px stroke, round caps and joins, no fills. The paths live in `static/app.js` (`ICONS`); `web/design.py` (`fs_icon()`) renders the same paths on the server.
+- Draw icons in `currentColor` so they take the colour of their label: `on-ink` in the sidebar, `text-muted` for neutral marks, `accent-text` for positive brand marks, `positive` for a tick in a table cell. The files in `assets/Icons` are drawn in `ink-950` for preview only.
+- Sizes: 18px in the sidebar, 20px inline, 30px in empty states. Never below 16px.
+- Every sidebar destination has its own drawing (`NAV_ICONS`). Accounting is a balance scale, the brand idea of books that balance.
+- Icons are decorative (`aria-hidden`); the visible label or an `aria-label` carries the meaning. Never use text characters (☰ ✓ ✗ ↗) or emoji as icons.
+- Integration tiles are 64px. Official logos (QuickBooks, Xero, Merit Aktiva) keep their artwork and sit on a white plate in dark mode. FastAccounts-made placeholders use a neutral `surface-sunken` tile with outlined Bricolage initials in `ink-950`, never the brand violet; FastAccounts connectors use an `accent-soft` tile with the matching line icon in `violet-600`. See `static/integrations/NOTICE.md`.
 - No emoji anywhere in the product.
 
 ## Logo

@@ -5,8 +5,10 @@
   fonts, spacing, radii and shadows, with usage notes.
 - [components-reference.css](components-reference.css): exact component values
   for implementation reference. Do not load this file as an application stylesheet.
+- [icons.md](icons.md): the line icon set, its drawing rules and the integration tiles.
 - [static/brand](../../static/brand): primary, dark and single-colour marks,
-  plus ink and white glyphs. `static/favicon.svg` matches the primary mark.
+  plus ink and white glyphs and the Apple touch icon. `static/favicon.svg`
+  matches the primary mark.
 
 Runtime tokens live in `web/design.py` (`DESIGN_CSS`) and `static/app.css`.
 Keep both aligned with `tokens.json`. Public components live in `web/design.py`

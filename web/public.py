@@ -11,7 +11,7 @@ import integrations
 import version
 from . import google_auth, i18n
 from .design import (DESIGN_CSS, FONT_LINKS, FASTPRODUCT, MOBILE_NAV_JS,
-                     accent_style, fs_button, fs_eyebrow, fs_nav, fs_footer)
+                     accent_style, fs_button, fs_eyebrow, fs_icon, fs_nav, fs_footer)
 
 
 PUBLIC_CSS = """
@@ -252,15 +252,21 @@ section[id]{scroll-margin-top:90px}
 .lh-step-number{display:block;font-family:var(--font-display);font-size:52px;line-height:1;color:var(--accent);margin-bottom:24px}
 .lh-steps h3{font-size:22px;line-height:1.2;margin-bottom:14px}
 .lh-steps p{font-size:15px;color:var(--on-ink-muted)}
+/* Official third-party logos keep their own colours; give them a light plate in dark mode. */
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) img[src$="merit-aktiva.svg"]{background:#ffffff;border-radius:var(--radius-sm);padding:4px 6px}}
+:root[data-theme="dark"] img[src$="merit-aktiva.svg"]{background:#ffffff;border-radius:var(--radius-sm);padding:4px 6px}
+.integration .docs{display:inline-flex;align-items:center}
+
 /* ---------- old and new comparison ---------- */
 .lh-comparison{display:grid;grid-template-columns:1fr 1fr;gap:24px}
 .lh-compare-panel{padding:clamp(24px,4vw,40px);border:1px solid var(--line);border-radius:var(--radius-md);background:var(--card)}
 .lh-compare-panel.new{background:var(--paper-2);border-color:var(--line)}
 .lh-compare-panel h3{font-size:26px;margin-bottom:24px}
 .lh-compare-panel ul{list-style:none;padding:0;margin:0}
-.lh-compare-panel li{display:flex;align-items:baseline;gap:14px;padding-block:16px;border-top:1px solid var(--line)}
-.lh-compare-panel li span{color:var(--muted);font-weight:700}
-.lh-compare-panel.new li span{color:var(--accent-strong)}
+.lh-compare-panel li{display:flex;align-items:flex-start;gap:14px;padding-block:16px;border-top:1px solid var(--line)}
+.lh-mark{flex:none;display:grid;place-items:center;width:20px;height:20px;margin-top:2px;color:var(--muted)}
+.lh-mark .fs-icon{width:20px;height:20px}
+.lh-compare-panel.new .lh-mark{color:var(--accent-strong)}
 /* ---------- factual product stats ---------- */
 .lh-facts{background:var(--paper-2);border-block:1px solid var(--line);padding-block:40px}
 .lh-facts dl{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:28px;margin:0}
@@ -424,6 +430,7 @@ def public_page(*content, title: str, current: str, lang: str):
             Meta(name="theme-color", content="#150a2c"),
             Meta(name="description", content=i18n.t("meta.description", lang)),
             Link(rel="icon", type="image/svg+xml", href="/static/favicon.svg"),
+        Link(rel="apple-touch-icon", href="/static/brand/apple-touch-icon.png"),
             *FONT_LINKS,
             Style(DESIGN_CSS + PUBLIC_CSS),
             accent_style(FASTPRODUCT),
@@ -579,9 +586,9 @@ def landing_page(lang: str = i18n.DEFAULT_LANG):
         Section(Div(
             Div(H2(T("landing.comparison_title")), cls="lh-head"),
             Div(*[Article(H3(T(f"landing.{way}_title")),
-                          Ul(*[Li(Span(symbol, aria_hidden="true"), T(f"landing.{way}{n}"))
+                          Ul(*[Li(Span(fs_icon(symbol), cls="lh-mark"), T(f"landing.{way}{n}"))
                                for n in range(1, 5)]), cls=f"lh-compare-panel {way}")
-                  for way, symbol in (("old", "✗"), ("new", "✓"))], cls="lh-comparison"),
+                  for way, symbol in (("old", "close"), ("new", "check"))], cls="lh-comparison"),
             cls="fs-wrap"), id="comparison", cls="lh-sec"),
         Section(Div(Div(
             Div(H2(T("bureau.title")), P(T("bureau.body")),
@@ -636,7 +643,7 @@ def _integration_card(item: integrations.Integration, lang: str):
             Div(Span(T("integrations.ownership")), Strong(copy.get("ownership", item.ownership))),
             cls="ownership",
         ),
-        A(T("integrations.docs"), href=item.docs_url, target="_blank", rel="noopener noreferrer", cls="docs"),
+        A(T("integrations.docs"), fs_icon("external"), href=item.docs_url, target="_blank", rel="noopener noreferrer", cls="docs"),
         id=item.key,
         cls="integration",
     )
@@ -950,6 +957,7 @@ def workspace_page(user: dict, lang: str = "en"):
         Meta(name="viewport", content="width=device-width, initial-scale=1"),
         Meta(name="theme-color", content="#150a2c"),
         Link(rel="icon", type="image/svg+xml", href="/static/favicon.svg"),
+        Link(rel="apple-touch-icon", href="/static/brand/apple-touch-icon.png"),
         *FONT_LINKS,
         Link(rel="stylesheet", href="/static/app.css"),
         Div(
@@ -979,7 +987,7 @@ def workspace_page(user: dict, lang: str = "en"):
             ),
             Div(
                 Header(
-                    Div(Button("☰", id="menu-toggle", aria_label=T("nav.open_navigation"), cls="menu-toggle"), Span(T("nav.workspace"), cls="workspace-label"), Strong(id="current-org")),
+                    Div(Button(fs_icon("menu", "icon"), id="menu-toggle", aria_label=T("nav.open_navigation"), cls="menu-toggle"), Span(T("nav.workspace"), cls="workspace-label"), Strong(id="current-org")),
                     Div(*[A(info["native"], href=f"/set-lang/{code}?next=/app", lang=code, aria_current="true" if code == lang else "false") for code, info in i18n.LANGUAGES.items() if code in ("en", "et")], cls="workspace-languages", aria_label=T("language.choose")),
                     cls="app-topbar",
                 ),

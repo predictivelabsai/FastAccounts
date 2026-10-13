@@ -224,6 +224,8 @@ img{max-width:100%;display:block}
 .fs-nav.on-ink .fs-lang a.active{background:var(--ink-raised);color:var(--on-ink)}
 .fs-menu-toggle{display:none}
 .fs-nav-actions-mobile{display:none}
+.fs-icon{display:inline-block;width:1em;height:1em;flex:none;vertical-align:-.125em}
+a .fs-icon{margin-left:.3em}
 
 /* ---------- footer ---------- */
 .fs-footer{background:var(--ink);color:var(--on-ink)}
@@ -301,6 +303,25 @@ def accent_style(product: Product) -> Style:
         f':root,:root:not([data-theme="light"]),:root[data-theme="dark"]'
         f"{{--accent:{product.accent};--accent-hover:{product.accent_strong};"
         f"--accent-text:{product.accent_strong};--on-accent:#ffffff;}}"
+    )
+
+
+# Server-rendered subset of the FastAccounts line icons (static/app.js ICONS holds the
+# full set): 24px grid, 1.75 stroke, round caps and joins, drawn in currentColor.
+ICON_PATHS = {
+    "check": "M5 12.5l4.5 4.5L19 7.5",
+    "close": "M6 6l12 12 M18 6 6 18",
+    "menu": "M4 7h16 M4 12h16 M4 17h16",
+    "external": "M13.5 4H20v6.5 M20 4l-9 9 M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5",
+}
+
+
+def fs_icon(name: str, cls: str = "fs-icon"):
+    """Decorative inline icon; pair it with visible text or an aria-label on the parent."""
+    return NotStr(
+        f'<svg class="{cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" '
+        f'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">'
+        f'<path d="{ICON_PATHS[name]}"/></svg>'
     )
 
 

@@ -4,6 +4,24 @@ Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as
 delivered.
 
+## 2026-10-13: Brand icon set and integration tiles
+
+- Replaced the ten-icon portal set with one 29-icon line set (24px grid, 1.75
+  stroke, round caps). Every sidebar destination now has its own icon; fifteen
+  previously fell back to the same document icon and payroll reused contacts.
+  The AI copilot gets its own icon, and its conversation is styled as brand
+  message cards.
+- Replaced text glyphs used as icons (☰, ✓, ✗, ↗) with the same line icons on
+  public and portal pages, through `fs_icon()` on the server.
+- Redrew the FastAccounts-made integration tiles: neutral placeholders for
+  third-party providers (no brand violet), an ink tile for FastHR, violet icon
+  tiles for FastAccounts connectors and a dedicated e-invoice tile. Lettering is
+  outlined Bricolage Grotesque. Official QuickBooks, Xero and Merit Aktiva logos
+  are only minified; Merit gets a light plate in dark mode.
+- Added a 180px Apple touch icon and `docs/brand/icons.md`.
+- Validation: `tests/test_icons.py` checks distinct nav icons, one drawing style,
+  matching server and portal paths, no glyph icons and outlined tiles.
+
 ## 2026-10-13: Books that balance brand system
 
 - Applied the canonical brand tokens to the public site and signed-in portal,

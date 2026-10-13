@@ -489,7 +489,7 @@
     "banking_candidate": "Planuojama",
     "direction": "Duomenų kryptis",
     "ownership": "Duomenų nuosavybė",
-    "docs": "Skaityti paslaugų teikėjo dokumentaciją ↗",
+    "docs": "Skaityti paslaugų teikėjo dokumentaciją",
     "review_gate": "Reikia peržiūrėti: ",
     "review_notice": "Importuojant ir eksportuojant sukuriami suderinimo įrašai. Tiesioginis mokesčių teikimas yra Planuojamas; dabartinės PVM galimybės apsiriboja darbo dokumentais ir eksportu.",
     "items": {
