@@ -174,7 +174,7 @@ def test_hero_and_overview_polish_in_browser(theme, tmp_path):
             shell = str(to_xml(workspace_page({"name": "Synthetic user"})))
             # Simulate a navigation group with no visible rows before JS initialisation.
             shell = shell.replace('data-view="accounting"', 'hidden="" data-view="accounting"')
-            for view in ("cash-flow", "fixed-assets", "tax"):
+            for view in ("cash-flow", "fixed-assets", "periods", "tax"):
                 shell = shell.replace(f'data-view="{view}"', f'hidden="" data-view="{view}"')
             page.set_content(shell)
             page.locator(".client-book").first.wait_for()

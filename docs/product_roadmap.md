@@ -1604,8 +1604,8 @@ native-language review, including Estonian estnltk QA, remains pending.
   and resumption, duplicate-lock and wrong-state refusals, the
   close/reopen role matrix, read roles, reason validation, tenant
   isolation, audit events, four-language key parity and an offline browser
-  flow. Full `python -m pytest -q` (Windows, Python 3.14.6): 1386 passed,
-  4 skipped, 5 existing dependency warnings in 3264.38s.
+  flow. Full `python -m pytest -q` (Windows, Python 3.14.6): 1400 passed,
+  4 skipped, 5 existing dependency warnings in 2292.00s.
   JavaScript syntax, whitespace, em-dash and attribution checks passed; the
   Estonian copy passed estnltk spelling and compound checks (`auditilogisse`
   follows the existing et.json usage).
