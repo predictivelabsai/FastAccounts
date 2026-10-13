@@ -4,6 +4,64 @@ Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as
 delivered.
 
+## 2026-10-12: Document appearance settings (parity slate P2 item 4)
+
+- Added rerun-safe migration `0028_document_settings`, one optional row per
+  organisation, database colour/footer constraints and the PostgreSQL adapter.
+  CI and exact upgrade expectations now include 28 migrations.
+- Added audited organisation-locked settings writes, owner/administrator and
+  CSRF routes, member-readable settings/logo access and bounded PNG/JPEG uploads.
+  Evidence checks MIME type, extension, magic bytes, SHA-256 and size. Removal
+  and replacement clean up the attachment row and stored file.
+- Applied accent colour to sales invoice/credit note titles, a proportionate
+  top-right logo and a grey footer on every PDF page. Missing or broken logos
+  are skipped silently. Appearance reads reuse the caller's transaction and
+  unchanged input produces deterministic PDF bytes.
+- Added Settings > Document appearance, nullable accent/footer controls, logo
+  preview/upload/removal, viewer gating and matching English, Estonian,
+  Lithuanian and Latvian copy. Existing catalogue values are preserved.
+- Validation: focused document-settings checks: 42 passed, 1 existing dependency
+  warning in 38.75s; both strengthened accent/footer checks also passed.
+  Existing document/bulk-email regressions: 33 passed, 1 warning in 39.48s.
+  Full `python -m pytest -q` on Windows/Python 3.14.6: 1313 passed,
+  4 skipped, 5 existing dependency warnings in 1131.25s (0:18:51).
+  All eight offline four-language owner/viewer browser flows passed.
+  JavaScript syntax, diff, locale preservation and new-copy checks passed. Synthetic data only; network calls are blocked
+  and browser requests are fulfilled locally. See `docs/specs/document-settings.md`.
+- Open follow-ups: independent native-language copy QA and live PostgreSQL
+  validation. Payroll/statement branding and editable templates remain outside scope.
+
+### Four-language copy QA
+
+All new strings are recorded verbatim below. Matching keys, section order,
+catalogue merges and punctuation are checked automatically. Independent
+native-language review, including Estonian estnltk QA, remains pending.
+
+| Key | English | Estonian | Lithuanian | Latvian |
+| --- | --- | --- | --- | --- |
+| `document_settings.nav.document_settings` | Document appearance | Dokumentide kujundus | Dokumentų išvaizda | Dokumentu izskats |
+| `document_settings.workspace.Document appearance` | Document appearance | Dokumentide kujundus | Dokumentų išvaizda | Dokumentu izskats |
+| `document_settings.workspace.Customise sales invoice and credit note PDFs for this organisation.` | Customise sales invoice and credit note PDFs for this organisation. | Kohanda selle organisatsiooni müügiarvete ja kreeditarvete PDF-failide kujundust. | Pritaikykite šios organizacijos pardavimo sąskaitų ir kreditinių sąskaitų PDF failų išvaizdą. | Pielāgojiet šīs organizācijas pārdošanas rēķinu un kredītrēķinu PDF failu izskatu. |
+| `document_settings.workspace.Appearance settings` | Appearance settings | Kujundusseaded | Išvaizdos nustatymai | Izskata iestatījumi |
+| `document_settings.workspace.Use an accent colour` | Use an accent colour | Kasuta aktsentvärvi | Naudoti akcento spalvą | Izmantot akcenta krāsu |
+| `document_settings.workspace.Accent colour` | Accent colour | Aktsentvärv | Akcento spalva | Akcenta krāsa |
+| `document_settings.workspace.Invoice footer` | Invoice footer | Arve jalus | Sąskaitos poraštė | Rēķina kājene |
+| `document_settings.workspace.Organisation logo` | Organisation logo | Organisatsiooni logo | Organizacijos logotipas | Organizācijas logotips |
+| `document_settings.workspace.No logo uploaded.` | No logo uploaded. | Logo pole üles laaditud. | Logotipas neįkeltas. | Logotips nav augšupielādēts. |
+| `document_settings.workspace.Upload a PNG or JPEG image, up to 512 KB.` | Upload a PNG or JPEG image, up to 512 KB. | Laadi üles PNG- või JPEG-pilt suurusega kuni 512 KB. | Įkelkite PNG arba JPEG paveikslėlį, ne didesnį nei 512 KB. | Augšupielādējiet PNG vai JPEG attēlu, kura izmērs nepārsniedz 512 KB. |
+| `document_settings.workspace.Logo file` | Logo file | Logofail | Logotipo failas | Logotipa fails |
+| `document_settings.workspace.Upload logo` | Upload logo | Laadi logo üles | Įkelti logotipą | Augšupielādēt logotipu |
+| `document_settings.workspace.Remove logo` | Remove logo | Eemalda logo | Pašalinti logotipą | Noņemt logotipu |
+| `document_settings.workspace.Remove the logo from sales invoice and credit note PDFs?` | Remove the logo from sales invoice and credit note PDFs? | Kas eemaldada logo müügiarvete ja kreeditarvete PDF-failidest? | Pašalinti logotipą iš pardavimo sąskaitų ir kreditinių sąskaitų PDF failų? | Vai noņemt logotipu no pārdošanas rēķinu un kredītrēķinu PDF failiem? |
+| `document_settings.workspace.Logo must be no larger than 512 KB.` | Logo must be no larger than 512 KB. | Logo suurus ei tohi ületada 512 KB. | Logotipas negali būti didesnis nei 512 KB. | Logotipa izmērs nedrīkst pārsniegt 512 KB. |
+| `document_settings.workspace.Accent colour must contain six hexadecimal digits after #` | Accent colour must contain six hexadecimal digits after # | Aktsentvärv peab olema kujul #RRGGBB | Akcento spalvą turi sudaryti ženklas # ir šeši šešioliktainiai skaitmenys | Akcenta krāsai jāsastāv no zīmes # un sešiem heksadecimāliem cipariem |
+| `document_settings.workspace.Invoice footer must contain at most 500 characters` | Invoice footer must contain at most 500 characters | Arve jalus võib sisaldada kuni 500 märki | Sąskaitos poraštėje gali būti ne daugiau kaip 500 simbolių | Rēķina kājenē drīkst būt ne vairāk kā 500 rakstzīmes |
+| `document_settings.workspace.Logo must be a PNG or JPEG image` | Logo must be a PNG or JPEG image | Logo peab olema PNG- või JPEG-pilt | Logotipas turi būti PNG arba JPEG paveikslėlis | Logotipam jābūt PNG vai JPEG attēlam |
+| `document_settings.workspace.Logo must contain at most 512 KB` | Logo must contain at most 512 KB | Logo suurus võib olla kuni 512 KB | Logotipo dydis negali viršyti 512 KB | Logotipa izmērs nedrīkst pārsniegt 512 KB |
+| `document_settings.workspace.Logo content and filename must match its image type` | Logo content and filename must match its image type | Logo sisu ja failinimi peavad vastama pildi tüübile | Logotipo turinys ir failo pavadinimas turi atitikti paveikslėlio tipą | Logotipa saturam un faila nosaukumam jāatbilst attēla tipam |
+| `document_settings.workspace.Logo not found` | Logo not found | Logo ei leitud | Logotipas nerastas | Logotips nav atrasts |
+| `document_settings.workspace.Logo file not found` | Logo file not found | Logofaili ei leitud | Logotipo failas nerastas | Logotipa fails nav atrasts |
+
 ## 2026-10-12: TOTP two-factor authentication (authentication slate P2 item 3)
 
 - Added the standard-library RFC 6238 engine, migration `0027_mfa`, guarded

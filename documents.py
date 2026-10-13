@@ -211,17 +211,19 @@ class DocumentService:
         row["lines"] = ObjectRepository(tx, organisation_id).document_lines('invoice', invoice_id)
         return row
 
-    def invoice(self, invoice_id: str, organisation_id: str | None = None) -> dict:
+    def invoice(self, invoice_id: str, organisation_id: str | None = None, tx=None) -> dict:
+        if tx is None:
+            with self.db.transaction() as owned_tx:
+                return self.invoice(invoice_id, organisation_id, tx=owned_tx)
         params = (invoice_id, organisation_id) if organisation_id else (invoice_id,)
         condition = "i.id=? AND i.organisation_id=?" if organisation_id else "i.id=?"
-        row = self.db.one(
+        row = tx.one(
             "SELECT i.*,c.name contact_name,c.email contact_email,c.address contact_address,c.vat_no contact_vat_no "
             "FROM invoices i JOIN contacts c ON c.id=i.contact_id AND c.organisation_id=i.organisation_id WHERE " + condition, params,
         )
         if not row:
             raise KeyError("Invoice not found")
-        with self.db.transaction() as tx:
-            row["lines"] = ObjectRepository(tx, row['organisation_id']).document_lines('invoice', invoice_id)
+        row["lines"] = ObjectRepository(tx, row['organisation_id']).document_lines('invoice', invoice_id)
         return row
 
     def _next_number(self, tx, organisation_id: str, document_type: str) -> str:
@@ -716,10 +718,11 @@ class DocumentService:
 
     @staticmethod
     def _evidence_owner(tx, organisation_id, owner_type, owner_id):
-        tables = {"invoice": "invoices", "bill": "bills", "journal": "posting_batches"}
+        tables = {"invoice": "invoices", "bill": "bills", "journal": "posting_batches", "organisation": "organisations"}
         if owner_type not in tables:
-            raise ValueError("Evidence owner must be invoice, bill or journal")
-        query = f"SELECT id FROM {tables[owner_type]} WHERE organisation_id=? AND id=?"
+            raise ValueError("Evidence owner must be invoice, bill, journal or organisation")
+        query = ("SELECT id FROM organisations WHERE id=? AND id=?" if owner_type == "organisation" else
+                 f"SELECT id FROM {tables[owner_type]} WHERE organisation_id=? AND id=?")
         if owner_type == "journal":
             query += " AND voucher_type='manual_journal'"
         if not tx.one(query, (organisation_id, owner_id)):
@@ -748,18 +751,56 @@ class DocumentService:
             raise ValueError("Attachment integrity check failed")
         return attachment, content
 
-    def invoice_pdf(self, invoice_id: str) -> bytes:
+    def invoice_pdf(self, invoice_id: str, tx=None) -> bytes:
+        from reportlab.lib.colors import Color, HexColor
         from reportlab.lib.pagesizes import A4
+        from reportlab.lib.utils import ImageReader, simpleSplit
         from reportlab.pdfgen.canvas import Canvas
+        from document_settings import DocumentSettingsService
+        from organisations import OrganisationService
 
-        invoice = self.invoice(invoice_id)
-        organisation = self.db.one("SELECT * FROM organisations WHERE id=?", (invoice["organisation_id"],)) or {}
+        if tx is None:
+            with self.db.transaction() as owned_tx:
+                return self.invoice_pdf(invoice_id, tx=owned_tx)
+        invoice = self.invoice(invoice_id, tx=tx)
+        oid = invoice['organisation_id']
+        organisation = tx.one("SELECT * FROM organisations WHERE id=?", (oid,)) or {}
+        settings = OrganisationService(self.db).document_settings(oid, tx=tx)
         output = BytesIO()
-        canvas = Canvas(output, pagesize=A4)
+        canvas = Canvas(output, pagesize=A4, invariant=1)
         width, height = A4
+
+        def footer():
+            if not settings['footer_text']:
+                return
+            canvas.saveState()
+            canvas.setFont('Helvetica', 7.5)
+            canvas.setFillColor(Color(0.45, 0.45, 0.45))
+            lines = simpleSplit(' '.join(settings['footer_text'].split()), 'Helvetica', 7.5, width - 84)
+            for index, line in enumerate(lines):
+                canvas.drawString(42, 40 + (len(lines) - index - 1) * 9, line)
+            canvas.restoreState()
+
         canvas.setTitle(invoice.get("number") or "Draft invoice")
         canvas.setFont("Helvetica-Bold", 20)
+        if settings['accent_colour']:
+            canvas.saveState()
+            canvas.setFillColor(HexColor(settings['accent_colour']))
         canvas.drawString(42, height - 55, "CREDIT NOTE" if invoice["document_type"] == "credit_note" else "INVOICE")
+        if settings['accent_colour']:
+            canvas.restoreState()
+        if settings['logo_attachment_id']:
+            try:
+                attachment, content = DocumentSettingsService(self.db).logo(oid, tx=tx)
+                if attachment['content_type'] in {'image/png', 'image/jpeg'}:
+                    image = ImageReader(BytesIO(content))
+                    image_width, image_height = image.getSize()
+                    scale = min(140 / image_width, 40 / image_height)
+                    logo_width, logo_height = image_width * scale, image_height * scale
+                    canvas.drawImage(image, width - 42 - logo_width, height - 49,
+                                     width=logo_width, height=logo_height, mask='auto')
+            except Exception:
+                pass
         canvas.setFont("Helvetica-Bold", 12)
         canvas.drawString(42, height - 82, organisation.get("name", ""))
         canvas.setFont("Helvetica", 10)
@@ -787,6 +828,7 @@ class DocumentService:
         for line in invoice["lines"]:
             y -= 20
             if y < 85:
+                footer()
                 canvas.showPage(); y = height - 55
             canvas.drawString(42, y, str(line["description"])[:60])
             canvas.drawRightString(width - 220, y, str(line["quantity"]))
@@ -796,6 +838,7 @@ class DocumentService:
         y -= 35
         canvas.setFont("Helvetica-Bold", 11)
         canvas.drawRightString(width - 42, y, f"Total {invoice['currency']} {money(invoice['total']):.2f}")
+        footer()
         canvas.save()
         return output.getvalue()
 
@@ -881,7 +924,7 @@ class DocumentService:
                 if not token or not from_email:
                     raise RuntimeError('Email delivery is not connected')
                 organisation = tx.one('SELECT * FROM organisations WHERE id=?', (oid,)) or {}
-                pdf = self.invoice_pdf(invoice_id)
+                pdf = self.invoice_pdf(invoice_id, tx=tx)
                 attachment = tx.one(
                     "SELECT * FROM attachments WHERE organisation_id=? AND owner_type='invoice' AND owner_id=? AND sha256=?",
                     (oid, invoice_id, sha256_bytes(pdf)))

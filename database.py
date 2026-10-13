@@ -216,6 +216,10 @@ class Database:
                     script = _POSTGRES_PAYROLL_0006
                 elif path.stem == "0023_analytical_objects":
                     script = script.split('-- SQLITE_ANALYTICAL_IMMUTABILITY', 1)[0] + _postgres_object_triggers()
+                elif path.stem == "0028_document_settings":
+                    script = script.replace(
+                        "accent_colour GLOB '#[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]'",
+                        "accent_colour ~ '^#[0-9a-fA-F]{6}$'")
                 connection.execute(script)
                 connection.execute(
                     "INSERT INTO schema_migrations(version) VALUES (%s)",

@@ -168,11 +168,16 @@ class OrganisationService:
                     (new_id(), organisation_id, starts.strftime("%Y-%m"), starts.isoformat(), ends.isoformat()),
                 )
 
-    def get(self, organisation_id: str) -> dict:
-        row = self.db.one("SELECT * FROM organisations WHERE id=?", (organisation_id,))
+    def get(self, organisation_id: str, tx=None) -> dict:
+        row = (tx or self.db).one("SELECT * FROM organisations WHERE id=?", (organisation_id,))
         if not row:
             raise KeyError("Organisation not found")
         return row
+
+    def document_settings(self, organisation_id: str, tx=None) -> dict:
+        from document_settings import DocumentSettingsService
+
+        return DocumentSettingsService(self.db).get(organisation_id, tx=tx)
 
     def for_user(self, email: str) -> list[dict]:
         return self.db.rows(

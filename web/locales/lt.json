@@ -1758,5 +1758,34 @@
       "Revaluation date must use YYYY-MM-DD": "Pervertinimo data turi būti YYYY-MM-DD formato",
       "A revaluation already exists for this date": "Šios datos pervertinimas jau yra"
     }
+  },
+  "document_settings": {
+    "nav": {
+      "document_settings": "Dokumentų išvaizda"
+    },
+    "views": {},
+    "workspace": {
+      "Document appearance": "Dokumentų išvaizda",
+      "Customise sales invoice and credit note PDFs for this organisation.": "Pritaikykite šios organizacijos pardavimo sąskaitų ir kreditinių sąskaitų PDF failų išvaizdą.",
+      "Appearance settings": "Išvaizdos nustatymai",
+      "Use an accent colour": "Naudoti akcento spalvą",
+      "Accent colour": "Akcento spalva",
+      "Invoice footer": "Sąskaitos poraštė",
+      "Organisation logo": "Organizacijos logotipas",
+      "No logo uploaded.": "Logotipas neįkeltas.",
+      "Upload a PNG or JPEG image, up to 512 KB.": "Įkelkite PNG arba JPEG paveikslėlį, ne didesnį nei 512 KB.",
+      "Logo file": "Logotipo failas",
+      "Upload logo": "Įkelti logotipą",
+      "Remove logo": "Pašalinti logotipą",
+      "Remove the logo from sales invoice and credit note PDFs?": "Pašalinti logotipą iš pardavimo sąskaitų ir kreditinių sąskaitų PDF failų?",
+      "Logo must be no larger than 512 KB.": "Logotipas negali būti didesnis nei 512 KB.",
+      "Accent colour must contain six hexadecimal digits after #": "Akcento spalvą turi sudaryti ženklas # ir šeši šešioliktainiai skaitmenys",
+      "Invoice footer must contain at most 500 characters": "Sąskaitos poraštėje gali būti ne daugiau kaip 500 simbolių",
+      "Logo must be a PNG or JPEG image": "Logotipas turi būti PNG arba JPEG paveikslėlis",
+      "Logo must contain at most 512 KB": "Logotipo dydis negali viršyti 512 KB",
+      "Logo content and filename must match its image type": "Logotipo turinys ir failo pavadinimas turi atitikti paveikslėlio tipą",
+      "Logo not found": "Logotipas nerastas",
+      "Logo file not found": "Logotipo failas nerastas"
+    }
   }
 }

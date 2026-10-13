@@ -1758,5 +1758,34 @@
       "Revaluation date must use YYYY-MM-DD": "Ümberhindluse kuupäev peab olema kujul AAAA-KK-PP",
       "A revaluation already exists for this date": "Selle kuupäeva ümberhindlus on juba olemas"
     }
+  },
+  "document_settings": {
+    "nav": {
+      "document_settings": "Dokumentide kujundus"
+    },
+    "views": {},
+    "workspace": {
+      "Document appearance": "Dokumentide kujundus",
+      "Customise sales invoice and credit note PDFs for this organisation.": "Kohanda selle organisatsiooni müügiarvete ja kreeditarvete PDF-failide kujundust.",
+      "Appearance settings": "Kujundusseaded",
+      "Use an accent colour": "Kasuta aktsentvärvi",
+      "Accent colour": "Aktsentvärv",
+      "Invoice footer": "Arve jalus",
+      "Organisation logo": "Organisatsiooni logo",
+      "No logo uploaded.": "Logo pole üles laaditud.",
+      "Upload a PNG or JPEG image, up to 512 KB.": "Laadi üles PNG- või JPEG-pilt suurusega kuni 512 KB.",
+      "Logo file": "Logofail",
+      "Upload logo": "Laadi logo üles",
+      "Remove logo": "Eemalda logo",
+      "Remove the logo from sales invoice and credit note PDFs?": "Kas eemaldada logo müügiarvete ja kreeditarvete PDF-failidest?",
+      "Logo must be no larger than 512 KB.": "Logo suurus ei tohi ületada 512 KB.",
+      "Accent colour must contain six hexadecimal digits after #": "Aktsentvärv peab olema kujul #RRGGBB",
+      "Invoice footer must contain at most 500 characters": "Arve jalus võib sisaldada kuni 500 märki",
+      "Logo must be a PNG or JPEG image": "Logo peab olema PNG- või JPEG-pilt",
+      "Logo must contain at most 512 KB": "Logo suurus võib olla kuni 512 KB",
+      "Logo content and filename must match its image type": "Logo sisu ja failinimi peavad vastama pildi tüübile",
+      "Logo not found": "Logo ei leitud",
+      "Logo file not found": "Logofaili ei leitud"
+    }
   }
 }

@@ -1866,5 +1866,34 @@
       "Revaluation date must use YYYY-MM-DD": "Revaluation date must use YYYY-MM-DD",
       "A revaluation already exists for this date": "A revaluation already exists for this date"
     }
+  },
+  "document_settings": {
+    "nav": {
+      "document_settings": "Document appearance"
+    },
+    "views": {},
+    "workspace": {
+      "Document appearance": "Document appearance",
+      "Customise sales invoice and credit note PDFs for this organisation.": "Customise sales invoice and credit note PDFs for this organisation.",
+      "Appearance settings": "Appearance settings",
+      "Use an accent colour": "Use an accent colour",
+      "Accent colour": "Accent colour",
+      "Invoice footer": "Invoice footer",
+      "Organisation logo": "Organisation logo",
+      "No logo uploaded.": "No logo uploaded.",
+      "Upload a PNG or JPEG image, up to 512 KB.": "Upload a PNG or JPEG image, up to 512 KB.",
+      "Logo file": "Logo file",
+      "Upload logo": "Upload logo",
+      "Remove logo": "Remove logo",
+      "Remove the logo from sales invoice and credit note PDFs?": "Remove the logo from sales invoice and credit note PDFs?",
+      "Logo must be no larger than 512 KB.": "Logo must be no larger than 512 KB.",
+      "Accent colour must contain six hexadecimal digits after #": "Accent colour must contain six hexadecimal digits after #",
+      "Invoice footer must contain at most 500 characters": "Invoice footer must contain at most 500 characters",
+      "Logo must be a PNG or JPEG image": "Logo must be a PNG or JPEG image",
+      "Logo must contain at most 512 KB": "Logo must contain at most 512 KB",
+      "Logo content and filename must match its image type": "Logo content and filename must match its image type",
+      "Logo not found": "Logo not found",
+      "Logo file not found": "Logo file not found"
+    }
   }
 }
