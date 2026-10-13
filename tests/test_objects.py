@@ -229,7 +229,7 @@ def test_migration_upgrade_rerun_and_data_preservation(tmp_path, monkeypatch):
     tables = ['organisations', 'accounts', 'invoices', 'invoice_lines', 'posting_batches', 'gl_entries', 'audit_events']
     before = {t: db.rows(f'SELECT * FROM {t} ORDER BY id') for t in tables}
     monkeypatch.setattr(database, 'MIGRATIONS', original)
-    assert db.migrate() == ['0023_analytical_objects', '0024_reminder_rules', '0025_fx_realised'] and db.migrate() == []
+    assert db.migrate() == ['0023_analytical_objects', '0024_reminder_rules', '0025_fx_realised', '0026_fx_revaluations'] and db.migrate() == []
     with db.transaction() as tx:
         tx.connection.executescript((original / 'sqlite' / '0023_analytical_objects.sql').read_text(encoding='utf-8'))
     assert before == {t: db.rows(f'SELECT * FROM {t} ORDER BY id') for t in tables}

@@ -804,7 +804,12 @@
       });
     },
     "exchange-rates": async (c) => {
-      const rows = await api(c.url('/exchange-rates'));
+      const [rows, runs] = await Promise.all([api(c.url('/exchange-rates')), api(c.url('/fx-revaluations'))]);
+      const resultTable = (run) => table(['Document', 'Currency', 'Open portion', 'Booked base', 'Target base', 'Delta'],
+        (run?.documents || []).map((x) => row([td(esc(x.document)), td(esc(x.currency)), td(esc(x.portion)),
+          td(esc(x.booked_base)), td(esc(x.target)), td(esc(x.delta))])));
+      const historyTable = (history) => table(['Date', 'Status', 'Posting batch'], history.map((x) => row([
+        td(esc(x.revaluation_date)), td(tr(x.status)), td(esc(x.posting_batch_id || t('No posting')))])));
       if (!c.mount(page(t('Exchange rates'), t('Rates are units of the to currency per one unit of the from currency.'), '',
         table(['Date', 'From currency', 'To currency', 'Exchange rate', 'Source', 'Actions'], rows.map((x) => row([
           td(esc(x.rate_date)), td(esc(x.from_currency)), td(esc(x.to_currency)), td(esc(x.rate)), td(esc(x.source)),
@@ -812,13 +817,23 @@
         form(field('Date', 'rate_date', today(), 'date', 'required') +
           field('From currency', 'from_currency', '', 'text', 'pattern="[A-Z]{3}" maxlength="3" required') +
           field('To currency', 'to_currency', org.base_currency, 'text', 'pattern="[A-Z]{3}" maxlength="3" required') +
-          field('Exchange rate', 'rate', '', 'text', 'inputmode="decimal" required'), 'Add rate')))) return;
-      content.querySelector('[data-action=cancel]').remove();
+          field('Exchange rate', 'rate', '', 'text', 'inputmode="decimal" required'), 'Add rate') +
+        `<section data-fx-revaluation><h2>${tr('Revalue balances')}</h2><p>${tr('Revalue current open foreign balances at the selected date rate.')}</p>` +
+        form(field('Revaluation date', 'revaluation_date', today(), 'date', 'required'), 'Run revaluation') +
+        `<div data-fx-result>${resultTable(runs[0])}</div><h3>${tr('Revaluation history')}</h3>` +
+        `<div data-fx-history>${historyTable(runs)}</div></section>`))) return;
+      content.querySelectorAll('[data-action=cancel]').forEach((x) => x.remove());
       if (!canEditMappings()) content.querySelectorAll('input, button[type=submit]').forEach((x) => { x.disabled = true; });
       bindForm(content, async (data) => {
         await post(c.url('/exchange-rates'), data);
         toast(t('Saved successfully'));
         await render();
+      });
+      const revaluation = content.querySelector('[data-fx-revaluation]');
+      bindForm(revaluation, async (data) => {
+        const result = await post(c.url('/fx-revaluations'), data);
+        revaluation.querySelector('[data-fx-result]').innerHTML = resultTable(result);
+        revaluation.querySelector('[data-fx-history]').innerHTML = historyTable(await api(c.url('/fx-revaluations')));
       });
       bindActions(content, {deleteRate: async (b) => {
         await post(c.url(`/exchange-rates/${b.dataset.id}`), {}, 'DELETE');

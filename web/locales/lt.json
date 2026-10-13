@@ -1719,7 +1719,21 @@
       "From and to currencies must differ": "Pradinė ir tikslinė valiutos turi skirtis",
       "Rate must fit NUMERIC(20,10)": "Kursas turi tilpti į NUMERIC(20,10)",
       "A manual exchange rate already exists for this date and currency pair": "Šios datos ir valiutų poros rankinis kursas jau yra",
-      "Exchange rate not found": "Valiutos kursas nerastas"
+      "Exchange rate not found": "Valiutos kursas nerastas",
+      "Document": "Dokumentas",
+      "Revalue balances": "Pervertinti likučius",
+      "Revalue current open foreign balances at the selected date rate.": "Pervertinkite esamus neapmokėtus likučius užsienio valiuta pagal pasirinktos datos kursą.",
+      "Revaluation date": "Pervertinimo data",
+      "Run revaluation": "Vykdyti pervertinimą",
+      "Open portion": "Neapmokėta dalis",
+      "Booked base": "Apskaityta bazine valiuta",
+      "Target base": "Tikslinė suma bazine valiuta",
+      "Delta": "Skirtumas",
+      "Revaluation history": "Pervertinimų istorija",
+      "Posting batch": "Įrašų paketas",
+      "No posting": "Įrašas nesukurtas",
+      "Revaluation date must use YYYY-MM-DD": "Pervertinimo data turi būti YYYY-MM-DD formato",
+      "A revaluation already exists for this date": "Šios datos pervertinimas jau yra"
     }
   }
 }

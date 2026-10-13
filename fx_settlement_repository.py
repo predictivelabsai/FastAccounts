@@ -11,6 +11,20 @@ def original_control(tx, organisation_id, batch_id, account_id):
             if rows else None)
 
 
+def revaluation_control(tx, organisation_id, document, account_id, *, prepayment=False):
+    """Signed additions to the original debit/credit baseline, never relief."""
+    kind = 'prepayment' if prepayment else document['document_type']
+    rows = tx.rows(
+        'SELECT g.debit,g.credit FROM gl_entries g JOIN posting_batches b '
+        'ON b.organisation_id=g.organisation_id AND b.id=g.posting_batch_id '
+        'WHERE g.organisation_id=? AND g.account_id=? AND g.source_line_type=? '
+        "AND g.source_line_id=? AND b.voucher_type='fx_revaluation'",
+        (organisation_id, account_id, kind, document['id']))
+    original_is_debit = document.get('side') == 'supplier' if prepayment else kind == 'invoice'
+    return (sum(((decimal(r['debit']) - decimal(r['credit'])) * (1 if original_is_debit else -1)
+                 for r in rows), Decimal('0')) if rows else None)
+
+
 def settled_control(tx, organisation_id, document, account_id, *, prepayment=False):
     """Return consumed currency units and the actual base relief of prior events."""
     paid, relieved = Decimal('0'), Decimal('0')

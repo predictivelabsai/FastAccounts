@@ -8,6 +8,7 @@ from ledger import LedgerService, PostingLine
 from prepayment_repository import PrepaymentRepository
 from exchange_rates import booking_rate
 from fx_settlement import effective_rate, booked_portion, add_fx_line, control_line
+from fx_settlement_repository import revaluation_control
 
 
 class PrepaymentService:
@@ -177,7 +178,9 @@ class PrepaymentService:
             doc_base = booked_portion(tx, organisation_id, document, trade, value, base)
             final_rounding = ((value == money(prepayment['unallocated_balance']) and pre_base != money(value * pre_rate))
                               or (paid + value == money(document['total']) and doc_base != money(value * doc_rate)))
-            if pre_rate != doc_rate or final_rounding:
+            revalued = (revaluation_control(tx, organisation_id, prepayment, control, prepayment=True) is not None
+                        or revaluation_control(tx, organisation_id, document, trade) is not None)
+            if pre_rate != doc_rate or final_rounding or revalued:
                 debit_value, credit_value = (pre_base, doc_base) if customer else (doc_base, pre_base)
                 posting_currency = base
             lines = [control_line(debit, debit_value, debit=True, contact_id=prepayment['contact_id'], memo=memo,
@@ -230,9 +233,10 @@ class PrepaymentService:
             pre_base = booked_portion(tx, organisation_id, prepayment, control, value, base,
                 total_key='amount', paid=money(prepayment['amount']) - money(prepayment['unallocated_balance']))
             final_rounding = value == money(prepayment['unallocated_balance']) and pre_base != money(value * paid_rate)
+            revalued = revaluation_control(tx, organisation_id, prepayment, control, prepayment=True) is not None
             for row in entries:
                 portion = value
-                if booked_rate != paid_rate or final_rounding:
+                if booked_rate != paid_rate or final_rounding or revalued:
                     posting_currency = base
                     portion = pre_base if row['account_id'] == control else money(value * paid_rate)
                 lines.append(control_line(row['account_id'], portion, debit=bool(money(row['credit'])), contact_id=prepayment['contact_id'],

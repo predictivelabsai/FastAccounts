@@ -1402,7 +1402,7 @@ pending.
   Append fx_rates in all four locale catalogues.
 - [x] Realised FX, dedicated gain/loss account, prepayment and periodisation FX
   integration are implemented in P2 item 2 below. Periodic revaluation of open
-  balances and automated feeds remain deferred. Accountant UAT remains open.
+  balances is covered in P2 item 3 below. Automated feeds and accountant UAT remain open.
   See docs/specs/fx-rates.md.
 - Validation: Python 3.14.6, full `python -m pytest -q`: `1099 passed,
   4 skipped, 5 warnings in 824.88s (0:13:44)`. All 57 new FX checks passed,
@@ -1436,5 +1436,35 @@ pending.
   realised-FX checks passed. The skips are existing PostgreSQL opt-ins; warnings
   are existing dependency deprecations. Tests used synthetic data and no live
   providers. Diff checks passed.
-- [ ] Next: periodic revaluation of open balances. Automated feeds, production
-  accountant UAT and live PostgreSQL validation remain deferred.
+- Periodic revaluation of open balances is covered in P2 item 3 below. Automated
+  feeds, production accountant UAT and live PostgreSQL validation remain deferred.
+
+### Open-balance FX revaluation: P2 item 3 (2026-10-12)
+
+- [x] Add rerun-safe migration `0026_fx_revaluations` with tenant-scoped run identity,
+  one run per organisation/date and an optional immutable posting batch. CI and
+  upgrade expectations include 26 migrations. Per-document results are retained
+  in the `fx_revaluation.posted` audit rather than a companion table.
+- Include open foreign AR/AP documents and both customer/supplier prepayments.
+  Compute current original plus attributable revaluation base less tracked
+  relief; target remaining currency units at the selected date's exact-direction
+  rate, with fallback 1. Post deltas in one balanced base-currency batch with one
+  aggregate FX line when its net amount is non-zero. Zero deltas post no rows.
+- Later-date runs converge from current state; same-date repeats are refused,
+  including Empty runs. Subsequent payments, prepayment offsets and refunds use
+  the remaining revalued baseline and clear final cents exactly. Source links,
+  original postings, transaction-currency totals and tenant boundaries are retained.
+- Add viewer-readable history, owner/administrator plus CSRF POST and strict date
+  input. Exchange rates settings adds a compact run form, result table and history,
+  with disabled viewer controls. Copy is added within the existing fx_rates tails
+  in all four locales. See `docs/specs/fx-rates.md` for scope and accounting rules.
+- Validation: Windows, Python 3.14.6, full `python -m pytest -q`:
+  `1219 passed, 4 skipped, 5 warnings in 1233.70s (0:20:33)`. All 51 new
+  revaluation checks passed, including offline owner/viewer browser flows in all
+  four locales. The skips are existing PostgreSQL opt-ins; warnings are existing
+  dependency deprecations. Synthetic data only, no live provider calls. Diff and
+  locale preservation checks passed; Estonian additions are listed for copy QA
+  in `docs/specs/fx-rates.md`.
+- Automated rate feeds/schedules, bank cash revaluation, historical as-of
+  reconstruction, accountant UAT and live PostgreSQL validation remain outside
+  this delivery. No prepayment scope deferral.

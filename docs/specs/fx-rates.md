@@ -1,4 +1,4 @@
-# FX booking and realised settlement: P2 items 1 and 2
+# FX booking, realised settlement and open-balance revaluation: P2 items 1 to 3
 
 Implemented on 2026-10-12. FastAccounts maintains manual exchange rates and
 converts document and payment bookings into the organisation's base currency.
@@ -162,7 +162,130 @@ checks cover gain/loss signs, mixed allocations, exact control clearing,
 equal-rate posting equality, atomic rollback, prepayment cross-currency offsets,
 refund reversal links, period transit clearing and idempotent role seeding.
 
-## Deferred: next P2 item
+## Periodic revaluation (2026-10-12)
 
-Periodic revaluation of open balances and automated rate feeds remain deferred.
+Goal: revalue current open foreign-currency control balances atomically with a
+manual run in Exchange rates settings. This is a current-state run using the
+selected date's rate, not an as-of reconstruction of document/payment history.
+The posting date must be in an unlocked configured fiscal period, including for
+an empty run. Documents and settled portions remain in their transaction currency.
+
+Scope includes issued/part-paid customer invoices (AR), approved/part-paid
+supplier bills (AP), customer prepayments and supplier prepayments. Credit
+documents, drafts, fully settled balances and base-currency balances are excluded.
+Only a non-zero unrelieved attributable base balance participates. A document
+with no original or revaluation control entries has no booked base to revalue;
+the run does not invent a baseline from its stored rate.
+
+For each document, sum its original control batch and all document-linked
+`fx_revaluation` control entries with the original control's debit/credit sign.
+Subtract actual relief from `settled_control`, including legacy NULL allocation
+portions and prepayment allocations/refunds. Paid units represented without
+tracked ledger relief affect the remaining currency portion but do not fabricate
+base relief in a revaluation or in settlements after that revaluation.
+Unrelieved currency units are `total - paid_total`, or `unallocated_balance` for
+prepayments. Resolve the latest exact-direction currency-to-base rate on/before
+the revaluation date through `booking_rate`, with fallback 1. The document's
+stored rate is never used as the revaluation rate. Compute:
+
+```
+target = money(unrelieved_currency * effective_rate)
+delta  = current_attributable_base - target
+```
+
+A debit control receives `-delta` and a credit control receives `delta` in signed
+debit-minus-credit terms. Zero deltas produce no ledger entries. All non-zero
+document control lines share one balanced base-currency batch, with one aggregate
+`FX_GAIN_LOSS` line for the net difference. When the signed differences cancel,
+the aggregate FX amount is zero and no zero-value FX line is emitted. An active
+FX role is still required for a run with non-zero document deltas. All arithmetic
+uses Decimal and `money()` with ROUND_HALF_UP. No posted lines are changed.
+
+Each control line retains `source_line_type` (`invoice`, `bill` or `prepayment`),
+`source_line_id`, contact and document due date where available. Its batch uses
+`voucher_type='fx_revaluation'` and the run ID as voucher ID. Baseline queries add
+only these attributable entries, keeping allocation and refund relief separate.
+After a revaluation, `booked_portion` apportions the remaining attributable base
+over the remaining currency units. The final settlement takes the exact remaining
+base, absorbing cents. Payment, allocation and refund paths use these base amounts
+even when their current rate equals the document's original rate. Prepayment
+inclusion is implemented without a disclosed scope deferral.
+
+Repeatability: migration 0026 gives each organisation/date a unique run. A second
+run on the same date raises `A revaluation already exists for this date`, including
+after an Empty run. Later-date runs recompute deltas from the current baseline;
+they do not amortise an earlier adjustment. The organisation lock serialises run
+identity and prepayment balance changes. Different organisations remain isolated.
+
+`fx_revaluations` retains run ID, organisation, revaluation/posting date, optional
+batch ID, Posted/Empty status, actor and creation timestamp. No per-line companion
+table is needed: the immutable `fx_revaluation.posted` audit retains the complete
+per-document result, resolved rate, portion, booked base, target, delta, base
+currency and totals. Totals include the signed FX amount (debit positive, credit
+negative). History reconstructs these results from the tenant-scoped audit.
+Migration 0026 and its composite tenant indexes are directly rerun-safe.
+Validation, ledger posting, run identity and audit are one transaction. Missing
+roles, inactive accounts, locked periods or posting failures roll everything back.
+
+GET `/organisations/{organisation_id}/fx-revaluations` is member-readable,
+including viewers. POST requires owner/administrator plus CSRF and strictly
+validated YYYY-MM-DD input with no extra fields. Settings adds a date/run form,
+the result table and history list alongside manual rates. `canEditMappings()`
+disables both date and run controls for other members. New copy is appended within
+the existing trailing `fx_rates` section in en/et/lt/lv.
+
+Implementation files: `fx_revaluation.py`, `fx_revaluation_repository.py`,
+`fx_settlement.py`, `fx_settlement_repository.py`, `documents.py`, `prepayments.py`,
+`api_app.py`, `static/app.js`, `migrations/sqlite/0026_fx_revaluations.sql`, CI,
+four locale tails, `tests/test_fx_revaluation.py` and existing migration/browser
+expectations. Acceptance covers both trade sides and gain/loss directions,
+partial/fully paid and base-currency exclusions, exact later clearing, repeat
+convergence, empty runs, rollback, prepayment offsets/refunds, tenant constraints,
+roles, CSRF and offline owner/viewer browser flows in all locales. The roadmap
+and change log record the final full-suite result after verification.
+
+Complete changed-file inventory (33 files):
+
+- Services and persistence: `fx_revaluation.py`, `fx_revaluation_repository.py`,
+  `fx_settlement.py`, `fx_settlement_repository.py`, `documents.py`, `prepayments.py`.
+- API and UI: `api_app.py`, `static/app.js`.
+- Migration and CI: `migrations/sqlite/0026_fx_revaluations.sql`,
+  `.github/workflows/ci.yml`.
+- Locales: `web/locales/en.json`, `web/locales/et.json`, `web/locales/lt.json`,
+  `web/locales/lv.json`.
+- Tests: `tests/test_fx_revaluation.py`, `tests/test_fx_rates.py`,
+  `tests/test_fx_realised.py`, `tests/test_automation.py`, `tests/test_cash_flow.py`,
+  `tests/test_master_data_import.py`, `tests/test_migrations_and_tenancy.py`,
+  `tests/test_objects.py`, `tests/test_payment_links.py`, `tests/test_payroll.py`,
+  `tests/test_payroll_part_time_hourly.py`, `tests/test_periodisation.py`,
+  `tests/test_postgres_optional.py`, `tests/test_prepayments.py`,
+  `tests/test_public.py`, `tests/test_quotes.py`.
+- Documentation: `docs/specs/fx-rates.md`, `docs/change_log.md`,
+  `docs/product_roadmap.md`.
+
+Estonian additions for copy QA (14 strings, within `fx_rates.workspace`):
+
+| English key | Estonian addition |
+| --- | --- |
+| Document | Dokument |
+| Revalue balances | Hinda saldod ümber |
+| Revalue current open foreign balances at the selected date rate. | Hinda avatud saldod välisvaluutas ümber valitud kuupäeva kursiga. |
+| Revaluation date | Ümberhindluse kuupäev |
+| Run revaluation | Käivita ümberhindlus |
+| Open portion | Avatud osa |
+| Booked base | Arvestatud summa baasvaluutas |
+| Target base | Sihtsumma baasvaluutas |
+| Delta | Vahe |
+| Revaluation history | Ümberhindluste ajalugu |
+| Posting batch | Kandepakett |
+| No posting | Kannet ei tehtud |
+| Revaluation date must use YYYY-MM-DD | Ümberhindluse kuupäev peab olema kujul AAAA-KK-PP |
+| A revaluation already exists for this date | Selle kuupäeva ümberhindlus on juba olemas |
+
+Out of scope: automated schedules and rate feeds, foreign bank-account cash
+revaluation, historical as-of reconstruction and automatic reversals.
+
+## Deferred
+
+Automated rate feeds and scheduling remain deferred.
 Production accountant UAT and live PostgreSQL validation remain pending.
