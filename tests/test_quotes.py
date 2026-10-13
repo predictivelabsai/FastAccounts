@@ -292,7 +292,7 @@ def test_upgrade_preserves_data_and_existing_sequences(tmp_path, monkeypatch):
         tx.execute("UPDATE document_sequences SET next_number=42 WHERE document_type='invoice'")
     before = {table: db.rows(f'SELECT * FROM {table} ORDER BY id') for table in ['organisations','accounts','contacts','invoices','gl_entries']}
     monkeypatch.setattr(database, 'MIGRATIONS', original)
-    assert db.migrate() == ['0020_quotes'] and db.migrate() == []
+    assert db.migrate() == ['0020_quotes', '0021_periodisation'] and db.migrate() == []
     for table, rows in before.items():
         assert db.rows(f'SELECT * FROM {table} ORDER BY id') == rows
     assert db.scalar("SELECT next_number FROM document_sequences WHERE document_type='invoice'") == 42

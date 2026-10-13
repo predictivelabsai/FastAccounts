@@ -1135,3 +1135,39 @@ the entries below, plus one connector fix:
   skips and five existing dependency deprecation warnings. Targeted tax/locale
   checks, compilation and diff checks passed. Tests used synthetic data and no
   live providers. Python 3.14.6 was used because Python 3.12 is unavailable.
+
+## 2026-10-12: Purchase periodisation
+
+- Added P1 item 8 purchase schedules and per-period rows with migration
+  `0021_periodisation`, composite tenant foreign keys, CHECK constraints and
+  idempotent additive chart roles. Existing custom codes, roles, bills and posted
+  ledger data are preserved. CI and all explicit migration assertions include
+  the new migration.
+- Draft bill approval books the full net cost to Periodised expenses in transit.
+  Already posted bills gain a balanced reclassification on their original bill
+  date, without changing the original bill or ledger lines. Equal monthly
+  portions then debit real expense and credit deferred cost in one immutable
+  balanced batch each. Assign the cent remainder to the first or last portion.
+- Keep full input VAT deduction on the original bill. Portions contain zero VAT
+  and leave AP and payment allocation unchanged. Validate the schedule against
+  the whole real bill's net amount; support base-currency expense bills with
+  fully recoverable VAT or no VAT.
+- Added Draft activation, single-period and catch-up posting, progress, audit
+  entries, locked-period guards, atomic journal links, concurrent retry safety
+  and a daily automation-worker check with failure isolation. Cancellation only
+  stops future Pending portions after due portions are posted. Posted journals
+  remain intact; any funded deferred residual requires accountant review and an
+  explicit adjustment.
+- Added viewer-readable and write-role/CSRF-protected API routes with decimal
+  strings, plus the Documents Periodised view, creation and detail dialogs,
+  progress and posting/cancellation confirmations. New translation blocks are
+  appended at the end of English, Estonian, Lithuanian and Latvian files without
+  altering existing keys or copy. The design note explains ledger and VAT timing.
+- Validation: Python 3.12.14, `python -m pytest -q`:
+  `881 passed, 4 skipped in 652.14s (0:10:52)`. All 49 new feature checks passed,
+  including offline browser flows in all four locales. The four skips are
+  existing opt-in PostgreSQL checks. No live provider calls were made. JavaScript
+  syntax, focused Python compilation, locale preservation and diff checks passed.
+- Production accountant UAT, partial VAT recovery, foreign currency, irregular
+  periods, monetary schedule editing and coordinated reversals or cancellation
+  settlement remain deferred. Roadmap status and scope are synchronised.

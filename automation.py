@@ -335,7 +335,7 @@ class AutomationService:
         return results
 
     def worker_tick(self, *, today=None) -> dict:
-        result = {"runs": [], "reminders": [], "bank_feeds": [], "depreciation": [], "errors": []}
+        result = {"runs": [], "reminders": [], "bank_feeds": [], "depreciation": [], "periodisation": [], "errors": []}
         for org_id in self._organisations(None):
             for key, method in (("runs", self.run_due), ("reminders", self.process_reminders)):
                 try:
@@ -352,4 +352,10 @@ class AutomationService:
             except Exception:
                 result["errors"].append({"organisation_id": org_id, "operation": "depreciation",
                                          "error_message": "Depreciation scheduling failed"})
+            try:
+                from periodisation import PeriodisationService
+                result['periodisation'].extend(PeriodisationService(self.db).run_due(org_id, today=today, actor=AUTOMATION_ACTOR))
+            except Exception:
+                result['errors'].append({'organisation_id': org_id, 'operation': 'periodisation',
+                                         'error_message': 'Purchase periodisation scheduling failed'})
         return result

@@ -728,6 +728,33 @@
         }),
       });
     },
+    periodised: async (c) => {
+      const rows = await api(c.url('/purchase-schedules'));
+      const actions = (x) => {
+        const attrs = `data-id="${esc(x.id)}"`;
+        return button('Purchase periods', 'viewPurchaseSchedule', false, attrs) +
+          (x.status === 'Draft' ? button('Activate schedule', 'activatePurchaseSchedule', false, attrs) : '') +
+          (x.status === 'Active' ? button('Post due portions', 'postPurchaseSchedule', false, attrs) : '') +
+          (['Draft', 'Active'].includes(x.status) ? button('Cancel future portions', 'cancelPurchaseSchedule', false, attrs) : '');
+      };
+      if (!c.mount(page(t('Periodised'), t('Spread purchase expenses across accounting periods.'),
+        button('New purchase schedule', 'newPurchaseSchedule', true), table(
+          ['Bill', 'Supplier', 'Start period', 'Status', 'Progress', ['Net amount'], 'Actions'],
+          rows.map((x) => row([td(esc(x.supplier_number)), td(esc(x.contact_name)), td(date(x.start_period)),
+            td(pill(x.status)), td(`${esc(x.posted_periods)} / ${esc(x.number_of_periods)}`),
+            td(esc(money(x.net_amount, x.currency)), 'numeric'), td(actions(x))])), button('New purchase schedule', 'newPurchaseSchedule'))))) return;
+      const action = async (b, suffix, data) => {
+        await post(c.url(`/purchase-schedules/${b.dataset.id}${suffix}`), data, suffix ? 'POST' : 'PATCH');
+        await render();
+      };
+      bindActions(content, {
+        newPurchaseSchedule: () => purchaseScheduleDialog(),
+        viewPurchaseSchedule: (b) => purchaseScheduleDialog(b.dataset.id),
+        activatePurchaseSchedule: (b) => action(b, '', {status: 'Active'}),
+        postPurchaseSchedule: (b) => confirmAction('Post due portions', tr('Post balanced net expense transfers for all due portions. VAT stays on the original bill.'), () => action(b, '/post')),
+        cancelPurchaseSchedule: (b) => confirmAction('Cancel future portions', tr('Future portions stop. Any remaining deferred cost needs accountant review.'), () => action(b, '/cancel')),
+      });
+    },
     recurring: async (c) => {
       const [schedules, reminders, invoices] = await Promise.all([
         api(c.url("/invoice-schedules")),
@@ -2287,6 +2314,36 @@
       await attachmentsSection(d, base, kind, record.id);
       toast(t("Saved successfully"));
       await render();
+    });
+  }
+  async function purchaseScheduleDialog(scheduleId = null) {
+    const base = path('');
+    if (scheduleId) {
+      const record = await api(base + `/purchase-schedules/${scheduleId}`);
+      if (base !== path('')) return;
+      dialog('Purchase periods', `<p>${esc(record.supplier_number)} · ${esc(record.contact_name)} · ${pill(record.status)}</p>` +
+        `<p>${tr('VAT stays on the original bill. Portions transfer net expense only.')}</p>` +
+        table(['Period date', ['Net amount'], 'Status'], record.periods.map((x) => row([
+          td(date(x.period_date)), td(esc(money(x.net_amount, record.currency)), 'numeric'), td(pill(x.status))]))) +
+        `<p>${tr('Deferred cost awaiting review')}: ${esc(money(record.funding_batch_id ? record.cancelled_amount : '0.00', record.currency))}</p>`);
+      return;
+    }
+    const [bills, accounts, schedules] = await Promise.all([api(base + '/bills'), api(base + '/accounts'), api(base + '/purchase-schedules')]);
+    if (base !== path('')) return;
+    const available = bills.filter((b) => b.document_type === 'bill' && !schedules.some((s) => s.bill_id === b.id));
+    if (!available.length) return toast(t('Create a purchase bill before adding a schedule.'), 'info');
+    const d = dialog('New purchase schedule', form(
+      `<p class="full-width">${tr('VAT stays on the original bill. Portions transfer net expense only.')}</p>` +
+      select('Bill', 'bill_id', available.map((b) => [b.id, `${b.supplier_number} · ${b.contact_name}`])) +
+      select('Expense account', 'expense_account_id', accounts.filter((a) => a.active && a.account_type === 'Expense').map((a) => [a.id, `${a.code} ${a.name}`])) +
+      field('Start period', 'start_period', today(), 'date', 'required') +
+      field('Number of periods', 'number_of_periods', 12, 'number', 'required min="1" max="120" step="1"') +
+      select('Cent remainder', 'split_rule', [['equal_first', t('First period')], ['equal_last', t('Last period')]]) +
+      field('Notes', 'notes', ''), 'Create schedule'));
+    ['bill_id', 'expense_account_id'].forEach((key) => { d.querySelector(`[name=${key}]`).required = true; });
+    bindForm(d, async (data) => {
+      await post(base + '/purchase-schedules', {...data, number_of_periods: Number(data.number_of_periods)});
+      await saved(d);
     });
   }
   async function quoteDialog(quoteId = null, readOnly = false) {

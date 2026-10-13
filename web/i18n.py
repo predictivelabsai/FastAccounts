@@ -28,7 +28,12 @@ def catalog(lang: str) -> dict[str, Any]:
         if code == DEFAULT_LANG:
             return {}
         return catalog(DEFAULT_LANG)
-    return data if isinstance(data, dict) else {}
+    if not isinstance(data, dict):
+        return {}
+    # Feature copy appended at the end of each JSON file extends existing sections.
+    for section, additions in data.get('periodisation', {}).items():
+        data.setdefault(section, {}).update(additions)
+    return data
 
 
 def t(key: str, lang: str = DEFAULT_LANG) -> str:
