@@ -98,7 +98,7 @@ STAGED_CSV = "code,name\nP1,Synthetic widget\nP2,Another widget"
 
 def test_migration_count_rerun_and_ci(env):
     d = env
-    assert d["db"].scalar("SELECT COUNT(*) FROM schema_migrations") == 30
+    assert d["db"].scalar("SELECT COUNT(*) FROM schema_migrations") == 31
     assert d["db"].rows("SELECT * FROM copilot_messages") == []
     assert d["db"].rows("SELECT * FROM copilot_usage") == []
     for _ in range(2):
@@ -106,7 +106,7 @@ def test_migration_count_rerun_and_ci(env):
             tx.execute("DELETE FROM schema_migrations WHERE version='0029_copilot'")
         assert d["db"].migrate() == ["0029_copilot"]
     assert d["db"].rows("SELECT * FROM copilot_messages") == []
-    assert "'0028_document_settings', '0029_copilot', '0030_master_data_maintenance']" in (ROOT / ".github/workflows/ci.yml").read_text()
+    assert "'0028_document_settings', '0029_copilot', '0030_master_data_maintenance', '0031_master_data_groups']" in (ROOT / ".github/workflows/ci.yml").read_text()
 
 
 def test_kill_switches_block_before_any_provider_call(env, monkeypatch):

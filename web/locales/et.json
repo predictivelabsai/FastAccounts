@@ -38,7 +38,8 @@
     "cash_flow": "Rahavoo aruanne",
     "data_import": "Andmete import",
     "quotes": "Pakkumised",
-    "maintenance": "Andmete hooldus"
+    "maintenance": "Andmete hooldus",
+    "groups": "Grupid"
   },
   "footer": {
     "tagline": "Avatud lähtekoodiga raamatupidamine Ühendkuningriigis ja Eestis.",
@@ -1822,7 +1823,26 @@
     "The contact becomes selectable again. Reactivate it?": "Kontakt muutub jälle valitavaks. Taasaktiveerida?",
     "Only contacts without any documents or payments can be deleted. This cannot be undone. Delete it?": "Kustutada saab ainult kontakti, millel pole ühtegi dokumenti ega makset. Seda ei saa tagasi võtta. Kustutada?",
     "Deleted successfully": "Kustutatud",
-    "maintenance": "Andmete hooldus"
+    "maintenance": "Andmete hooldus",
+    "Groups": "Grupid",
+    "Group clients, suppliers and workspace users for filtering and reporting. Groups are labels and do not change access controls.": "Grupeeri kliendid, hankijad ja tööruumi kasutajad filtreerimiseks ja aruandluseks. Grupid on märgised ega muuda ligipääsuõigusi.",
+    "Contact groups": "Kontaktigrupid",
+    "User groups": "Kasutajagrupid",
+    "Tag customers and suppliers into groups such as retail or wholesale.": "Märgista kliendid ja hankijad gruppidesse, nt jaemüük või hulgimüük.",
+    "Tag workspace users into teams. Access roles stay separate.": "Märgista tööruumi kasutajad tiimidesse. Ligipääsurollid jäävad eraldiseisvaks.",
+    "Members": "Liikmed",
+    "New group name": "Uue grupi nimi",
+    "Create group": "Loo grupp",
+    "Manage members": "Halda liikmeid",
+    "Delete group": "Kustuta grupp",
+    "Member": "Liige",
+    "Remove": "Eemalda",
+    "Add member": "Lisa liige",
+    "Add member email": "Lisa liikme e-post",
+    "Choose a member": "Vali liige",
+    "No members yet.": "Liikmeid veel ei ole.",
+    "Members of {name}": "Grupi {name} liikmed",
+    "Memberships go with the group; contacts and users stay. Delete {name}?": "Liikmesus kaob koos grupiga; kontaktid ja kasutajad jäävad. Kustutada {name}?"
   },
   "views": {
     "overview": "Ülevaade",

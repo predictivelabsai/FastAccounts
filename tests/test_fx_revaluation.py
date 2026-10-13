@@ -346,7 +346,7 @@ def test_auth_csrf_wiring(sending):
 
 def test_migration_rerun_tenant_constraints_and_roles(db, ee_org, uk_org):
     root = Path(__file__).resolve().parents[1]
-    assert db.scalar('SELECT COUNT(*) FROM schema_migrations') == 30
+    assert db.scalar('SELECT COUNT(*) FROM schema_migrations') == 31
     assert db.migrate() == []
     sql = (root / 'migrations/sqlite/0026_fx_revaluations.sql').read_text(encoding='utf-8')
     with db.transaction() as tx:
@@ -354,7 +354,7 @@ def test_migration_rerun_tenant_constraints_and_roles(db, ee_org, uk_org):
         tx.connection.executescript(sql)
     for org, code in [(ee_org, '6990'), (uk_org, '7900')]:
         assert db.one("SELECT code FROM accounts WHERE organisation_id=? AND system_role='FX_GAIN_LOSS'", (org['id'],))['code'] == code
-    assert "'0025_fx_realised', '0026_fx_revaluations', '0027_mfa', '0028_document_settings', '0029_copilot', '0030_master_data_maintenance']" in (root / '.github/workflows/ci.yml').read_text(encoding='utf-8')
+    assert "'0025_fx_realised', '0026_fx_revaluations', '0027_mfa', '0028_document_settings', '0029_copilot', '0030_master_data_maintenance', '0031_master_data_groups']" in (root / '.github/workflows/ci.yml').read_text(encoding='utf-8')
     data = setup(db, ee_org)
     doc = document(db, ee_org, data)
     import sqlite3

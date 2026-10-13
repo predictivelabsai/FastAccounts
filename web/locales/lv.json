@@ -38,7 +38,8 @@
     "cash_flow": "Naudas plūsmas pārskats",
     "data_import": "Datu imports",
     "quotes": "Piedāvājumi",
-    "maintenance": "Datu uzturēšana"
+    "maintenance": "Datu uzturēšana",
+    "groups": "Grupas"
   },
   "footer": {
     "tagline": "Atvērtā pirmkoda grāmatvedība Apvienotajai Karalistei un Igaunijai.",
@@ -1822,7 +1823,26 @@
     "The contact becomes selectable again. Reactivate it?": "Kontakts atkal būs atlasāms. Atkal aktivizēt?",
     "Only contacts without any documents or payments can be deleted. This cannot be undone. Delete it?": "Dzēst var tikai kontaktu bez jebkādiem dokumentiem vai maksājumiem. To nevar atsaukt. Dzēst?",
     "Deleted successfully": "Dzēsts",
-    "maintenance": "Dat u uzturēšana"
+    "maintenance": "Dat u uzturēšana",
+    "Groups": "Grupas",
+    "Group clients, suppliers and workspace users for filtering and reporting. Groups are labels and do not change access controls.": "Grupējiet klientus, piegādātājus un darbvietas lietotājus filtrēšanai un atskaitēm. Grupas ir etiķetes un nemaina piekļuves tiesības.",
+    "Contact groups": "Kontaktu grupas",
+    "User groups": "Lietotāju grupas",
+    "Tag customers and suppliers into groups such as retail or wholesale.": "Iedaliet klientus un piegādātājus grupās, piemēram, mazumtirdzniecība vai vairumtirdzniecība.",
+    "Tag workspace users into teams. Access roles stay separate.": "Iedaliet darbvietas lietotājus komandās. Piekļuves lomas paliek atsevišķas.",
+    "Members": "Dalībnieki",
+    "New group name": "Jaunās grupas nosaukums",
+    "Create group": "Izveidot grupu",
+    "Manage members": "Pārvaldīt dalībniekus",
+    "Delete group": "Dzēst grupu",
+    "Member": "Dalībnieks",
+    "Remove": "Noņemt",
+    "Add member": "Pievienot dalībnieku",
+    "Add member email": "Pievienot dalībnieka e-pastu",
+    "Choose a member": "Izvēlieties dalībnieku",
+    "No members yet.": "Dalībnieku vēl nav.",
+    "Members of {name}": "{name} dalībnieki",
+    "Memberships go with the group; contacts and users stay. Delete {name}?": "Dalība izzūd kopā ar grupu; kontakti un lietotāji paliek. Dzēst {name}?"
   },
   "views": {
     "overview": "Overview",

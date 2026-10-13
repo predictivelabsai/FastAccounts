@@ -1001,6 +1001,83 @@
         }),
       });
     },
+    groups: async (c) => {
+      const editable = canEditMappings();
+      const [contactGroups, userGroups, contacts] = await Promise.all([
+        api(c.url('/contact-groups')),
+        api(c.url('/user-groups')),
+        api(c.url('/contacts')),
+      ]);
+      const groupActions = (kind, g) => {
+        if (!editable) return '';
+        const attrs = `data-kind="${kind}" data-id="${esc(g.id)}" data-name="${esc(g.name)}"`;
+        return `<span class="actions">${button('Manage members', 'manageMembers', false, attrs) +
+          button('Delete group', 'deleteGroup', false, attrs)}</span>`;
+      };
+      const section = (kind, label, intro, groups) => {
+        const rows = table(['Name', 'Members', 'Actions'],
+          groups.map((g) => row([
+            td(esc(g.name)),
+            td(num(g.members), 'numeric'),
+            td(groupActions(kind, g)),
+          ])));
+        const create = editable ? form(field('New group name', 'name', '', 'text', 'required maxlength="100"'), 'Create group') : '';
+        return `<section class="section" data-groups="${kind}"><h2>${tr(label)}</h2><p class="muted">${esc(intro)}</p>${rows}${create}</section>`;
+      };
+      if (!c.mount(page(t('Groups'), t('Group clients, suppliers and workspace users for filtering and reporting. Groups are labels and do not change access controls.'), '',
+        section('contact', 'Contact groups', tr('Tag customers and suppliers into groups such as retail or wholesale.'), contactGroups) +
+        section('user', 'User groups', tr('Tag workspace users into teams. Access roles stay separate.'), userGroups)))) return;
+      content.querySelectorAll('[data-action=cancel]').forEach((x) => x.remove());
+      if (!editable) content.querySelectorAll('input, button').forEach((x) => { x.disabled = true; });
+      const memberDialog = async (kind, group) => {
+        const payload = await api(c.url(`/${kind}-groups/${group.id}/members`));
+        const options = [['', t('Choose a member')], ...contacts.filter((x) => !payload.members.includes(x.id))
+          .map((x) => [x.id, x.name])];
+        const memberField = kind === 'contact'
+          ? select('Add member', 'member', options)
+          : field('Add member email', 'member', '', 'email', 'required maxlength="320"');
+        const membersTable = payload.members.length
+          ? table([tr('Member'), tr('Actions')], payload.members.map((m) => row([
+              td(kind === 'contact' ? esc((contacts.find((x) => x.id === m) || {}).name || m) : esc(m)),
+              td(editable ? button('Remove', 'removeMember', false, `data-member="${esc(m)}"`) : ''),
+            ])))
+          : `<p class="muted">${tr('No members yet.')}</p>`;
+        const d = dialog(tr('Members of {name}').replace('{name}', group.name),
+          membersTable + form(memberField, tr('Add member')));
+        d.querySelectorAll('[data-action=cancel]').forEach((x) => x.remove());
+        bindForm(d, async (values) => {
+          await post(c.url(`/${kind}-groups/${group.id}/members`), {member: values.member});
+          toast(t('Saved successfully'));
+          closeDialog(d);
+          await render();
+        });
+        d.querySelectorAll('[data-action=removeMember]').forEach((b) => (b.onclick = async () => {
+          await post(c.url(`/${kind}-groups/${group.id}/members/${encodeURIComponent(b.dataset.member)}`), {}, 'DELETE');
+          toast(t('Saved successfully'));
+          closeDialog(d);
+          await render();
+        }));
+      };
+      const createForm = (kind) => {
+        const holder = content.querySelector(`[data-groups="${kind}"]`);
+        if (!editable) return;
+        bindForm(holder, async (values) => {
+          await post(c.url(`/${kind}-groups`), {name: values.name});
+          toast(t('Saved successfully'));
+          await render();
+        });
+      };
+      createForm('contact');
+      createForm('user');
+      bindActions(content, {
+        manageMembers: (b) => memberDialog(b.dataset.kind, { id: b.dataset.id, name: b.dataset.name }),
+        deleteGroup: (b) => confirmAction(tr('Delete group'), tr('Memberships go with the group; contacts and users stay. Delete {name}?').replace('{name}', b.dataset.name), async () => {
+          await post(c.url(`/${b.dataset.kind}-groups/${b.dataset.id}`), {}, 'DELETE');
+          toast(t('Deleted successfully'));
+          await render();
+        }),
+      });
+    },
     "reminder-rules": async (c) => {
       const rules = await api(c.url('/reminder-rules'));
       const preview = rules.enabled ? rules.effective_stages.map((x) =>

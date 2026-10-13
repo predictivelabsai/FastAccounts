@@ -38,7 +38,8 @@
     "cash_flow": "Pinigų srautų ataskaita",
     "data_import": "Duomenų importas",
     "quotes": "Pasiūlymai",
-    "maintenance": "Duomenų priežiūra"
+    "maintenance": "Duomenų priežiūra",
+    "groups": "Grupės"
   },
   "footer": {
     "tagline": "Atvirojo kodo buhalterinė apskaita Jungtinei Karalystei ir Estijai.",
@@ -1822,7 +1823,26 @@
     "The contact becomes selectable again. Reactivate it?": "Kontaktas vėl taps pasirenkamas. Vėl aktyvuoti?",
     "Only contacts without any documents or payments can be deleted. This cannot be undone. Delete it?": "Ištrinti galima tik kontaktą be jokių dokumentų ar mokėjimų. Atšaukti negalima. Ištrinti?",
     "Deleted successfully": "Ištrinta",
-    "maintenance": "Duomenų priežiūra"
+    "maintenance": "Duomenų priežiūra",
+    "Groups": "Grupės",
+    "Group clients, suppliers and workspace users for filtering and reporting. Groups are labels and do not change access controls.": "Grupuokite klientus, tiekėjus ir darbo srities naudotojus filtravimui ir ataskaitoms. Grupės yra etiketės ir nekeičia prieigos teisių.",
+    "Contact groups": "Kontaktų grupės",
+    "User groups": "Naudotojų grupės",
+    "Tag customers and suppliers into groups such as retail or wholesale.": "Žymėkite klientus ir tiekėjus į grupes, pavyzdžiui, mažmena ar didmena.",
+    "Tag workspace users into teams. Access roles stay separate.": "Žymėkite darbo srities naudotojus į komandas. Prieigos rolių tai nepakeičia.",
+    "Members": "Nariai",
+    "New group name": "Naujos grupės pavadinimas",
+    "Create group": "Sukurti grupę",
+    "Manage members": "Tvarkyti narius",
+    "Delete group": "Ištrinti grupę",
+    "Member": "Narys",
+    "Remove": "Pašalinti",
+    "Add member": "Pridėti narį",
+    "Add member email": "Pridėti nario el. paštą",
+    "Choose a member": "Pasirinkite narį",
+    "No members yet.": "Narių dar nėra.",
+    "Members of {name}": "{name} nariai",
+    "Memberships go with the group; contacts and users stay. Delete {name}?": "Narystės dingsta kartu su grupe; kontaktai ir naudotojai lieka. Ištrinti {name}?"
   },
   "views": {
     "overview": "Overview",

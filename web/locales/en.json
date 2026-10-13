@@ -38,7 +38,8 @@
     "cash_flow": "Cash-flow statement",
     "data_import": "Data import",
     "quotes": "Quotes",
-    "maintenance": "Data maintenance"
+    "maintenance": "Data maintenance",
+    "groups": "Groups"
   },
   "footer": {
     "tagline": "Open-source bookkeeping for the UK and Estonia.",
@@ -1822,7 +1823,26 @@
     "The contact becomes selectable again. Reactivate it?": "The contact becomes selectable again. Reactivate it?",
     "Only contacts without any documents or payments can be deleted. This cannot be undone. Delete it?": "Only contacts without any documents or payments can be deleted. This cannot be undone. Delete it?",
     "Deleted successfully": "Deleted successfully",
-    "maintenance": "Data maintenance"
+    "maintenance": "Data maintenance",
+    "Groups": "Groups",
+    "Group clients, suppliers and workspace users for filtering and reporting. Groups are labels and do not change access controls.": "Group clients, suppliers and workspace users for filtering and reporting. Groups are labels and do not change access controls.",
+    "Contact groups": "Contact groups",
+    "User groups": "User groups",
+    "Tag customers and suppliers into groups such as retail or wholesale.": "Tag customers and suppliers into groups such as retail or wholesale.",
+    "Tag workspace users into teams. Access roles stay separate.": "Tag workspace users into teams. Access roles stay separate.",
+    "Members": "Members",
+    "New group name": "New group name",
+    "Create group": "Create group",
+    "Manage members": "Manage members",
+    "Delete group": "Delete group",
+    "Member": "Member",
+    "Remove": "Remove",
+    "Add member": "Add member",
+    "Add member email": "Add member email",
+    "Choose a member": "Choose a member",
+    "No members yet.": "No members yet.",
+    "Members of {name}": "Members of {name}",
+    "Memberships go with the group; contacts and users stay. Delete {name}?": "Memberships go with the group; contacts and users stay. Delete {name}?"
   },
   "views": {
     "overview": "Overview",
