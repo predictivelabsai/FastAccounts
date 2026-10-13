@@ -19,6 +19,7 @@ from core_utils import audit, db_number, decimal, money, new_id, sha256_bytes, u
 from database import Database, get_database
 from delivery_repository import DeliveryRepository
 from exchange_rates import booking_rate
+from fx_settlement import effective_rate, booked_portion, add_fx_line, control_line
 from ledger import LedgerService, PostingLine
 from periodisation_repository import PeriodisationRepository
 from objects import dimensions, validate_dimensions
@@ -474,7 +475,7 @@ class DocumentService:
                 schedule = None
             if schedule:
                 if (money(schedule['net_amount']) != money(bill['subtotal']) or schedule['currency'] != bill['currency']
-                        or decimal(bill['exchange_rate']) != 1 or bill['document_type'] != 'bill'
+                        or bill['document_type'] != 'bill'
                         or sum((money(l['recoverable_tax']) for l in lines), Decimal(0)) != money(bill['tax_total'])):
                     raise ValueError('Bill no longer matches its purchase schedule')
                 deferred = period_repo.account(schedule['deferred_account_id'])
@@ -518,7 +519,9 @@ class DocumentService:
                 organisation_id=bill["organisation_id"], voucher_type=bill["document_type"],
                 voucher_id=bill_id, voucher_code=bill["supplier_number"], posting_date=bill["bill_date"],
                 lines=postings, actor=actor, currency=bill["currency"],
-                exchange_rate=decimal(bill["exchange_rate"]), tx=tx,
+                exchange_rate=(effective_rate(bill['currency'], tx.scalar(
+                    'SELECT base_currency FROM organisations WHERE id=?', (bill['organisation_id'],)), bill['exchange_rate'])
+                    if schedule else decimal(bill['exchange_rate'])), tx=tx,
                 allow_inactive_objects=True,
             )
             now = utc_now()
@@ -578,17 +581,57 @@ class DocumentService:
             raise ValueError("Transfers require two bank accounts and are not accepted by this method")
         control_role = "AR" if payment_type == "customer_receipt" else "AP"
         control = self._role_account(tx, organisation_id, control_role)
+        rate = booking_rate(tx, organisation_id, bank["currency"], organisation["base_currency"], payment_date, exchange_rate)
+        base = organisation["base_currency"]
+        paid_rate = effective_rate(bank["currency"], base, rate)
+        expected_type = "invoice" if payment_type == "customer_receipt" else "bill"
+        table = "invoices" if expected_type == "invoice" else "bills"
+        documents, booked_amounts = {}, {}
+        booked_total, allocated_total, differing_rates, final_rounding = Decimal('0'), Decimal('0'), False, False
+        for item in allocations:
+            if item.get("document_type", expected_type) != expected_type:
+                raise ValueError("Allocation document type does not match payment type")
+            document_id = item["document_id"]
+            if document_id in documents:
+                raise ValueError('Allocation exceeds the open document balance')
+            documents[document_id] = tx.one(
+                f"SELECT * FROM {table} WHERE id=? AND organisation_id=? AND contact_id=?",
+                (document_id, organisation_id, contact_id))
+            document = documents[document_id]
+            allocated = money(item["amount"])
+            if not document or allocated <= 0 or allocated > money(document["total"]) - money(document["paid_total"]):
+                raise ValueError("Allocation exceeds the open document balance")
+            differing_rates |= effective_rate(document['currency'], base, document['exchange_rate']) != paid_rate
+            booked_amounts[document_id] = booked_portion(tx, organisation_id, document, control, allocated, base)
+            booked_total += booked_amounts[document_id]
+            final_rounding |= (money(document['paid_total']) + allocated == money(document['total'])
+                               and booked_amounts[document_id] != money(allocated * paid_rate))
+            allocated_total += allocated
+            document['paid_total'] = money(document['paid_total']) + allocated
+        if allocated_total > value:
+            raise ValueError('Allocations cannot exceed the payment')
+        fully_settled = any(money(row['paid_total']) == money(row['total']) for row in documents.values())
+        final_rounding |= (fully_settled
+                           and booked_total + money((value - allocated_total) * paid_rate) != money(value * paid_rate))
+        # Preserve equal-rate aggregates, except a final stored-base cent must
+        # clear exactly rather than reproduce the historical rounding residual.
+        posting_currency = bank['currency']
+        bank_value, control_value = value, value
+        if differing_rates or final_rounding:
+            posting_currency = base
+            bank_value = money(value * paid_rate)
+            control_value = booked_total + money((value - allocated_total) * paid_rate)
         if payment_type == "customer_receipt":
-            lines = [PostingLine(bank["ledger_account_id"], debit=value, memo=reference),
-                     PostingLine(control, credit=value, contact_id=contact_id, memo=reference)]
+            lines = [PostingLine(bank["ledger_account_id"], debit=bank_value, memo=reference),
+                     control_line(control, control_value, debit=False, contact_id=contact_id, memo=reference)]
         else:
-            lines = [PostingLine(control, debit=value, contact_id=contact_id, memo=reference),
-                     PostingLine(bank["ledger_account_id"], credit=value, memo=reference)]
+            lines = [control_line(control, control_value, debit=True, contact_id=contact_id, memo=reference),
+                     PostingLine(bank["ledger_account_id"], credit=bank_value, memo=reference)]
+        add_fx_line(tx, organisation_id, lines, memo=reference)
         batch = self.ledger.post(
             organisation_id=organisation_id, voucher_type="payment", voucher_id=payment_id,
             voucher_code=reference or f"PAY-{payment_id[:8]}", posting_date=payment_date,
-            lines=lines, actor=actor, currency=bank["currency"],
-            exchange_rate=booking_rate(tx, organisation_id, bank["currency"], organisation["base_currency"], payment_date, exchange_rate), tx=tx,
+            lines=lines, actor=actor, currency=posting_currency, exchange_rate=rate, tx=tx,
         )
         tx.execute(
             "INSERT INTO payments(id,organisation_id,payment_type,contact_id,bank_account_id,payment_date,amount,currency,reference,posting_batch_id,created_by,created_at) "
@@ -598,6 +641,7 @@ class DocumentService:
              batch["id"], actor, now),
         )
         expected_type = "invoice" if payment_type == "customer_receipt" else "bill"
+        allocated_running = Decimal('0')
         for item in allocations:
             if item.get("document_type", expected_type) != expected_type:
                 raise ValueError("Allocation document type does not match payment type")
@@ -609,9 +653,13 @@ class DocumentService:
             allocated = money(item["amount"])
             if not document or allocated <= 0 or allocated > money(document["total"]) - money(document["paid_total"]):
                 raise ValueError("Allocation exceeds the open document balance")
+            relief = booked_amounts[document['id']] if differing_rates or final_rounding else (
+                money((allocated_running + allocated) * paid_rate) - money(allocated_running * paid_rate))
+            allocated_running += allocated
             tx.execute(
-                "INSERT INTO payment_allocations(id,payment_id,document_type,document_id,amount) VALUES (?,?,?,?,?)",
-                (new_id(), payment_id, expected_type, document["id"], db_number(allocated)),
+                'INSERT INTO payment_allocations(id,payment_id,document_type,document_id,amount,booked_base_amount) '
+                'VALUES (?,?,?,?,?,?)',
+                (new_id(), payment_id, expected_type, document['id'], db_number(allocated), db_number(relief)),
             )
             paid = money(document["paid_total"]) + allocated
             status = "Paid" if paid == money(document["total"]) else "Part Paid"

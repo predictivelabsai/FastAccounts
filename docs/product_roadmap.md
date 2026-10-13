@@ -1066,9 +1066,10 @@ pending.
   data-preserving upgrades. Verify contact-statement movements and current ageing
   after allocation. Intercept browser traffic and verify all four languages,
   error correction, stable retry keys, refreshed balances and mobile dialogs.
-- [ ] Accountant UAT, allocation reversal, foreign-currency advances/FX differences,
+- [ ] Accountant UAT and allocation reversal,
   bank-feed matching and VAT-on-advance/cash-VAT treatment remain follow-ups.
-  The first implementation uses the organisation base currency. Existing
+  Foreign-currency advances and FX differences are delivered in P2 item 2 below.
+  Existing
   historical document-ageing behaviour is unchanged; statements remain dated
   ledger views. PostgreSQL integration checks require `TEST_POSTGRES_URL`;
   Python 3.12 is unavailable locally, so validation uses Python 3.14.6.
@@ -1241,7 +1242,7 @@ pending.
   and four-locale browser checks passed. The skips are existing opt-in PostgreSQL
   checks. Tests used synthetic data and no live provider calls. JavaScript
   syntax, focused Python compilation, locale preservation and diff checks passed.
-- [ ] Deferred: production accountant UAT, partial VAT recovery, foreign currency,
+- [ ] Deferred: production accountant UAT, partial VAT recovery,
   explicit irregular period lists, monetary schedule editing and coordinated
   bill/deferral/portion reversals or cancellation settlement. See
   `docs/specs/purchase-periodisation.md` for the ledger and VAT decisions.
@@ -1399,9 +1400,9 @@ pending.
   refusal and create/delete audits, with organisation-scoped queries. Settings
   provides a compact rate table/form and disabled non-administrator controls.
   Append fx_rates in all four locale catalogues.
-- [ ] P2 item 2 is deferred: realised FX, revaluation, gain/loss accounts,
-  periodisation/prepayment FX integration and automated feeds. Retain current
-  prepayment and periodisation refusals. Production accountant UAT remains open.
+- [x] Realised FX, dedicated gain/loss account, prepayment and periodisation FX
+  integration are implemented in P2 item 2 below. Periodic revaluation of open
+  balances and automated feeds remain deferred. Accountant UAT remains open.
   See docs/specs/fx-rates.md.
 - Validation: Python 3.14.6, full `python -m pytest -q`: `1099 passed,
   4 skipped, 5 warnings in 824.88s (0:13:44)`. All 57 new FX checks passed,
@@ -1409,3 +1410,31 @@ pending.
   remain the existing PostgreSQL opt-in checks. `node --check static/app.js`,
   diff checks and preservation of existing locale sections passed. EstNLTK is
   unavailable locally; Estonian copy follows the existing valuuta terminology.
+
+
+### Realised FX and settlement integration: P2 item 2 (2026-10-12)
+
+- [x] Add migration `0025_fx_realised`, the combined `FX_GAIN_LOSS` chart role
+  with recursive next-free-code seeding, default UK/EE chart entries, stored
+  prepayment booking rates and exact payment-allocation booked-base portions.
+  CI and upgrade checks now include 25 migrations.
+- [x] Settle receipts and supplier payments with the actual original booked
+  AR/AP base portions, two aggregate legs and one net FX line. Higher-rate
+  receipts recognise gains; higher-rate supplier payments recognise losses.
+  Ordinary equal effective rates preserve previous aggregate batches without FX;
+  final-cent rounding exceptions prioritise exact clearing.
+  Base-currency documents use effective rate 1 regardless of stored explicit rate.
+- [x] Enable foreign-currency prepayment creation, foreign/base allocation in
+  both directions and refund FX with original reversal links, atomic writes and
+  document-currency balances. Enable periodisation at the document's effective
+  rate; cumulative funded-base cents clear transit exactly across the schedule.
+  Existing VAT, equal-first/equal-last, cancellation and tenancy rules remain.
+- No new screens, routes or locale changes. See `docs/specs/fx-rates.md` for
+  booked-base determination, allocation amount semantics and refund behaviour.
+- Validation: Windows, Python 3.14.6, full `python -m pytest -q`:
+  `1168 passed, 4 skipped, 5 warnings in 893.41s (0:14:53)`. All 69 new
+  realised-FX checks passed. The skips are existing PostgreSQL opt-ins; warnings
+  are existing dependency deprecations. Tests used synthetic data and no live
+  providers. Diff checks passed.
+- [ ] Next: periodic revaluation of open balances. Automated feeds, production
+  accountant UAT and live PostgreSQL validation remain deferred.

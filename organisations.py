@@ -34,6 +34,7 @@ UK_ACCOUNTS = (
     ("4000", "Sales", "Income", "Credit", "SALES"),
     ("5000", "Cost of sales", "Expense", "Debit", "COST_OF_SALES"),
     ("6000", "Operating expenses", "Expense", "Debit", "EXPENSE"),
+    ("7900", "Foreign exchange gains and losses", "Expense", "Debit", "FX_GAIN_LOSS"),
     ("6500", "Depreciation expense", "Expense", "Debit", "DEPRECIATION_EXPENSE"),
 )
 
@@ -61,6 +62,7 @@ EE_ACCOUNTS = (
     ("4010", "Müügitulu", "Income", "Credit", "SALES"),
     ("5010", "Müüdud kaupade kulu", "Expense", "Debit", "COST_OF_SALES"),
     ("6010", "Tegevuskulud", "Expense", "Debit", "EXPENSE"),
+    ("6990", "Valuutakursi kasum ja kahjum", "Expense", "Debit", "FX_GAIN_LOSS"),
     ("6410", "Põhivara kulumi kulu", "Expense", "Debit", "DEPRECIATION_EXPENSE"),
 )
 

@@ -6,6 +6,8 @@ from core_utils import audit, db_number, decimal, money, new_id, utc_now
 from database import Database, get_database
 from ledger import LedgerService, PostingLine
 from prepayment_repository import PrepaymentRepository
+from exchange_rates import booking_rate
+from fx_settlement import effective_rate, booked_portion, add_fx_line, control_line
 
 
 class PrepaymentService:
@@ -108,8 +110,9 @@ class PrepaymentService:
             if not bank:
                 raise ValueError("Prepayment bank account is not in this organisation")
             currency = (currency or bank["currency"]).upper()
-            if currency != bank["currency"] or currency != base_currency:
-                raise ValueError("Prepayments require the organisation base currency")
+            if currency != bank["currency"]:
+                raise ValueError("Prepayment currency must match the bank account")
+            rate = booking_rate(tx, organisation_id, currency, base_currency, day, None)
             control = self.repo.role_account(tx, organisation_id,
                 "CUSTOMER_PREPAYMENTS" if side == "customer" else "SUPPLIER_PREPAYMENTS")
             prepayment_id, now = new_id(), utc_now()
@@ -120,9 +123,9 @@ class PrepaymentService:
                                  source_line_type="prepayment", source_line_id=prepayment_id)]
             batch = self.ledger.post(organisation_id=organisation_id, voucher_type="prepayment",
                 voucher_id=prepayment_id, voucher_code=reference or f"PRE-{prepayment_id[:8]}",
-                posting_date=day, lines=lines, actor=actor, currency=currency, tx=tx)
+                posting_date=day, lines=lines, actor=actor, currency=currency, exchange_rate=rate, tx=tx)
             self.repo.insert(tx, "prepayments", dict(id=prepayment_id, organisation_id=organisation_id,
-                **{**expected, "amount": db_number(value)}, currency=currency,
+                **{**expected, "amount": db_number(value)}, currency=currency, exchange_rate=db_number(rate),
                 unallocated_balance=db_number(value), idempotency_key=key, posting_batch_id=batch["id"],
                 created_by=actor, created_at=now, updated_at=now))
             audit(tx, organisation_id, actor, "prepayment.created", "prepayment", prepayment_id,
@@ -150,8 +153,6 @@ class PrepaymentService:
             if (not document or document["document_type"] != document_type
                     or document["status"] not in open_statuses):
                 raise ValueError("Prepayment allocation requires an open document for the same contact")
-            if document["currency"] != prepayment["currency"] or decimal(document["exchange_rate"]) != 1:
-                raise ValueError("Prepayments require the organisation base currency")
             document_day = document["issue_date"] if customer else document["bill_date"]
             if day < max(prepayment["document_date"], document_day):
                 raise ValueError("Allocation date cannot precede the prepayment or document")
@@ -166,13 +167,27 @@ class PrepaymentService:
             debit, credit = (control, trade) if customer else (trade, control)
             allocation_id, now = new_id(), utc_now()
             memo = document.get("number") or document.get("supplier_number") or document_id
+            base = self.repo.base_currency(tx, organisation_id)
+            pre_rate = effective_rate(prepayment['currency'], base, prepayment['exchange_rate'])
+            doc_rate = effective_rate(document['currency'], base, document['exchange_rate'])
+            debit_value, credit_value = value, value
+            posting_currency, rate = prepayment['currency'], pre_rate
+            pre_base = booked_portion(tx, organisation_id, prepayment, control, value, base,
+                total_key='amount', paid=money(prepayment['amount']) - money(prepayment['unallocated_balance']))
+            doc_base = booked_portion(tx, organisation_id, document, trade, value, base)
+            final_rounding = ((value == money(prepayment['unallocated_balance']) and pre_base != money(value * pre_rate))
+                              or (paid + value == money(document['total']) and doc_base != money(value * doc_rate)))
+            if pre_rate != doc_rate or final_rounding:
+                debit_value, credit_value = (pre_base, doc_base) if customer else (doc_base, pre_base)
+                posting_currency = base
+            lines = [control_line(debit, debit_value, debit=True, contact_id=prepayment['contact_id'], memo=memo,
+                                 source_line_type=document_type, source_line_id=document_id),
+                     control_line(credit, credit_value, debit=False, contact_id=prepayment['contact_id'], memo=memo,
+                                 source_line_type=document_type, source_line_id=document_id)]
+            add_fx_line(tx, organisation_id, lines, memo=memo)
             batch = self.ledger.post(organisation_id=organisation_id, voucher_type="prepayment_allocation",
                 voucher_id=allocation_id, voucher_code=f"PRE-ALLOC-{allocation_id[:8]}", posting_date=day,
-                lines=[PostingLine(debit, debit=value, contact_id=prepayment["contact_id"], memo=memo,
-                                   source_line_type=document_type, source_line_id=document_id),
-                       PostingLine(credit, credit=value, contact_id=prepayment["contact_id"], memo=memo,
-                                   source_line_type=document_type, source_line_id=document_id)],
-                actor=actor, currency=prepayment["currency"], tx=tx)
+                lines=lines, actor=actor, currency=posting_currency, exchange_rate=rate, tx=tx)
             row = dict(id=allocation_id, organisation_id=organisation_id,
                        **{**expected, "amount": db_number(value)}, idempotency_key=key,
                        posting_batch_id=batch["id"], created_by=actor, created_at=now)
@@ -204,14 +219,30 @@ class PrepaymentService:
             # An explicit compensating event, linked to both the original batch
             # and its legs. Partial refunds do not mark the whole batch reversed.
             entries = self.repo.original_entries(tx, organisation_id, prepayment["posting_batch_id"])
-            lines = [PostingLine(row["account_id"], debit=value if money(row["credit"]) else Decimal("0"),
-                credit=value if money(row["debit"]) else Decimal("0"), contact_id=prepayment["contact_id"],
-                memo=reference, source_line_type="prepayment_refund", source_line_id=refund_id,
-                reverses_entry_id=row["id"]) for row in entries]
+            base = self.repo.base_currency(tx, organisation_id)
+            booked_rate = effective_rate(prepayment['currency'], base, prepayment['exchange_rate'])
+            refund_rate = booking_rate(tx, organisation_id, prepayment['currency'], base, day, None)
+            paid_rate = effective_rate(prepayment['currency'], base, refund_rate)
+            control = self.repo.role_account(tx, organisation_id,
+                'CUSTOMER_PREPAYMENTS' if prepayment['side'] == 'customer' else 'SUPPLIER_PREPAYMENTS')
+            lines = []
+            posting_currency = prepayment['currency']
+            pre_base = booked_portion(tx, organisation_id, prepayment, control, value, base,
+                total_key='amount', paid=money(prepayment['amount']) - money(prepayment['unallocated_balance']))
+            final_rounding = value == money(prepayment['unallocated_balance']) and pre_base != money(value * paid_rate)
+            for row in entries:
+                portion = value
+                if booked_rate != paid_rate or final_rounding:
+                    posting_currency = base
+                    portion = pre_base if row['account_id'] == control else money(value * paid_rate)
+                lines.append(control_line(row['account_id'], portion, debit=bool(money(row['credit'])), contact_id=prepayment['contact_id'],
+                    memo=reference, source_line_type='prepayment_refund', source_line_id=refund_id,
+                    reverses_entry_id=row['id']))
+            add_fx_line(tx, organisation_id, lines, memo=reference)
             batch = self.ledger.post(organisation_id=organisation_id, voucher_type="prepayment_refund",
                 voucher_id=refund_id, voucher_code=reference or f"PRE-REF-{refund_id[:8]}", posting_date=day,
-                lines=lines, actor=actor, currency=prepayment["currency"],
-                reverses_batch_id=prepayment["posting_batch_id"], tx=tx)
+                lines=lines, actor=actor, currency=posting_currency, exchange_rate=refund_rate,
+                reverses_batch_id=prepayment['posting_batch_id'], tx=tx)
             row = dict(id=refund_id, organisation_id=organisation_id,
                        **{**expected, "amount": db_number(value)}, idempotency_key=key,
                        posting_batch_id=batch["id"], created_by=actor, created_at=now)
