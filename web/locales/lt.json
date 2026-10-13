@@ -119,7 +119,7 @@
       ]
     },
     "terms": {
-      "title": "Sąlygos — projektas",
+      "title": "Sąlygos: projektas",
       "lede": "Šios bandomojo etapo sąlygos yra laikinos, o ne galutinės klientų sąlygos, ir nesukuria teiginių apie paslaugos lygį, atitiktį ar garantijas.",
       "note": "Bandomasis etapas · reikia teisinės peržiūros",
       "sections": [
@@ -221,7 +221,8 @@
     "review_body": "PVM darbo dokumentai, didžiosios knygos, ataskaitos, įrodymai, audito istorija ir aiškūs mokesčių deklaravimo agento planai.",
     "hero_eyebrow": "Atvirasis kodas. Dvi rinkos.",
     "hero_h1": "Buhalterinė apskaita, kuri išlieka aiški.",
-    "hero_highlight": "Jūsų įmonei arba klientams.",
+    "hero_highlight_prefix": "Jūsų įmonei arba",
+    "hero_highlight": "klientams.",
     "hero_sub": "Vienas aiškus kelias savo apskaitą tvarkančiai mažai įmonei, kitas – daugelio klientų knygas prižiūrinčiam apskaitos biurui.",
     "hero_cta": "Pradėti",
     "hero_trust": "Atvirasis kodas · Jungtinė Karalystė ir Estija · Jūsų apskaita, jūsų kontrolė",
@@ -1142,7 +1143,7 @@
     "Run now": "Vykdyti dabar",
     "History": "Istorija",
     "Invoices created: {count}": "Sukurta sąskaitų: {count}",
-    "Not due yet — next run {date}": "Terminas dar neatėjo — kita sąskaita {date}",
+    "Not due yet — next run {date}": "Terminas dar neatėjo: kita sąskaita {date}",
     "Reminders due": "Siųstini priminimai",
     "Stage": "Etapas",
     "3 days before due": "3 dienos iki mokėjimo termino",

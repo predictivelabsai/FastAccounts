@@ -56,7 +56,7 @@ def test_payroll_scope_and_single_error(monkeypatch, language):
             page.locator(f'[data-org="{oid}"]').click()
             playwright.expect(nav).to_have_attribute('aria-disabled', 'true')
             playwright.expect(nav).to_have_css('opacity', '0.45')
-            playwright.expect(page.locator('.kpi').nth(3).locator('strong')).to_have_text('—')
+            playwright.expect(page.locator('.kpi').nth(3).locator('strong')).to_have_text('–')
             assert nav.get_attribute('title')
             # Bypass Playwright's aria-disabled actionability check to exercise a real click.
             nav.click(force=True)

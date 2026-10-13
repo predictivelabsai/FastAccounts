@@ -196,7 +196,7 @@
       ]
     },
     "terms": {
-      "title": "Terms — draft",
+      "title": "Terms: draft",
       "lede": "These Pilot terms are placeholders, not final customer terms, and do not create claims about service levels, compliance or warranties.",
       "note": "Pilot · legal review required",
       "sections": [
@@ -329,7 +329,8 @@
     "review_body": "VAT workpapers, ledgers, reports, evidence, audit history, and explicit filing-agent plans.",
     "hero_eyebrow": "Open-source books. Two markets.",
     "hero_h1": "Bookkeeping that stays clear.",
-    "hero_highlight": "For your business or your clients.",
+    "hero_highlight_prefix": "For your business or",
+    "hero_highlight": "your clients.",
     "hero_sub": "A focused path for small businesses keeping their own books, and another for accounting bureaus managing many client books.",
     "hero_cta": "Get started",
     "hero_trust": "Open source · UK and Estonia · Your books, your control",
@@ -1250,7 +1251,7 @@
     "Run now": "Run now",
     "History": "History",
     "Invoices created: {count}": "Invoices created: {count}",
-    "Not due yet — next run {date}": "Not due yet — next run {date}",
+    "Not due yet — next run {date}": "Not due yet: next run {date}",
     "Reminders due": "Reminders due",
     "Stage": "Stage",
     "3 days before due": "3 days before due",

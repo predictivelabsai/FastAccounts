@@ -86,7 +86,7 @@ def test_language_dropdown_lists_four_locales_and_preserves_current_route():
     rendered = str(integrations_page("lv"))
     assert '<html lang="lv">' in rendered
     assert rendered.count('role="menuitem"') == 4
-    assert 'aria-label="Izvēlēties valodu"' in rendered
+    assert 'aria-label="Izvēlēties valodu: Latvian"' in rendered
     assert 'href="/set-lang/et?next=/integrations"' in rendered
     assert 'href="/set-lang/lt?next=/integrations"' in rendered
 
