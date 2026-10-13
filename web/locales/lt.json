@@ -1671,5 +1671,32 @@
       "Delivery outcome is unknown. Review delivery history before retrying.": "Siuntimo rezultatas nežinomas. Prieš bandydami dar kartą peržiūrėkite siuntimo istoriją.",
       "Email provider rejected the message": "El. pašto paslaugos teikėjas atmetė laišką"
     }
+  },
+  "reminder_rules": {
+    "nav": {
+      "reminder_rules": "Priminimai"
+    },
+    "views": {},
+    "workspace": {
+      "Reminders": "Priminimai",
+      "Reminder rules": "Priminimų taisyklės",
+      "Configure automatic invoice reminders for this organisation.": "Nustatykite automatinius šios organizacijos sąskaitų priminimus.",
+      "Stage 0 stays three days before due. Overdue stages must increase within 1 to 14 days.": "0 etapas lieka trys dienos iki mokėjimo termino. Vėlesnių etapų dienos turi didėti nuo 1 iki 14 dienų po termino.",
+      "Current effective reminders": "Dabartiniai priminimai",
+      "Enable automatic reminders": "Įjungti automatinius priminimus",
+      "Stage 1: days after due": "1 etapas: dienos po mokėjimo termino",
+      "Stage 2: days after due": "2 etapas: dienos po mokėjimo termino",
+      "Stop after": "Baigti po",
+      "All stages": "Visi etapai",
+      "Stage 0": "0 etapas",
+      "Stage 1": "1 etapas",
+      "Stage 2": "2 etapas",
+      "Automatic reminders are disabled.": "Automatiniai priminimai išjungti.",
+      "{days} days overdue": "{days} dienų po mokėjimo termino",
+      "Reminder rules require an enabled boolean, stages and stop stage": "Priminimų taisyklėms reikia įjungimo loginės reikšmės, etapų ir paskutinio etapo",
+      "Reminder stages must be 1 and 2; stage 0 stays three days before due": "Priminimų etapai turi būti 1 ir 2; 0 etapas lieka trys dienos iki mokėjimo termino",
+      "Reminder offsets must increase strictly within 1 to 14 days after due": "Priminimų dienos turi griežtai didėti nuo 1 iki 14 dienų po mokėjimo termino",
+      "Stop stage must be 0, 1 or 2": "Paskutinis etapas turi būti 0, 1 arba 2"
+    }
   }
 }

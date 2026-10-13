@@ -19,8 +19,9 @@ from objects import dimensions
 from objects_repository import ObjectRepository
 from fixed_assets import FixedAssetService
 from open_banking import OpenBankingService
+from reminder_rules import DEFAULT_STAGES, ReminderRuleService
 
-REMINDER_STAGES = ((0, -3), (1, 7), (2, 14))
+REMINDER_STAGES = DEFAULT_STAGES
 MAX_CATCHUPS_PER_PASS = 24
 AUTOMATION_ACTOR = "automation"
 HTTP_CLIENT_FACTORY = lambda: httpx.Client(timeout=20)
@@ -271,10 +272,13 @@ class AutomationService:
 
     def reminders_due(self, organisation_id: str, *, today=None) -> list[dict]:
         day, results = _date(today), []
+        stages = ReminderRuleService(self.db).ladder(organisation_id)
+        if not stages:
+            return results
         invoices = self.db.rows("SELECT i.*,c.name contact_name,c.email contact_email FROM invoices i JOIN contacts c ON c.id=i.contact_id AND c.organisation_id=i.organisation_id WHERE i.organisation_id=? AND i.document_type='invoice' AND i.status IN ('Issued','Part Paid') AND i.paid_total<i.total AND i.reminders_disabled=0 ORDER BY i.due_date,i.id", (organisation_id,))
         for invoice in invoices:
             sent = {row["ladder_stage"] for row in self.db.rows("SELECT ladder_stage FROM invoice_reminder_events WHERE invoice_id=? AND organisation_id=? AND status='Sent'", (invoice["id"], organisation_id))}
-            for stage, offset in REMINDER_STAGES:
+            for stage, offset in stages:
                 target = _date(invoice["due_date"]) + timedelta(days=offset)
                 if target <= day:
                     results.append({"invoice_id": invoice["id"], "number": invoice["number"], "contact_name": invoice["contact_name"],

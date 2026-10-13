@@ -1779,5 +1779,32 @@
       "Delivery outcome is unknown. Review delivery history before retrying.": "Delivery outcome is unknown. Review delivery history before retrying.",
       "Email provider rejected the message": "Email provider rejected the message"
     }
+  },
+  "reminder_rules": {
+    "nav": {
+      "reminder_rules": "Reminders"
+    },
+    "views": {},
+    "workspace": {
+      "Reminders": "Reminders",
+      "Reminder rules": "Reminder rules",
+      "Configure automatic invoice reminders for this organisation.": "Configure automatic invoice reminders for this organisation.",
+      "Stage 0 stays three days before due. Overdue stages must increase within 1 to 14 days.": "Stage 0 stays three days before due. Overdue stages must increase within 1 to 14 days.",
+      "Current effective reminders": "Current effective reminders",
+      "Enable automatic reminders": "Enable automatic reminders",
+      "Stage 1: days after due": "Stage 1: days after due",
+      "Stage 2: days after due": "Stage 2: days after due",
+      "Stop after": "Stop after",
+      "All stages": "All stages",
+      "Stage 0": "Stage 0",
+      "Stage 1": "Stage 1",
+      "Stage 2": "Stage 2",
+      "Automatic reminders are disabled.": "Automatic reminders are disabled.",
+      "{days} days overdue": "{days} days overdue",
+      "Reminder rules require an enabled boolean, stages and stop stage": "Reminder rules require an enabled boolean, stages and stop stage",
+      "Reminder stages must be 1 and 2; stage 0 stays three days before due": "Reminder stages must be 1 and 2; stage 0 stays three days before due",
+      "Reminder offsets must increase strictly within 1 to 14 days after due": "Reminder offsets must increase strictly within 1 to 14 days after due",
+      "Stop stage must be 0, 1 or 2": "Stop stage must be 0, 1 or 2"
+    }
   }
 }

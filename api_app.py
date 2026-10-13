@@ -11,7 +11,7 @@ from fastapi import Depends, FastAPI, File, Header, HTTPException, Request, Uplo
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse, Response
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 import integrations
 import version
@@ -26,6 +26,7 @@ from invoice_list import InvoiceListService, validate_list_dates
 from quotes import QuoteService
 from periodisation import PeriodisationService
 from payment_links import PaymentLinkService
+from reminder_rules import ReminderRuleService, validate_rule
 from objects import ObjectService
 from statements import StatementService
 from cash_flow import CashFlowService
@@ -171,6 +172,25 @@ class PurchaseScheduleIn(BaseModel):
     split_rule: Literal['equal_first', 'equal_last'] = 'equal_first'
     status: Literal['Draft', 'Active'] = 'Active'
     notes: str = ''
+
+
+class ReminderRuleIn(BaseModel):
+    model_config = {'extra': 'forbid'}
+    enabled: bool = Field(strict=True)
+    stages: dict[str, int] = Field(strict=True)
+    stop_stage: int | None = Field(default=None, strict=True)
+
+    @field_validator('stages', mode='before')
+    @classmethod
+    def strict_days(cls, value):
+        if not isinstance(value, dict) or any(type(day) is not int for day in value.values()):
+            raise ValueError('Reminder offsets must increase strictly within 1 to 14 days after due')
+        return value
+
+    @model_validator(mode='after')
+    def valid_rule(self):
+        validate_rule(self.model_dump())
+        return self
 
 
 class PaymentMethodIn(BaseModel):
@@ -731,6 +751,18 @@ def invoice_list_export(organisation_id: str, format_: str, request: Request,
 def list_payment_methods(organisation_id: str, user: User = Depends(current_user)):
     _require(organisation_id, user, {'owner', 'administrator', 'accountant', 'approver', 'viewer'})
     return PaymentLinkService().list_configs(organisation_id)
+
+
+@api.get('/organisations/{organisation_id}/reminder-rules')
+def get_reminder_rules(organisation_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, {'owner', 'administrator', 'accountant', 'approver', 'viewer'})
+    return ReminderRuleService().get(organisation_id)
+
+
+@api.put('/organisations/{organisation_id}/reminder-rules')
+def put_reminder_rules(organisation_id: str, payload: ReminderRuleIn, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, {'owner', 'administrator'})
+    return ReminderRuleService().save(organisation_id, **payload.model_dump(), actor=user.email)
 
 
 @api.get('/organisations/{organisation_id}/objects')

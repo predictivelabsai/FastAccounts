@@ -1671,5 +1671,32 @@
       "Delivery outcome is unknown. Review delivery history before retrying.": "Saatmise tulemus pole teada. Enne uuesti saatmist vaata saatmisajalugu.",
       "Email provider rejected the message": "E-posti teenusepakkuja lükkas kirja tagasi"
     }
+  },
+  "reminder_rules": {
+    "nav": {
+      "reminder_rules": "Meeldetuletused"
+    },
+    "views": {},
+    "workspace": {
+      "Reminders": "Meeldetuletused",
+      "Reminder rules": "Meeldetuletusreeglid",
+      "Configure automatic invoice reminders for this organisation.": "Seadista selle organisatsiooni automaatsed arvemeeldetuletused.",
+      "Stage 0 stays three days before due. Overdue stages must increase within 1 to 14 days.": "Etapp 0 jääb kolm päeva enne maksetähtaega. Maksetähtaega ületanud etappide vahed peavad kasvama 1 kuni 14 päeva piires.",
+      "Current effective reminders": "Praegu kehtivad meeldetuletused",
+      "Enable automatic reminders": "Luba automaatsed meeldetuletused",
+      "Stage 1: days after due": "Etapp 1: päevi pärast maksetähtaega",
+      "Stage 2: days after due": "Etapp 2: päevi pärast maksetähtaega",
+      "Stop after": "Lõpeta pärast",
+      "All stages": "Kõik etapid",
+      "Stage 0": "Etapp 0",
+      "Stage 1": "Etapp 1",
+      "Stage 2": "Etapp 2",
+      "Automatic reminders are disabled.": "Automaatsed meeldetuletused on välja lülitatud.",
+      "{days} days overdue": "{days} päeva üle maksetähtaja",
+      "Reminder rules require an enabled boolean, stages and stop stage": "Meeldetuletusreeglid vajavad lubamise tõeväärtust, etappe ja lõppetappi",
+      "Reminder stages must be 1 and 2; stage 0 stays three days before due": "Meeldetuletuste etapid peavad olema 1 ja 2; etapp 0 jääb kolm päeva enne maksetähtaega",
+      "Reminder offsets must increase strictly within 1 to 14 days after due": "Meeldetuletuste vahed peavad rangelt kasvama 1 kuni 14 päeva piires pärast maksetähtaega",
+      "Stop stage must be 0, 1 or 2": "Lõppetapp peab olema 0, 1 või 2"
+    }
   }
 }
