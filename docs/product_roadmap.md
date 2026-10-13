@@ -1581,6 +1581,62 @@ native-language review, including Estonian estnltk QA, remains pending.
   validation and XLSX renderers for the remaining lists remain out of scope;
   objects/bank CSV column sets are intentionally minimal.
 
+## 2026-10-13: Bulk VAT replacement for drafts (parity slate P2 item 7)
+
+- Added `tax_replacement.py`: a preview and an audited apply that replace one
+  tax code with another across every DRAFT invoice and bill of an
+  organisation. Recomputation keeps each document's amount basis (exclusive
+  lines keep net and recompute tax/gross; inclusive sales lines keep gross
+  and recompute the net/tax split), replaced bill lines take the target
+  code's recoverable percentage, and header subtotals, VAT totals and totals
+  are rewritten atomically under an organisation lock.
+- Posted documents are never touched: previews report how many issued
+  invoices and approved bills still use the source code so accountants can
+  reverse and rebook them deliberately. Voided documents are excluded from
+  the skipped counts.
+- Added owner/administrator apply and approve-plus-accountant preview routes
+  (both CSRF-guarded), and the Tax workspace view gained a VAT replacement
+  panel: from/to tax code selectors, a preview table with per-document old
+  and new VAT, the skipped-posted note, an apply button for owners and
+  administrators and result copy. English, Estonian, Lithuanian and Latvian
+  workspace keys were appended in place (the merged brand-system convention).
+- Validation: focused VAT-replacement checks: 11 passed, 1 existing
+  dependency warning in 9.54s, covering draft-only replacement for invoices
+  and bills with recoverable tax, inclusive split recalculation, preview
+  dry runs changing nothing, the role matrix, validation errors (same code,
+  missing source, inactive target, no candidates), tenant isolation, audit
+  events, four-language key parity and an offline tax-view browser flow
+  with the preview applied.
+Full `python -m pytest -q` on Windows/Python 3.14.6: 1411 passed,
+  4 skipped, 5 existing dependency warnings in 1374.65s. `node --check static/app.js`, whitespace,
+  em-dash and attribution checks passed; Estonian copy passed estnltk
+  spelling checks (`auditilogisse` follows existing usage).
+- Open follow-ups: replacing codes on in-review bills, replacing the tax
+  code on quotes before conversion and live PostgreSQL validation.
+
+### Four-language copy QA (VAT replacement)
+
+| Key | English | Estonian | Lithuanian | Latvian |
+| --- | --- | --- | --- | --- |
+| `workspace.VAT replacement` | VAT replacement | Käibemaksu asendus | PVM keitimas | PVN aizstāšana |
+| `workspace.Replace a tax code across this organisation's draft invoices and bills. Posted documents are never changed.` | Replace a tax code across this organisation's draft invoices and bills. Posted documents are never changed. | Asenda üks käibemaksukood selles organisatsioonis kavanddokumentides: müügiarvetes ja arvetes. Kinnitatud dokumente ei muudeta kunagi. | Pakeiskite PVM kodą šios organizacijos juodraštiniuose pardavimo sąskaitose ir sąskaitose faktūrose. Užregistruoti dokumentai niekada nekeičiami. | Nomainiet PVN kodu šīs organizācijas melnrakstu pārdošanas rēķinos un rēķinos. Reģistrētie dokumenti nekad netiek mainīti. |
+| `workspace.Choose two different tax codes.` | Choose two different tax codes. | Vali kaks erinevat käibemaksukoodi. | Pasirinkite du skirtingus PVM kodus. | Izvēlieties divus dažādus PVN kodus. |
+| `workspace.{documents} draft documents would change; {lines} lines would be recalculated.` | {documents} draft documents would change; {lines} lines would be recalculated. | {documents} kavandit muutuks; {lines} rida arvutataks ümber. | Pasikeistų {documents} juodraštinių dokumentų; perskaičiuotų {lines} eilučių. | Mainītos {documents} melnraksta dokumentus; pārrēķinātu {lines} rindu. |
+| `workspace.Nothing to replace: no draft documents use the source tax code.` | Nothing to replace: no draft documents use the source tax code. | Asendada ei ole midagi: ükski kavand ei kasuta lähtekäibemaksukoodi. | Nėra ko keisti: nė vienas juodraštinis dokumentas nenaudoja šaltinio PVM kodo. | Nav ko aizstāt: neviens melnraksta dokuments neizmanto avota PVN kodu. |
+| `workspace.Posted documents are skipped: {invoices} invoices and {bills} bills use the source code and must be reversed deliberately.` | Posted documents are skipped: {invoices} invoices and {bills} bills use the source code and must be reversed deliberately. | Kinnitatud dokumente jäetakse vahele: lähtekoodi kasutavad {invoices} müügiarvet ja {bills} arvet; need tuleb tahtlikult tagasi võtta ja uuesti esitada. | Užregistruoti dokumentai praleidžiami: šaltinio kodą naudoja {invoices} pardavimo sąskaitų ir {bills} sąskaitų faktūrų; jas reikėtų sąmoningai anuliuoti ir įrašyti iš naujo. | Reģistrētos dokumentus izlaižam: avota kodu izmanto {invoices} pārdošanas rēķini un {bills} rēķini; tos apzināti jāatceļ un jāreģistrē no jauna. |
+| `workspace.From tax code` | From tax code | Lähtekäibemaksukood | Šaltinio PVM kodas | Avota PVN kods |
+| `workspace.To tax code` | To tax code | Sihtkäibemaksukood | Paskirties PVM kodas | Pārdomātais PVN kods |
+| `workspace.Choose a tax code` | Choose a tax code | Vali käibemaksukood | Pasirinkite PVM kodą | Izvēlieties PVN kodu |
+| `workspace.Preview` | Preview | Eelvaade | Peržiūra | Priekšskatījums |
+| `workspace.Apply replacement` | Apply replacement | Rakenda asendus | Taikyti keitimą | Piemērot aizstāšanu |
+| `workspace.Apply VAT replacement` | Apply VAT replacement | Käibemaksu asenduse kinnitamine | Taikyti PVM keitimą | Piemērot PVN aizstāšanu |
+| `workspace.Draft lines with the source code switch to the target code and totals recalculate. Applied documents are audited. Continue?` | Draft lines with the source code switch to the target code and totals recalculate. Applied documents are audited. Continue? | Lähtekoodi read vahetuvad sihtkoodi vastu ja summad arvutatakse ümber. Rakendatud dokumendid kantakse auditilogisse. Jätka? | Šaltinio kodo juodraščio eilutės perkeliamos į paskirties kodą, o sumos perskaičiuojamos. Taikyti dokumentai užfiksuojami audite. Tęsti? | Melnraksta rindas ar avota kodu pāriet uz mērķa kodu, un summas tiek pārrēķinātas. Piemērotie dokumenti tiek fiksēti auditā. Turpināt? |
+| `workspace.Replacement applied: {documents} documents, {lines} lines.` | Replacement applied: {documents} documents, {lines} lines. | Asendus rakendatud: {documents} dokumenti, {lines} rida. | Keitimas taikytas: {documents} dokumentų, {lines} eilučių. | Aizstāšana piemērota: {documents} dokumenti, {lines} rindas. |
+| `workspace.Kind` | Kind | Liik | Rūšis | Veids |
+| `workspace.Document` | Document | Dokument | Dokumentas | Dokuments |
+| `workspace.Old VAT` | Old VAT | Vana käibemaks | Ankstesnis PVM | Iepriekšējais PVN |
+| `workspace.New VAT` | New VAT | Uus käibemaks | Naujas PVM | Jaunais PVN |
+
 ## 2026-10-13: Fiscal period close and reopen (parity slate P2 item 6)
 
 - Extended the ledger service: `list_periods` returns the organisation's

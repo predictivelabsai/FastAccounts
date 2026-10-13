@@ -1519,6 +1519,7 @@
     },
     tax: async (c) => {
       const codes = await api(c.url("/tax-codes"));
+      const editable = canEditMappings();
       if (
         !c.mount(
           page(
@@ -1535,14 +1536,68 @@
                   td(num(x.rate) + "%", "numeric"),
                 ]),
               ),
+            )}</section><section class="section" data-vat-replacement><h2>${tr("VAT replacement")}</h2><p class="muted">${tr(
+              "Replace a tax code across this organisation's draft invoices and bills. Posted documents are never changed.",
+            )}</p><div id="vat-replacement-result" class="report-result"></div>${form(
+              select("From tax code", "from_code_id", [["", t("Choose a tax code")], ...codes.map((x) => [x.id, `${x.code} · ${num(x.rate)}%`])]) +
+                select("To tax code", "to_code_id", [["", t("Choose a tax code")], ...codes.map((x) => [x.id, `${x.code} · ${num(x.rate)}%`])]),
+              "Preview",
             )}</section>`,
           ),
         )
       )
         return;
+      const result = content.querySelector("#vat-replacement-result");
+      let selection = null;
+      const replacementForm = content.querySelector("[data-vat-replacement] form");
+      bindForm(content.querySelector("[data-vat-replacement]"), async (values) => {
+        if (values.from_code_id === values.to_code_id || !values.from_code_id)
+          throw new Error(t("Choose two different tax codes."));
+        selection = {from_code_id: values.from_code_id, to_code_id: values.to_code_id};
+        const data = await post(c.url("/tax/replacement/preview"), selection);
+        result.innerHTML =
+        result.innerHTML =
+          (data.documents.length
+            ? `<p>${tr("{documents} draft documents would change; {lines} lines would be recalculated.")
+                .replace("{documents}", num(data.documents.length))
+                .replace("{lines}", num(data.documents.reduce((sum, x) => sum + x.affected_lines, 0)))}</p>` +
+              table(
+                ["Kind", "Document", "Status", "Lines", ["Old VAT"], ["New VAT"]],
+                data.documents.map((x) =>
+                  row([
+                    td(tr(x.kind === "invoice" ? "Invoice" : "Bill")),
+                    td(esc(x.label)),
+                    td(pill(tr(x.status))),
+                    td(`${num(x.affected_lines)} / ${num(x.total_lines)}`),
+                    td(esc(money(x.old_tax_total, x.currency)), "numeric"),
+                    td(esc(money(x.new_tax_total, x.currency)), "numeric"),
+                  ]),
+                ),
+              ) +
+              (editable ? button("Apply replacement", "applyReplacement", true) : "")
+            : `<p class="notice">${t("Nothing to replace: no draft documents use the source tax code.")}</p>`) +
+          `<p class="muted">${tr("Posted documents are skipped: {invoices} invoices and {bills} bills use the source code and must be reversed deliberately.")
+            .replace("{invoices}", num(data.skipped_posted.invoice))
+            .replace("{bills}", num(data.skipped_posted.bill))}</p>`;
+        content.querySelectorAll("[data-action=applyReplacement]").forEach((x) => (x.disabled = !editable));
+      });
       bindActions(content, {
         prepare: () => taxDialog(false),
         vd: () => taxDialog(true),
+        applyReplacement: () =>
+          confirmAction(
+            tr("Apply VAT replacement"),
+            tr("Draft lines with the source code switch to the target code and totals recalculate. Applied documents are audited. Continue?"),
+            async () => {
+              const summary = await post(c.url("/tax/replacement"), selection);
+              toast(
+                tr("Replacement applied: {documents} documents, {lines} lines.")
+                  .replace("{documents}", num(summary.replaced_documents))
+                  .replace("{lines}", num(summary.replaced_lines)),
+              );
+              await render();
+            },
+          ),
       });
     },
     payroll: async (c) => {
