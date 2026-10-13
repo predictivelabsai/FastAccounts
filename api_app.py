@@ -19,7 +19,7 @@ from automation import AutomationService, email_configured, email_status
 from banking import BankingService
 from connectors.registry import provider_metadata
 from database import get_database
-from documents import DocumentService
+from documents import DocumentService, EInvoiceAlreadyImported
 from excel_export import (employees_workbook, general_ledger_workbook,
                           invoices_workbook, vat_returns_workbook)
 from governance import GovernanceService
@@ -487,6 +487,20 @@ def create_bill(organisation_id: str, payload: BillIn, user: User = Depends(requ
     data = payload.model_dump()
     data["lines"] = [line.model_dump() for line in payload.lines]
     return DocumentService().create_bill(organisation_id, actor=user.email, **data)
+
+
+@api.post("/organisations/{organisation_id}/e-invoices/import", status_code=201)
+async def import_einvoice(organisation_id: str, file: UploadFile = File(...),
+                          user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    content = await file.read(int(os.getenv("MAX_ATTACHMENT_BYTES", "10485760")) + 1)
+    try:
+        return DocumentService().import_einvoice(
+            organisation_id, content=content, filename=file.filename or "e-invoice.xml", actor=user.email)
+    except EInvoiceAlreadyImported as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
 
 
 @api.post("/organisations/{organisation_id}/bills/{bill_id}/review")

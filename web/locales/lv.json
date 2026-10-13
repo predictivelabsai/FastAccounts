@@ -650,6 +650,12 @@
   },
   "nav.pricing": "Cenas",
   "workspace": {
+    "Import e-invoice": "Importēt e-rēķinu",
+    "Choose an Estonian e-arve XML file. The bill is saved as a draft for review, with the source file attached.": "Izvēlieties Igaunijas e-arve XML failu. Pirkuma rēķins tiks saglabāts kā melnraksts pārbaudei, pievienojot avota failu.",
+    "E-invoice XML file": "E-rēķina XML fails",
+    "Import draft bill": "Importēt pirkuma rēķina melnrakstu",
+    "Choose a non-empty e-invoice XML file.": "Izvēlieties e-rēķina XML failu, kas nav tukšs.",
+    "E-invoice imported as a draft bill.": "E-rēķins importēts kā pirkuma rēķina melnraksts.",
     "Create payment order": "Izveidot maksājuma uzdevumu",
     "Payment orders": "Maksājumu uzdevumi",
     "Execution date": "Maksājuma datums",

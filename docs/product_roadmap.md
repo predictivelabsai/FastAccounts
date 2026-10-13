@@ -909,3 +909,23 @@ pending.
   journal to avoid double counting. Existing document-based ageing and payment
   workflows do not treat these ledger-only entries as invoice/bill documents;
   their settlement and ageing support remain follow-up work.
+
+## 35. Estonian e-invoice export and purchase inbox (PR3, 2026-10-11)
+
+- [x] Write e-arve 1.2 sales XML with seller/buyer details, Decimal item amounts,
+  grouped VAT totals and optional bank payment information. Export only Issued,
+  Part Paid and Paid invoices; retain generic UK XML. No migration is required.
+- [x] Parse purchase e-arve XML independently of namespaces and validate item
+  arithmetic and declared net/VAT/gross totals at two-decimal precision.
+  Use synthetic fixtures and writer/parser round trips for intake consistency.
+- [x] Add a write-role, CSRF-protected upload route and Bills import dialog.
+  Resolve suppliers by tenant-scoped registry number, map tax codes by rate,
+  create a Draft bill and retain source XML evidence. Duplicate supplier invoice
+  numbers return a conflict. Translate the dialog in all four workspace locales.
+- [x] Register an explicit Planning stub for e-invoice operator delivery;
+  submission remains disabled pending Finbite/Omniva operator contracts.
+- [ ] Complete accountant UAT, independent schema/XSD validation and external
+  system acceptance checks. The writer is spec-faithful and review-gated, not
+  XSD-live-verified. Review supplier registry collisions and zero-rate or
+  reverse-charge tax-code choices before approval. See
+  [`e-invoices.md`](e-invoices.md) for schema details and intake boundaries.

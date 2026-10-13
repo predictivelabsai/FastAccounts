@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Invoice xmlns="urn:example.test:e-arve" invoiceId="SALE-2026-0012" regNumber="87654321" sellerRegNumber="12345678">
+  <InvoiceParties><SellerParty><Name>Näidis Müüja OÜ</Name><RegulatoryNumber>12345678</RegulatoryNumber><VATRegNumber>EE101234567</VATRegNumber></SellerParty><BuyerParty><Name>Näidis Klient OÜ</Name><RegulatoryNumber>87654321</RegulatoryNumber><PaymentRefNumber>10013</PaymentRefNumber></BuyerParty></InvoiceParties>
+  <InvoiceInformation><Type type="DEB"/><DocumentName>Arve</DocumentName><InvoiceNumber>SALE-2026-0012</InvoiceNumber><InvoiceDate>2026-10-02</InvoiceDate><DueDate>2026-10-16</DueDate></InvoiceInformation>
+  <InvoiceSumGroup><InvoiceSum>130.00</InvoiceSum><VAT><SumBeforeVAT>30.00</SumBeforeVAT><VATRate>9</VATRate><VATSum>2.70</VATSum><SumAfterVAT>32.70</SumAfterVAT></VAT><VAT><SumBeforeVAT>100.00</SumBeforeVAT><VATRate>24</VATRate><VATSum>24.00</VATSum><SumAfterVAT>124.00</SumAfterVAT></VAT><TotalVATSum>26.70</TotalVATSum><TotalSum>156.70</TotalSum><Currency>EUR</Currency></InvoiceSumGroup>
+    <InvoiceItem><InvoiceItemGroup>
+    <ItemEntry><ItemDescription>Nõustamine</ItemDescription><ItemDetailInfo><ItemUnit>h</ItemUnit><ItemAmount>2</ItemAmount><ItemPrice>50.00</ItemPrice></ItemDetailInfo><ItemSum>100.00</ItemSum><VAT><SumBeforeVAT>100.00</SumBeforeVAT><VATRate>24</VATRate><VATSum>24.00</VATSum><SumAfterVAT>124.00</SumAfterVAT></VAT><ItemTotalSum>124.00</ItemTotalSum></ItemEntry>
+    <ItemEntry><ItemDescription>Raamat</ItemDescription><ItemDetailInfo><ItemUnit>tk</ItemUnit><ItemAmount>3</ItemAmount><ItemPrice>10.00</ItemPrice></ItemDetailInfo><ItemSum>30.00</ItemSum><VAT><SumBeforeVAT>30.00</SumBeforeVAT><VATRate>9</VATRate><VATSum>2.70</VATSum><SumAfterVAT>32.70</SumAfterVAT></VAT><ItemTotalSum>32.70</ItemTotalSum></ItemEntry>
+  </InvoiceItemGroup></InvoiceItem>
+
+</Invoice>

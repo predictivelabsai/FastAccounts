@@ -1341,3 +1341,9 @@ class EMTATSDExportProvider:
     """TSD stays file-only; this class deliberately has no network client."""
     def submit(self, *_args, **_kwargs):
         raise PermissionError("e-MTA direct TSD filing is not enabled; use a reviewed manual-upload export")
+
+
+class EInvoiceOperatorProvider:
+    """Delivery stays disabled until a reviewed operator contract exists."""
+    def submit(self, *_args, **_kwargs):
+        raise PermissionError("E-invoice operator delivery is not enabled; Finbite/Omniva hosted delivery requires operator contracts")

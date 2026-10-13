@@ -8,11 +8,20 @@ from datetime import date, timedelta
 from decimal import Decimal
 from io import BytesIO
 from pathlib import Path
+import sqlite3
 from xml.etree.ElementTree import Element, SubElement, tostring
+
+from psycopg import IntegrityError as PostgresIntegrityError
+
+import einvoice
 
 from core_utils import audit, db_number, decimal, money, new_id, sha256_bytes, utc_now
 from database import Database, get_database
 from ledger import LedgerService, PostingLine
+
+
+class EInvoiceAlreadyImported(ValueError):
+    """A supplier invoice number already exists within this organisation."""
 
 
 class DocumentService:
@@ -71,9 +80,12 @@ class DocumentService:
         return self.db.one("SELECT * FROM items WHERE id=?", (item_id,)) or {}
 
     def _document_lines(self, tx, organisation_id: str, items: list[dict],
-                        amount_type: str) -> tuple[list[dict], Decimal, Decimal, Decimal]:
+                        amount_type: str, declared_vat: list[object] | None = None
+                        ) -> tuple[list[dict], Decimal, Decimal, Decimal]:
         if amount_type not in {"exclusive", "inclusive", "no_tax"} or not items:
             raise ValueError("At least one line and a valid amount type are required")
+        if declared_vat is not None and len(declared_vat) != len(items):
+            raise ValueError("Declared VAT must correspond to every bill line")
         result, subtotal, tax_total = [], Decimal("0"), Decimal("0")
         for index, item in enumerate(items, 1):
             quantity = decimal(item.get("quantity", 1))
@@ -104,6 +116,15 @@ class DocumentService:
                 net = money(raw)
                 tax_amount = money(net * rate / Decimal("100")) if amount_type != "no_tax" else money(0)
                 gross = money(net + tax_amount)
+            if declared_vat is not None:
+                declared_tax = money(declared_vat[index - 1])
+                declared_gross = money(net + declared_tax)
+                # Suppliers may round VAT from a gross price. Preserve that
+                # cent only when it reconciles exactly to the same net amount.
+                if declared_tax < 0 or (declared_tax != tax_amount and
+                        money(declared_gross / (Decimal(1) + rate / 100)) != net):
+                    raise ValueError("Declared bill VAT does not match exclusive or inclusive rounding")
+                tax_amount, gross = declared_tax, declared_gross
             row = {
                 "id": new_id(), "line_number": index,
                 "description": str(item.get("description") or "Item").strip(),
@@ -266,7 +287,7 @@ class DocumentService:
     def create_bill(self, organisation_id: str, *, contact_id: str, supplier_number: str,
                     bill_date: str, due_date: str, lines: list[dict], actor: str,
                     currency: str | None = None, reference: str = "", notes: str = "",
-                    document_type: str = "bill", tx=None) -> dict:
+                    document_type: str = "bill", declared_vat: list[object] | None = None, tx=None) -> dict:
         if document_type not in {"bill", "supplier_credit"} or not supplier_number.strip():
             raise ValueError("Valid supplier document details are required")
         if tx is None:
@@ -275,14 +296,15 @@ class DocumentService:
                     organisation_id, contact_id=contact_id, supplier_number=supplier_number,
                     bill_date=bill_date, due_date=due_date, lines=lines, actor=actor,
                     currency=currency, reference=reference, notes=notes,
-                    document_type=document_type, tx=owned_tx,
+                    document_type=document_type, declared_vat=declared_vat, tx=owned_tx,
                 )
         bill_id, now = new_id(), utc_now()
         organisation = tx.one("SELECT * FROM organisations WHERE id=?", (organisation_id,))
         contact = tx.one("SELECT * FROM contacts WHERE id=? AND organisation_id=?", (contact_id, organisation_id))
         if not organisation or not contact or contact["contact_type"] not in {"supplier", "both"}:
             raise ValueError("A supplier in this organisation is required")
-        calculated, subtotal, tax_total, total = self._document_lines(tx, organisation_id, lines, "exclusive")
+        calculated, subtotal, tax_total, total = self._document_lines(
+            tx, organisation_id, lines, "exclusive", declared_vat=declared_vat)
         tx.execute(
             "INSERT INTO bills(id,organisation_id,contact_id,document_type,supplier_number,bill_date,due_date,currency,reference,notes,subtotal,tax_total,total,created_by,created_at,updated_at) "
             "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
@@ -316,6 +338,88 @@ class DocumentService:
             raise KeyError("Bill not found")
         row["lines"] = self.db.rows("SELECT * FROM bill_lines WHERE bill_id=? ORDER BY line_number", (bill_id,))
         return row
+
+    def import_einvoice(self, organisation_id: str, *, content: bytes,
+                        filename: str, actor: str) -> dict:
+        """Validate and retain an XML purchase as a draft, without ledger posting."""
+        if not content or len(content) > int(os.getenv("MAX_ATTACHMENT_BYTES", "10485760")):
+            raise ValueError("E-invoice is empty or exceeds the configured size limit")
+        purchase = einvoice.parse_purchase(content)
+        evidence = None
+        try:
+            with self.db.transaction() as tx:
+                organisation = tx.one("SELECT * FROM organisations WHERE id=?", (organisation_id,))
+                if not organisation:
+                    raise KeyError("Organisation not found")
+                taxes = tx.rows(
+                    "SELECT * FROM tax_codes WHERE organisation_id=? AND active=1 "
+                    "AND country_code=? ORDER BY CASE kind WHEN 'standard' THEN 0 "
+                    "WHEN 'reduced' THEN 1 WHEN 'zero' THEN 2 ELSE 3 END,code,valid_from DESC,id",
+                    (organisation_id, organisation["country_code"]))
+                by_rate = {}
+                for tax in taxes:
+                    by_rate.setdefault(decimal(tax["rate"]), tax["id"])
+                unknown = sorted({item["vat_rate"] for item in purchase["items"]} - by_rate.keys())
+                if unknown:
+                    raise ValueError("Unknown VAT rates: " + ", ".join(format(rate, "f") for rate in unknown))
+                account_id = self._role_account(tx, organisation_id, "EXPENSE")
+                seller = purchase["seller"]
+                supplier = None
+                if seller.get("registration_no"):
+                    supplier = tx.one(
+                        "SELECT * FROM contacts WHERE organisation_id=? AND registration_no=? "
+                        "AND contact_type IN ('supplier','both') ORDER BY created_at,id LIMIT 1",
+                        (organisation_id, seller["registration_no"]))
+                # Registry matches retain the existing name. Without a registry code,
+                # reuse an exact name/VAT match so a repeated upload stays idempotent.
+                else:
+                    supplier = tx.one(
+                        "SELECT * FROM contacts WHERE organisation_id=? AND name=? "
+                        "AND COALESCE(vat_no,'')=? AND COALESCE(registration_no,'')='' "
+                        "AND contact_type IN ('supplier','both') ORDER BY created_at,id LIMIT 1",
+                        (organisation_id, seller["name"], seller.get("vat_no") or ""))
+                note = f"Imported from e-invoice {purchase['invoice_number']}"
+                if not supplier:
+                    supplier = self.create_contact(
+                        organisation_id, name=seller["name"], contact_type="supplier",
+                        registration_no=seller.get("registration_no") or "",
+                        vat_no=seller.get("vat_no") or "", email=seller.get("email") or "",
+                        address=seller.get("address") or "",
+                        country_code=seller.get("country_code") or "EE", tx=tx)
+                    audit(tx, organisation_id, actor, "contact.einvoice_imported", "contact", supplier["id"], {"note": note})
+                if tx.one("SELECT id FROM bills WHERE organisation_id=? AND contact_id=? AND supplier_number=?",
+                          (organisation_id, supplier["id"], purchase["invoice_number"])):
+                    raise EInvoiceAlreadyImported("Supplier invoice already imported")
+                lines = [dict(description=item["description"], quantity=item["quantity"],
+                              unit_price=item["unit_price"], account_id=account_id,
+                              tax_code_id=by_rate[item["vat_rate"]]) for item in purchase["items"]]
+                try:
+                    bill = self.create_bill(
+                        organisation_id, contact_id=supplier["id"], supplier_number=purchase["invoice_number"],
+                        bill_date=purchase["invoice_date"], due_date=purchase["due_date"] or purchase["invoice_date"],
+                        currency=purchase["currency"], reference=purchase["buyer_reference"],
+                        notes=note, lines=lines, actor=actor,
+                        declared_vat=[item["tax_amount"] for item in purchase["items"]], tx=tx)
+                except (sqlite3.IntegrityError, PostgresIntegrityError) as error:
+                    if (getattr(error, "sqlstate", None) == "23505" or
+                            getattr(error, "sqlite_errorname", "") == "SQLITE_CONSTRAINT_UNIQUE"):
+                        raise EInvoiceAlreadyImported("Supplier invoice already imported") from error
+                    raise
+                for source, stored in zip(purchase["items"], bill["lines"]):
+                    for key in ("net_amount", "tax_amount", "gross_amount"):
+                        difference = money(stored[key]) - money(source[key])
+                        if difference:
+                            raise ValueError(f"Imported line {key} differs by {difference:.2f}")
+                evidence = self.attach_evidence(
+                    organisation_id, owner_type="bill", owner_id=bill["id"],
+                    filename=filename, content_type="application/xml", content=content, actor=actor, tx=tx)
+                result = {"bill_id": bill["id"], "supplier": supplier["name"],
+                          "total": format(money(bill["total"]), ".2f"), "warnings": []}
+            return result
+        except Exception:
+            if evidence:
+                Path(evidence["storage_path"]).unlink(missing_ok=True)
+            raise
 
     def submit_bill_for_review(self, bill_id: str, *, actor: str) -> dict:
         with self.db.transaction() as tx:
@@ -468,7 +572,20 @@ class DocumentService:
         return tx.one("SELECT * FROM payments WHERE id=?", (payment_id,)) or {}
 
     def attach_evidence(self, organisation_id: str, *, owner_type: str, owner_id: str,
-                        filename: str, content_type: str, content: bytes, actor: str) -> dict:
+                        filename: str, content_type: str, content: bytes, actor: str, tx=None) -> dict:
+        if tx is None:
+            result = None
+            try:
+                with self.db.transaction() as owned_tx:
+                    result = self.attach_evidence(
+                        organisation_id, owner_type=owner_type, owner_id=owner_id,
+                        filename=filename, content_type=content_type, content=content,
+                        actor=actor, tx=owned_tx)
+                return result
+            except Exception:
+                if result:
+                    Path(result["storage_path"]).unlink(missing_ok=True)
+                raise
         max_size = int(os.getenv("MAX_ATTACHMENT_BYTES", "10485760"))
         if not content or len(content) > max_size:
             raise ValueError("Attachment is empty or exceeds the configured size limit")
@@ -478,25 +595,24 @@ class DocumentService:
         root = Path(os.getenv("FASTACCOUNTS_DATA_DIR", "./data")).resolve() / "attachments" / organisation_id
         target = root / f"{attachment_id}-{safe_name}"
         try:
-            with self.db.transaction() as tx:
-                self._evidence_owner(tx, organisation_id, owner_type, owner_id)
-                if tx.one("SELECT id FROM attachments WHERE organisation_id=? AND owner_type=? AND owner_id=? AND sha256=?",
-                          (organisation_id, owner_type, owner_id, digest)):
-                    raise ValueError("This evidence is already attached to this document")
-                root.mkdir(parents=True, exist_ok=True)
-                target.write_bytes(content)
-                tx.execute(
-                    "INSERT INTO attachments(id,organisation_id,owner_type,owner_id,filename,content_type,size_bytes,sha256,storage_path,uploaded_by,created_at) "
-                    "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-                    (attachment_id, organisation_id, owner_type, owner_id, safe_name,
-                     content_type, len(content), digest, str(target), actor, now),
-                )
-                audit(tx, organisation_id, actor, "evidence.attached", "attachment", attachment_id,
-                      {"owner_type": owner_type, "owner_id": owner_id, "sha256": digest})
+            self._evidence_owner(tx, organisation_id, owner_type, owner_id)
+            if tx.one("SELECT id FROM attachments WHERE organisation_id=? AND owner_type=? AND owner_id=? AND sha256=?",
+                      (organisation_id, owner_type, owner_id, digest)):
+                raise ValueError("This evidence is already attached to this document")
+            root.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(content)
+            tx.execute(
+                "INSERT INTO attachments(id,organisation_id,owner_type,owner_id,filename,content_type,size_bytes,sha256,storage_path,uploaded_by,created_at) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                (attachment_id, organisation_id, owner_type, owner_id, safe_name,
+                 content_type, len(content), digest, str(target), actor, now),
+            )
+            audit(tx, organisation_id, actor, "evidence.attached", "attachment", attachment_id,
+                  {"owner_type": owner_type, "owner_id": owner_id, "sha256": digest})
+            return tx.one("SELECT * FROM attachments WHERE id=?", (attachment_id,)) or {}
         except Exception:
             target.unlink(missing_ok=True)
             raise
-        return self.db.one("SELECT * FROM attachments WHERE id=?", (attachment_id,)) or {}
 
     @staticmethod
     def _evidence_owner(tx, organisation_id, owner_type, owner_id):
@@ -587,26 +703,17 @@ class DocumentService:
         """Produce an Estonian-style 1.2 review export or generic XML elsewhere."""
         invoice = self.invoice(invoice_id)
         organisation = self.db.one("SELECT * FROM organisations WHERE id=?", (invoice["organisation_id"],)) or {}
+        if invoice["status"] not in {"Issued", "Part Paid", "Paid"}:
+            raise ValueError("Only issued invoices can be exported as XML")
         if organisation.get("country_code") == "EE":
-            root = Element("E_Invoice")
-            header = SubElement(root, "Header")
-            SubElement(header, "Date").text = invoice["issue_date"]
-            SubElement(header, "FileId").text = invoice.get("number") or invoice["id"]
-            invoice_node = SubElement(root, "Invoice", invoiceId=invoice.get("number") or "DRAFT")
-            SubElement(invoice_node, "InvoiceParties")
-            content = SubElement(invoice_node, "InvoiceItem")
-            group = SubElement(content, "InvoiceItemGroup")
-            for item in invoice["lines"]:
-                row = SubElement(group, "ItemEntry")
-                SubElement(row, "Description").text = str(item["description"])
-                SubElement(row, "ItemAmount").text = str(item["quantity"])
-                SubElement(row, "ItemPrice").text = str(item["unit_price"])
-                SubElement(row, "ItemTotal").text = str(item["net_amount"])
-            total = SubElement(invoice_node, "InvoiceSumGroup")
-            SubElement(total, "InvoiceSum").text = str(invoice["subtotal"])
-            SubElement(total, "VAT").text = str(invoice["tax_total"])
-            SubElement(total, "TotalSum").text = str(invoice["total"])
-            return tostring(root, encoding="utf-8", xml_declaration=True)
+            contact = self.db.one(
+                "SELECT * FROM contacts WHERE id=? AND organisation_id=?",
+                (invoice["contact_id"], invoice["organisation_id"])) or {}
+            bank_account = self.db.one(
+                "SELECT * FROM bank_accounts WHERE organisation_id=? AND active=1 "
+                "AND iban IS NOT NULL AND TRIM(iban)<>'' ORDER BY name,id LIMIT 1",
+                (invoice["organisation_id"],))
+            return einvoice.e_arve_xml(organisation, contact, invoice, bank_account)
         root = Element("FastAccountsInvoice", version="1.0")
         for key in ("number", "document_type", "issue_date", "due_date", "currency"):
             SubElement(root, key).text = str(invoice.get(key) or "")

@@ -4,6 +4,46 @@ Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as
 delivered.
 
+## 2026-10-11: Estonian e-invoice export and purchase inbox (PR3)
+
+### Added
+
+- Added an isolated e-arve 1.2 XML writer with seller/buyer details, invoice
+  lines, grouped VAT totals and optional organisation IBAN payment information.
+  XML export accepts Issued, Part Paid and Paid invoices; drafts are rejected.
+  The UK generic XML branch remains available. No migration or configuration
+  change is required.
+- Added namespace-independent purchase parsing with Decimal item arithmetic
+  and declared net/VAT/gross consistency checks. Purchase upload creates a Draft
+  bill with supplier resolution, tax-code matching by rate and original XML
+  evidence. Duplicate supplier invoice numbers return an already-imported
+  conflict. The Bills dialog has English, Estonian, Lithuanian and Latvian copy.
+- Added the `einvoice_operator` Planning stub to the connector registry and
+  integration catalogue. Its submission boundary raises `PermissionError`;
+  Finbite/Omniva hosted delivery needs operator contracts.
+
+### Validation and boundaries
+
+- Verified `python -m pytest tests/ -q`: 510 passed, three optional PostgreSQL
+  integration tests skipped, with only existing dependency deprecation warnings.
+  English and Estonian import-dialog browser regressions ran with intercepted
+  requests. `python -m compileall -q .`, JavaScript syntax and staged diff checks
+  passed on local Python 3.14.6. No live provider calls were made.
+- Synthetic writer/parser round trips and purchase fixtures verify internal
+  declaration consistency. The writer is spec-faithful and review-gated, not
+  live-verified against a schema/XSD. Accountant UAT and external schema/operator
+  acceptance remain pending. No live operator delivery is implemented.
+- Supplier matching uses tenant-scoped `registration_no` and `contact_type`
+  supplier/both. Existing matched contacts retain their names. Contacts have no
+  note column, so import provenance is stored on the draft bill and source XML
+  evidence. Registry collisions and numeric zero-rate/reverse-charge tax-code
+  choices require review. Bills already enforce uniqueness by organisation,
+  supplier contact and supplier invoice number. Details are in
+  [`e-invoices.md`](e-invoices.md), synchronised with roadmap section 35.
+- Preserve valid inclusive VAT rounding during purchase intake, including
+  recoverable VAT and subsequent balanced bill approval. Ordinary bill creation
+  retains its existing net-based calculation unless validated VAT is supplied.
+
 ## 2026-10-11: Opening balances and opening receivables/payables (PR2)
 
 ### Added

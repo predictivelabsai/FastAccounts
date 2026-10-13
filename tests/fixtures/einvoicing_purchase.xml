@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<E_Invoice>
+  <Header><Date>2026-10-01</Date><FileId>synthetic-purchase-2026-41</FileId><Version>1.2</Version></Header>
+  <Invoice invoiceId="SUP-2026-0041" regNumber="12345678" sellerRegNumber="87654321">
+    <InvoiceParties>
+      <SellerParty><Name>Näidis Tarnija OÜ</Name><RegulatoryNumber>87654321</RegulatoryNumber><VATRegNumber>EE108765432</VATRegNumber><ContactData><EmailAddress>supplier@example.test</EmailAddress><PostalAddress><PostalAddress1>Näidise tee 4, Tallinn</PostalAddress1><Country>EE</Country></PostalAddress></ContactData></SellerParty>
+      <BuyerParty><Name>Näidis Ostja OÜ</Name><RegulatoryNumber>12345678</RegulatoryNumber><PaymentRefNumber>10013</PaymentRefNumber></BuyerParty>
+    </InvoiceParties>
+    <InvoiceInformation><Type type="DEB"/><DocumentName>Arve</DocumentName><InvoiceNumber>SUP-2026-0041</InvoiceNumber><InvoiceDate>2026-10-01</InvoiceDate><DueDate>2026-10-15</DueDate></InvoiceInformation>
+    <InvoiceSumGroup><InvoiceSum>130.00</InvoiceSum><VAT><SumBeforeVAT>30.00</SumBeforeVAT><VATRate>9</VATRate><VATSum>2.70</VATSum><SumAfterVAT>32.70</SumAfterVAT></VAT><VAT><SumBeforeVAT>100.00</SumBeforeVAT><VATRate>24</VATRate><VATSum>24.00</VATSum><SumAfterVAT>124.00</SumAfterVAT></VAT><TotalVATSum>26.70</TotalVATSum><TotalSum>156.70</TotalSum><Currency>EUR</Currency></InvoiceSumGroup>
+    <InvoiceItem><InvoiceItemGroup>
+      <ItemEntry><ItemDescription>Raamatupidamisteenus</ItemDescription><ItemDetailInfo><ItemUnit>h</ItemUnit><ItemAmount>2</ItemAmount><ItemPrice>50.00</ItemPrice></ItemDetailInfo><ItemSum>100.00</ItemSum><VAT><SumBeforeVAT>100.00</SumBeforeVAT><VATRate>24</VATRate><VATSum>24.00</VATSum><SumAfterVAT>124.00</SumAfterVAT></VAT><ItemTotalSum>124.00</ItemTotalSum></ItemEntry>
+      <ItemEntry><ItemDescription>Õpik</ItemDescription><ItemDetailInfo><ItemUnit>tk</ItemUnit><ItemAmount>3</ItemAmount><ItemPrice>10.00</ItemPrice></ItemDetailInfo><ItemSum>30.00</ItemSum><VAT><SumBeforeVAT>30.00</SumBeforeVAT><VATRate>9</VATRate><VATSum>2.70</VATSum><SumAfterVAT>32.70</SumAfterVAT></VAT><ItemTotalSum>32.70</ItemTotalSum></ItemEntry>
+    </InvoiceItemGroup></InvoiceItem>
+
+    <PaymentInfo><Currency>EUR</Currency><PaymentDescription>SUP-2026-0041</PaymentDescription><Payable>YES</Payable><PaymentTotalSum>156.70</PaymentTotalSum><PaymentDueDate>2026-10-15</PaymentDueDate><PaymentReferenceNumber>10013</PaymentReferenceNumber><PaymentId>SUP-2026-0041</PaymentId><PayToAccount>EE471000001020145685</PayToAccount><PayToName>Näidis Tarnija OÜ</PayToName></PaymentInfo>
+  </Invoice>
+  <Footer><TotalNumberInvoices>1</TotalNumberInvoices><TotalAmount>156.70</TotalAmount></Footer>
+</E_Invoice>
