@@ -343,7 +343,7 @@ def test_api_authorisation_csrf_and_workflow(db, offer, uk_org, monkeypatch):
         old = client.post(base, json={**data, 'quote_date':'2000-01-01','valid_until':'2000-01-02'}).json()
         assert client.post(base + '/' + old['id'] + '/expire-status').json()['status'] == 'Expired'
     routes = [r for r in api.routes if '/quotes' in r.path]
-    assert len(routes) == 9
+    assert len(routes) == 10  # Nine workflow routes plus the read-only CSV export.
     for route in routes:
         assert (current_user if route.methods == {'GET'} else require_csrf) in [d.call for d in route.dependant.dependencies]
     api.dependency_overrides[current_user] = lambda: User(email=ACTOR)
