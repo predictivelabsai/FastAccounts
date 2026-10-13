@@ -21,6 +21,7 @@ from banking import BankingService
 from connectors.registry import provider_metadata
 from database import get_database
 from documents import DocumentService, EInvoiceAlreadyImported
+from statements import StatementService
 from excel_export import (employees_workbook, general_ledger_workbook,
                           invoices_workbook, vat_returns_workbook)
 from governance import GovernanceService
@@ -744,6 +745,30 @@ def report_workbook(organisation_id: str, book: str, date_from: str | None = Non
 def receivables_aging(organisation_id: str, as_at: str, user: User = Depends(current_user)):
     _require(organisation_id, user, {"owner", "administrator", "accountant", "viewer"})
     return LedgerService().receivables_aging(organisation_id, as_at=as_at)
+
+
+@api.get("/organisations/{organisation_id}/contacts/{contact_id}/statement")
+def contact_statement(organisation_id: str, contact_id: str, date_from: str, date_to: str,
+                      side: str = "customer", eur_rate: str | None = None,
+                      user: User = Depends(current_user)):
+    from decimal import Decimal
+    from fastapi.encoders import jsonable_encoder
+    _require(organisation_id, user, {"owner", "administrator", "accountant", "viewer"})
+    statement = StatementService().statement(organisation_id, contact_id, date_from=date_from,
+                                             date_to=date_to, side=side, eur_rate=eur_rate)
+    return JSONResponse(jsonable_encoder(statement, custom_encoder={Decimal: str}))
+
+
+@api.get("/organisations/{organisation_id}/contacts/{contact_id}/statement.pdf")
+def contact_statement_pdf(organisation_id: str, contact_id: str, date_from: str, date_to: str,
+                          side: str = "customer", eur_rate: str | None = None,
+                          user: User = Depends(current_user)):
+    _require(organisation_id, user, {"owner", "administrator", "accountant", "viewer"})
+    service = StatementService()
+    statement = service.statement(organisation_id, contact_id, date_from=date_from,
+                                  date_to=date_to, side=side, eur_rate=eur_rate)
+    return Response(service.pdf(statement), media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="{service.filename(statement)}"'})
 
 
 @api.get("/organisations/{organisation_id}/reports/payables-aging")
