@@ -36,7 +36,7 @@ def test_migration_count_rerun_and_ci(sending):
     for _ in range(2):
         with d["db"].transaction() as tx:
             tx.execute("DELETE FROM schema_migrations WHERE version='0030_master_data_maintenance'")
-        assert d["db"].migrate() == ["0030_master_data_maintenance", "0031_master_data_groups"]
+        assert d["db"].migrate() == ["0030_master_data_maintenance"]
     assert d["db"].rows("SELECT name FROM pragma_table_info('contacts') WHERE name='active'")
     assert "'0029_copilot', '0030_master_data_maintenance', '0031_master_data_groups']" in (ROOT / ".github/workflows/ci.yml").read_text()
 

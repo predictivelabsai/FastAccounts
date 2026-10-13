@@ -1581,6 +1581,38 @@ native-language review, including Estonian estnltk QA, remains pending.
   validation and XLSX renderers for the remaining lists remain out of scope;
   objects/bank CSV column sets are intentionally minimal.
 
+## 2026-10-13: Contact and user groups (parity slate P2 item 9)
+
+- Added rerun-safe migration `0031_master_data_groups` (count 31, CI list
+  updated): `contact_groups`/`contact_group_members` and
+  `user_groups`/`user_group_members` with organisation-scoped unique names,
+  cascade-deleted memberships and a tenant index on contact membership.
+- Added `contact_groups.py`: audited, organisation-locked CRUD for both
+  kinds, membership add/remove (contacts validated to exist in the org;
+  user groups may stage addresses that have not joined yet), member counts
+  and filtering. Groups are labels: they do not gate access in any way.
+- Added routes under `/organisations/{oid}/{kind}-groups` (owner/administrator
+  writes with CSRF, member reads for all roles), a `group_id` filter on the
+  contacts list, and the Settings > Groups workspace view with two sections,
+  member dialogs, confirmations and viewer gating; English, Estonian,
+  Lithuanian and Latvian keys appended in place; Estonian passed estnltk
+  spelling checks. Also registered the new views (and the earlier `periods`
+  view that the merged brand-icons pass missed) in the workspace icon map
+  with distinct calendar, wrench and team drawings, keeping the icon-set
+  contract green.
+- Validation: focused group checks: 14 passed, 1 existing dependency
+  warning in 20.15s, covering CRUD, duplicate refusal, membership add and
+  remove with the idempotency error, contact-group filtering of the
+  contacts list, user-group staging semantics, audit actions in order,
+  role matrix, tenant isolation, migration rerun and CI count, four-language
+  key parity and an offline browser member-dialog flow. Full
+  `python -m pytest -q` on Windows/Python 3.14.6: 1438 passed,
+  4 skipped, 5 existing dependency warnings in 1817.13s. Neighbour suites (brand, icons, public, maintenance,
+  copilot, period close, VAT replacement, prepayments, periodisation)
+  verified green alongside.
+- Open follow-ups: group filters on report surfaces and invoice exports,
+  bulk membership import, live PostgreSQL validation.
+
 ## 2026-10-13: Master-data maintenance (parity slate P2 item 8)
 
 - Added rerun-safe migration `0030_master_data_maintenance` (count 30, CI

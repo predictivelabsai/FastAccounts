@@ -719,60 +719,61 @@ def _group_roles(write: bool):
     return READ_ROLES
 
 
-@api.get('/organisations/{organisation_id}/{kind}-groups')
-def list_groups(organisation_id: str, kind: str, user: User = Depends(current_user)):
-    if kind not in GROUP_KINDS:
-        raise KeyError("Group kind not found")
-    _require(organisation_id, user, READ_ROLES)
-    return GroupService().list_groups(organisation_id, kind)
 
 
-@api.post('/organisations/{organisation_id}/{kind}-groups', status_code=201)
-def create_group(organisation_id: str, kind: str, payload: GroupCreateIn,
-                 user: User = Depends(require_csrf)):
-    if kind not in GROUP_KINDS:
-        raise KeyError("Group kind not found")
-    _require(organisation_id, user, _group_roles(True))
-    return GroupService().create_group(organisation_id, kind, payload.name, actor=user.email)
 
 
-@api.get('/organisations/{organisation_id}/{kind}-groups/{group_id}/members')
-def group_members(organisation_id: str, kind: str, group_id: str,
-                  user: User = Depends(current_user)):
-    if kind not in GROUP_KINDS:
-        raise KeyError("Group kind not found")
-    _require(organisation_id, user, READ_ROLES)
-    return GroupService().members(organisation_id, kind, group_id)
 
 
-@api.post('/organisations/{organisation_id}/{kind}-groups/{group_id}/members', status_code=201)
-def add_group_member(organisation_id: str, kind: str, group_id: str, payload: GroupMemberIn,
-                     user: User = Depends(require_csrf)):
-    if kind not in GROUP_KINDS:
-        raise KeyError("Group kind not found")
-    _require(organisation_id, user, _group_roles(True))
-    GroupService().add_member(organisation_id, kind, group_id, payload.member, actor=user.email)
-    return GroupService().members(organisation_id, kind, group_id)
 
 
-@api.delete('/organisations/{organisation_id}/{kind}-groups/{group_id}/members/{member}')
-def remove_group_member(organisation_id: str, kind: str, group_id: str, member: str,
-                        user: User = Depends(require_csrf)):
-    if kind not in GROUP_KINDS:
-        raise KeyError("Group kind not found")
-    _require(organisation_id, user, _group_roles(True))
-    GroupService().remove_member(organisation_id, kind, group_id, member, actor=user.email)
-    return {'removed': True}
 
 
-@api.delete('/organisations/{organisation_id}/{kind}-groups/{group_id}')
-def delete_group(organisation_id: str, kind: str, group_id: str,
-                 user: User = Depends(require_csrf)):
-    if kind not in GROUP_KINDS:
-        raise KeyError("Group kind not found")
-    _require(organisation_id, user, _group_roles(True))
-    GroupService().delete_group(organisation_id, kind, group_id, actor=user.email)
-    return {'deleted': True}
+
+
+def _register_group_routes(kind: str) -> None:
+    """Explicit per-kind registrations; asset-groups keeps its own handler."""
+
+    @api.get(f'/organisations/{{organisation_id}}/{kind}-groups')
+    def _list_groups(organisation_id: str, user: User = Depends(current_user)):
+        _require(organisation_id, user, READ_ROLES)
+        return GroupService().list_groups(organisation_id, kind)
+
+    @api.post(f'/organisations/{{organisation_id}}/{kind}-groups', status_code=201)
+    def _create_group(organisation_id: str, payload: GroupCreateIn,
+                      user: User = Depends(require_csrf)):
+        _require(organisation_id, user, _group_roles(True))
+        return GroupService().create_group(organisation_id, kind, payload.name, actor=user.email)
+
+    @api.get(f'/organisations/{{organisation_id}}/{kind}-groups/{{group_id}}/members')
+    def _group_members(organisation_id: str, group_id: str, user: User = Depends(current_user)):
+        _require(organisation_id, user, READ_ROLES)
+        return GroupService().members(organisation_id, kind, group_id)
+
+    @api.post(f'/organisations/{{organisation_id}}/{kind}-groups/{{group_id}}/members', status_code=201)
+    def _add_group_member(organisation_id: str, group_id: str, payload: GroupMemberIn,
+                          user: User = Depends(require_csrf)):
+        _require(organisation_id, user, _group_roles(True))
+        GroupService().add_member(organisation_id, kind, group_id, payload.member, actor=user.email)
+        return GroupService().members(organisation_id, kind, group_id)
+
+    @api.delete(f'/organisations/{{organisation_id}}/{kind}-groups/{{group_id}}/members/{{member}}')
+    def _remove_group_member(organisation_id: str, group_id: str, member: str,
+                             user: User = Depends(require_csrf)):
+        _require(organisation_id, user, _group_roles(True))
+        GroupService().remove_member(organisation_id, kind, group_id, member, actor=user.email)
+        return {'removed': True}
+
+    @api.delete(f'/organisations/{{organisation_id}}/{kind}-groups/{{group_id}}')
+    def _delete_group(organisation_id: str, group_id: str, user: User = Depends(require_csrf)):
+        _require(organisation_id, user, _group_roles(True))
+        GroupService().delete_group(organisation_id, kind, group_id, actor=user.email)
+        return {'deleted': True}
+
+
+_register_group_routes('contact')
+_register_group_routes('user')
+
 
 
 @api.get('/organisations/{organisation_id}/contacts/export.csv')

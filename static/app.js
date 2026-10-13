@@ -123,6 +123,9 @@
     path = (s) => `/organisations/${encodeURIComponent(org.id)}${s}`;
   // FastAccounts line icons: 24px grid, 1.75 stroke, round caps and joins (docs/brand/icons.md).
   const ICONS = {
+    calendar: "M4 6h16v14H4z M4 10h16 M8 3.5V7 M16 3.5V7",
+    wrench: "M14.5 6.5a4.5 4.5 0 0 0-6 6L4 17l3 3 4.5-4.5a4.5 4.5 0 0 0 6-6L14 12l-2.5-2.5z",
+    team: "M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M2.5 20v-1a5 5 0 0 1 8-4 M17 13.5a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M13.5 20v-1a5 5 0 0 1 8-4",
     home: "M4 10.5 12 4l8 6.5V20H4z M10 20v-5h4v5",
     invoice: "M6 3h8l4 4v14H6z M14 3v4h4 M9 11h6 M9 14.5h6 M9 18h3",
     quote: "M4 5h16v11H10l-4.5 3.5V16H4z M8 9h8 M8 12.5h5",
@@ -163,6 +166,9 @@
     imports: "import", "payment-methods": "card", "reminder-rules": "bell",
     "exchange-rates": "exchange", objects: "tag", documents: "appearance",
     copilot: "assistant",
+    periods: "calendar",
+    maintenance: "wrench",
+    groups: "team",
   };
   const icon = (name = "document") =>
     `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${ICONS[name] || ICONS.document}"/></svg>`;
