@@ -641,7 +641,29 @@
     "mail_reset_subject": "FastAccountsi parooli lähtestamine",
     "mail_reset_body": "Kasuta seda linki FastAccountsi uue parooli määramiseks:",
     "mail_reset_expiry": "Link kehtib ühe tunni ja töötab ühe korra.",
-    "mail_ignore": "Kui sa seda ei taotlenud, võid selle kirja tähelepanuta jätta."
+    "mail_ignore": "Kui sa seda ei taotlenud, võid selle kirja tähelepanuta jätta.",
+    "mfa_title": "Kaheastmeline autentimine",
+    "mfa_code": "Autentimisrakenduse kood või taastekood",
+    "mfa_challenge": "Jätka",
+    "mfa_challenge_intro": "Sisesta autentimisrakenduse kood või kasutamata taastekood.",
+    "mfa_enroll": "Seadista kaheastmeline autentimine",
+    "mfa_enroll_help": "Autentimisrakenduse seadistamiseks kinnita oma parool. Ainult Google'i kontoga kasutajad peavad esmalt parooli lähtestamise vormi kaudu parooli määrama.",
+    "mfa_restart": "Alusta seadistamist uuesti",
+    "mfa_setup_help": "Lisa see salajane võti autentimisrakendusse ja sisesta seejärel rakenduse kuuekohaline kood.",
+    "mfa_secret": "Salajane seadistusvõti",
+    "mfa_uri": "Autentimisrakenduse URI",
+    "mfa_activate": "Aktiveeri",
+    "mfa_enabled": "Kaheastmeline autentimine on lubatud.",
+    "mfa_disabled": "Kaheastmeline autentimine on keelatud.",
+    "mfa_disable": "Keela kaheastmeline autentimine",
+    "mfa_codes": "Loo uued taastekoodid",
+    "mfa_recovery_title": "Taastekoodid",
+    "mfa_recovery_help": "Hoia neid koode turvalises kohas. Iga koodi saab kasutada ühe korra. Koode hiljem enam ei kuvata.",
+    "mfa_acknowledge": "Olen koodid turvaliselt salvestanud",
+    "mfa_back": "Tagasi töölauale",
+    "mfa_error_code": "Kood on vale või juba kasutatud.",
+    "mfa_error_state": "Seadistamine pole võimalik. Laadi leht uuesti ja proovi veel kord.",
+    "mfa_error_expired": "Sisselogimise aeg on lõppenud. Logi uuesti sisse."
   },
   "login": {
     "title": "Sisselogimine",
@@ -1462,7 +1484,8 @@
     "Only Accepted quotes can be converted": "Arveks saab muuta ainult vastu võetud pakkumisi",
     "Quote not found": "Pakkumist ei leitud",
     "Quote fields cannot be null": "Pakkumise väljad ei saa olla tühiväärtusega",
-    "Notes": "Märkused"
+    "Notes": "Märkused",
+    "Two-factor authentication": "Kaheastmeline autentimine"
   },
   "views": {
     "overview": "Ülevaade",

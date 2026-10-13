@@ -177,7 +177,13 @@ class Database:
                 for path in sorted(directory.glob("*.sql")):
                     if path.stem in done:
                         continue
-                    connection.executescript(path.read_text(encoding="utf-8"))
+                    script = path.read_text(encoding="utf-8")
+                    if path.stem == "0027_mfa":
+                        columns = {row[1] for row in connection.execute("PRAGMA table_info(user_accounts)")}
+                        script = re.sub(
+                            r"ALTER TABLE user_accounts ADD COLUMN (\w+)[^;]*;",
+                            lambda match: "" if match[1] in columns else match[0], script)
+                    connection.executescript(script)
                     connection.execute(
                         "INSERT INTO schema_migrations(version,applied_at) VALUES (?,datetime('now'))",
                         (path.stem,),

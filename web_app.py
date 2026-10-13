@@ -4,6 +4,7 @@ from __future__ import annotations
 import hmac
 import os
 import secrets
+import time
 from urllib.parse import quote, unquote, urlsplit
 
 from dotenv import load_dotenv
@@ -24,7 +25,7 @@ from web import account_auth, google_auth, i18n
 from web.account_auth import accounts, client_address, csrf_ok, establish_session, form_csrf
 from web.public import (about_page, changelog_page, contact_page,
                         integrations_page, landing_page, login_page, privacy_page,
-                        password_token_page, roadmap_page, security_page,
+                        mfa_page, password_token_page, roadmap_page, security_page,
                         terms_page, workspace_page)
 
 
@@ -144,6 +145,7 @@ def google_start(request, session):
         return RedirectResponse("/login?error=Google+sign-in+is+not+configured", status_code=303)
     state = google_auth.new_state()
     session["google_oauth_state"] = state
+    session["google_next"] = _safe_return_path(request.query_params.get("next", ""))
     return RedirectResponse(google_auth.authorize_url(request, state), status_code=303)
 
 
@@ -156,8 +158,11 @@ def google_callback(request, session, code: str = "", state: str = ""):
     if not user:
         return RedirectResponse("/login?error=Google+sign-in+failed", status_code=303)
     account = accounts.link_google(user["email"], user.get("name", ""))
+    next_path = session.pop("google_next", "")
+    if account and account["totp_enabled"]:
+        return _mfa_start(session, account, "google", next_path)
     establish_session(session, {**(account or {}), **user, "session_version": (account or {}).get("session_version", 1)}, "google")
-    return RedirectResponse("/app", status_code=303)
+    return RedirectResponse(next_path if next_path and next_path != "/" else "/app", status_code=303)
 
 
 @rt("/auth/test")
@@ -167,6 +172,8 @@ def test_login(session, email: str = "demo@fastaccounts.local"):
         return PlainTextResponse("Not found", status_code=404)
     email = email.strip().lower()
     account = accounts.get(email) or {}
+    if account.get("totp_enabled"):
+        return _mfa_start(session, account, "test")
     establish_session(session, {"email": email, "name": "Demo Kasutaja",
                                 "session_version": account.get("session_version", 1)}, "test")
     return RedirectResponse("/app", status_code=303)
@@ -209,6 +216,8 @@ async def local_login(request, session):
             accounts.hit(email, "login")
         return respond(401, "error_credentials")
     accounts.clear(email, "login")
+    if account["totp_enabled"]:
+        return _mfa_start(session, account, "password", next_path)
     establish_session(session, account, "password")
     target = next_path if next_path and next_path != "/" else "/app"
     return RedirectResponse(target, status_code=303)
@@ -297,8 +306,113 @@ async def local_verify_submit(request, session):
         return _token_page(session, request, "verify", token, status=400, error_key="error_verify_failed")
     if not google_auth.access_allowed(account["email"]):
         return RedirectResponse("/login?notice=verified", status_code=303)
+    if account["totp_enabled"]:
+        return _mfa_start(session, account, "password")
     establish_session(session, account, "password")
     return RedirectResponse("/app", status_code=303)
+
+
+def _mfa_start(session, account, method, next_path=""):
+    session.pop("user", None)
+    session.pop("mfa_enrol", None)
+    form_csrf(session)
+    session["mfa_pending"] = {"email": account["email"], "token": secrets.token_urlsafe(16),
+                              "created": int(time.time()), "method": method,
+                              "sv": account["session_version"], "next_path": _safe_return_path(next_path)}
+    return RedirectResponse("/mfa", status_code=303)
+
+
+def _mfa_pending(session):
+    pending = session.get("mfa_pending")
+    if not isinstance(pending, dict):
+        return None
+    account = accounts.get(pending.get("email", ""))
+    if (not account or not account["totp_enabled"] or not account["email_verified"]
+            or not google_auth.access_allowed(account["email"])
+            or pending.get("sv") != account["session_version"]
+            or not 0 <= time.time() - pending.get("created", 0) < 600):
+        session.pop("mfa_pending", None)
+        return None
+    return pending
+
+
+def _mfa_user(session):
+    user = session.get("user")
+    if not account_auth.session_user_valid(user):
+        session.pop("user", None)
+        return None
+    return accounts.get(user["email"])
+
+
+def _mfa_response(session, request, *, status=200, error="", recovery=None):
+    pending = _mfa_pending(session)
+    account = None if pending else _mfa_user(session)
+    lang = _page_language(session, request)
+    secret = ""
+    if account and not account["totp_enabled"] and account["totp_secret"]:
+        if session.get("mfa_enrol") == account_auth.token_digest(account["totp_secret"]):
+            secret = account["totp_secret"]
+    page = mfa_page(account, lang, csrf=form_csrf(session), pending=pending, secret=secret,
+                    recovery=recovery, error=_auth_text(error, lang) if error else "")
+    return HTMLResponse("<!doctype html>\n" + to_xml(page), status_code=status, headers=NO_STORE)
+
+
+@rt("/mfa")
+def mfa_security(session, request):
+    if not _mfa_pending(session) and not _mfa_user(session):
+        return RedirectResponse("/login", status_code=303)
+    return _mfa_response(session, request)
+
+
+@rt("/auth/mfa/{action}", methods=["POST"])
+async def mfa_submit(action: str, session, request):
+    if action not in {"challenge", "enroll", "activate", "disable", "codes"}:
+        return PlainTextResponse("Not found", status_code=404)
+    form = await _auth_form(request)
+    respond = lambda status, error: _mfa_response(session, request, status=status, error=error)
+    if not csrf_ok(session, form.get("csrf_token")):
+        return respond(403, "error_session_expired")
+    pending = _mfa_pending(session) if action == "challenge" else None
+    account = accounts.get(pending["email"]) if pending else _mfa_user(session)
+    if not account or (action == "challenge" and not pending):
+        return respond(401, "mfa_error_expired")
+    email, ip = account["email"], client_address(request)
+    if not accounts.consume(email, "mfa_email") or not accounts.consume(ip, "mfa_ip"):
+        return respond(429, "error_rate_limited")
+    if action in {"enroll", "disable", "codes"}:
+        if accounts.limited(email, "login") or accounts.limited(ip, "login_ip"):
+            return respond(429, "error_rate_limited")
+        if not account_auth.verify_password(form.get("password", ""), account["password_hash"]):
+            accounts.hit(email, "login")
+            accounts.hit(ip, "login_ip")
+            return respond(401, "error_credentials")
+    try:
+        value = form.get("code", "").strip()[:128]
+        if action == "challenge":
+            if not hmac.compare_digest(form.get("token", ""), pending["token"]):
+                return respond(403, "error_session_expired")
+            result = accounts.challenge(email, value, session_version=pending["sv"])
+            if not result:
+                return respond(401, "mfa_error_code")
+            target = _safe_return_path(pending.get("next_path", ""))
+            establish_session(session, result, pending["method"] + "+totp")
+            return RedirectResponse(target if target != "/" else "/app", status_code=303)
+        if action == "enroll":
+            result = accounts.enroll(email, regenerate=form.get("regenerate") == "1")
+            session["mfa_enrol"] = account_auth.token_digest(result["totp_secret"])
+        elif action == "activate":
+            if (not account["totp_secret"] or session.get("mfa_enrol") != account_auth.token_digest(account["totp_secret"])):
+                return respond(403, "mfa_error_state")
+            recovery = accounts.activate(email, value)
+            session.pop("mfa_enrol", None)
+            return _mfa_response(session, request, recovery=recovery)
+        elif action == "disable":
+            accounts.disable(email, value, form.get("password", ""))
+        else:
+            return _mfa_response(session, request, recovery=accounts.codes(email, value, form.get("password", "")))
+    except ValueError as error:
+        return respond(400, str(error))
+    return _mfa_response(session, request)
 
 
 @rt("/app")
