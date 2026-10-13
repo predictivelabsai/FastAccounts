@@ -233,36 +233,88 @@
           "title": "Available",
           "intro": "Implemented product paths that can be used within the boundaries stated here.",
           "items": [
-            {"title": "Public foundation", "date": "2026-08-10", "body": "Landing page, integrations catalogue, health identity and guarded sign-in were released before the first recorded application version.", "market": "UK + Estonia"},
-            {"title": "Core bookkeeping 0.2.0", "date": "2026-08-10", "body": "Invoices, bills, evidence, statement import and reconciliation, immutable double-entry accounting, reports and reviewable VAT workpapers are implemented.", "market": "UK + Estonia"},
-            {"title": "Accounts and workflows 0.3.0–0.4.0", "date": "2026-10-09", "body": "Recurring invoices, reminders, reviewed employee file and FastHR imports, and email/password accounts are implemented with no-network test coverage.", "market": "UK + Estonia"}
+            {
+              "title": "Public foundation",
+              "date": "2026-08-10",
+              "body": "Landing page, integrations catalogue, health identity and guarded sign-in were released before the first recorded application version.",
+              "market": "UK + Estonia"
+            },
+            {
+              "title": "Core bookkeeping 0.2.0",
+              "date": "2026-08-10",
+              "body": "Invoices, bills, evidence, statement import and reconciliation, immutable double-entry accounting, reports and reviewable VAT workpapers are implemented.",
+              "market": "UK + Estonia"
+            },
+            {
+              "title": "Accounts and workflows 0.3.0–0.4.0",
+              "date": "2026-10-09",
+              "body": "Recurring invoices, reminders, reviewed employee file and FastHR imports, and email/password accounts are implemented with no-network test coverage.",
+              "market": "UK + Estonia"
+            }
           ]
         },
         {
           "title": "Review required",
           "intro": "Implemented work that awaits external verification or production UAT.",
           "items": [
-            {"title": "Independent accountant UAT", "body": "Validate UK VAT, Estonian KMD and Estonian bureau payroll with qualified accountants before making professional-validation claims.", "market": "UK + Estonia"},
-            {"title": "Provider verification", "body": "Verify QuickBooks, Xero, Merit Aktiva, BambooHR and Personio with permitted customer or test-company credentials while keeping imports reviewed and tenant-scoped.", "market": "Both markets"}
+            {
+              "title": "Independent accountant UAT",
+              "body": "Validate UK VAT, Estonian KMD and Estonian bureau payroll with qualified accountants before making professional-validation claims.",
+              "market": "UK + Estonia"
+            },
+            {
+              "title": "Provider verification",
+              "body": "Verify QuickBooks, Xero, Merit Aktiva, BambooHR and Personio with permitted customer or test-company credentials while keeping imports reviewed and tenant-scoped.",
+              "market": "Both markets"
+            }
           ]
         },
         {
           "title": "Pilot",
           "intro": "Limited journeys available for evaluation, with explicit production boundaries.",
           "items": [
-            {"title": "Hosted service", "body": "The managed hosting journey is offered only under a separate customer agreement while operational evidence is completed.", "market": "Both markets"},
-            {"title": "Estonian bureau payroll 0.2.1", "date": "2026-10-08", "body": "Part-time and hourly payroll, social-tax minimum handling and synthetic demonstrations are implemented; production use remains Review required.", "market": "Estonia"},
-            {"title": "Tax workpaper and export paths", "body": "UK VAT and Estonian KMD workpapers and exports are available for evaluation. Direct filing is Planned.", "market": "UK + Estonia"}
+            {
+              "title": "Hosted service",
+              "body": "The managed hosting journey is offered only under a separate customer agreement while operational evidence is completed.",
+              "market": "Both markets"
+            },
+            {
+              "title": "Estonian bureau payroll 0.2.1",
+              "date": "2026-10-08",
+              "body": "Part-time and hourly payroll, social-tax minimum handling and synthetic demonstrations are implemented; production use remains Review required.",
+              "market": "Estonia"
+            },
+            {
+              "title": "Tax workpaper and export paths",
+              "body": "UK VAT and Estonian KMD workpapers and exports are available for evaluation. Direct filing is Planned.",
+              "market": "UK + Estonia"
+            }
           ]
         },
         {
           "title": "Planned",
           "intro": "Capabilities that are not yet implemented or included in the current service promise.",
           "items": [
-            {"title": "Managed-service operations", "body": "Name the hosting subprocessor and data location, complete encrypted backup/restore drills and add incident alerting, edge rate limits and malware scanning.", "market": "Both markets"},
-            {"title": "Read-only open banking", "body": "Add provider selection, reconnect, scheduled pulls and monitoring after legal, commercial and bank-coverage review.", "market": "UK + Estonia"},
-            {"title": "Direct tax filing", "body": "Complete provider approvals and guarded submission journeys for HMRC and e-MTA. Workpapers and exports remain the current deliverable.", "market": "UK + Estonia"},
-            {"title": "Broader statutory reporting", "body": "Consider UK Corporation Tax and Companies House accounts plus Estonian annual-report mapping only after fixtures and professional review.", "market": "UK + Estonia"}
+            {
+              "title": "Managed-service operations",
+              "body": "Name the hosting subprocessor and data location, complete encrypted backup/restore drills and add incident alerting, edge rate limits and malware scanning.",
+              "market": "Both markets"
+            },
+            {
+              "title": "Read-only open banking",
+              "body": "Add provider selection, reconnect, scheduled pulls and monitoring after legal, commercial and bank-coverage review.",
+              "market": "UK + Estonia"
+            },
+            {
+              "title": "Direct tax filing",
+              "body": "Complete provider approvals and guarded submission journeys for HMRC and e-MTA. Workpapers and exports remain the current deliverable.",
+              "market": "UK + Estonia"
+            },
+            {
+              "title": "Broader statutory reporting",
+              "body": "Consider UK Corporation Tax and Companies House accounts plus Estonian annual-report mapping only after fixtures and professional review.",
+              "market": "UK + Estonia"
+            }
           ]
         }
       ]
@@ -274,11 +326,31 @@
       "source_intro": "Read every recorded change in the",
       "source_link": "technical change log",
       "releases": [
-        {"title": "0.4.0 · Email and password accounts", "date": "2026-10-09", "body": "Added registration, sign-in and password reset beside Google SSO. Passwords use scrypt hashes; confirmation and reset links are single-use, throttled and sent through optional Postmark configuration."},
-        {"title": "0.3.0 · Integrations and automation", "date": "2026-10-09", "body": "Added recurring invoices and reminders, tenant-scoped connection controls, the FastHR connector, reviewed employee imports, a universal CSV/TSV path and documented-contract Personio and BambooHR adapters. Review required: provider tests use mocked transports and await production verification."},
-        {"title": "0.2.1 · Estonian bureau payroll", "date": "2026-10-08", "body": "Added part-time and hourly pay, pension-rate choices, the 2026 social-tax minimum and a synthetic payroll demonstration. Review required: production accountant UAT is incomplete."},
-        {"title": "0.2.0 · Engineering pilot", "date": "2026-08-10", "body": "Delivered the accounting workspace, portable migrations, invoices, bills, evidence, statement import and reconciliation, an immutable balanced ledger, financial reports and reviewable UK and Estonian VAT workpapers."},
-        {"title": "Foundation before versioned releases", "date": "2026-08-10", "body": "Published the first-party landing page, integrations catalogue, health endpoint and guarded authentication foundation. No 0.1.x release is recorded in the checked-in change log."}
+        {
+          "title": "0.4.0 · Email and password accounts",
+          "date": "2026-10-09",
+          "body": "Added registration, sign-in and password reset beside Google SSO. Passwords use scrypt hashes; confirmation and reset links are single-use, throttled and sent through optional Postmark configuration."
+        },
+        {
+          "title": "0.3.0 · Integrations and automation",
+          "date": "2026-10-09",
+          "body": "Added recurring invoices and reminders, tenant-scoped connection controls, the FastHR connector, reviewed employee imports, a universal CSV/TSV path and documented-contract Personio and BambooHR adapters. Review required: provider tests use mocked transports and await production verification."
+        },
+        {
+          "title": "0.2.1 · Estonian bureau payroll",
+          "date": "2026-10-08",
+          "body": "Added part-time and hourly pay, pension-rate choices, the 2026 social-tax minimum and a synthetic payroll demonstration. Review required: production accountant UAT is incomplete."
+        },
+        {
+          "title": "0.2.0 · Engineering pilot",
+          "date": "2026-08-10",
+          "body": "Delivered the accounting workspace, portable migrations, invoices, bills, evidence, statement import and reconciliation, an immutable balanced ledger, financial reports and reviewable UK and Estonian VAT workpapers."
+        },
+        {
+          "title": "Foundation before versioned releases",
+          "date": "2026-08-10",
+          "body": "Published the first-party landing page, integrations catalogue, health endpoint and guarded authentication foundation. No 0.1.x release is recorded in the checked-in change log."
+        }
       ]
     }
   },
@@ -493,7 +565,7 @@
         "direction": "FastAccounts to accountant",
         "ownership": "Accountant-reviewed export"
       },
-    "open_banking": {
+      "open_banking": {
         "name": "Open banking",
         "logo_alt": "Open banking icon",
         "category": "Bank data",
@@ -505,206 +577,326 @@
           "Reconciliation input"
         ],
         "direction": "Read-only first",
-      "ownership": "Bank remains source"
-    },
-    "file_import": {
-      "name": "Employee file import",
-      "logo_alt": "Employee file import icon",
-      "category": "HR software",
-      "description": "Import employee master records from a CSV or TSV export of any payroll or HR system. Native Excel workbooks must first be exported as CSV.",
-      "capabilities": ["CSV/Excel export import", "Employee master records"],
-      "direction": "Import · uploaded files",
-      "ownership": "Uploaded export remains source"
-    },
-    "fasthr": {
-      "name": "FastHR",
-      "logo_alt": "FastHR placeholder mark",
-      "category": "HR software",
-      "description": "Import FastHR employee master records for reviewed bureau payroll. FastHR does not contain an Estonian personal identification code.",
-      "capabilities": ["Employee master records", "Employment status", "Base salary", "Organisation details"],
-      "direction": "Import · employee master data",
-      "ownership": "FastHR remains source"
-    },
-    "bamboohr": {
-      "name": "BambooHR",
-      "logo_alt": "BambooHR placeholder mark",
-      "category": "HR software",
-      "description": "Review required: the documented-contract adapter has not been verified with vendor credentials, and salary needs a reviewed field mapping or local entry.",
-      "capabilities": ["Employee directory", "Name and email", "Status when exposed", "Custom field passthrough"],
-      "direction": "Import · employee directory",
-      "ownership": "BambooHR remains source"
-    },
-    "personio": {
-      "name": "Personio",
-      "logo_alt": "Personio placeholder mark",
-      "category": "HR software",
-      "description": "Review required: the documented-contract adapter has not been verified with vendor credentials, and salary needs a reviewed attribute mapping or local entry.",
-      "capabilities": ["Employee attributes", "Employment status", "Termination date", "Custom attribute passthrough"],
-      "direction": "Import · employee master data",
-      "ownership": "Personio remains source"
-    },
-    "hibob": {
-      "name": "Bob (HiBob)",
-      "logo_alt": "Bob by HiBob placeholder mark",
-      "category": "HR software",
-      "description": "Bring selected Bob workforce data into a reviewed bureau-payroll intake.",
-      "capabilities": ["Employee directory", "Employee lifecycle", "Time management"],
-      "direction": "Import first · export by policy",
-      "ownership": "Configured per object"
-    },
-    "zoho_people": {
-      "name": "Zoho People",
-      "logo_alt": "Zoho People placeholder mark",
-      "category": "HR software",
-      "description": "Use Zoho People records and working-time data as reviewed payroll inputs.",
-      "capabilities": ["Employee records", "Attendance", "Leave", "Timesheets", "Forms"],
-      "direction": "Import first · export by policy",
-      "ownership": "Configured per object"
-    },
-    "employment_hero": {
-      "name": "Employment Hero",
-      "logo_alt": "Employment Hero placeholder mark",
-      "category": "HR software",
-      "description": "Stage selected Employment Hero workforce data for review before it enters bureau payroll.",
-      "capabilities": ["Employee records", "Onboarding", "Leave", "Timesheets", "Payroll inputs"],
-      "direction": "Import first · export by policy",
-      "ownership": "Configured per object"
-    },
-    "workday": {
-      "name": "Workday",
-      "logo_alt": "Workday placeholder mark",
-      "category": "HR software",
-      "description": "Treat enterprise HCM worker and payroll-input data as a reviewed source for bureau payroll.",
-      "capabilities": ["Worker records", "Organisation structures", "Time and absence", "Compensation", "Payroll inputs"],
-      "direction": "Import first · export by policy",
-      "ownership": "Configured per object"
-    },
-    "hrmaster": {
-      "name": "HRmaster (HR Master)",
-      "logo_alt": "HRmaster placeholder mark",
-      "category": "HR software",
-      "description": "Use the Hungarian HR suite as a reviewed source for employee records and payroll inputs.",
-      "capabilities": ["Personnel records", "Payroll inputs", "Recruitment", "Evaluations", "Cafeteria benefits"],
-      "direction": "Import first · export by policy",
-      "ownership": "Configured per object"
-    },
-    "gusto": {
-      "name": "Gusto",
-      "logo_alt": "Gusto placeholder mark",
-      "category": "HR software",
-      "description": "Use the US payroll platform as a reviewed source where a client group includes a US entity.",
-      "capabilities": ["Employee records", "Payroll inputs", "Time off", "Benefits data", "Contractor records"],
-      "direction": "Import first · export by policy",
-      "ownership": "Configured per object"
-    },
-    "rippling": {
-      "name": "Rippling",
-      "logo_alt": "Rippling placeholder mark",
-      "category": "HR software",
-      "description": "Bring selected workforce records into a reviewed payroll intake for client books.",
-      "capabilities": ["Employee records", "Onboarding", "Time and attendance", "Leave", "Payroll inputs"],
-      "direction": "Import first · export by policy",
-      "ownership": "Configured per object"
-    },
-    "deel": {
-      "name": "Deel",
-      "logo_alt": "Deel placeholder mark",
-      "category": "HR software",
-      "description": "Use global payroll and employer-of-record data as reviewed inputs for bureau payroll.",
-      "capabilities": ["Worker records", "Contracts", "Global payroll inputs", "Time off", "Expenses"],
-      "direction": "Import first · export by policy",
-      "ownership": "Configured per object"
-    },
-    "odoo_hr": {
-      "name": "Odoo HR",
-      "logo_alt": "Odoo HR placeholder mark",
-      "category": "HR software",
-      "description": "Configure each tenant with its Odoo URL and database name for reviewed imports over XML-RPC or JSON-RPC.",
-      "capabilities": ["Employee records", "Attendance", "Time off", "Recruitment", "Expenses"],
-      "direction": "Import first · export by policy",
-      "ownership": "Configured per object"
-    },
-    "persona_fujitsu": {
-      "name": "Fujitsu Persona",
-      "logo_alt": "Fujitsu Persona placeholder mark",
-      "category": "HR software",
-      "description": "Estonia's oldest personnel and payroll software has served organisations since 1995. Its modules can supply reviewed employee and payroll inputs.",
-      "capabilities": ["Personnel records", "Payroll", "Working time", "Self-service portal"],
-      "direction": "Import first · export by policy",
-      "ownership": "Configured per object"
-    },
-    "wemply": {
-      "name": "Wemply",
-      "logo_alt": "Wemply placeholder mark",
-      "category": "HR software",
-      "description": "A modular staffing, working-time and Estonian payroll platform used by more than 1,000 companies. Wemply was named Aasta HR lahendus 2025.",
-      "capabilities": ["Staffing", "Working time", "Estonian payroll", "TSD reporting", "TÖR reporting"],
-      "direction": "Import first · export by policy",
-      "ownership": "Configured per object"
-    },
-    "hours24": {
-      "name": "hours24",
-      "logo_alt": "hours24 placeholder mark",
-      "category": "HR software",
-      "description": "AI-assisted time tracking and scheduling used in Estonia and Finland. A free tier supports up to five employees.",
-      "capabilities": ["AI-assisted time capture", "Working-time records", "Work schedules"],
-      "direction": "Import first · export by policy",
-      "ownership": "Configured per object"
-    },
-    "yester": {
-      "name": "Yester",
-      "logo_alt": "Yester placeholder mark",
-      "category": "HR software",
-      "description": "An Estonian workforce platform operating since 2000, with onboarding, expenses, travel and driving logs. It is tightly integrated with Merit Tarkvara.",
-      "capabilities": ["Onboarding", "Expense reports", "Business travel", "Driving logs", "Merit integration"],
-      "direction": "Import first · export by policy",
-      "ownership": "Configured per object"
-    },
-    "hrm4baltics": {
-      "name": "HRM4Baltics (Digmatix)",
-      "logo_alt": "HRM4Baltics placeholder mark",
-      "category": "HR software",
-      "description": "A Microsoft Dynamics 365 Business Central HRM solution covering Estonian, Latvian and Lithuanian payroll. It includes X-tee integration.",
-      "capabilities": ["Personnel records", "Estonian payroll", "Latvian payroll", "Lithuanian payroll", "X-tee integration"],
-      "direction": "Import first · export by policy",
-      "ownership": "Configured per object"
-    },
-    "merit_palk": {
-      "name": "Merit Palk",
-      "logo_alt": "Merit Palk placeholder mark",
-      "category": "HR software",
-      "description": "Estonia's most-used payroll software serves more than 25,000 firms and offers a free tier for up to two employees. It can pair with the existing Merit Aktiva accounting adapter.",
-      "capabilities": ["Employee records", "Payroll calculations", "Payslips", "TSD preparation", "Merit Aktiva pairing"],
-      "direction": "Import first · export by policy",
-      "ownership": "Configured per object"
-    },
-    "taavi_palk": {
-      "name": "Taavi Palk",
-      "logo_alt": "Taavi Palk placeholder mark",
-      "category": "HR software",
-      "description": "An Estonian payroll product used by more than 1,500 companies. It prepares statutory reports and exports payslips to Estonian bookkeeping systems.",
-      "capabilities": ["TSD reports", "Register reports", "Statistics reports", "Payslip exports"],
-      "direction": "Import first · export by policy",
-      "ownership": "Configured per object"
-    },
-    "andevis": {
-      "name": "Andevis",
-      "logo_alt": "Andevis placeholder mark",
-      "category": "HR software",
-      "description": "A customisable Estonian HR suite whose modules can provide reviewed personnel and payroll inputs.",
-      "capabilities": ["Personnel records", "Working time", "Payroll", "Training", "Development reviews"],
-      "direction": "Import first · export by policy",
-      "ownership": "Configured per object"
-    },
-    "eeva": {
-      "name": "Eeva (Eetasoft)",
-      "logo_alt": "Eeva by Eetasoft placeholder mark",
-      "category": "HR software",
-      "description": "Eeva's personnel module manages core employment records and is linked to Eeva payroll. Data would enter bureau payroll only through reviewed imports.",
-      "capabilities": ["Contracts", "Orders", "Leave", "ISCO classifier", "Eeva payroll link"],
-      "direction": "Import first · export by policy",
-      "ownership": "Configured per object"
-    }
+        "ownership": "Bank remains source"
+      },
+      "file_import": {
+        "name": "Employee file import",
+        "logo_alt": "Employee file import icon",
+        "category": "HR software",
+        "description": "Import employee master records from a CSV or TSV export of any payroll or HR system. Native Excel workbooks must first be exported as CSV.",
+        "capabilities": [
+          "CSV/Excel export import",
+          "Employee master records"
+        ],
+        "direction": "Import · uploaded files",
+        "ownership": "Uploaded export remains source"
+      },
+      "fasthr": {
+        "name": "FastHR",
+        "logo_alt": "FastHR placeholder mark",
+        "category": "HR software",
+        "description": "Import FastHR employee master records for reviewed bureau payroll. FastHR does not contain an Estonian personal identification code.",
+        "capabilities": [
+          "Employee master records",
+          "Employment status",
+          "Base salary",
+          "Organisation details"
+        ],
+        "direction": "Import · employee master data",
+        "ownership": "FastHR remains source"
+      },
+      "bamboohr": {
+        "name": "BambooHR",
+        "logo_alt": "BambooHR placeholder mark",
+        "category": "HR software",
+        "description": "Review required: the documented-contract adapter has not been verified with vendor credentials, and salary needs a reviewed field mapping or local entry.",
+        "capabilities": [
+          "Employee directory",
+          "Name and email",
+          "Status when exposed",
+          "Custom field passthrough"
+        ],
+        "direction": "Import · employee directory",
+        "ownership": "BambooHR remains source"
+      },
+      "personio": {
+        "name": "Personio",
+        "logo_alt": "Personio placeholder mark",
+        "category": "HR software",
+        "description": "Review required: the documented-contract adapter has not been verified with vendor credentials, and salary needs a reviewed attribute mapping or local entry.",
+        "capabilities": [
+          "Employee attributes",
+          "Employment status",
+          "Termination date",
+          "Custom attribute passthrough"
+        ],
+        "direction": "Import · employee master data",
+        "ownership": "Personio remains source"
+      },
+      "hibob": {
+        "name": "Bob (HiBob)",
+        "logo_alt": "Bob by HiBob placeholder mark",
+        "category": "HR software",
+        "description": "Bring selected Bob workforce data into a reviewed bureau-payroll intake.",
+        "capabilities": [
+          "Employee directory",
+          "Employee lifecycle",
+          "Time management"
+        ],
+        "direction": "Import first · export by policy",
+        "ownership": "Configured per object"
+      },
+      "zoho_people": {
+        "name": "Zoho People",
+        "logo_alt": "Zoho People placeholder mark",
+        "category": "HR software",
+        "description": "Use Zoho People records and working-time data as reviewed payroll inputs.",
+        "capabilities": [
+          "Employee records",
+          "Attendance",
+          "Leave",
+          "Timesheets",
+          "Forms"
+        ],
+        "direction": "Import first · export by policy",
+        "ownership": "Configured per object"
+      },
+      "employment_hero": {
+        "name": "Employment Hero",
+        "logo_alt": "Employment Hero placeholder mark",
+        "category": "HR software",
+        "description": "Stage selected Employment Hero workforce data for review before it enters bureau payroll.",
+        "capabilities": [
+          "Employee records",
+          "Onboarding",
+          "Leave",
+          "Timesheets",
+          "Payroll inputs"
+        ],
+        "direction": "Import first · export by policy",
+        "ownership": "Configured per object"
+      },
+      "workday": {
+        "name": "Workday",
+        "logo_alt": "Workday placeholder mark",
+        "category": "HR software",
+        "description": "Treat enterprise HCM worker and payroll-input data as a reviewed source for bureau payroll.",
+        "capabilities": [
+          "Worker records",
+          "Organisation structures",
+          "Time and absence",
+          "Compensation",
+          "Payroll inputs"
+        ],
+        "direction": "Import first · export by policy",
+        "ownership": "Configured per object"
+      },
+      "hrmaster": {
+        "name": "HRmaster (HR Master)",
+        "logo_alt": "HRmaster placeholder mark",
+        "category": "HR software",
+        "description": "Use the Hungarian HR suite as a reviewed source for employee records and payroll inputs.",
+        "capabilities": [
+          "Personnel records",
+          "Payroll inputs",
+          "Recruitment",
+          "Evaluations",
+          "Cafeteria benefits"
+        ],
+        "direction": "Import first · export by policy",
+        "ownership": "Configured per object"
+      },
+      "gusto": {
+        "name": "Gusto",
+        "logo_alt": "Gusto placeholder mark",
+        "category": "HR software",
+        "description": "Use the US payroll platform as a reviewed source where a client group includes a US entity.",
+        "capabilities": [
+          "Employee records",
+          "Payroll inputs",
+          "Time off",
+          "Benefits data",
+          "Contractor records"
+        ],
+        "direction": "Import first · export by policy",
+        "ownership": "Configured per object"
+      },
+      "rippling": {
+        "name": "Rippling",
+        "logo_alt": "Rippling placeholder mark",
+        "category": "HR software",
+        "description": "Bring selected workforce records into a reviewed payroll intake for client books.",
+        "capabilities": [
+          "Employee records",
+          "Onboarding",
+          "Time and attendance",
+          "Leave",
+          "Payroll inputs"
+        ],
+        "direction": "Import first · export by policy",
+        "ownership": "Configured per object"
+      },
+      "deel": {
+        "name": "Deel",
+        "logo_alt": "Deel placeholder mark",
+        "category": "HR software",
+        "description": "Use global payroll and employer-of-record data as reviewed inputs for bureau payroll.",
+        "capabilities": [
+          "Worker records",
+          "Contracts",
+          "Global payroll inputs",
+          "Time off",
+          "Expenses"
+        ],
+        "direction": "Import first · export by policy",
+        "ownership": "Configured per object"
+      },
+      "odoo_hr": {
+        "name": "Odoo HR",
+        "logo_alt": "Odoo HR placeholder mark",
+        "category": "HR software",
+        "description": "Configure each tenant with its Odoo URL and database name for reviewed imports over XML-RPC or JSON-RPC.",
+        "capabilities": [
+          "Employee records",
+          "Attendance",
+          "Time off",
+          "Recruitment",
+          "Expenses"
+        ],
+        "direction": "Import first · export by policy",
+        "ownership": "Configured per object"
+      },
+      "persona_fujitsu": {
+        "name": "Fujitsu Persona",
+        "logo_alt": "Fujitsu Persona placeholder mark",
+        "category": "HR software",
+        "description": "Estonia's oldest personnel and payroll software has served organisations since 1995. Its modules can supply reviewed employee and payroll inputs.",
+        "capabilities": [
+          "Personnel records",
+          "Payroll",
+          "Working time",
+          "Self-service portal"
+        ],
+        "direction": "Import first · export by policy",
+        "ownership": "Configured per object"
+      },
+      "wemply": {
+        "name": "Wemply",
+        "logo_alt": "Wemply placeholder mark",
+        "category": "HR software",
+        "description": "A modular staffing, working-time and Estonian payroll platform used by more than 1,000 companies. Wemply was named Aasta HR lahendus 2025.",
+        "capabilities": [
+          "Staffing",
+          "Working time",
+          "Estonian payroll",
+          "TSD reporting",
+          "TÖR reporting"
+        ],
+        "direction": "Import first · export by policy",
+        "ownership": "Configured per object"
+      },
+      "hours24": {
+        "name": "hours24",
+        "logo_alt": "hours24 placeholder mark",
+        "category": "HR software",
+        "description": "AI-assisted time tracking and scheduling used in Estonia and Finland. A free tier supports up to five employees.",
+        "capabilities": [
+          "AI-assisted time capture",
+          "Working-time records",
+          "Work schedules"
+        ],
+        "direction": "Import first · export by policy",
+        "ownership": "Configured per object"
+      },
+      "yester": {
+        "name": "Yester",
+        "logo_alt": "Yester placeholder mark",
+        "category": "HR software",
+        "description": "An Estonian workforce platform operating since 2000, with onboarding, expenses, travel and driving logs. It is tightly integrated with Merit Tarkvara.",
+        "capabilities": [
+          "Onboarding",
+          "Expense reports",
+          "Business travel",
+          "Driving logs",
+          "Merit integration"
+        ],
+        "direction": "Import first · export by policy",
+        "ownership": "Configured per object"
+      },
+      "hrm4baltics": {
+        "name": "HRM4Baltics (Digmatix)",
+        "logo_alt": "HRM4Baltics placeholder mark",
+        "category": "HR software",
+        "description": "A Microsoft Dynamics 365 Business Central HRM solution covering Estonian, Latvian and Lithuanian payroll. It includes X-tee integration.",
+        "capabilities": [
+          "Personnel records",
+          "Estonian payroll",
+          "Latvian payroll",
+          "Lithuanian payroll",
+          "X-tee integration"
+        ],
+        "direction": "Import first · export by policy",
+        "ownership": "Configured per object"
+      },
+      "merit_palk": {
+        "name": "Merit Palk",
+        "logo_alt": "Merit Palk placeholder mark",
+        "category": "HR software",
+        "description": "Estonia's most-used payroll software serves more than 25,000 firms and offers a free tier for up to two employees. It can pair with the existing Merit Aktiva accounting adapter.",
+        "capabilities": [
+          "Employee records",
+          "Payroll calculations",
+          "Payslips",
+          "TSD preparation",
+          "Merit Aktiva pairing"
+        ],
+        "direction": "Import first · export by policy",
+        "ownership": "Configured per object"
+      },
+      "taavi_palk": {
+        "name": "Taavi Palk",
+        "logo_alt": "Taavi Palk placeholder mark",
+        "category": "HR software",
+        "description": "An Estonian payroll product used by more than 1,500 companies. It prepares statutory reports and exports payslips to Estonian bookkeeping systems.",
+        "capabilities": [
+          "TSD reports",
+          "Register reports",
+          "Statistics reports",
+          "Payslip exports"
+        ],
+        "direction": "Import first · export by policy",
+        "ownership": "Configured per object"
+      },
+      "andevis": {
+        "name": "Andevis",
+        "logo_alt": "Andevis placeholder mark",
+        "category": "HR software",
+        "description": "A customisable Estonian HR suite whose modules can provide reviewed personnel and payroll inputs.",
+        "capabilities": [
+          "Personnel records",
+          "Working time",
+          "Payroll",
+          "Training",
+          "Development reviews"
+        ],
+        "direction": "Import first · export by policy",
+        "ownership": "Configured per object"
+      },
+      "eeva": {
+        "name": "Eeva (Eetasoft)",
+        "logo_alt": "Eeva by Eetasoft placeholder mark",
+        "category": "HR software",
+        "description": "Eeva's personnel module manages core employment records and is linked to Eeva payroll. Data would enter bureau payroll only through reviewed imports.",
+        "capabilities": [
+          "Contracts",
+          "Orders",
+          "Leave",
+          "ISCO classifier",
+          "Eeva payroll link"
+        ],
+        "direction": "Import first · export by policy",
+        "ownership": "Configured per object"
+      }
     }
   },
   "auth": {
@@ -982,7 +1174,6 @@
     "Over 90 days": "Over 90 days",
     "Due date": "Due date",
     "Days overdue": "Days overdue",
-    "Outstanding": "Outstanding",
     "Net cash movement": "Net cash movement",
     "Movement": "Movement",
     "Income": "Income",
@@ -1894,6 +2085,35 @@
       "Logo content and filename must match its image type": "Logo content and filename must match its image type",
       "Logo not found": "Logo not found",
       "Logo file not found": "Logo file not found"
+    }
+  },
+  "copilot": {
+    "nav": {
+      "assistant": "Assistant",
+      "copilot": "AI copilot"
+    },
+    "workspace": {
+      "AI copilot": "AI copilot",
+      "Ask about your books, scan documents and draft staged imports. The copilot never changes records on its own.": "Ask about your books, scan documents and draft staged imports. The copilot never changes records on its own.",
+      "AI copilot is not configured on this service.": "AI copilot is not configured on this service.",
+      "AI copilot is off for this organisation. An owner or administrator can enable it here.": "AI copilot is off for this organisation. An owner or administrator can enable it here.",
+      "Used today": "Used today",
+      "Enable AI copilot for this organisation": "Enable AI copilot for this organisation",
+      "Conversation": "Conversation",
+      "Message": "Message",
+      "Attach document": "Attach document",
+      "No attachment": "No attachment",
+      "Send message": "Send message",
+      "Copilot replied": "Copilot replied",
+      "No copilot messages yet.": "No copilot messages yet.",
+      "Input tokens": "Input tokens",
+      "Output tokens": "Output tokens",
+      "Copilot usage": "Copilot usage",
+      "Per-user daily usage counts every message, scan and token billed to this organisation.": "Per-user daily usage counts every message, scan and token billed to this organisation.",
+      "Stage {rows} rows for import": "Stage {rows} rows for import",
+      "Stage import rows": "Stage import rows",
+      "Review these rows in Data import before they touch your books. Stage them now?": "Review these rows in Data import before they touch your books. Stage them now?",
+      "Import batch staged. Review it under Data import.": "Import batch staged. Review it under Data import."
     }
   }
 }

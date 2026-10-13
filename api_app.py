@@ -24,6 +24,7 @@ from documents import DocumentService, EInvoiceAlreadyImported
 from bulk_sending import BulkSendingService, MAX_BULK_INVOICES
 from invoice_list import InvoiceListService, validate_list_dates
 from csv_exports import CsvExportService
+from copilot import CopilotDisabled, CopilotQuotaExceeded, CopilotService
 from list_export_repository import ListExportRepository
 from quotes import QuoteService
 from periodisation import PeriodisationService
@@ -533,6 +534,16 @@ async def missing_value(_request: Request, error: KeyError):
     return JSONResponse({"detail": str(error.args[0])}, status_code=404)
 
 
+@api.exception_handler(CopilotDisabled)
+async def copilot_disabled(_request: Request, error: CopilotDisabled):
+    return JSONResponse({"detail": str(error)}, status_code=409)
+
+
+@api.exception_handler(CopilotQuotaExceeded)
+async def copilot_quota(_request: Request, error: CopilotQuotaExceeded):
+    return JSONResponse({"detail": str(error)}, status_code=429)
+
+
 @api.exception_handler(AccessDenied)
 async def forbidden(_request: Request, error: AccessDenied):
     return JSONResponse({"detail": str(error)}, status_code=403)
@@ -886,6 +897,86 @@ def get_document_logo(organisation_id: str, user: User = Depends(current_user)):
     _require(organisation_id, user, {'owner', 'administrator', 'accountant', 'approver', 'viewer'})
     attachment, content = DocumentSettingsService().logo(organisation_id)
     return Response(content, media_type=attachment['content_type'])
+
+
+# --- AI copilot -------------------------------------------------------------
+
+READ_ROLES = {'owner', 'administrator', 'accountant', 'approver', 'viewer'}
+
+
+class CopilotMessageIn(BaseModel):
+    content: str = Field(min_length=1, max_length=8000)
+    attachment_ids: list[str] = Field(default_factory=list, max_length=3)
+
+
+class CopilotScanIn(BaseModel):
+    attachment_id: str = Field(min_length=1)
+
+
+class CopilotStageIn(BaseModel):
+    kind: str = Field(min_length=1, max_length=20)
+    csv_content: str = Field(min_length=1, max_length=2_000_000)
+    message_id: str | None = None
+
+
+class CopilotToggleIn(BaseModel):
+    enabled: bool
+
+
+@api.get('/organisations/{organisation_id}/copilot/status')
+def copilot_status(organisation_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, READ_ROLES)
+    return CopilotService().status(organisation_id, user.email)
+
+
+@api.get('/organisations/{organisation_id}/copilot/messages')
+def copilot_messages(organisation_id: str, limit: int = 50,
+                     user: User = Depends(current_user)):
+    _require(organisation_id, user, READ_ROLES)
+    return CopilotService().messages(organisation_id, user.email, limit=min(max(limit, 1), 100))
+
+
+@api.post('/organisations/{organisation_id}/copilot/messages', status_code=201)
+def copilot_send(organisation_id: str, payload: CopilotMessageIn,
+                 user: User = Depends(require_csrf)):
+    _require(organisation_id, user, READ_ROLES)
+    return CopilotService().send(organisation_id, user.email, payload.content,
+                                 attachment_ids=payload.attachment_ids)
+
+
+@api.post('/organisations/{organisation_id}/copilot/scan', status_code=201)
+def copilot_scan(organisation_id: str, payload: CopilotScanIn,
+                 user: User = Depends(require_csrf)):
+    _require(organisation_id, user, READ_ROLES)
+    return CopilotService().scan(organisation_id, user.email, payload.attachment_id)
+
+
+@api.post('/organisations/{organisation_id}/copilot/stage', status_code=201)
+def copilot_stage(organisation_id: str, payload: CopilotStageIn,
+                  user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES & {'owner', 'administrator'})
+    return CopilotService().stage(organisation_id, user.email, payload.kind,
+                                  payload.csv_content, message_id=payload.message_id)
+
+
+@api.get('/organisations/{organisation_id}/copilot/usage')
+def copilot_usage(organisation_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, WRITE_ROLES & {'owner', 'administrator'})
+    return CopilotService().usage(organisation_id)
+
+
+@api.get('/organisations/{organisation_id}/copilot/documents')
+def copilot_documents(organisation_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, READ_ROLES)
+    return CopilotService().documents(organisation_id)
+
+
+@api.put('/organisations/{organisation_id}/copilot/settings')
+def copilot_settings(organisation_id: str, payload: CopilotToggleIn,
+                     user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES & {'owner', 'administrator'})
+    CopilotService().set_enabled(organisation_id, payload.enabled, actor=user.email)
+    return CopilotService().status(organisation_id, user.email)
 
 
 @api.get('/organisations/{organisation_id}/objects')
