@@ -74,13 +74,38 @@
       "lede": "Faktos balstīts pārskats par FastAccounts pieejamajiem drošības līdzekļiem, pašmitināšanas atbildību un darbu, kas jāpārskata vai ir plānots pirms ražošanas lietojuma.",
       "note": "Nepieciešama pārskatīšana · novērtēts 2026. gada 9. oktobrī",
       "sections": [
-        {"title": "Mitināšanas modelis", "body": "FastAccounts var mitināt patstāvīgi; tad operators izvēlas un aizsargā infrastruktūru. Pārvaldītais pilots izmanto to pašu Docker lietotni ar PostgreSQL un pastāvīgu pierādījumu glabātuvi FastSME pārvaldītā infrastruktūrā. Infrastruktūras nodrošinātājs ir atkarīgs no izvietojuma un jānorāda ražošanas klienta līgumā."},
-        {"title": "Šifrēšana", "body": "Integrāciju piekļuves dati miera stāvoklī tiek šifrēti ar versijotu Fernet atslēgu un netiek atgriezti pārlūkā vai ierakstīti žurnālos. Mitinātā datplūsma izmanto HTTPS/TLS. FastAccounts neapgalvo, ka visi datubāzes lauki vai augšupielādētie pierādījumi ir šifrēti lietotnes līmenī miera stāvoklī."},
-        {"title": "Rezerves kopijas un atjaunošana", "body": "Pašmitinātājs atbild par datubāzes, pierādījumu krātuves, šifrēšanas un atjaunošanas procesu. Plānots: šifrētas pārvaldītās mitināšanas kopijas un pārbaudīta atjaunošana. Repozitorijā nav pabeigta atjaunošanas izmēģinājuma, tāpēc atjaunošanas laiks netiek solīts."},
-        {"title": "Piekļuves kontrole", "body": "Pieejams: vietējie e-pasta un paroles konti un Google pierakstīšanās, dalība organizācijā ar ielūgumu, parakstītas sesijas, CSRF aizsardzība un īpašnieka, administratora, grāmatveža, apstiprinātāja un skatītāja lomas. Paroles izmanto scrypt jaucējvērtības, apstiprināšanas un atiestatīšanas marķieri ir vienreizējas jaucējvērtības, un atkārtoti pierakstīšanās mēģinājumi tiek ierobežoti. Uzņēmuma dati ir nodalīti pa organizācijām, un starporganizāciju piekļuve ir testēta. Plānots: pārvaldītā pakalpojuma MFA politika un pieprasījumu ierobežošana tīkla malā."},
-        {"title": "Drošības incidenti", "body": "Par aizdomīgu incidentu ziņojiet privāti uz info@predictivelabs.ai ar tematu “FastAccounts drošības incidents”. Komanda saglabās vajadzīgos ierakstus, izpētīs apjomu un koordinēs saziņu ar klientiem. Līgumisks reaģēšanas laiks vēl netiek piedāvāts.", "action": "Ziņot par incidentu", "email_subject": "FastAccounts drošības incidents"},
-        {"title": "Atkarību ziņošana", "body": "Python atkarības ir norādītas requirements.txt; CI kompilē lietotni, izpilda testus, pārbauda migrācijas un meklē biežus noslēpumu paraugus. Projekts neapgalvo, ka ievainojamības tiek nepārtraukti automātiski uzraudzītas. Par aizdomīgu atkarību ziņojiet privātajam drošības kontaktam."},
-        {"title": "Atbildīga ievainojamību atklāšana", "body": "Pirms publiskas apspriešanas ziņojiet privāti un norādiet skartās versijas, atkārtošanas soļus un ietekmi. Mēs apstiprināsim saziņas kanālu, godprātīgi izmeklēsim un saskaņosim atklāšanas datumu ar ziņotāju. Lūdzu, dodiet saprātīgu laiku labošanai; atbildes vai labojuma termiņš vēl netiek garantēts.", "action": "Nosūtīt privātu ziņojumu", "email_subject": "FastAccounts atbildīga ievainojamības atklāšana"}
+        {
+          "title": "Mitināšanas modelis",
+          "body": "FastAccounts var mitināt patstāvīgi; tad operators izvēlas un aizsargā infrastruktūru. Pārvaldītais pilots izmanto to pašu Docker lietotni ar PostgreSQL un pastāvīgu pierādījumu glabātuvi FastSME pārvaldītā infrastruktūrā. Infrastruktūras nodrošinātājs ir atkarīgs no izvietojuma un jānorāda ražošanas klienta līgumā."
+        },
+        {
+          "title": "Šifrēšana",
+          "body": "Integrāciju piekļuves dati miera stāvoklī tiek šifrēti ar versijotu Fernet atslēgu un netiek atgriezti pārlūkā vai ierakstīti žurnālos. Mitinātā datplūsma izmanto HTTPS/TLS. FastAccounts neapgalvo, ka visi datubāzes lauki vai augšupielādētie pierādījumi ir šifrēti lietotnes līmenī miera stāvoklī."
+        },
+        {
+          "title": "Rezerves kopijas un atjaunošana",
+          "body": "Pašmitinātājs atbild par datubāzes, pierādījumu krātuves, šifrēšanas un atjaunošanas procesu. Plānots: šifrētas pārvaldītās mitināšanas kopijas un pārbaudīta atjaunošana. Repozitorijā nav pabeigta atjaunošanas izmēģinājuma, tāpēc atjaunošanas laiks netiek solīts."
+        },
+        {
+          "title": "Piekļuves kontrole",
+          "body": "Pieejams: vietējie e-pasta un paroles konti un Google pierakstīšanās, dalība organizācijā ar ielūgumu, parakstītas sesijas, CSRF aizsardzība un īpašnieka, administratora, grāmatveža, apstiprinātāja un skatītāja lomas. Paroles izmanto scrypt jaucējvērtības, apstiprināšanas un atiestatīšanas marķieri ir vienreizējas jaucējvērtības, un atkārtoti pierakstīšanās mēģinājumi tiek ierobežoti. Uzņēmuma dati ir nodalīti pa organizācijām, un starporganizāciju piekļuve ir testēta. Plānots: pārvaldītā pakalpojuma MFA politika un pieprasījumu ierobežošana tīkla malā."
+        },
+        {
+          "title": "Drošības incidenti",
+          "body": "Par aizdomīgu incidentu ziņojiet privāti uz info@predictivelabs.ai ar tematu “FastAccounts drošības incidents”. Komanda saglabās vajadzīgos ierakstus, izpētīs apjomu un koordinēs saziņu ar klientiem. Līgumisks reaģēšanas laiks vēl netiek piedāvāts.",
+          "action": "Ziņot par incidentu",
+          "email_subject": "FastAccounts drošības incidents"
+        },
+        {
+          "title": "Atkarību ziņošana",
+          "body": "Python atkarības ir norādītas requirements.txt; CI kompilē lietotni, izpilda testus, pārbauda migrācijas un meklē biežus noslēpumu paraugus. Projekts neapgalvo, ka ievainojamības tiek nepārtraukti automātiski uzraudzītas. Par aizdomīgu atkarību ziņojiet privātajam drošības kontaktam."
+        },
+        {
+          "title": "Atbildīga ievainojamību atklāšana",
+          "body": "Pirms publiskas apspriešanas ziņojiet privāti un norādiet skartās versijas, atkārtošanas soļus un ietekmi. Mēs apstiprināsim saziņas kanālu, godprātīgi izmeklēsim un saskaņosim atklāšanas datumu ar ziņotāju. Lūdzu, dodiet saprātīgu laiku labošanai; atbildes vai labojuma termiņš vēl netiek garantēts.",
+          "action": "Nosūtīt privātu ziņojumu",
+          "email_subject": "FastAccounts atbildīga ievainojamības atklāšana"
+        }
       ]
     },
     "privacy": {
@@ -88,12 +113,32 @@
       "lede": "Šis pilota paziņojums izskaidro pašreizējā produkta lomas un datu plūsmas. Ražošanas kārtība jāpabeidz klienta datu apstrādes līgumā.",
       "note": "Pilotprojekts · vienkāršs paziņojums, novērtēts 2026. gada 9. oktobrī",
       "sections": [
-        {"title": "Pārziņa un apstrādātāja lomas", "body": "Mitinātā pakalpojumā Predictive Labs Ltd ir konta, atbalsta un pakalpojuma administrēšanas datu pārzinis un organizācijas ievadīto uzņēmuma, klientu, piegādātāju un darbinieku datu apstrādātājs. Klients paliek savas organizācijas datu pārzinis. Pašmitinātā izvietojumā operators nosaka savas lomas un paziņojumus."},
-        {"title": "Pašreizējie apakšapstrādātāji", "body": "Pašreizējais kods izmanto Google izvēles pierakstīšanai un Postmark konta, rēķinu un atgādinājumu e-pastiem, ja tas ir konfigurēts. Bez Postmark piekļuves datiem tas netiek izmantots. Repozitorijs nenosauc pārvaldītās infrastruktūras nodrošinātāju; tas jānorāda klienta datu apstrādes līgumā pirms ražošanas datu pieņemšanas. Pieslēgtie grāmatvedības, personāla vai banku pakalpojumi ir klienta izvēlētas integrācijas, nevis noklusējuma saņēmēji."},
-        {"title": "Glabāšana", "body": "Grāmatvedības ieraksti tiek glabāti pēc klienta politikas un piemērojamajiem termiņiem: plānā paredzēti seši gadi parastiem AK PVN ierakstiem un septiņi gadi no finanšu gada beigām Igaunijas uzskaitei, vajadzības gadījumā ilgāk. Dzēšana nedrīkst nemanāmi noņemt iegrāmatotus virsgrāmatas ierakstus vai datus ar juridisku glabāšanas pienākumu. Plānots: automātiska glabāšanas izpilde pārvaldītajā mitināšanā."},
-        {"title": "Starptautiska datu pārsūtīšana", "body": "Pašmitinātājs izvēlas datu atrašanās vietu. Mitinātajā pilotā Google vai Postmark var apstrādāt datus saskaņā ar saviem noteikumiem un pārsūtīšanas garantijām. Ražošanas datu apstrādes līgumā jānorāda mitināšanas vieta, visi apakšapstrādātāji un pārsūtīšanas mehānismi; šī lapa neizdomā repozitorijā nedokumentētu vietu."},
-        {"title": "Analītika un žurnāli", "body": "Publiskajā vietnē un lietotnē nav analītikas vai reklāmas SDK. Izvietojums var glabāt tehniskos tīmekļa, autentifikācijas un audita žurnālus, kas vajadzīgi pakalpojuma darbībai un drošībai. Tajos nedrīkst būt pakalpojumu sniedzēju piekļuves dati, un glabāšanas laiks ražošanā jādokumentē."},
-        {"title": "Datu subjekta pieprasījumi", "body": "Lai pieprasītu piekļuvi, labošanu, dzēšanu, ierobežošanu vai citas datu tiesības, vispirms sazinieties ar organizāciju, kas pārvalda attiecīgo uzskaiti. Par FastAccounts konta vai pakalpojuma datiem rakstiet uz info@predictivelabs.ai. Var būt jāpārbauda identitāte un jāsaglabā juridiski obligātie ieraksti.", "action": "Sazināties par datu aizsardzību", "email_subject": "FastAccounts datu aizsardzības pieprasījums"}
+        {
+          "title": "Pārziņa un apstrādātāja lomas",
+          "body": "Mitinātā pakalpojumā Predictive Labs Ltd ir konta, atbalsta un pakalpojuma administrēšanas datu pārzinis un organizācijas ievadīto uzņēmuma, klientu, piegādātāju un darbinieku datu apstrādātājs. Klients paliek savas organizācijas datu pārzinis. Pašmitinātā izvietojumā operators nosaka savas lomas un paziņojumus."
+        },
+        {
+          "title": "Pašreizējie apakšapstrādātāji",
+          "body": "Pašreizējais kods izmanto Google izvēles pierakstīšanai un Postmark konta, rēķinu un atgādinājumu e-pastiem, ja tas ir konfigurēts. Bez Postmark piekļuves datiem tas netiek izmantots. Repozitorijs nenosauc pārvaldītās infrastruktūras nodrošinātāju; tas jānorāda klienta datu apstrādes līgumā pirms ražošanas datu pieņemšanas. Pieslēgtie grāmatvedības, personāla vai banku pakalpojumi ir klienta izvēlētas integrācijas, nevis noklusējuma saņēmēji."
+        },
+        {
+          "title": "Glabāšana",
+          "body": "Grāmatvedības ieraksti tiek glabāti pēc klienta politikas un piemērojamajiem termiņiem: plānā paredzēti seši gadi parastiem AK PVN ierakstiem un septiņi gadi no finanšu gada beigām Igaunijas uzskaitei, vajadzības gadījumā ilgāk. Dzēšana nedrīkst nemanāmi noņemt iegrāmatotus virsgrāmatas ierakstus vai datus ar juridisku glabāšanas pienākumu. Plānots: automātiska glabāšanas izpilde pārvaldītajā mitināšanā."
+        },
+        {
+          "title": "Starptautiska datu pārsūtīšana",
+          "body": "Pašmitinātājs izvēlas datu atrašanās vietu. Mitinātajā pilotā Google vai Postmark var apstrādāt datus saskaņā ar saviem noteikumiem un pārsūtīšanas garantijām. Ražošanas datu apstrādes līgumā jānorāda mitināšanas vieta, visi apakšapstrādātāji un pārsūtīšanas mehānismi; šī lapa neizdomā repozitorijā nedokumentētu vietu."
+        },
+        {
+          "title": "Analītika un žurnāli",
+          "body": "Publiskajā vietnē un lietotnē nav analītikas vai reklāmas SDK. Izvietojums var glabāt tehniskos tīmekļa, autentifikācijas un audita žurnālus, kas vajadzīgi pakalpojuma darbībai un drošībai. Tajos nedrīkst būt pakalpojumu sniedzēju piekļuves dati, un glabāšanas laiks ražošanā jādokumentē."
+        },
+        {
+          "title": "Datu subjekta pieprasījumi",
+          "body": "Lai pieprasītu piekļuvi, labošanu, dzēšanu, ierobežošanu vai citas datu tiesības, vispirms sazinieties ar organizāciju, kas pārvalda attiecīgo uzskaiti. Par FastAccounts konta vai pakalpojuma datiem rakstiet uz info@predictivelabs.ai. Var būt jāpārbauda identitāte un jāsaglabā juridiski obligātie ieraksti.",
+          "action": "Sazināties par datu aizsardzību",
+          "email_subject": "FastAccounts datu aizsardzības pieprasījums"
+        }
       ]
     },
     "about": {
@@ -101,10 +146,22 @@
       "lede": "FastAccounts ir atvērtā pirmkoda grāmatvedības produkts Apvienotās Karalistes un Igaunijas mazajiem uzņēmumiem un grāmatvedības birojiem.",
       "note": "Nepieciešama pārskatīšana · neatkarīga valstu validācija",
       "sections": [
-        {"title": "Juridiskā persona", "body": "FastAccounts izstrādā un pārvalda Predictive Labs Ltd, Anglijā un Velsā reģistrēts uzņēmums ar numuru 14857334. Reģistrētā adrese: 155 Minories Street, Suite 275, London EC3N 1AD, Apvienotā Karaliste."},
-        {"title": "Komanda", "body": "Produktu, dokumentāciju un publisko laidienu vēsturi uztur neliela Predictive Labs komanda; 0.3.0 laidiena ierakstā Joosep Laats ir nosaukts saistībā ar apvienoto produkta darbu. Mēs neuzrādām lielāku komandu, klientu skaitu vai konsultantu tīklu, nekā apliecina pierādījumi."},
-        {"title": "Grāmatvedības tirgu kompetence", "body": "Pieejams: testēti AK PVN un Igaunijas PVN deklarācijas (KMD) darba dokumenti, valstu rēķinu noteikumi, precīzi Decimal aprēķini un nemaināmi divkāršie ieraksti. Nepieciešama pārskatīšana: neatkarīga AK un Igaunijas grāmatvežu UAT. FastAccounts ir programmatūra, nevis nodokļu vai juridisks padoms."},
-        {"title": "Produkta robežas", "body": "Pieejams: rēķini, pirkumu rēķini, pierādījumi, bankas izrakstu imports un saskaņošana, virsgrāmata, pārskati un pārskatāmi PVN darba dokumenti. Nepieciešama pārskatīšana: Igaunijas algu aprēķinam grāmatvedības biroju klientiem jāpabeidz ražošanas UAT. FastAccounts nav ERP un neietver krājumus, pasūtījumus, ražošanu, CRM vai vispārēju personāla vadību."}
+        {
+          "title": "Juridiskā persona",
+          "body": "FastAccounts izstrādā un pārvalda Predictive Labs Ltd, Anglijā un Velsā reģistrēts uzņēmums ar numuru 14857334. Reģistrētā adrese: 155 Minories Street, Suite 275, London EC3N 1AD, Apvienotā Karaliste."
+        },
+        {
+          "title": "Komanda",
+          "body": "Produktu, dokumentāciju un publisko laidienu vēsturi uztur neliela Predictive Labs komanda; 0.3.0 laidiena ierakstā Joosep Laats ir nosaukts saistībā ar apvienoto produkta darbu. Mēs neuzrādām lielāku komandu, klientu skaitu vai konsultantu tīklu, nekā apliecina pierādījumi."
+        },
+        {
+          "title": "Grāmatvedības tirgu kompetence",
+          "body": "Pieejams: testēti AK PVN un Igaunijas PVN deklarācijas (KMD) darba dokumenti, valstu rēķinu noteikumi, precīzi Decimal aprēķini un nemaināmi divkāršie ieraksti. Nepieciešama pārskatīšana: neatkarīga AK un Igaunijas grāmatvežu UAT. FastAccounts ir programmatūra, nevis nodokļu vai juridisks padoms."
+        },
+        {
+          "title": "Produkta robežas",
+          "body": "Pieejams: rēķini, pirkumu rēķini, pierādījumi, bankas izrakstu imports un saskaņošana, virsgrāmata, pārskati un pārskatāmi PVN darba dokumenti. Nepieciešama pārskatīšana: Igaunijas algu aprēķinam grāmatvedības biroju klientiem jāpabeidz ražošanas UAT. FastAccounts nav ERP un neietver krājumus, pasūtījumus, ražošanu, CRM vai vispārēju personāla vadību."
+        }
       ]
     },
     "contact": {
@@ -112,10 +169,30 @@
       "lede": "Viena darbīga pastkaste ar skaidru tematu katram saziņas ceļam. Mēs nepublicējam nekonfigurētas adreses.",
       "note": "Pieejams · info@predictivelabs.ai",
       "sections": [
-        {"title": "Pārdošana", "body": "Jautājiet par mitināto pilotu, pašmitināšanu vai grāmatvedības biroja izvērtējumu. Norādiet tirgu, organizācijas veidu un darbplūsmu, ko vēlaties pārbaudīt.", "action": "Rakstīt pārdošanai", "email_subject": "FastAccounts pārdošanas pieprasījums"},
-        {"title": "Atbalsts", "body": "Produkta palīdzībai norādiet FastAccounts versiju, lapu vai darbplūsmu, gaidīto un faktisko rezultātu. Nesūtiet e-pastā paroles, OAuth marķierus, bankas piekļuves datus vai īstus grāmatvedības eksportus.", "action": "Rakstīt atbalstam", "email_subject": "FastAccounts atbalsta pieprasījums"},
-        {"title": "Drošība", "body": "Par iespējamu ievainojamību vai incidentu ziņojiet privāti. Norādiet skartās versijas un atkārtojamu informāciju, bet nepievienojiet dzīvus piekļuves datus vai nevajadzīgus personas datus.", "action": "Rakstīt par drošību", "email_subject": "FastAccounts drošības ziņojums"},
-        {"title": "Datu aizsardzība", "body": "Konta vai pakalpojuma datu pieprasījumā norādiet organizāciju un attiecīgos datus. Pieprasījumi par klienta uzskaiti parasti vispirms jāiesniedz organizācijai, kas to pārvalda.", "action": "Rakstīt par datu aizsardzību", "email_subject": "FastAccounts datu aizsardzības pieprasījums"}
+        {
+          "title": "Pārdošana",
+          "body": "Jautājiet par mitināto pilotu, pašmitināšanu vai grāmatvedības biroja izvērtējumu. Norādiet tirgu, organizācijas veidu un darbplūsmu, ko vēlaties pārbaudīt.",
+          "action": "Rakstīt pārdošanai",
+          "email_subject": "FastAccounts pārdošanas pieprasījums"
+        },
+        {
+          "title": "Atbalsts",
+          "body": "Produkta palīdzībai norādiet FastAccounts versiju, lapu vai darbplūsmu, gaidīto un faktisko rezultātu. Nesūtiet e-pastā paroles, OAuth marķierus, bankas piekļuves datus vai īstus grāmatvedības eksportus.",
+          "action": "Rakstīt atbalstam",
+          "email_subject": "FastAccounts atbalsta pieprasījums"
+        },
+        {
+          "title": "Drošība",
+          "body": "Par iespējamu ievainojamību vai incidentu ziņojiet privāti. Norādiet skartās versijas un atkārtojamu informāciju, bet nepievienojiet dzīvus piekļuves datus vai nevajadzīgus personas datus.",
+          "action": "Rakstīt par drošību",
+          "email_subject": "FastAccounts drošības ziņojums"
+        },
+        {
+          "title": "Datu aizsardzība",
+          "body": "Konta vai pakalpojuma datu pieprasījumā norādiet organizāciju un attiecīgos datus. Pieprasījumi par klienta uzskaiti parasti vispirms jāiesniedz organizācijai, kas to pārvalda.",
+          "action": "Rakstīt par datu aizsardzību",
+          "email_subject": "FastAccounts datu aizsardzības pieprasījums"
+        }
       ]
     },
     "terms": {
@@ -123,11 +200,26 @@
       "lede": "Šie pilotprojekta noteikumi ir pagaidu noteikumi, nevis galīgie klienta noteikumi, un nerada apgalvojumus par pakalpojuma līmeni, atbilstību vai garantijām.",
       "note": "Pilotprojekts · nepieciešama juridiska pārskatīšana",
       "sections": [
-        {"title": "Pakalpojuma apjoms", "body": "FastAccounts nodrošina grāmatvedības programmatūru un izvēles mitināto pilotprojektu. Pieejamību raksturo četri statusi: Pieejams, Nepieciešama pārskatīšana, Pilotprojekts un Plānots. Tieša nodokļu iesniegšana ir Plānota un nav iekļauta, ja vien parakstīts līgums skaidri nenosaka citādi."},
-        {"title": "Klienta atbildība", "body": "Klients atbild par avota datu pareizību, lietotāju piekļuvi, grāmatvedības un algu rezultātu pārbaudi, obligātajām deklarācijām un profesionālu padomu. Sintētisku demonstrāciju nedrīkst uzskatīt par ražošanas uzskaiti."},
-        {"title": "Atvērtā pirmkoda programmatūra", "body": "Pirmkoda repozitorijs ir publicēts ar MIT licenci. Pašmitināto lietojumu regulē šī licence; izvietojuma darbība, drošība, rezerves kopijas un atjauninājumi ir operatora atbildība."},
-        {"title": "Mitinātais pilots", "body": "Mitināta lietojuma pieejamība, atbalsts, datu apstrāde, maksa, atcelšana un pakalpojuma līmenis jānosaka atsevišķā klienta līgumā. Šis projekts nesola nepārtrauktu pakalpojumu, atbildes laiku vai ražošanas atjaunošanas mērķi."},
-        {"title": "Vēl saskaņojamie juridiskie noteikumi", "body": "Garantijām, atbildības ierobežojumiem, piemērojamām tiesībām, strīdu kārtībai un ražošanas datu apstrādes līgumam vajadzīga juridiska pārskatīšana; tie šeit nav izdomāti. Pirms īstas uzskaites mitināšanas sazinieties ar Predictive Labs Ltd."}
+        {
+          "title": "Pakalpojuma apjoms",
+          "body": "FastAccounts nodrošina grāmatvedības programmatūru un izvēles mitināto pilotprojektu. Pieejamību raksturo četri statusi: Pieejams, Nepieciešama pārskatīšana, Pilotprojekts un Plānots. Tieša nodokļu iesniegšana ir Plānota un nav iekļauta, ja vien parakstīts līgums skaidri nenosaka citādi."
+        },
+        {
+          "title": "Klienta atbildība",
+          "body": "Klients atbild par avota datu pareizību, lietotāju piekļuvi, grāmatvedības un algu rezultātu pārbaudi, obligātajām deklarācijām un profesionālu padomu. Sintētisku demonstrāciju nedrīkst uzskatīt par ražošanas uzskaiti."
+        },
+        {
+          "title": "Atvērtā pirmkoda programmatūra",
+          "body": "Pirmkoda repozitorijs ir publicēts ar MIT licenci. Pašmitināto lietojumu regulē šī licence; izvietojuma darbība, drošība, rezerves kopijas un atjauninājumi ir operatora atbildība."
+        },
+        {
+          "title": "Mitinātais pilots",
+          "body": "Mitināta lietojuma pieejamība, atbalsts, datu apstrāde, maksa, atcelšana un pakalpojuma līmenis jānosaka atsevišķā klienta līgumā. Šis projekts nesola nepārtrauktu pakalpojumu, atbildes laiku vai ražošanas atjaunošanas mērķi."
+        },
+        {
+          "title": "Vēl saskaņojamie juridiskie noteikumi",
+          "body": "Garantijām, atbildības ierobežojumiem, piemērojamām tiesībām, strīdu kārtībai un ražošanas datu apstrādes līgumam vajadzīga juridiska pārskatīšana; tie šeit nav izdomāti. Pirms īstas uzskaites mitināšanas sazinieties ar Predictive Labs Ltd."
+        }
       ]
     },
     "roadmap": {
@@ -137,26 +229,94 @@
       "source_intro": "Pilns ieviešanas ieraksts ir",
       "source_link": "izmaiņu žurnālā",
       "stages": [
-        {"title": "Pieejams", "intro": "Ieviestas produkta plūsmas, ko var izmantot šeit norādītajās robežās.", "items": [
-          {"title": "Publiskais pamats", "date": "2026-08-10", "body": "Sākumlapa, integrāciju katalogs, veselības pārbaude un aizsargāta pierakstīšanās tika izlaista pirms pirmās reģistrētās lietotnes versijas.", "market": "AK + Igaunija"},
-          {"title": "Pamata grāmatvedība 0.2.0", "date": "2026-08-10", "body": "Rēķini, pirkumu rēķini, pierādījumi, izrakstu imports un saskaņošana, nemaināmi divkāršie ieraksti, pārskati un pārskatāmi PVN darba dokumenti ir ieviesti.", "market": "AK + Igaunija"},
-          {"title": "Konti un darbplūsmas 0.3.0–0.4.0", "date": "2026-10-09", "body": "Periodiskie rēķini, atgādinājumi, pārskatāms failu un FastHR darbinieku imports, kā arī e-pasta un paroles konti ir ieviesti ar testiem bez tīkla savienojuma.", "market": "AK + Igaunija"}
-        ]},
-        {"title": "Nepieciešama pārskatīšana", "intro": "Ieviests darbs, kam vajadzīga ārēja pārbaude vai ražošanas UAT.", "items": [
-          {"title": "Neatkarīga grāmatvežu UAT", "body": "Pirms profesionālas validācijas apgalvojumiem pārbaudīt AK PVN, Igaunijas KMD un Igaunijas biroju algu aprēķinu ar kvalificētiem grāmatvežiem.", "market": "AK + Igaunija"},
-          {"title": "Pakalpojumu sniedzēju pārbaude", "body": "Pārbaudīt QuickBooks, Xero, Merit Aktiva, BambooHR un Personio ar atļautiem klienta vai testa uzņēmuma piekļuves datiem, saglabājot importu pārskatāmu un organizācijai nodalītu.", "market": "Abi tirgi"}
-        ]},
-        {"title": "Pilotprojekts", "intro": "Ierobežotas plūsmas izvērtēšanai ar skaidri norādītām ražošanas robežām.", "items": [
-          {"title": "Mitinātais pakalpojums", "body": "Pārvaldītā mitināšana tiek piedāvāta tikai ar atsevišķu klienta līgumu, kamēr tiek pabeigti darbības pierādījumi.", "market": "Abi tirgi"},
-          {"title": "Igaunijas biroju algas 0.2.1", "date": "2026-10-08", "body": "Nepilna laika un stundas algu aprēķins, sociālā nodokļa minimums un sintētiskas demonstrācijas ir ieviestas; ražošanas lietojumam Nepieciešama pārskatīšana.", "market": "Igaunija"},
-          {"title": "Nodokļu darba dokumenti un eksports", "body": "AK PVN un Igaunijas KMD darba dokumenti un eksports ir pieejami izvērtēšanai. Tieša iesniegšana ir Plānota.", "market": "AK + Igaunija"}
-        ]},
-        {"title": "Plānots", "intro": "Iespējas, kas vēl nav ieviestas vai iekļautas pašreizējā pakalpojuma solījumā.", "items": [
-          {"title": "Pārvaldītā pakalpojuma darbība", "body": "Nosaukt mitināšanas apakšapstrādātāju un datu atrašanās vietu, pabeigt šifrētu kopiju atjaunošanas izmēģinājumu un pievienot incidentu brīdinājumus, pieprasījumu ierobežošanu un ļaunprogrammatūras pārbaudi.", "market": "Abi tirgi"},
-          {"title": "Tikai lasāma atvērtā banku darbība", "body": "Pēc juridiskās, komerciālās un banku pārklājuma pārbaudes pievienot pakalpojuma sniedzēja izvēli, atkārtotu savienošanu, plānotu importu un uzraudzību.", "market": "AK + Igaunija"},
-          {"title": "Tieša nodokļu iesniegšana", "body": "Pabeigt pakalpojumu sniedzēju apstiprinājumus un aizsargātas HMRC un e-MTA iesniegšanas plūsmas. Pašreizējais rezultāts ir darba dokumenti un eksports.", "market": "AK + Igaunija"},
-          {"title": "Plašāki obligātie pārskati", "body": "AK uzņēmumu nodokli un Companies House pārskatus, kā arī Igaunijas gada pārskata kartēšanu apsvērt tikai pēc piemēriem un profesionālas pārbaudes.", "market": "AK + Igaunija"}
-        ]}
+        {
+          "title": "Pieejams",
+          "intro": "Ieviestas produkta plūsmas, ko var izmantot šeit norādītajās robežās.",
+          "items": [
+            {
+              "title": "Publiskais pamats",
+              "date": "2026-08-10",
+              "body": "Sākumlapa, integrāciju katalogs, veselības pārbaude un aizsargāta pierakstīšanās tika izlaista pirms pirmās reģistrētās lietotnes versijas.",
+              "market": "AK + Igaunija"
+            },
+            {
+              "title": "Pamata grāmatvedība 0.2.0",
+              "date": "2026-08-10",
+              "body": "Rēķini, pirkumu rēķini, pierādījumi, izrakstu imports un saskaņošana, nemaināmi divkāršie ieraksti, pārskati un pārskatāmi PVN darba dokumenti ir ieviesti.",
+              "market": "AK + Igaunija"
+            },
+            {
+              "title": "Konti un darbplūsmas 0.3.0–0.4.0",
+              "date": "2026-10-09",
+              "body": "Periodiskie rēķini, atgādinājumi, pārskatāms failu un FastHR darbinieku imports, kā arī e-pasta un paroles konti ir ieviesti ar testiem bez tīkla savienojuma.",
+              "market": "AK + Igaunija"
+            }
+          ]
+        },
+        {
+          "title": "Nepieciešama pārskatīšana",
+          "intro": "Ieviests darbs, kam vajadzīga ārēja pārbaude vai ražošanas UAT.",
+          "items": [
+            {
+              "title": "Neatkarīga grāmatvežu UAT",
+              "body": "Pirms profesionālas validācijas apgalvojumiem pārbaudīt AK PVN, Igaunijas KMD un Igaunijas biroju algu aprēķinu ar kvalificētiem grāmatvežiem.",
+              "market": "AK + Igaunija"
+            },
+            {
+              "title": "Pakalpojumu sniedzēju pārbaude",
+              "body": "Pārbaudīt QuickBooks, Xero, Merit Aktiva, BambooHR un Personio ar atļautiem klienta vai testa uzņēmuma piekļuves datiem, saglabājot importu pārskatāmu un organizācijai nodalītu.",
+              "market": "Abi tirgi"
+            }
+          ]
+        },
+        {
+          "title": "Pilotprojekts",
+          "intro": "Ierobežotas plūsmas izvērtēšanai ar skaidri norādītām ražošanas robežām.",
+          "items": [
+            {
+              "title": "Mitinātais pakalpojums",
+              "body": "Pārvaldītā mitināšana tiek piedāvāta tikai ar atsevišķu klienta līgumu, kamēr tiek pabeigti darbības pierādījumi.",
+              "market": "Abi tirgi"
+            },
+            {
+              "title": "Igaunijas biroju algas 0.2.1",
+              "date": "2026-10-08",
+              "body": "Nepilna laika un stundas algu aprēķins, sociālā nodokļa minimums un sintētiskas demonstrācijas ir ieviestas; ražošanas lietojumam Nepieciešama pārskatīšana.",
+              "market": "Igaunija"
+            },
+            {
+              "title": "Nodokļu darba dokumenti un eksports",
+              "body": "AK PVN un Igaunijas KMD darba dokumenti un eksports ir pieejami izvērtēšanai. Tieša iesniegšana ir Plānota.",
+              "market": "AK + Igaunija"
+            }
+          ]
+        },
+        {
+          "title": "Plānots",
+          "intro": "Iespējas, kas vēl nav ieviestas vai iekļautas pašreizējā pakalpojuma solījumā.",
+          "items": [
+            {
+              "title": "Pārvaldītā pakalpojuma darbība",
+              "body": "Nosaukt mitināšanas apakšapstrādātāju un datu atrašanās vietu, pabeigt šifrētu kopiju atjaunošanas izmēģinājumu un pievienot incidentu brīdinājumus, pieprasījumu ierobežošanu un ļaunprogrammatūras pārbaudi.",
+              "market": "Abi tirgi"
+            },
+            {
+              "title": "Tikai lasāma atvērtā banku darbība",
+              "body": "Pēc juridiskās, komerciālās un banku pārklājuma pārbaudes pievienot pakalpojuma sniedzēja izvēli, atkārtotu savienošanu, plānotu importu un uzraudzību.",
+              "market": "AK + Igaunija"
+            },
+            {
+              "title": "Tieša nodokļu iesniegšana",
+              "body": "Pabeigt pakalpojumu sniedzēju apstiprinājumus un aizsargātas HMRC un e-MTA iesniegšanas plūsmas. Pašreizējais rezultāts ir darba dokumenti un eksports.",
+              "market": "AK + Igaunija"
+            },
+            {
+              "title": "Plašāki obligātie pārskati",
+              "body": "AK uzņēmumu nodokli un Companies House pārskatus, kā arī Igaunijas gada pārskata kartēšanu apsvērt tikai pēc piemēriem un profesionālas pārbaudes.",
+              "market": "AK + Igaunija"
+            }
+          ]
+        }
       ]
     },
     "changelog": {
@@ -166,11 +326,31 @@
       "source_intro": "Visas reģistrētās izmaiņas lasiet",
       "source_link": "tehniskajā izmaiņu žurnālā",
       "releases": [
-        {"title": "0.4.0 · E-pasta un paroles konti", "date": "2026-10-09", "body": "Blakus Google SSO pievienota reģistrācija, pierakstīšanās un paroles atiestatīšana. Paroles izmanto scrypt jaucējvērtības; apstiprināšanas un atiestatīšanas saites ir vienreizējas, ierobežotas un tiek sūtītas ar izvēles Postmark konfigurāciju."},
-        {"title": "0.3.0 · Integrācijas un automatizācija", "date": "2026-10-09", "body": "Pievienoti periodiskie rēķini un atgādinājumi, organizācijai nodalīta savienojumu kontrole, FastHR savienotājs, pārskatāms darbinieku imports, universāls CSV/TSV ceļš un dokumentēti Personio un BambooHR adapteri. Nepieciešama pārskatīšana: testi izmanto imitētu datplūsmu, un ražošanas pārbaude nav pabeigta."},
-        {"title": "0.2.1 · Igaunijas biroju algu aprēķins", "date": "2026-10-08", "body": "Pievienots nepilns darba laiks, stundas samaksa, pensiju likmes, 2026. gada sociālā nodokļa minimums un sintētiska algu demonstrācija. Nepieciešama pārskatīšana: grāmatvežu ražošanas UAT nav pabeigta."},
-        {"title": "0.2.0 · Inženierijas pilots", "date": "2026-08-10", "body": "Piegādāta grāmatvedības darbvieta, pārnesamas migrācijas, rēķini, pirkumu rēķini, pierādījumi, izrakstu imports un saskaņošana, nemaināma līdzsvarota virsgrāmata, finanšu pārskati un pārskatāmi AK un Igaunijas PVN darba dokumenti."},
-        {"title": "Pamats pirms versiju laidieniem", "date": "2026-08-10", "body": "Publicēta pirmā sākumlapa, integrāciju katalogs, veselības pārbaude un aizsargātas autentifikācijas pamats. Repozitorija izmaiņu žurnālā nav 0.1.x laidiena."}
+        {
+          "title": "0.4.0 · E-pasta un paroles konti",
+          "date": "2026-10-09",
+          "body": "Blakus Google SSO pievienota reģistrācija, pierakstīšanās un paroles atiestatīšana. Paroles izmanto scrypt jaucējvērtības; apstiprināšanas un atiestatīšanas saites ir vienreizējas, ierobežotas un tiek sūtītas ar izvēles Postmark konfigurāciju."
+        },
+        {
+          "title": "0.3.0 · Integrācijas un automatizācija",
+          "date": "2026-10-09",
+          "body": "Pievienoti periodiskie rēķini un atgādinājumi, organizācijai nodalīta savienojumu kontrole, FastHR savienotājs, pārskatāms darbinieku imports, universāls CSV/TSV ceļš un dokumentēti Personio un BambooHR adapteri. Nepieciešama pārskatīšana: testi izmanto imitētu datplūsmu, un ražošanas pārbaude nav pabeigta."
+        },
+        {
+          "title": "0.2.1 · Igaunijas biroju algu aprēķins",
+          "date": "2026-10-08",
+          "body": "Pievienots nepilns darba laiks, stundas samaksa, pensiju likmes, 2026. gada sociālā nodokļa minimums un sintētiska algu demonstrācija. Nepieciešama pārskatīšana: grāmatvežu ražošanas UAT nav pabeigta."
+        },
+        {
+          "title": "0.2.0 · Inženierijas pilots",
+          "date": "2026-08-10",
+          "body": "Piegādāta grāmatvedības darbvieta, pārnesamas migrācijas, rēķini, pirkumu rēķini, pierādījumi, izrakstu imports un saskaņošana, nemaināma līdzsvarota virsgrāmata, finanšu pārskati un pārskatāmi AK un Igaunijas PVN darba dokumenti."
+        },
+        {
+          "title": "Pamats pirms versiju laidieniem",
+          "date": "2026-08-10",
+          "body": "Publicēta pirmā sākumlapa, integrāciju katalogs, veselības pārbaude un aizsargātas autentifikācijas pamats. Repozitorija izmaiņu žurnālā nav 0.1.x laidiena."
+        }
       ]
     }
   },
@@ -386,7 +566,7 @@
         "direction": "No FastAccounts grāmatvedim",
         "ownership": "Grāmatveža pārbaudīts eksports"
       },
-    "open_banking": {
+      "open_banking": {
         "name": "Atvērtā banku darbība",
         "logo_alt": "Atvērtās banku darbības ikona",
         "category": "Bankas dati",
@@ -398,206 +578,326 @@
           "Saskaņošanas ievaddati"
         ],
         "direction": "Vispirms tikai lasīšana",
-      "ownership": "Banka paliek datu avots"
-    },
-    "file_import": {
-      "name": "Darbinieku faila imports",
-      "logo_alt": "Darbinieku faila importa ikona",
-      "category": "Personāla programmatūra",
-      "description": "Importējiet darbinieku pamatdatus no jebkuras algu vai personāla sistēmas CSV vai TSV eksporta. Excel darbgrāmata vispirms jāeksportē CSV formātā.",
-      "capabilities": ["CSV/Excel eksporta imports", "Darbinieku pamatdati"],
-      "direction": "Imports · augšupielādēti faili",
-      "ownership": "Augšupielādētais eksports paliek datu avots"
-    },
-    "fasthr": {
-      "name": "FastHR",
-      "logo_alt": "FastHR pagaidu zīme",
-      "category": "Personāla programmatūra",
-      "description": "Importējiet FastHR darbinieku pamatdatus pārskatītam grāmatvedības biroja algu aprēķinam. FastHR nesatur Igaunijas personas kodu.",
-      "capabilities": ["Darbinieku pamatdati", "Nodarbinātības statuss", "Pamatalga", "Organizācijas dati"],
-      "direction": "Imports · darbinieku pamatdati",
-      "ownership": "FastHR paliek datu avots"
-    },
-    "bamboohr": {
-      "name": "BambooHR",
-      "logo_alt": "BambooHR pagaidu zīme",
-      "category": "Personāla programmatūra",
-      "description": "Nepieciešama pārskatīšana: dokumentētā līguma adapteris nav pārbaudīts ar pakalpojuma sniedzēja piekļuves datiem, un algai vajadzīga pārskatīta lauka kartēšana vai vietēja ievade.",
-      "capabilities": ["Darbinieku katalogs", "Vārds un e-pasts", "Statuss, ja tas ir pieejams", "Pielāgoto lauku saglabāšana"],
-      "direction": "Imports · darbinieku katalogs",
-      "ownership": "BambooHR paliek datu avots"
-    },
-    "personio": {
-      "name": "Personio",
-      "logo_alt": "Personio pagaidu zīme",
-      "category": "Personāla programmatūra",
-      "description": "Nepieciešama pārskatīšana: dokumentētā līguma adapteris nav pārbaudīts ar pakalpojuma sniedzēja piekļuves datiem, un algai vajadzīga pārskatīta atribūta kartēšana vai vietēja ievade.",
-      "capabilities": ["Darbinieku atribūti", "Nodarbinātības statuss", "Darba attiecību beigu datums", "Pielāgoto atribūtu saglabāšana"],
-      "direction": "Imports · darbinieku pamatdati",
-      "ownership": "Personio paliek datu avots"
-    },
-    "hibob": {
-      "name": "Bob (HiBob)",
-      "logo_alt": "Bob by HiBob pagaidu zīme",
-      "category": "Personāla programmatūra",
-      "description": "Importējiet atlasītus Bob personāla datus pārskatīšanai pirms biroja algu aprēķina.",
-      "capabilities": ["Darbinieku katalogs", "Darba attiecību dzīves cikls", "Darba laika pārvaldība"],
-      "direction": "Vispirms imports · eksports saskaņā ar politiku",
-      "ownership": "Konfigurējams katram objektam"
-    },
-    "zoho_people": {
-      "name": "Zoho People",
-      "logo_alt": "Zoho People pagaidu zīme",
-      "category": "Personāla programmatūra",
-      "description": "Izmantojiet Zoho People darbinieku un darba laika datus kā pārskatītus algu aprēķina ievaddatus.",
-      "capabilities": ["Darbinieku dati", "Darba laika uzskaite", "Atvaļinājumi", "Darba laika tabulas", "Veidlapas"],
-      "direction": "Vispirms imports · eksports saskaņā ar politiku",
-      "ownership": "Konfigurējams katram objektam"
-    },
-    "employment_hero": {
-      "name": "Employment Hero",
-      "logo_alt": "Employment Hero pagaidu zīme",
-      "category": "Personāla programmatūra",
-      "description": "Nododiet atlasītus Employment Hero personāla datus pārskatīšanai pirms biroja algu aprēķina.",
-      "capabilities": ["Darbinieku dati", "Darba uzsākšana", "Atvaļinājumi", "Darba laika tabulas", "Algu aprēķina ievaddati"],
-      "direction": "Vispirms imports · eksports saskaņā ar politiku",
-      "ownership": "Konfigurējams katram objektam"
-    },
-    "workday": {
-      "name": "Workday",
-      "logo_alt": "Workday pagaidu zīme",
-      "category": "Personāla programmatūra",
-      "description": "Izmantojiet uzņēmuma līmeņa HCM darbinieku un algu datus kā pārskatāmu avotu biroja algu aprēķinam.",
-      "capabilities": ["Darbinieku dati", "Organizācijas struktūra", "Darba laiks un prombūtne", "Atlīdzība", "Algu aprēķina ievaddati"],
-      "direction": "Vispirms imports · eksports saskaņā ar politiku",
-      "ownership": "Konfigurējams katram objektam"
-    },
-    "hrmaster": {
-      "name": "HRmaster (HR Master)",
-      "logo_alt": "HRmaster pagaidu zīme",
-      "category": "Personāla programmatūra",
-      "description": "Izmantojiet Ungārijas personāla risinājumu kā pārskatāmu darbinieku un algu aprēķina ievaddatu avotu.",
-      "capabilities": ["Personāla dati", "Algu aprēķina ievaddati", "Personāla atlase", "Novērtēšana", "Cafeteria labumi"],
-      "direction": "Vispirms imports · eksports saskaņā ar politiku",
-      "ownership": "Konfigurējams katram objektam"
-    },
-    "gusto": {
-      "name": "Gusto",
-      "logo_alt": "Gusto pagaidu zīme",
-      "category": "Personāla programmatūra",
-      "description": "Izmantojiet ASV algu platformu kā pārskatāmu avotu, ja klienta uzņēmumu grupā ir ASV juridiskā persona.",
-      "capabilities": ["Darbinieku dati", "Algu aprēķina ievaddati", "Atvaļinājumi", "Labumu dati", "Līgumdarbinieku dati"],
-      "direction": "Vispirms imports · eksports saskaņā ar politiku",
-      "ownership": "Konfigurējams katram objektam"
-    },
-    "rippling": {
-      "name": "Rippling",
-      "logo_alt": "Rippling pagaidu zīme",
-      "category": "Personāla programmatūra",
-      "description": "Importējiet atlasītus personāla datus pārskatīšanai pirms klienta algu aprēķina.",
-      "capabilities": ["Darbinieku dati", "Darba uzsākšana", "Darba laiks un apmeklējums", "Atvaļinājumi", "Algu aprēķina ievaddati"],
-      "direction": "Vispirms imports · eksports saskaņā ar politiku",
-      "ownership": "Konfigurējams katram objektam"
-    },
-    "deel": {
-      "name": "Deel",
-      "logo_alt": "Deel pagaidu zīme",
-      "category": "Personāla programmatūra",
-      "description": "Izmantojiet globālā algu aprēķina un juridiskā darba devēja datus kā pārskatītus biroja algu aprēķina ievaddatus.",
-      "capabilities": ["Darbinieku dati", "Līgumi", "Globālā algu aprēķina ievaddati", "Atvaļinājumi", "Izdevumi"],
-      "direction": "Vispirms imports · eksports saskaņā ar politiku",
-      "ownership": "Konfigurējams katram objektam"
-    },
-    "odoo_hr": {
-      "name": "Odoo HR",
-      "logo_alt": "Odoo HR pagaidu zīme",
-      "category": "Personāla programmatūra",
-      "description": "Katram klientam konfigurējiet Odoo URL un datubāzes nosaukumu, lai veiktu pārskatāmus importus ar XML-RPC vai JSON-RPC.",
-      "capabilities": ["Darbinieku dati", "Darba laika uzskaite", "Atvaļinājumi", "Personāla atlase", "Izdevumi"],
-      "direction": "Vispirms imports · eksports saskaņā ar politiku",
-      "ownership": "Konfigurējams katram objektam"
-    },
-    "persona_fujitsu": {
-      "name": "Fujitsu Persona",
-      "logo_alt": "Fujitsu Persona pagaidu zīme",
-      "category": "Personāla programmatūra",
-      "description": "Igaunijas vecākā personāla un algu programmatūra darbojas kopš 1995. gada. Tās moduļi var nodrošināt pārskatāmus darbinieku un algu aprēķina ievaddatus.",
-      "capabilities": ["Personāla dati", "Algu aprēķins", "Darba laika uzskaite", "Pašapkalpošanās portāls"],
-      "direction": "Vispirms imports · eksports saskaņā ar politiku",
-      "ownership": "Konfigurējams katram objektam"
-    },
-    "wemply": {
-      "name": "Wemply",
-      "logo_alt": "Wemply pagaidu zīme",
-      "category": "Personāla programmatūra",
-      "description": "Modulāru personāla, darba laika un Igaunijas algu platformu izmanto vairāk nekā 1000 uzņēmumu. Wemply ieguva titulu “Aasta HR lahendus 2025”.",
-      "capabilities": ["Personāla pārvaldība", "Darba laika uzskaite", "Igaunijas algu aprēķins", "TSD pārskati", "TÖR pārskati"],
-      "direction": "Vispirms imports · eksports saskaņā ar politiku",
-      "ownership": "Konfigurējams katram objektam"
-    },
-    "hours24": {
-      "name": "hours24",
-      "logo_alt": "hours24 pagaidu zīme",
-      "category": "Personāla programmatūra",
-      "description": "Mākslīgā intelekta atbalstīta darba laika uzskaite un grafiku plānošana, ko izmanto Igaunijā un Somijā. Līdz pieciem darbiniekiem pieejams bezmaksas plāns.",
-      "capabilities": ["MI atbalstīta laika ievade", "Darba laika dati", "Darba grafiki"],
-      "direction": "Vispirms imports · eksports saskaņā ar politiku",
-      "ownership": "Konfigurējams katram objektam"
-    },
-    "yester": {
-      "name": "Yester",
-      "logo_alt": "Yester pagaidu zīme",
-      "category": "Personāla programmatūra",
-      "description": "Igaunijas darbaspēka platforma darbojas kopš 2000. gada un aptver darba uzsākšanu, izdevumus, komandējumus un braucienu uzskaiti. Tā ir cieši integrēta ar Merit Tarkvara.",
-      "capabilities": ["Darba uzsākšana", "Izdevumu atskaites", "Komandējumi", "Braucienu uzskaite", "Merit integrācija"],
-      "direction": "Vispirms imports · eksports saskaņā ar politiku",
-      "ownership": "Konfigurējams katram objektam"
-    },
-    "hrm4baltics": {
-      "name": "HRM4Baltics (Digmatix)",
-      "logo_alt": "HRM4Baltics pagaidu zīme",
-      "category": "Personāla programmatūra",
-      "description": "Microsoft Dynamics 365 Business Central personāla risinājums aptver Igaunijas, Latvijas un Lietuvas algu aprēķinu. Tajā ir X-tee integrācija.",
-      "capabilities": ["Personāla dati", "Igaunijas algu aprēķins", "Latvijas algu aprēķins", "Lietuvas algu aprēķins", "X-tee integrācija"],
-      "direction": "Vispirms imports · eksports saskaņā ar politiku",
-      "ownership": "Konfigurējams katram objektam"
-    },
-    "merit_palk": {
-      "name": "Merit Palk",
-      "logo_alt": "Merit Palk pagaidu zīme",
-      "category": "Personāla programmatūra",
-      "description": "Igaunijā visvairāk izmantotā algu programmatūra apkalpo vairāk nekā 25 000 uzņēmumu un ir bez maksas līdz diviem darbiniekiem. Tā var darboties kopā ar esošo Merit Aktiva grāmatvedības adapteri.",
-      "capabilities": ["Darbinieku dati", "Algu aprēķins", "Algas lapiņas", "TSD sagatavošana", "Savienojums ar Merit Aktiva"],
-      "direction": "Vispirms imports · eksports saskaņā ar politiku",
-      "ownership": "Konfigurējams katram objektam"
-    },
-    "taavi_palk": {
-      "name": "Taavi Palk",
-      "logo_alt": "Taavi Palk pagaidu zīme",
-      "category": "Personāla programmatūra",
-      "description": "Igaunijas algu programmatūru izmanto vairāk nekā 1500 uzņēmumu. Tā sagatavo normatīvos pārskatus un eksportē algas lapiņas uz Igaunijas grāmatvedības sistēmām.",
-      "capabilities": ["TSD pārskati", "Reģistru pārskati", "Statistikas pārskati", "Algas lapiņu eksports"],
-      "direction": "Vispirms imports · eksports saskaņā ar politiku",
-      "ownership": "Konfigurējams katram objektam"
-    },
-    "andevis": {
-      "name": "Andevis",
-      "logo_alt": "Andevis pagaidu zīme",
-      "category": "Personāla programmatūra",
-      "description": "Pielāgojams Igaunijas personāla risinājums, kura moduļi var nodrošināt pārskatāmus personāla un algu aprēķina ievaddatus.",
-      "capabilities": ["Personāla dati", "Darba laika uzskaite", "Algu aprēķins", "Apmācības", "Attīstības pārrunas"],
-      "direction": "Vispirms imports · eksports saskaņā ar politiku",
-      "ownership": "Konfigurējams katram objektam"
-    },
-    "eeva": {
-      "name": "Eeva (Eetasoft)",
-      "logo_alt": "Eeva pagaidu zīme",
-      "category": "Personāla programmatūra",
-      "description": "Eeva personāla modulis pārvalda galvenos darba attiecību datus un ir saistīts ar Eeva algu aprēķinu. Dati biroja algu aprēķinā nonāktu tikai ar pārskatītu importu.",
-      "capabilities": ["Līgumi", "Rīkojumi", "Atvaļinājumi", "ISCO klasifikators", "Saite ar Eeva algu aprēķinu"],
-      "direction": "Vispirms imports · eksports saskaņā ar politiku",
-      "ownership": "Konfigurējams katram objektam"
-    }
+        "ownership": "Banka paliek datu avots"
+      },
+      "file_import": {
+        "name": "Darbinieku faila imports",
+        "logo_alt": "Darbinieku faila importa ikona",
+        "category": "Personāla programmatūra",
+        "description": "Importējiet darbinieku pamatdatus no jebkuras algu vai personāla sistēmas CSV vai TSV eksporta. Excel darbgrāmata vispirms jāeksportē CSV formātā.",
+        "capabilities": [
+          "CSV/Excel eksporta imports",
+          "Darbinieku pamatdati"
+        ],
+        "direction": "Imports · augšupielādēti faili",
+        "ownership": "Augšupielādētais eksports paliek datu avots"
+      },
+      "fasthr": {
+        "name": "FastHR",
+        "logo_alt": "FastHR pagaidu zīme",
+        "category": "Personāla programmatūra",
+        "description": "Importējiet FastHR darbinieku pamatdatus pārskatītam grāmatvedības biroja algu aprēķinam. FastHR nesatur Igaunijas personas kodu.",
+        "capabilities": [
+          "Darbinieku pamatdati",
+          "Nodarbinātības statuss",
+          "Pamatalga",
+          "Organizācijas dati"
+        ],
+        "direction": "Imports · darbinieku pamatdati",
+        "ownership": "FastHR paliek datu avots"
+      },
+      "bamboohr": {
+        "name": "BambooHR",
+        "logo_alt": "BambooHR pagaidu zīme",
+        "category": "Personāla programmatūra",
+        "description": "Nepieciešama pārskatīšana: dokumentētā līguma adapteris nav pārbaudīts ar pakalpojuma sniedzēja piekļuves datiem, un algai vajadzīga pārskatīta lauka kartēšana vai vietēja ievade.",
+        "capabilities": [
+          "Darbinieku katalogs",
+          "Vārds un e-pasts",
+          "Statuss, ja tas ir pieejams",
+          "Pielāgoto lauku saglabāšana"
+        ],
+        "direction": "Imports · darbinieku katalogs",
+        "ownership": "BambooHR paliek datu avots"
+      },
+      "personio": {
+        "name": "Personio",
+        "logo_alt": "Personio pagaidu zīme",
+        "category": "Personāla programmatūra",
+        "description": "Nepieciešama pārskatīšana: dokumentētā līguma adapteris nav pārbaudīts ar pakalpojuma sniedzēja piekļuves datiem, un algai vajadzīga pārskatīta atribūta kartēšana vai vietēja ievade.",
+        "capabilities": [
+          "Darbinieku atribūti",
+          "Nodarbinātības statuss",
+          "Darba attiecību beigu datums",
+          "Pielāgoto atribūtu saglabāšana"
+        ],
+        "direction": "Imports · darbinieku pamatdati",
+        "ownership": "Personio paliek datu avots"
+      },
+      "hibob": {
+        "name": "Bob (HiBob)",
+        "logo_alt": "Bob by HiBob pagaidu zīme",
+        "category": "Personāla programmatūra",
+        "description": "Importējiet atlasītus Bob personāla datus pārskatīšanai pirms biroja algu aprēķina.",
+        "capabilities": [
+          "Darbinieku katalogs",
+          "Darba attiecību dzīves cikls",
+          "Darba laika pārvaldība"
+        ],
+        "direction": "Vispirms imports · eksports saskaņā ar politiku",
+        "ownership": "Konfigurējams katram objektam"
+      },
+      "zoho_people": {
+        "name": "Zoho People",
+        "logo_alt": "Zoho People pagaidu zīme",
+        "category": "Personāla programmatūra",
+        "description": "Izmantojiet Zoho People darbinieku un darba laika datus kā pārskatītus algu aprēķina ievaddatus.",
+        "capabilities": [
+          "Darbinieku dati",
+          "Darba laika uzskaite",
+          "Atvaļinājumi",
+          "Darba laika tabulas",
+          "Veidlapas"
+        ],
+        "direction": "Vispirms imports · eksports saskaņā ar politiku",
+        "ownership": "Konfigurējams katram objektam"
+      },
+      "employment_hero": {
+        "name": "Employment Hero",
+        "logo_alt": "Employment Hero pagaidu zīme",
+        "category": "Personāla programmatūra",
+        "description": "Nododiet atlasītus Employment Hero personāla datus pārskatīšanai pirms biroja algu aprēķina.",
+        "capabilities": [
+          "Darbinieku dati",
+          "Darba uzsākšana",
+          "Atvaļinājumi",
+          "Darba laika tabulas",
+          "Algu aprēķina ievaddati"
+        ],
+        "direction": "Vispirms imports · eksports saskaņā ar politiku",
+        "ownership": "Konfigurējams katram objektam"
+      },
+      "workday": {
+        "name": "Workday",
+        "logo_alt": "Workday pagaidu zīme",
+        "category": "Personāla programmatūra",
+        "description": "Izmantojiet uzņēmuma līmeņa HCM darbinieku un algu datus kā pārskatāmu avotu biroja algu aprēķinam.",
+        "capabilities": [
+          "Darbinieku dati",
+          "Organizācijas struktūra",
+          "Darba laiks un prombūtne",
+          "Atlīdzība",
+          "Algu aprēķina ievaddati"
+        ],
+        "direction": "Vispirms imports · eksports saskaņā ar politiku",
+        "ownership": "Konfigurējams katram objektam"
+      },
+      "hrmaster": {
+        "name": "HRmaster (HR Master)",
+        "logo_alt": "HRmaster pagaidu zīme",
+        "category": "Personāla programmatūra",
+        "description": "Izmantojiet Ungārijas personāla risinājumu kā pārskatāmu darbinieku un algu aprēķina ievaddatu avotu.",
+        "capabilities": [
+          "Personāla dati",
+          "Algu aprēķina ievaddati",
+          "Personāla atlase",
+          "Novērtēšana",
+          "Cafeteria labumi"
+        ],
+        "direction": "Vispirms imports · eksports saskaņā ar politiku",
+        "ownership": "Konfigurējams katram objektam"
+      },
+      "gusto": {
+        "name": "Gusto",
+        "logo_alt": "Gusto pagaidu zīme",
+        "category": "Personāla programmatūra",
+        "description": "Izmantojiet ASV algu platformu kā pārskatāmu avotu, ja klienta uzņēmumu grupā ir ASV juridiskā persona.",
+        "capabilities": [
+          "Darbinieku dati",
+          "Algu aprēķina ievaddati",
+          "Atvaļinājumi",
+          "Labumu dati",
+          "Līgumdarbinieku dati"
+        ],
+        "direction": "Vispirms imports · eksports saskaņā ar politiku",
+        "ownership": "Konfigurējams katram objektam"
+      },
+      "rippling": {
+        "name": "Rippling",
+        "logo_alt": "Rippling pagaidu zīme",
+        "category": "Personāla programmatūra",
+        "description": "Importējiet atlasītus personāla datus pārskatīšanai pirms klienta algu aprēķina.",
+        "capabilities": [
+          "Darbinieku dati",
+          "Darba uzsākšana",
+          "Darba laiks un apmeklējums",
+          "Atvaļinājumi",
+          "Algu aprēķina ievaddati"
+        ],
+        "direction": "Vispirms imports · eksports saskaņā ar politiku",
+        "ownership": "Konfigurējams katram objektam"
+      },
+      "deel": {
+        "name": "Deel",
+        "logo_alt": "Deel pagaidu zīme",
+        "category": "Personāla programmatūra",
+        "description": "Izmantojiet globālā algu aprēķina un juridiskā darba devēja datus kā pārskatītus biroja algu aprēķina ievaddatus.",
+        "capabilities": [
+          "Darbinieku dati",
+          "Līgumi",
+          "Globālā algu aprēķina ievaddati",
+          "Atvaļinājumi",
+          "Izdevumi"
+        ],
+        "direction": "Vispirms imports · eksports saskaņā ar politiku",
+        "ownership": "Konfigurējams katram objektam"
+      },
+      "odoo_hr": {
+        "name": "Odoo HR",
+        "logo_alt": "Odoo HR pagaidu zīme",
+        "category": "Personāla programmatūra",
+        "description": "Katram klientam konfigurējiet Odoo URL un datubāzes nosaukumu, lai veiktu pārskatāmus importus ar XML-RPC vai JSON-RPC.",
+        "capabilities": [
+          "Darbinieku dati",
+          "Darba laika uzskaite",
+          "Atvaļinājumi",
+          "Personāla atlase",
+          "Izdevumi"
+        ],
+        "direction": "Vispirms imports · eksports saskaņā ar politiku",
+        "ownership": "Konfigurējams katram objektam"
+      },
+      "persona_fujitsu": {
+        "name": "Fujitsu Persona",
+        "logo_alt": "Fujitsu Persona pagaidu zīme",
+        "category": "Personāla programmatūra",
+        "description": "Igaunijas vecākā personāla un algu programmatūra darbojas kopš 1995. gada. Tās moduļi var nodrošināt pārskatāmus darbinieku un algu aprēķina ievaddatus.",
+        "capabilities": [
+          "Personāla dati",
+          "Algu aprēķins",
+          "Darba laika uzskaite",
+          "Pašapkalpošanās portāls"
+        ],
+        "direction": "Vispirms imports · eksports saskaņā ar politiku",
+        "ownership": "Konfigurējams katram objektam"
+      },
+      "wemply": {
+        "name": "Wemply",
+        "logo_alt": "Wemply pagaidu zīme",
+        "category": "Personāla programmatūra",
+        "description": "Modulāru personāla, darba laika un Igaunijas algu platformu izmanto vairāk nekā 1000 uzņēmumu. Wemply ieguva titulu “Aasta HR lahendus 2025”.",
+        "capabilities": [
+          "Personāla pārvaldība",
+          "Darba laika uzskaite",
+          "Igaunijas algu aprēķins",
+          "TSD pārskati",
+          "TÖR pārskati"
+        ],
+        "direction": "Vispirms imports · eksports saskaņā ar politiku",
+        "ownership": "Konfigurējams katram objektam"
+      },
+      "hours24": {
+        "name": "hours24",
+        "logo_alt": "hours24 pagaidu zīme",
+        "category": "Personāla programmatūra",
+        "description": "Mākslīgā intelekta atbalstīta darba laika uzskaite un grafiku plānošana, ko izmanto Igaunijā un Somijā. Līdz pieciem darbiniekiem pieejams bezmaksas plāns.",
+        "capabilities": [
+          "MI atbalstīta laika ievade",
+          "Darba laika dati",
+          "Darba grafiki"
+        ],
+        "direction": "Vispirms imports · eksports saskaņā ar politiku",
+        "ownership": "Konfigurējams katram objektam"
+      },
+      "yester": {
+        "name": "Yester",
+        "logo_alt": "Yester pagaidu zīme",
+        "category": "Personāla programmatūra",
+        "description": "Igaunijas darbaspēka platforma darbojas kopš 2000. gada un aptver darba uzsākšanu, izdevumus, komandējumus un braucienu uzskaiti. Tā ir cieši integrēta ar Merit Tarkvara.",
+        "capabilities": [
+          "Darba uzsākšana",
+          "Izdevumu atskaites",
+          "Komandējumi",
+          "Braucienu uzskaite",
+          "Merit integrācija"
+        ],
+        "direction": "Vispirms imports · eksports saskaņā ar politiku",
+        "ownership": "Konfigurējams katram objektam"
+      },
+      "hrm4baltics": {
+        "name": "HRM4Baltics (Digmatix)",
+        "logo_alt": "HRM4Baltics pagaidu zīme",
+        "category": "Personāla programmatūra",
+        "description": "Microsoft Dynamics 365 Business Central personāla risinājums aptver Igaunijas, Latvijas un Lietuvas algu aprēķinu. Tajā ir X-tee integrācija.",
+        "capabilities": [
+          "Personāla dati",
+          "Igaunijas algu aprēķins",
+          "Latvijas algu aprēķins",
+          "Lietuvas algu aprēķins",
+          "X-tee integrācija"
+        ],
+        "direction": "Vispirms imports · eksports saskaņā ar politiku",
+        "ownership": "Konfigurējams katram objektam"
+      },
+      "merit_palk": {
+        "name": "Merit Palk",
+        "logo_alt": "Merit Palk pagaidu zīme",
+        "category": "Personāla programmatūra",
+        "description": "Igaunijā visvairāk izmantotā algu programmatūra apkalpo vairāk nekā 25 000 uzņēmumu un ir bez maksas līdz diviem darbiniekiem. Tā var darboties kopā ar esošo Merit Aktiva grāmatvedības adapteri.",
+        "capabilities": [
+          "Darbinieku dati",
+          "Algu aprēķins",
+          "Algas lapiņas",
+          "TSD sagatavošana",
+          "Savienojums ar Merit Aktiva"
+        ],
+        "direction": "Vispirms imports · eksports saskaņā ar politiku",
+        "ownership": "Konfigurējams katram objektam"
+      },
+      "taavi_palk": {
+        "name": "Taavi Palk",
+        "logo_alt": "Taavi Palk pagaidu zīme",
+        "category": "Personāla programmatūra",
+        "description": "Igaunijas algu programmatūru izmanto vairāk nekā 1500 uzņēmumu. Tā sagatavo normatīvos pārskatus un eksportē algas lapiņas uz Igaunijas grāmatvedības sistēmām.",
+        "capabilities": [
+          "TSD pārskati",
+          "Reģistru pārskati",
+          "Statistikas pārskati",
+          "Algas lapiņu eksports"
+        ],
+        "direction": "Vispirms imports · eksports saskaņā ar politiku",
+        "ownership": "Konfigurējams katram objektam"
+      },
+      "andevis": {
+        "name": "Andevis",
+        "logo_alt": "Andevis pagaidu zīme",
+        "category": "Personāla programmatūra",
+        "description": "Pielāgojams Igaunijas personāla risinājums, kura moduļi var nodrošināt pārskatāmus personāla un algu aprēķina ievaddatus.",
+        "capabilities": [
+          "Personāla dati",
+          "Darba laika uzskaite",
+          "Algu aprēķins",
+          "Apmācības",
+          "Attīstības pārrunas"
+        ],
+        "direction": "Vispirms imports · eksports saskaņā ar politiku",
+        "ownership": "Konfigurējams katram objektam"
+      },
+      "eeva": {
+        "name": "Eeva (Eetasoft)",
+        "logo_alt": "Eeva pagaidu zīme",
+        "category": "Personāla programmatūra",
+        "description": "Eeva personāla modulis pārvalda galvenos darba attiecību datus un ir saistīts ar Eeva algu aprēķinu. Dati biroja algu aprēķinā nonāktu tikai ar pārskatītu importu.",
+        "capabilities": [
+          "Līgumi",
+          "Rīkojumi",
+          "Atvaļinājumi",
+          "ISCO klasifikators",
+          "Saite ar Eeva algu aprēķinu"
+        ],
+        "direction": "Vispirms imports · eksports saskaņā ar politiku",
+        "ownership": "Konfigurējams katram objektam"
+      }
     }
   },
   "auth": {
@@ -708,7 +1008,7 @@
     "Currency totals": "Kopsummas pa valūtām",
     "Due on or before": "Apmaksas termiņš līdz",
     "No eligible bills.": "Nav apmaksai piemērotu rēķinu.",
-    "Outstanding": "Neapmaksātā summa",
+    "Outstanding": "Outstanding",
     "Select": "Atlasīt",
     "Excluded bills": "Neiekļautie rēķini",
     "Reason": "Iemesls",
@@ -875,7 +1175,6 @@
     "Over 90 days": "Over 90 days",
     "Due date": "Due date",
     "Days overdue": "Days overdue",
-    "Outstanding": "Outstanding",
     "Net cash movement": "Net cash movement",
     "Movement": "Movement",
     "Income": "Income",
@@ -1787,6 +2086,35 @@
       "Logo content and filename must match its image type": "Logotipa saturam un faila nosaukumam jāatbilst attēla tipam",
       "Logo not found": "Logotips nav atrasts",
       "Logo file not found": "Logotipa fails nav atrasts"
+    }
+  },
+  "copilot": {
+    "nav": {
+      "assistant": "Asistents",
+      "copilot": "AI asistents"
+    },
+    "workspace": {
+      "AI copilot": "AI asistents",
+      "Ask about your books, scan documents and draft staged imports. The copilot never changes records on its own.": "Jautiet par savām uzskaitēm, skenējiet dokumentus un sagatavojiet importēšanas rindu priekšskatījumu. Asistents pats nekad nemaina ierakstus.",
+      "AI copilot is not configured on this service.": "AI asistents šajā servisā nav konfigurēts.",
+      "AI copilot is off for this organisation. An owner or administrator can enable it here.": "AI asistents šajā organizācijā ir izslēgts. Īpašnieks vai administrators to var ieslēgt šeit.",
+      "Used today": "Šodien izmantots",
+      "Enable AI copilot for this organisation": "Atļaut AI asistentu šajā organizācijā",
+      "Conversation": "Saruna",
+      "Message": "Ziņojums",
+      "Attach document": "Pievienot dokumentu",
+      "No attachment": "Bez pielikuma",
+      "Send message": "Sūtīt ziņojumu",
+      "Copilot replied": "Asistents atbildēja",
+      "No copilot messages yet.": "Asistenta ziņojumu vēl nav.",
+      "Input tokens": "Pieprasījuma tokeni",
+      "Output tokens": "Atbildes tokeni",
+      "Copilot usage": "Asistenta lietošana",
+      "Per-user daily usage counts every message, scan and token billed to this organisation.": "Ikdienas lietošana uz lietotāju rāda visus ziņojumus, skenējumus un tokenus, ko izrakstām šai organizācijai.",
+      "Stage {rows} rows for import": "Iekļaut {rows} rindas importēšanas priekšskatījumā",
+      "Stage import rows": "Importēšanas rindu priekšskatījums",
+      "Review these rows in Data import before they touch your books. Stage them now?": "Pārskatiet šīs rindas datu importēšanā, pirms tās nonāk uzskaitē. Iekļaut priekšskatījumā tagad?",
+      "Import batch staged. Review it under Data import.": "Importēšanas pakete iekļauta priekšskatījumā. Pārskatiet to datu importēšanā."
     }
   }
 }

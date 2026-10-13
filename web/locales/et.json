@@ -74,13 +74,38 @@
       "lede": "Faktiline ülevaade FastAccountsis saadaval olevatest turvameetmetest, isemajutaja vastutusest ning enne tootmiskasutust ülevaatamist või kavandamist vajavast tööst.",
       "note": "Vajab ülevaatust · hinnatud 9. oktoobril 2026",
       "sections": [
-        {"title": "Majutusmudel", "body": "FastAccountsi saab ise majutada; sel juhul valib ja turvab taristu selle käitaja. Hallatav pilootteenus kasutab sama Dockeri rakendust koos PostgreSQL-i ja püsiva tõendusmaterjalide hoidlaga FastSME hallatavas taristus. Alusinfrastruktuuri pakkuja sõltub juurutusest ning tuleb tootmiskliendi lepingus nimetada."},
-        {"title": "Krüpteerimine", "body": "Liidestuste kasutustunnused krüpteeritakse puhkeolekus võtmeversiooniga Ferneti varamus ning neid ei lisata brauserivastustesse ega logidesse. Majutatud ühendus kasutab HTTPS-i/TLS-i. FastAccounts ei väida praegu, et iga andmebaasiväli või üles laaditud tõendusfail oleks rakenduse tasemel puhkeolekus krüpteeritud."},
-        {"title": "Varukoopiad ja taaste", "body": "Isemajutaja vastutab andmebaasi, tõendusfailide, krüpteerimise ja taastamise eest. Kavandatud: hallatava majutuse krüpteeritud varukoopiad ja kontrollitud taastamine. Hoidlas pole lõpetatud taasteproovi kirjet, seega me taastamisaega ei luba."},
-        {"title": "Juurdepääsukontroll", "body": "Saadaval: kohalikud e-posti ja parooliga kontod ning Google'i sisselogimine, kutsepõhine organisatsiooni liikmesus, allkirjastatud seansid, CSRF-kaitse ning omaniku, administraatori, raamatupidaja, kinnitaja ja vaataja rollid. Paroolid räsitakse scryptiga; kinnitus- ja lähtestuslingid on ühekordsed ning andmebaasi salvestatakse ainult nende räsid. Korduvaid sisselogimiskatseid piiratakse. Äriandmed on organisatsioonipõhised ja organisatsioonidevahelist ligipääsu kontrollivad testid. Kavandatud: hallatava teenuse MFA-poliitika ja võrguserva päringupiirangud."},
-        {"title": "Turvaintsidendid", "body": "Saada turvaintsidendi kahtlus privaatselt aadressile info@predictivelabs.ai ja lisa teemaks „FastAccountsi turvaintsident“. Meeskond säilitab asjakohased kirjed, hindab ulatust ja koordineerib klienditeavitust. Lepingulist reageerimisaega veel ei pakuta.", "action": "Teata turvaintsidendist", "email_subject": "FastAccountsi turvaintsident"},
-        {"title": "Sõltuvuste teavitused", "body": "Pythoni sõltuvused on kirjas failis requirements.txt. CI kompileerib rakenduse, käivitab testid, kontrollib migratsioone ja otsib lähtekoodist levinud saladuste mustreid. Projekt ei väida, et sõltuvuste turvanõrkusi jälgitakse pidevalt ja automaatselt. Kahtlasest sõltuvusest teata privaatselt turvakontakti kaudu."},
-        {"title": "Vastutustundlik avalikustamine", "body": "Teata turvanõrkusest enne avalikku arutelu privaatselt ning lisa mõjutatud versioonid, kordamise juhis ja mõju. Kinnitame suhtluskanali, uurime heas usus ja lepime teavitajaga kokku avalikustamise aja. Palun anna parandamiseks mõistlik aeg; vastamise või parandamise tähtaega me veel ei garanteeri.", "action": "Saada privaatne turvateade", "email_subject": "FastAccountsi vastutustundlik avalikustamine"}
+        {
+          "title": "Majutusmudel",
+          "body": "FastAccountsi saab ise majutada; sel juhul valib ja turvab taristu selle käitaja. Hallatav pilootteenus kasutab sama Dockeri rakendust koos PostgreSQL-i ja püsiva tõendusmaterjalide hoidlaga FastSME hallatavas taristus. Alusinfrastruktuuri pakkuja sõltub juurutusest ning tuleb tootmiskliendi lepingus nimetada."
+        },
+        {
+          "title": "Krüpteerimine",
+          "body": "Liidestuste kasutustunnused krüpteeritakse puhkeolekus võtmeversiooniga Ferneti varamus ning neid ei lisata brauserivastustesse ega logidesse. Majutatud ühendus kasutab HTTPS-i/TLS-i. FastAccounts ei väida praegu, et iga andmebaasiväli või üles laaditud tõendusfail oleks rakenduse tasemel puhkeolekus krüpteeritud."
+        },
+        {
+          "title": "Varukoopiad ja taaste",
+          "body": "Isemajutaja vastutab andmebaasi, tõendusfailide, krüpteerimise ja taastamise eest. Kavandatud: hallatava majutuse krüpteeritud varukoopiad ja kontrollitud taastamine. Hoidlas pole lõpetatud taasteproovi kirjet, seega me taastamisaega ei luba."
+        },
+        {
+          "title": "Juurdepääsukontroll",
+          "body": "Saadaval: kohalikud e-posti ja parooliga kontod ning Google'i sisselogimine, kutsepõhine organisatsiooni liikmesus, allkirjastatud seansid, CSRF-kaitse ning omaniku, administraatori, raamatupidaja, kinnitaja ja vaataja rollid. Paroolid räsitakse scryptiga; kinnitus- ja lähtestuslingid on ühekordsed ning andmebaasi salvestatakse ainult nende räsid. Korduvaid sisselogimiskatseid piiratakse. Äriandmed on organisatsioonipõhised ja organisatsioonidevahelist ligipääsu kontrollivad testid. Kavandatud: hallatava teenuse MFA-poliitika ja võrguserva päringupiirangud."
+        },
+        {
+          "title": "Turvaintsidendid",
+          "body": "Saada turvaintsidendi kahtlus privaatselt aadressile info@predictivelabs.ai ja lisa teemaks „FastAccountsi turvaintsident“. Meeskond säilitab asjakohased kirjed, hindab ulatust ja koordineerib klienditeavitust. Lepingulist reageerimisaega veel ei pakuta.",
+          "action": "Teata turvaintsidendist",
+          "email_subject": "FastAccountsi turvaintsident"
+        },
+        {
+          "title": "Sõltuvuste teavitused",
+          "body": "Pythoni sõltuvused on kirjas failis requirements.txt. CI kompileerib rakenduse, käivitab testid, kontrollib migratsioone ja otsib lähtekoodist levinud saladuste mustreid. Projekt ei väida, et sõltuvuste turvanõrkusi jälgitakse pidevalt ja automaatselt. Kahtlasest sõltuvusest teata privaatselt turvakontakti kaudu."
+        },
+        {
+          "title": "Vastutustundlik avalikustamine",
+          "body": "Teata turvanõrkusest enne avalikku arutelu privaatselt ning lisa mõjutatud versioonid, kordamise juhis ja mõju. Kinnitame suhtluskanali, uurime heas usus ja lepime teavitajaga kokku avalikustamise aja. Palun anna parandamiseks mõistlik aeg; vastamise või parandamise tähtaega me veel ei garanteeri.",
+          "action": "Saada privaatne turvateade",
+          "email_subject": "FastAccountsi vastutustundlik avalikustamine"
+        }
       ]
     },
     "privacy": {
@@ -88,12 +113,32 @@
       "lede": "See pilootteenuse teavitus selgitab praeguses tootes nähtavaid rolle ja andmevooge. Tootmiskokkuleppe peab lõpule viima kliendiga sõlmitav andmetöötlusleping.",
       "note": "Piloot · lihtsas keeles teavitus, hinnatud 9. oktoobril 2026",
       "sections": [
-        {"title": "Vastutava ja volitatud töötleja rollid", "body": "Majutatud teenuses on Predictive Labs Ltd konto-, toe- ja teenusehalduse andmete vastutav töötleja ning organisatsiooni sisestatud ettevõtte-, kliendi-, tarnija- ja töötajaandmete volitatud töötleja. Klient jääb oma organisatsiooni andmete vastutavaks töötlejaks. Isemajutatud juurutuses määrab käitaja enda rollid ja teavitused."},
-        {"title": "Praegused alamtöötlejad", "body": "Praegune kood kasutab valikuliseks sisselogimiseks Google'it ning seadistamise korral konto-, arve- ja meeldetuletuskirjadeks Postmarki. Kui Postmarki kasutustunnuseid pole, seda ei kasutata. Hoidla ei nimeta hallatava taristu pakkujat; tootmiskeskkonna majutaja tuleb enne päris kliendiandmete vastuvõtmist andmetöötluslepingus nimetada. Ühendatud raamatupidamis-, personali- või pangateenused on kliendi valitud liidestused, mitte vaikimisi andmesaajad."},
-        {"title": "Säilitamine", "body": "Raamatupidamiskirjeid säilitatakse kliendi poliitika ja kohaldatavate tähtaegade järgi: tegevuskavas on Ühendkuningriigi tavapäraste käibemaksukirjete jaoks kuus aastat ning Eesti raamatupidamiskirjete jaoks seitse aastat majandusaasta lõpust, vajaduse korral kauem. Kustutamistaotlus ei tohi märkamatult eemaldada pearaamatukandeid ega seadusest või õiguslikust hoidest tulenevaid kirjeid. Kavandatud: hallatava majutuse automaatne säilituse juhtimine."},
-        {"title": "Rahvusvaheline andmeedastus", "body": "Isemajutaja valib andmete asukoha. Majutatud piloodis võivad Google või Postmark töödelda andmeid oma teenusetingimuste ja edastusmeetmete alusel. Tootmise andmetöötlusleping peab kirjeldama majutuskoha, kõik alamtöötlejad ja edastusmehhanismid; see leht ei mõtle välja asukohta, mida hoidla ei dokumenteeri."},
-        {"title": "Analüütika ja logid", "body": "Avalik veebileht ega rakendus ei sisalda analüütika- või reklaamitarkvara. Juurutus võib teenuse käitamiseks ja kaitsmiseks säilitada tehnilisi veebi-, autentimis- ja auditilogisid. Logides ei tohi olla teenusepakkujate kasutustunnuseid ning nende säilitusaeg tuleb tootmiskeskkonnas dokumenteerida."},
-        {"title": "Andmesubjekti taotlused", "body": "Juurdepääsu, parandamise, kustutamise, piiramise või muu andmekaitsetaotluse korral pöördu esmalt organisatsiooni poole, kes vastavaid raamatuid haldab. FastAccountsi konto- või teenuseandmete asjus kirjuta aadressile info@predictivelabs.ai. Võime paluda isikusamasuse kinnitamist ja peame säilitama andmed, mille alleshoidmist seadus nõuab.", "action": "Võta andmekaitse asjus ühendust", "email_subject": "FastAccountsi andmekaitsetaotlus"}
+        {
+          "title": "Vastutava ja volitatud töötleja rollid",
+          "body": "Majutatud teenuses on Predictive Labs Ltd konto-, toe- ja teenusehalduse andmete vastutav töötleja ning organisatsiooni sisestatud ettevõtte-, kliendi-, tarnija- ja töötajaandmete volitatud töötleja. Klient jääb oma organisatsiooni andmete vastutavaks töötlejaks. Isemajutatud juurutuses määrab käitaja enda rollid ja teavitused."
+        },
+        {
+          "title": "Praegused alamtöötlejad",
+          "body": "Praegune kood kasutab valikuliseks sisselogimiseks Google'it ning seadistamise korral konto-, arve- ja meeldetuletuskirjadeks Postmarki. Kui Postmarki kasutustunnuseid pole, seda ei kasutata. Hoidla ei nimeta hallatava taristu pakkujat; tootmiskeskkonna majutaja tuleb enne päris kliendiandmete vastuvõtmist andmetöötluslepingus nimetada. Ühendatud raamatupidamis-, personali- või pangateenused on kliendi valitud liidestused, mitte vaikimisi andmesaajad."
+        },
+        {
+          "title": "Säilitamine",
+          "body": "Raamatupidamiskirjeid säilitatakse kliendi poliitika ja kohaldatavate tähtaegade järgi: tegevuskavas on Ühendkuningriigi tavapäraste käibemaksukirjete jaoks kuus aastat ning Eesti raamatupidamiskirjete jaoks seitse aastat majandusaasta lõpust, vajaduse korral kauem. Kustutamistaotlus ei tohi märkamatult eemaldada pearaamatukandeid ega seadusest või õiguslikust hoidest tulenevaid kirjeid. Kavandatud: hallatava majutuse automaatne säilituse juhtimine."
+        },
+        {
+          "title": "Rahvusvaheline andmeedastus",
+          "body": "Isemajutaja valib andmete asukoha. Majutatud piloodis võivad Google või Postmark töödelda andmeid oma teenusetingimuste ja edastusmeetmete alusel. Tootmise andmetöötlusleping peab kirjeldama majutuskoha, kõik alamtöötlejad ja edastusmehhanismid; see leht ei mõtle välja asukohta, mida hoidla ei dokumenteeri."
+        },
+        {
+          "title": "Analüütika ja logid",
+          "body": "Avalik veebileht ega rakendus ei sisalda analüütika- või reklaamitarkvara. Juurutus võib teenuse käitamiseks ja kaitsmiseks säilitada tehnilisi veebi-, autentimis- ja auditilogisid. Logides ei tohi olla teenusepakkujate kasutustunnuseid ning nende säilitusaeg tuleb tootmiskeskkonnas dokumenteerida."
+        },
+        {
+          "title": "Andmesubjekti taotlused",
+          "body": "Juurdepääsu, parandamise, kustutamise, piiramise või muu andmekaitsetaotluse korral pöördu esmalt organisatsiooni poole, kes vastavaid raamatuid haldab. FastAccountsi konto- või teenuseandmete asjus kirjuta aadressile info@predictivelabs.ai. Võime paluda isikusamasuse kinnitamist ja peame säilitama andmed, mille alleshoidmist seadus nõuab.",
+          "action": "Võta andmekaitse asjus ühendust",
+          "email_subject": "FastAccountsi andmekaitsetaotlus"
+        }
       ]
     },
     "about": {
@@ -101,10 +146,22 @@
       "lede": "FastAccounts on avatud lähtekoodiga raamatupidamistoode Ühendkuningriigi ja Eesti väikeettevõtetele ning raamatupidamisbüroodele.",
       "note": "Vajab ülevaatust · sõltumatu riigipõhine valideerimine",
       "sections": [
-        {"title": "Juriidiline isik", "body": "FastAccountsi arendab ja haldab Inglismaal ja Walesis registrikoodi 14857334 all registreeritud Predictive Labs Ltd. Ettevõtte registrijärgne aadress on 155 Minories Street, Suite 275, London EC3N 1AD, Ühendkuningriik."},
-        {"title": "Meeskond", "body": "Toodet, dokumentatsiooni ja avalikku väljalaskeajalugu haldab väike Predictive Labsi meeskond; versiooni 0.3.0 väljalaskekirjes on ühendatud tootetöö tegijana nimetatud Joosep Laats. Me ei esita meeskonda, klientide arvu ega nõustajate võrgustikku suuremana, kui tõendid lubavad."},
-        {"title": "Raamatupidamisturgude pädevus", "body": "Saadaval: testitud Ühendkuningriigi käibemaksu ja Eesti käibemaksu deklaratsiooni (KMD) tööpaberid, riigipõhised arved, täpsed Decimal-arvutused ning muutumatud kahekordsed kanded. Vajab ülevaatust: Ühendkuningriigi ja Eesti raamatupidajate sõltumatu vastuvõtutest (UAT). FastAccounts on tarkvara, mitte maksu- ega õigusnõu."},
-        {"title": "Toote piirid", "body": "Saadaval: arved, ostuarved, tõendusmaterjalid, pangaväljavõtete import ja vastendamine, pearaamat, aruanded ning ülevaadatavad käibemaksu tööpaberid. Vajab ülevaatust: Eesti palgaarvestus raamatupidamisbüroo kliendiettevõtetele, mille tootmiskasutuse UAT on pooleli. FastAccounts ei ole ERP ega sisalda laohaldust, tellimuste haldust, tootmist, CRM-i või üldist personalihaldust."}
+        {
+          "title": "Juriidiline isik",
+          "body": "FastAccountsi arendab ja haldab Inglismaal ja Walesis registrikoodi 14857334 all registreeritud Predictive Labs Ltd. Ettevõtte registrijärgne aadress on 155 Minories Street, Suite 275, London EC3N 1AD, Ühendkuningriik."
+        },
+        {
+          "title": "Meeskond",
+          "body": "Toodet, dokumentatsiooni ja avalikku väljalaskeajalugu haldab väike Predictive Labsi meeskond; versiooni 0.3.0 väljalaskekirjes on ühendatud tootetöö tegijana nimetatud Joosep Laats. Me ei esita meeskonda, klientide arvu ega nõustajate võrgustikku suuremana, kui tõendid lubavad."
+        },
+        {
+          "title": "Raamatupidamisturgude pädevus",
+          "body": "Saadaval: testitud Ühendkuningriigi käibemaksu ja Eesti käibemaksu deklaratsiooni (KMD) tööpaberid, riigipõhised arved, täpsed Decimal-arvutused ning muutumatud kahekordsed kanded. Vajab ülevaatust: Ühendkuningriigi ja Eesti raamatupidajate sõltumatu vastuvõtutest (UAT). FastAccounts on tarkvara, mitte maksu- ega õigusnõu."
+        },
+        {
+          "title": "Toote piirid",
+          "body": "Saadaval: arved, ostuarved, tõendusmaterjalid, pangaväljavõtete import ja vastendamine, pearaamat, aruanded ning ülevaadatavad käibemaksu tööpaberid. Vajab ülevaatust: Eesti palgaarvestus raamatupidamisbüroo kliendiettevõtetele, mille tootmiskasutuse UAT on pooleli. FastAccounts ei ole ERP ega sisalda laohaldust, tellimuste haldust, tootmist, CRM-i või üldist personalihaldust."
+        }
       ]
     },
     "contact": {
@@ -112,10 +169,30 @@
       "lede": "Üks toimiv postkast ja iga pöördumise jaoks selge teemarida. Me ei avalda seadistamata e-posti aadresse.",
       "note": "Saadaval · info@predictivelabs.ai",
       "sections": [
-        {"title": "Müük", "body": "Küsi hallatava piloodi, isemajutuse või raamatupidamisbüroo hindamise kohta. Lisa oma turg, organisatsiooni tüüp ja töövoog, mida soovid proovida.", "action": "Kirjuta müügile", "email_subject": "FastAccountsi müügipäring"},
-        {"title": "Kasutajatugi", "body": "Tooteabi saamiseks lisa FastAccountsi versioon, leht või töövoog, oodatud tulemus ja tegelik tulemus. Ära saada e-postiga paroole, OAuthi pääsuloendeid, panga kasutustunnuseid ega päris raamatupidamise väljavõtteid.", "action": "Kirjuta kasutajatoele", "email_subject": "FastAccountsi kasutajatoe päring"},
-        {"title": "Turvalisus", "body": "Teata võimalikust turvanõrkusest või intsidendist privaatselt. Lisa mõjutatud versioonid ja kordamiseks vajalik teave, kuid ära lisa päris kasutustunnuseid ega ebavajalikke isikuandmeid.", "action": "Kirjuta turvakontaktile", "email_subject": "FastAccountsi turvateade"},
-        {"title": "Andmekaitse", "body": "Konto- või teenuseandmete taotluses nimeta organisatsioon ja asjaomased andmed. Kliendiraamatuid puudutav taotlus tuleb üldjuhul esmalt esitada neid haldavale organisatsioonile.", "action": "Kirjuta andmekaitse kontaktile", "email_subject": "FastAccountsi andmekaitsetaotlus"}
+        {
+          "title": "Müük",
+          "body": "Küsi hallatava piloodi, isemajutuse või raamatupidamisbüroo hindamise kohta. Lisa oma turg, organisatsiooni tüüp ja töövoog, mida soovid proovida.",
+          "action": "Kirjuta müügile",
+          "email_subject": "FastAccountsi müügipäring"
+        },
+        {
+          "title": "Kasutajatugi",
+          "body": "Tooteabi saamiseks lisa FastAccountsi versioon, leht või töövoog, oodatud tulemus ja tegelik tulemus. Ära saada e-postiga paroole, OAuthi pääsuloendeid, panga kasutustunnuseid ega päris raamatupidamise väljavõtteid.",
+          "action": "Kirjuta kasutajatoele",
+          "email_subject": "FastAccountsi kasutajatoe päring"
+        },
+        {
+          "title": "Turvalisus",
+          "body": "Teata võimalikust turvanõrkusest või intsidendist privaatselt. Lisa mõjutatud versioonid ja kordamiseks vajalik teave, kuid ära lisa päris kasutustunnuseid ega ebavajalikke isikuandmeid.",
+          "action": "Kirjuta turvakontaktile",
+          "email_subject": "FastAccountsi turvateade"
+        },
+        {
+          "title": "Andmekaitse",
+          "body": "Konto- või teenuseandmete taotluses nimeta organisatsioon ja asjaomased andmed. Kliendiraamatuid puudutav taotlus tuleb üldjuhul esmalt esitada neid haldavale organisatsioonile.",
+          "action": "Kirjuta andmekaitse kontaktile",
+          "email_subject": "FastAccountsi andmekaitsetaotlus"
+        }
       ]
     },
     "terms": {
@@ -123,11 +200,26 @@
       "lede": "Need piloottingimused on esialgsed, mitte lõplikud klienditingimused, ega loo väiteid teenusetaseme, nõuetele vastavuse või garantiide kohta.",
       "note": "Piloot · vajab õiguslikku ülevaatust",
       "sections": [
-        {"title": "Teenuse ulatus", "body": "FastAccounts pakub raamatupidamistarkvara ja valikulist majutatud pilooti. Saadavust kirjeldavad neli olekut: Saadaval, Vajab ülevaatust, Piloot ja Kavandatud. Otsene maksudeklaratsioonide esitamine on Kavandatud ega kuulu teenusesse, kui allkirjastatud leping ei ütle sõnaselgelt teisiti."},
-        {"title": "Kliendi vastutus", "body": "Klient vastutab lähteandmete õigsuse, kasutajate juurdepääsu, raamatupidamise ja palgaarvestuse väljundite kontrolli, kohustuslike deklaratsioonide ning erialase nõu eest. Sünteetilist näidist ei tohi käsitleda tootmisraamatupidamisena."},
-        {"title": "Avatud lähtekoodiga tarkvara", "body": "Lähtekoodihoidla on avaldatud MIT-litsentsi alusel. Isemajutatud kasutust reguleerib see litsents; juurutuse käitamine, turvamine, varundamine ja uuendamine on käitaja vastutus."},
-        {"title": "Majutatud piloot", "body": "Majutatud kasutuse saadavus, tugi, andmetöötlus, tasud, lõpetamine ja teenusetasemed tuleb kokku leppida eraldi kliendilepingus. See mustand ei luba katkematut teenust, reageerimisaega ega tootmiskeskkonna taastamise sihti."},
-        {"title": "Kokkuleppimist vajavad õigustingimused", "body": "Garantiid, vastutuse piirangud, kohaldatav õigus, vaidluste lahendamine ja tootmise andmetöötlemisleping vajavad õiguslikku ülevaatust ning neid ei ole siin välja mõeldud. Enne päris raamatupidamise majutamist võta ühendust Predictive Labs Ltd-ga."}
+        {
+          "title": "Teenuse ulatus",
+          "body": "FastAccounts pakub raamatupidamistarkvara ja valikulist majutatud pilooti. Saadavust kirjeldavad neli olekut: Saadaval, Vajab ülevaatust, Piloot ja Kavandatud. Otsene maksudeklaratsioonide esitamine on Kavandatud ega kuulu teenusesse, kui allkirjastatud leping ei ütle sõnaselgelt teisiti."
+        },
+        {
+          "title": "Kliendi vastutus",
+          "body": "Klient vastutab lähteandmete õigsuse, kasutajate juurdepääsu, raamatupidamise ja palgaarvestuse väljundite kontrolli, kohustuslike deklaratsioonide ning erialase nõu eest. Sünteetilist näidist ei tohi käsitleda tootmisraamatupidamisena."
+        },
+        {
+          "title": "Avatud lähtekoodiga tarkvara",
+          "body": "Lähtekoodihoidla on avaldatud MIT-litsentsi alusel. Isemajutatud kasutust reguleerib see litsents; juurutuse käitamine, turvamine, varundamine ja uuendamine on käitaja vastutus."
+        },
+        {
+          "title": "Majutatud piloot",
+          "body": "Majutatud kasutuse saadavus, tugi, andmetöötlus, tasud, lõpetamine ja teenusetasemed tuleb kokku leppida eraldi kliendilepingus. See mustand ei luba katkematut teenust, reageerimisaega ega tootmiskeskkonna taastamise sihti."
+        },
+        {
+          "title": "Kokkuleppimist vajavad õigustingimused",
+          "body": "Garantiid, vastutuse piirangud, kohaldatav õigus, vaidluste lahendamine ja tootmise andmetöötlemisleping vajavad õiguslikku ülevaatust ning neid ei ole siin välja mõeldud. Enne päris raamatupidamise majutamist võta ühendust Predictive Labs Ltd-ga."
+        }
       ]
     },
     "roadmap": {
@@ -137,26 +229,94 @@
       "source_intro": "Täielik rakendusajalugu on",
       "source_link": "muudatuste logis",
       "stages": [
-        {"title": "Saadaval", "intro": "Valmis tootevood, mida saab kasutada siin kirjeldatud piirides.", "items": [
-          {"title": "Avalik alus", "date": "2026-08-10", "body": "Avaleht, liidestuste kataloog, tervisekontroll ja kaitstud sisselogimine avaldati enne esimest kirjendatud rakenduse versiooni.", "market": "ÜK + Eesti"},
-          {"title": "Raamatupidamise põhifunktsioonid 0.2.0", "date": "2026-08-10", "body": "Müügi- ja ostuarved, tõendusmaterjalid, pangaväljavõtete import ja vastendamine, muutumatu kahekordne kirjendamine, aruanded ning ülevaadatavad käibemaksu tööpaberid on valmis.", "market": "ÜK + Eesti"},
-          {"title": "Kontod ja töövood 0.3.0–0.4.0", "date": "2026-10-09", "body": "Kordusarved, meeldetuletused, ülevaadatav faili- ja FastHR-i töötajate import ning e-posti ja parooliga kontod on valmis ning kaetud võrguta testidega.", "market": "ÜK + Eesti"}
-        ]},
-        {"title": "Vajab ülevaatust", "intro": "Valmis töö, mis ootab välist kontrolli või tootmiskasutuse UAT-i.", "items": [
-          {"title": "Raamatupidajate sõltumatu UAT", "body": "Kontrollida Ühendkuningriigi käibemaks, Eesti KMD ja Eesti büroopalgaarvestus kvalifitseeritud raamatupidajatega enne erialase valideerimise väiteid.", "market": "ÜK + Eesti"},
-          {"title": "Teenusepakkujate kontroll", "body": "Kontrollida QuickBooksi, Xero, Merit Aktiva, BambooHR-i ja Personio liidestusi lubatud kliendi- või testettevõtte kasutustunnustega, hoides impordi ülevaadatava ja organisatsioonipõhisena.", "market": "Mõlemad turud"}
-        ]},
-        {"title": "Piloot", "intro": "Piiratud töövood, mida saab hinnata selgelt kirjeldatud tootmiskasutuse piiridega.", "items": [
-          {"title": "Majutatud teenus", "body": "Hallatavat majutust pakutakse ainult eraldi kliendilepingu alusel, kuni käitustõendid on valmis.", "market": "Mõlemad turud"},
-          {"title": "Eesti büroopalgaarvestus 0.2.1", "date": "2026-10-08", "body": "Osalise tööaja ja tunnitasuga palgaarvestus, sotsiaalmaksu miinimumkohustus ning sünteetilised näidised on valmis; tootmiskasutus Vajab ülevaatust.", "market": "Eesti"},
-          {"title": "Maksude tööpaberid ja eksport", "body": "Ühendkuningriigi käibemaksu ja Eesti KMD tööpabereid ning eksporti saab hinnata. Otse esitamine on Kavandatud.", "market": "ÜK + Eesti"}
-        ]},
-        {"title": "Kavandatud", "intro": "Võimalused, mida pole veel valmis tehtud ega praeguses teenuselubaduses.", "items": [
-          {"title": "Hallatava teenuse käitus", "body": "Nimetada majutuse alamtöötleja ja andmete asukoht, läbida krüpteeritud varundus- ja taasteproov ning lisada intsidenditeavitused, võrguserva päringupiirangud ja pahavarakontroll.", "market": "Mõlemad turud"},
-          {"title": "Kirjutusõiguseta avatud pangandus", "body": "Lisada teenusepakkuja valik, taasühendamine, ajastatud import ja seire pärast õiguslikku, ärilist ja pankade katvuse ülevaatust.", "market": "ÜK + Eesti"},
-          {"title": "Maksudeklaratsioonide otse esitamine", "body": "Lõpetada teenusepakkujate kinnitused ning kaitstud HMRC ja e-MTA esitamise teekonnad. Praegune tulemus on tööpaber ja eksport.", "market": "ÜK + Eesti"},
-          {"title": "Laiem kohustuslik aruandlus", "body": "Kaaluda Ühendkuningriigi ettevõtte tulumaksu ja Companies House'i aruandeid ning Eesti aastaaruande kaardistamist alles pärast näidisandmeid ja erialast ülevaatust.", "market": "ÜK + Eesti"}
-        ]}
+        {
+          "title": "Saadaval",
+          "intro": "Valmis tootevood, mida saab kasutada siin kirjeldatud piirides.",
+          "items": [
+            {
+              "title": "Avalik alus",
+              "date": "2026-08-10",
+              "body": "Avaleht, liidestuste kataloog, tervisekontroll ja kaitstud sisselogimine avaldati enne esimest kirjendatud rakenduse versiooni.",
+              "market": "ÜK + Eesti"
+            },
+            {
+              "title": "Raamatupidamise põhifunktsioonid 0.2.0",
+              "date": "2026-08-10",
+              "body": "Müügi- ja ostuarved, tõendusmaterjalid, pangaväljavõtete import ja vastendamine, muutumatu kahekordne kirjendamine, aruanded ning ülevaadatavad käibemaksu tööpaberid on valmis.",
+              "market": "ÜK + Eesti"
+            },
+            {
+              "title": "Kontod ja töövood 0.3.0–0.4.0",
+              "date": "2026-10-09",
+              "body": "Kordusarved, meeldetuletused, ülevaadatav faili- ja FastHR-i töötajate import ning e-posti ja parooliga kontod on valmis ning kaetud võrguta testidega.",
+              "market": "ÜK + Eesti"
+            }
+          ]
+        },
+        {
+          "title": "Vajab ülevaatust",
+          "intro": "Valmis töö, mis ootab välist kontrolli või tootmiskasutuse UAT-i.",
+          "items": [
+            {
+              "title": "Raamatupidajate sõltumatu UAT",
+              "body": "Kontrollida Ühendkuningriigi käibemaks, Eesti KMD ja Eesti büroopalgaarvestus kvalifitseeritud raamatupidajatega enne erialase valideerimise väiteid.",
+              "market": "ÜK + Eesti"
+            },
+            {
+              "title": "Teenusepakkujate kontroll",
+              "body": "Kontrollida QuickBooksi, Xero, Merit Aktiva, BambooHR-i ja Personio liidestusi lubatud kliendi- või testettevõtte kasutustunnustega, hoides impordi ülevaadatava ja organisatsioonipõhisena.",
+              "market": "Mõlemad turud"
+            }
+          ]
+        },
+        {
+          "title": "Piloot",
+          "intro": "Piiratud töövood, mida saab hinnata selgelt kirjeldatud tootmiskasutuse piiridega.",
+          "items": [
+            {
+              "title": "Majutatud teenus",
+              "body": "Hallatavat majutust pakutakse ainult eraldi kliendilepingu alusel, kuni käitustõendid on valmis.",
+              "market": "Mõlemad turud"
+            },
+            {
+              "title": "Eesti büroopalgaarvestus 0.2.1",
+              "date": "2026-10-08",
+              "body": "Osalise tööaja ja tunnitasuga palgaarvestus, sotsiaalmaksu miinimumkohustus ning sünteetilised näidised on valmis; tootmiskasutus Vajab ülevaatust.",
+              "market": "Eesti"
+            },
+            {
+              "title": "Maksude tööpaberid ja eksport",
+              "body": "Ühendkuningriigi käibemaksu ja Eesti KMD tööpabereid ning eksporti saab hinnata. Otse esitamine on Kavandatud.",
+              "market": "ÜK + Eesti"
+            }
+          ]
+        },
+        {
+          "title": "Kavandatud",
+          "intro": "Võimalused, mida pole veel valmis tehtud ega praeguses teenuselubaduses.",
+          "items": [
+            {
+              "title": "Hallatava teenuse käitus",
+              "body": "Nimetada majutuse alamtöötleja ja andmete asukoht, läbida krüpteeritud varundus- ja taasteproov ning lisada intsidenditeavitused, võrguserva päringupiirangud ja pahavarakontroll.",
+              "market": "Mõlemad turud"
+            },
+            {
+              "title": "Kirjutusõiguseta avatud pangandus",
+              "body": "Lisada teenusepakkuja valik, taasühendamine, ajastatud import ja seire pärast õiguslikku, ärilist ja pankade katvuse ülevaatust.",
+              "market": "ÜK + Eesti"
+            },
+            {
+              "title": "Maksudeklaratsioonide otse esitamine",
+              "body": "Lõpetada teenusepakkujate kinnitused ning kaitstud HMRC ja e-MTA esitamise teekonnad. Praegune tulemus on tööpaber ja eksport.",
+              "market": "ÜK + Eesti"
+            },
+            {
+              "title": "Laiem kohustuslik aruandlus",
+              "body": "Kaaluda Ühendkuningriigi ettevõtte tulumaksu ja Companies House'i aruandeid ning Eesti aastaaruande kaardistamist alles pärast näidisandmeid ja erialast ülevaatust.",
+              "market": "ÜK + Eesti"
+            }
+          ]
+        }
       ]
     },
     "changelog": {
@@ -166,11 +326,31 @@
       "source_intro": "Kõiki kirjendatud muudatusi näeb",
       "source_link": "tehnilisest muudatuste logist",
       "releases": [
-        {"title": "0.4.0 · E-posti ja parooliga kontod", "date": "2026-10-09", "body": "Google SSO kõrvale lisandusid registreerimine, sisselogimine ja parooli lähtestamine. Paroolid räsitakse scryptiga; kinnitus- ja lähtestuslingid on ühekordsed, päringupiiranguga ning saadetakse Postmarki seadistuse kaudu."},
-        {"title": "0.3.0 · Liidestused ja automaatika", "date": "2026-10-09", "body": "Lisandusid kordusarved ja meeldetuletused, organisatsioonipõhine ühenduste haldus, FastHR-i liidestus, ülevaadatav töötajate import, universaalne CSV/TSV import ning dokumenteeritud Personio ja BambooHR-i liidestused. Vajab ülevaatust: teenusepakkujate testid kasutavad imiteeritud võrguühendust ja tootmiskontroll on pooleli."},
-        {"title": "0.2.1 · Eesti büroopalgaarvestus", "date": "2026-10-08", "body": "Lisandusid osaline tööaeg, tunnitasu, kogumispensioni määrad, 2026. aasta sotsiaalmaksu miinimumkohustus ja sünteetiline palgaarvestuse näidis. Vajab ülevaatust: raamatupidajate tootmis-UAT on lõpetamata."},
-        {"title": "0.2.0 · Inseneripiloot", "date": "2026-08-10", "body": "Valmisid raamatupidamise töölaud, porditavad migratsioonid, arved, ostuarved, tõendusmaterjalid, pangaväljavõtete import ja vastendamine, muutumatu tasakaalus pearaamat, finantsaruanded ning ülevaadatavad Ühendkuningriigi ja Eesti käibemaksu tööpaberid."},
-        {"title": "Alus enne versioonitud väljalaskeid", "date": "2026-08-10", "body": "Avaldati esimene avaleht, liidestuste kataloog, tervisekontroll ja kaitstud autentimise alus. Versioonihalduses olevas muudatuste logis ei ole 0.1.x väljalaset."}
+        {
+          "title": "0.4.0 · E-posti ja parooliga kontod",
+          "date": "2026-10-09",
+          "body": "Google SSO kõrvale lisandusid registreerimine, sisselogimine ja parooli lähtestamine. Paroolid räsitakse scryptiga; kinnitus- ja lähtestuslingid on ühekordsed, päringupiiranguga ning saadetakse Postmarki seadistuse kaudu."
+        },
+        {
+          "title": "0.3.0 · Liidestused ja automaatika",
+          "date": "2026-10-09",
+          "body": "Lisandusid kordusarved ja meeldetuletused, organisatsioonipõhine ühenduste haldus, FastHR-i liidestus, ülevaadatav töötajate import, universaalne CSV/TSV import ning dokumenteeritud Personio ja BambooHR-i liidestused. Vajab ülevaatust: teenusepakkujate testid kasutavad imiteeritud võrguühendust ja tootmiskontroll on pooleli."
+        },
+        {
+          "title": "0.2.1 · Eesti büroopalgaarvestus",
+          "date": "2026-10-08",
+          "body": "Lisandusid osaline tööaeg, tunnitasu, kogumispensioni määrad, 2026. aasta sotsiaalmaksu miinimumkohustus ja sünteetiline palgaarvestuse näidis. Vajab ülevaatust: raamatupidajate tootmis-UAT on lõpetamata."
+        },
+        {
+          "title": "0.2.0 · Inseneripiloot",
+          "date": "2026-08-10",
+          "body": "Valmisid raamatupidamise töölaud, porditavad migratsioonid, arved, ostuarved, tõendusmaterjalid, pangaväljavõtete import ja vastendamine, muutumatu tasakaalus pearaamat, finantsaruanded ning ülevaadatavad Ühendkuningriigi ja Eesti käibemaksu tööpaberid."
+        },
+        {
+          "title": "Alus enne versioonitud väljalaskeid",
+          "date": "2026-08-10",
+          "body": "Avaldati esimene avaleht, liidestuste kataloog, tervisekontroll ja kaitstud autentimise alus. Versioonihalduses olevas muudatuste logis ei ole 0.1.x väljalaset."
+        }
       ]
     }
   },
@@ -386,7 +566,7 @@
         "direction": "FastAccountsist raamatupidajale",
         "ownership": "Raamatupidaja üle vaadatud eksport"
       },
-    "open_banking": {
+      "open_banking": {
         "name": "Avatud pangandus",
         "logo_alt": "Avatud panganduse ikoon",
         "category": "Pangaandmed",
@@ -398,206 +578,326 @@
           "Kooskõlastuse sisend"
         ],
         "direction": "Esmalt ainult lugemisõigus",
-      "ownership": "Pank jääb algallikaks"
-    },
-    "file_import": {
-      "name": "Töötajate failiimport",
-      "logo_alt": "Töötajate failiimpordi ikoon",
-      "category": "Palgatarkvara",
-      "description": "Impordi töötajate põhiandmed mis tahes palga- või personalisüsteemi CSV- või TSV-ekspordist. Exceli töövihik tuleb esmalt CSV-vormingusse eksportida.",
-      "capabilities": ["CSV/Exceli ekspordi import", "Töötajate põhiandmed"],
-      "direction": "Import · üleslaaditud failid",
-      "ownership": "Üleslaaditud eksport jääb algallikaks"
-    },
-    "fasthr": {
-      "name": "FastHR",
-      "logo_alt": "FastHR-i ajutine märk",
-      "category": "Palgatarkvara",
-      "description": "Impordi FastHR-i töötajate põhiandmed ülevaadatavasse büroo palgaarvestusse. Isikukood ei sisaldu FastHR-is.",
-      "capabilities": ["Töötajate põhiandmed", "Töösuhte staatus", "Põhipalk", "Organisatsiooniandmed"],
-      "direction": "Import · töötajate põhiandmed",
-      "ownership": "FastHR jääb algallikaks"
-    },
-    "bamboohr": {
-      "name": "BambooHR",
-      "logo_alt": "BambooHR-i ajutine märk",
-      "category": "Palgatarkvara",
-      "description": "Vajab ülevaatust: dokumenteeritud lepingu põhist adapterit ei ole teenusepakkuja pääsuandmetega kontrollitud ning töötasu vajab ülevaadatud väljakaardistust või kohalikku sisestust.",
-      "capabilities": ["Töötajate kataloog", "Nimi ja e-post", "Olek, kui see on avaldatud", "Kohandatud väljade säilitamine"],
-      "direction": "Import · töötajate kataloog",
-      "ownership": "BambooHR jääb algallikaks"
-    },
-    "personio": {
-      "name": "Personio",
-      "logo_alt": "Personio ajutine märk",
-      "category": "Palgatarkvara",
-      "description": "Vajab ülevaatust: dokumenteeritud lepingu põhist adapterit ei ole teenusepakkuja pääsuandmetega kontrollitud ning töötasu vajab ülevaadatud atribuudikaardistust või kohalikku sisestust.",
-      "capabilities": ["Töötajaatribuudid", "Töösuhte olek", "Töösuhte lõppkuupäev", "Kohandatud atribuutide säilitamine"],
-      "direction": "Import · töötajate põhiandmed",
-      "ownership": "Personio jääb algallikaks"
-    },
-    "hibob": {
-      "name": "Bob (HiBob)",
-      "logo_alt": "Bob by HiBobi ajutine märk",
-      "category": "Palgatarkvara",
-      "description": "Too valitud Bobi personaliandmed ülevaadatava impordina büroo palgaarvestusse.",
-      "capabilities": ["Töötajate kataloog", "Töösuhte elutsükkel", "Tööaja haldus"],
-      "direction": "Esmalt import · eksport vastavalt reeglitele",
-      "ownership": "Seadistatav objektipõhiselt"
-    },
-    "zoho_people": {
-      "name": "Zoho People",
-      "logo_alt": "Zoho People'i ajutine märk",
-      "category": "Palgatarkvara",
-      "description": "Kasuta Zoho People'i töötaja- ja tööajaandmeid ülevaadatud palgaarvestuse sisenditena.",
-      "capabilities": ["Töötajaandmed", "Tööaja arvestus", "Puhkused", "Tööajatabelid", "Vormid"],
-      "direction": "Esmalt import · eksport vastavalt reeglitele",
-      "ownership": "Seadistatav objektipõhiselt"
-    },
-    "employment_hero": {
-      "name": "Employment Hero",
-      "logo_alt": "Employment Hero ajutine märk",
-      "category": "Palgatarkvara",
-      "description": "Suuna valitud Employment Hero personaliandmed enne büroo palgaarvestusse jõudmist ülevaatusele.",
-      "capabilities": ["Töötajaandmed", "Tööle asumine", "Puhkused", "Tööajatabelid", "Palgaarvestuse sisendid"],
-      "direction": "Esmalt import · eksport vastavalt reeglitele",
-      "ownership": "Seadistatav objektipõhiselt"
-    },
-    "workday": {
-      "name": "Workday",
-      "logo_alt": "Workday ajutine märk",
-      "category": "Palgatarkvara",
-      "description": "Kasuta ettevõttetaseme HCM-i töötaja- ja palgaandmeid büroo palgaarvestuse ülevaadatava allikana.",
-      "capabilities": ["Töötajaandmed", "Organisatsiooni struktuur", "Tööaeg ja puudumised", "Tasustamine", "Palgaarvestuse sisendid"],
-      "direction": "Esmalt import · eksport vastavalt reeglitele",
-      "ownership": "Seadistatav objektipõhiselt"
-    },
-    "hrmaster": {
-      "name": "HRmaster (HR Master)",
-      "logo_alt": "HRmasteri ajutine märk",
-      "category": "Palgatarkvara",
-      "description": "Kasuta Ungari personalitarkvara töötajaandmete ja palgaarvestuse sisendite ülevaadatava allikana.",
-      "capabilities": ["Personaliandmed", "Palgaarvestuse sisendid", "Värbamine", "Hindamised", "Cafeteria hüved"],
-      "direction": "Esmalt import · eksport vastavalt reeglitele",
-      "ownership": "Seadistatav objektipõhiselt"
-    },
-    "gusto": {
-      "name": "Gusto",
-      "logo_alt": "Gusto ajutine märk",
-      "category": "Palgatarkvara",
-      "description": "Kasuta USA palgaplatvormi ülevaadatava allikana, kui kliendigrupis on USA ettevõte.",
-      "capabilities": ["Töötajaandmed", "Palgaarvestuse sisendid", "Puhkused", "Hüvede andmed", "Töövõtjate andmed"],
-      "direction": "Esmalt import · eksport vastavalt reeglitele",
-      "ownership": "Seadistatav objektipõhiselt"
-    },
-    "rippling": {
-      "name": "Rippling",
-      "logo_alt": "Ripplingi ajutine märk",
-      "category": "Palgatarkvara",
-      "description": "Too valitud personaliandmed kliendiraamatute palgaarvestusse ülevaadatava impordina.",
-      "capabilities": ["Töötajaandmed", "Tööle asumine", "Tööaeg ja kohalolek", "Puhkused", "Palgaarvestuse sisendid"],
-      "direction": "Esmalt import · eksport vastavalt reeglitele",
-      "ownership": "Seadistatav objektipõhiselt"
-    },
-    "deel": {
-      "name": "Deel",
-      "logo_alt": "Deeli ajutine märk",
-      "category": "Palgatarkvara",
-      "description": "Kasuta globaalse palgaarvestuse ja ametliku tööandja teenuse andmeid büroo palgaarvestuse ülevaadatud sisenditena.",
-      "capabilities": ["Töötajaandmed", "Lepingud", "Globaalse palgaarvestuse sisendid", "Puhkused", "Kulud"],
-      "direction": "Esmalt import · eksport vastavalt reeglitele",
-      "ownership": "Seadistatav objektipõhiselt"
-    },
-    "odoo_hr": {
-      "name": "Odoo HR",
-      "logo_alt": "Odoo HR-i ajutine märk",
-      "category": "Palgatarkvara",
-      "description": "Seadista iga kliendi Odoo URL ja andmebaasi nimi, et teha ülevaadatavaid importe XML-RPC või JSON-RPC kaudu.",
-      "capabilities": ["Töötajaandmed", "Tööaja arvestus", "Puhkused", "Värbamine", "Kulud"],
-      "direction": "Esmalt import · eksport vastavalt reeglitele",
-      "ownership": "Seadistatav objektipõhiselt"
-    },
-    "persona_fujitsu": {
-      "name": "Fujitsu Persona",
-      "logo_alt": "Fujitsu Persona ajutine märk",
-      "category": "Palgatarkvara",
-      "description": "Eesti vanim personali- ja palgatarkvara on tegutsenud alates 1995. aastast. Selle moodulid saavad anda ülevaadatavaid töötaja- ja palgaarvestuse sisendeid.",
-      "capabilities": ["Personaliandmed", "Palgaarvestus", "Tööaja arvestus", "Iseteenindusportaal"],
-      "direction": "Esmalt import · eksport vastavalt reeglitele",
-      "ownership": "Seadistatav objektipõhiselt"
-    },
-    "wemply": {
-      "name": "Wemply",
-      "logo_alt": "Wemply ajutine märk",
-      "category": "Palgatarkvara",
-      "description": "Modulaarne personali-, tööaja- ja Eesti palgaarvestuse platvorm, mida kasutab üle 1000 ettevõtte. Wemply pälvis tiitli „Aasta HR lahendus 2025“.",
-      "capabilities": ["Personalihaldus", "Tööaja arvestus", "Eesti palgaarvestus", "TSD aruandlus", "TÖR aruandlus"],
-      "direction": "Esmalt import · eksport vastavalt reeglitele",
-      "ownership": "Seadistatav objektipõhiselt"
-    },
-    "hours24": {
-      "name": "hours24",
-      "logo_alt": "hours24 ajutine märk",
-      "category": "Palgatarkvara",
-      "description": "Tehisintellekti toega tööaja arvestus ja graafikute koostamine, mida kasutatakse Eestis ja Soomes. Kuni viiele töötajale on tasuta pakett.",
-      "capabilities": ["Tehisintellektiga aja sisestus", "Tööajaandmed", "Töögraafikud"],
-      "direction": "Esmalt import · eksport vastavalt reeglitele",
-      "ownership": "Seadistatav objektipõhiselt"
-    },
-    "yester": {
-      "name": "Yester",
-      "logo_alt": "Yesteri ajutine märk",
-      "category": "Palgatarkvara",
-      "description": "Alates 2000. aastast tegutsev Eesti tööjõuplatvorm katab tööle asumise, kulud, lähetused ja sõidupäevikud. See on tihedalt integreeritud Merit Tarkvaraga.",
-      "capabilities": ["Tööle asumine", "Kuluaruanded", "Lähetused", "Sõidupäevikud", "Meriti liidestus"],
-      "direction": "Esmalt import · eksport vastavalt reeglitele",
-      "ownership": "Seadistatav objektipõhiselt"
-    },
-    "hrm4baltics": {
-      "name": "HRM4Baltics (Digmatix)",
-      "logo_alt": "HRM4Balticsi ajutine märk",
-      "category": "Palgatarkvara",
-      "description": "Microsoft Dynamics 365 Business Centralil põhinev personalilahendus katab Eesti, Läti ja Leedu palgaarvestuse. Lahendusel on X-tee liidestus.",
-      "capabilities": ["Personaliandmed", "Eesti palgaarvestus", "Läti palgaarvestus", "Leedu palgaarvestus", "X-tee liidestus"],
-      "direction": "Esmalt import · eksport vastavalt reeglitele",
-      "ownership": "Seadistatav objektipõhiselt"
-    },
-    "merit_palk": {
-      "name": "Merit Palk",
-      "logo_alt": "Merit Palga ajutine märk",
-      "category": "Palgatarkvara",
-      "description": "Eesti enim kasutatud palgatarkvara teenindab üle 25 000 ettevõtte ja on kuni kahele töötajale tasuta. See sobib kokku olemasoleva Merit Aktiva raamatupidamisadapteriga.",
-      "capabilities": ["Töötajaandmed", "Palgaarvestus", "Palgalehed", "TSD ettevalmistus", "Merit Aktiva sidumine"],
-      "direction": "Esmalt import · eksport vastavalt reeglitele",
-      "ownership": "Seadistatav objektipõhiselt"
-    },
-    "taavi_palk": {
-      "name": "Taavi Palk",
-      "logo_alt": "Taavi Palga ajutine märk",
-      "category": "Palgatarkvara",
-      "description": "Eesti palgatarkvara kasutab üle 1500 ettevõtte. See koostab kohustuslikke aruandeid ja ekspordib palgalehti Eesti raamatupidamissüsteemidesse.",
-      "capabilities": ["TSD aruanded", "Registriaruanded", "Statistikaaruanded", "Palgalehtede eksport"],
-      "direction": "Esmalt import · eksport vastavalt reeglitele",
-      "ownership": "Seadistatav objektipõhiselt"
-    },
-    "andevis": {
-      "name": "Andevis",
-      "logo_alt": "Andevise ajutine märk",
-      "category": "Palgatarkvara",
-      "description": "Kohandatav Eesti personalitarkvara, mille moodulid saavad anda ülevaadatavaid personali- ja palgaarvestuse sisendeid.",
-      "capabilities": ["Personaliandmed", "Tööaja arvestus", "Palgaarvestus", "Koolitused", "Arenguvestlused"],
-      "direction": "Esmalt import · eksport vastavalt reeglitele",
-      "ownership": "Seadistatav objektipõhiselt"
-    },
-    "eeva": {
-      "name": "Eeva (Eetasoft)",
-      "logo_alt": "Eeva ajutine märk",
-      "category": "Palgatarkvara",
-      "description": "Eeva personalimoodul haldab põhilisi töösuhteandmeid ja on seotud Eeva palgaarvestusega. Andmed jõuaksid büroo palgaarvestusse ainult ülevaadatud impordina.",
-      "capabilities": ["Lepingud", "Käskkirjad", "Puhkused", "ISCO klassifikaator", "Eeva palgaarvestuse seos"],
-      "direction": "Esmalt import · eksport vastavalt reeglitele",
-      "ownership": "Seadistatav objektipõhiselt"
-    }
+        "ownership": "Pank jääb algallikaks"
+      },
+      "file_import": {
+        "name": "Töötajate failiimport",
+        "logo_alt": "Töötajate failiimpordi ikoon",
+        "category": "Palgatarkvara",
+        "description": "Impordi töötajate põhiandmed mis tahes palga- või personalisüsteemi CSV- või TSV-ekspordist. Exceli töövihik tuleb esmalt CSV-vormingusse eksportida.",
+        "capabilities": [
+          "CSV/Exceli ekspordi import",
+          "Töötajate põhiandmed"
+        ],
+        "direction": "Import · üleslaaditud failid",
+        "ownership": "Üleslaaditud eksport jääb algallikaks"
+      },
+      "fasthr": {
+        "name": "FastHR",
+        "logo_alt": "FastHR-i ajutine märk",
+        "category": "Palgatarkvara",
+        "description": "Impordi FastHR-i töötajate põhiandmed ülevaadatavasse büroo palgaarvestusse. Isikukood ei sisaldu FastHR-is.",
+        "capabilities": [
+          "Töötajate põhiandmed",
+          "Töösuhte staatus",
+          "Põhipalk",
+          "Organisatsiooniandmed"
+        ],
+        "direction": "Import · töötajate põhiandmed",
+        "ownership": "FastHR jääb algallikaks"
+      },
+      "bamboohr": {
+        "name": "BambooHR",
+        "logo_alt": "BambooHR-i ajutine märk",
+        "category": "Palgatarkvara",
+        "description": "Vajab ülevaatust: dokumenteeritud lepingu põhist adapterit ei ole teenusepakkuja pääsuandmetega kontrollitud ning töötasu vajab ülevaadatud väljakaardistust või kohalikku sisestust.",
+        "capabilities": [
+          "Töötajate kataloog",
+          "Nimi ja e-post",
+          "Olek, kui see on avaldatud",
+          "Kohandatud väljade säilitamine"
+        ],
+        "direction": "Import · töötajate kataloog",
+        "ownership": "BambooHR jääb algallikaks"
+      },
+      "personio": {
+        "name": "Personio",
+        "logo_alt": "Personio ajutine märk",
+        "category": "Palgatarkvara",
+        "description": "Vajab ülevaatust: dokumenteeritud lepingu põhist adapterit ei ole teenusepakkuja pääsuandmetega kontrollitud ning töötasu vajab ülevaadatud atribuudikaardistust või kohalikku sisestust.",
+        "capabilities": [
+          "Töötajaatribuudid",
+          "Töösuhte olek",
+          "Töösuhte lõppkuupäev",
+          "Kohandatud atribuutide säilitamine"
+        ],
+        "direction": "Import · töötajate põhiandmed",
+        "ownership": "Personio jääb algallikaks"
+      },
+      "hibob": {
+        "name": "Bob (HiBob)",
+        "logo_alt": "Bob by HiBobi ajutine märk",
+        "category": "Palgatarkvara",
+        "description": "Too valitud Bobi personaliandmed ülevaadatava impordina büroo palgaarvestusse.",
+        "capabilities": [
+          "Töötajate kataloog",
+          "Töösuhte elutsükkel",
+          "Tööaja haldus"
+        ],
+        "direction": "Esmalt import · eksport vastavalt reeglitele",
+        "ownership": "Seadistatav objektipõhiselt"
+      },
+      "zoho_people": {
+        "name": "Zoho People",
+        "logo_alt": "Zoho People'i ajutine märk",
+        "category": "Palgatarkvara",
+        "description": "Kasuta Zoho People'i töötaja- ja tööajaandmeid ülevaadatud palgaarvestuse sisenditena.",
+        "capabilities": [
+          "Töötajaandmed",
+          "Tööaja arvestus",
+          "Puhkused",
+          "Tööajatabelid",
+          "Vormid"
+        ],
+        "direction": "Esmalt import · eksport vastavalt reeglitele",
+        "ownership": "Seadistatav objektipõhiselt"
+      },
+      "employment_hero": {
+        "name": "Employment Hero",
+        "logo_alt": "Employment Hero ajutine märk",
+        "category": "Palgatarkvara",
+        "description": "Suuna valitud Employment Hero personaliandmed enne büroo palgaarvestusse jõudmist ülevaatusele.",
+        "capabilities": [
+          "Töötajaandmed",
+          "Tööle asumine",
+          "Puhkused",
+          "Tööajatabelid",
+          "Palgaarvestuse sisendid"
+        ],
+        "direction": "Esmalt import · eksport vastavalt reeglitele",
+        "ownership": "Seadistatav objektipõhiselt"
+      },
+      "workday": {
+        "name": "Workday",
+        "logo_alt": "Workday ajutine märk",
+        "category": "Palgatarkvara",
+        "description": "Kasuta ettevõttetaseme HCM-i töötaja- ja palgaandmeid büroo palgaarvestuse ülevaadatava allikana.",
+        "capabilities": [
+          "Töötajaandmed",
+          "Organisatsiooni struktuur",
+          "Tööaeg ja puudumised",
+          "Tasustamine",
+          "Palgaarvestuse sisendid"
+        ],
+        "direction": "Esmalt import · eksport vastavalt reeglitele",
+        "ownership": "Seadistatav objektipõhiselt"
+      },
+      "hrmaster": {
+        "name": "HRmaster (HR Master)",
+        "logo_alt": "HRmasteri ajutine märk",
+        "category": "Palgatarkvara",
+        "description": "Kasuta Ungari personalitarkvara töötajaandmete ja palgaarvestuse sisendite ülevaadatava allikana.",
+        "capabilities": [
+          "Personaliandmed",
+          "Palgaarvestuse sisendid",
+          "Värbamine",
+          "Hindamised",
+          "Cafeteria hüved"
+        ],
+        "direction": "Esmalt import · eksport vastavalt reeglitele",
+        "ownership": "Seadistatav objektipõhiselt"
+      },
+      "gusto": {
+        "name": "Gusto",
+        "logo_alt": "Gusto ajutine märk",
+        "category": "Palgatarkvara",
+        "description": "Kasuta USA palgaplatvormi ülevaadatava allikana, kui kliendigrupis on USA ettevõte.",
+        "capabilities": [
+          "Töötajaandmed",
+          "Palgaarvestuse sisendid",
+          "Puhkused",
+          "Hüvede andmed",
+          "Töövõtjate andmed"
+        ],
+        "direction": "Esmalt import · eksport vastavalt reeglitele",
+        "ownership": "Seadistatav objektipõhiselt"
+      },
+      "rippling": {
+        "name": "Rippling",
+        "logo_alt": "Ripplingi ajutine märk",
+        "category": "Palgatarkvara",
+        "description": "Too valitud personaliandmed kliendiraamatute palgaarvestusse ülevaadatava impordina.",
+        "capabilities": [
+          "Töötajaandmed",
+          "Tööle asumine",
+          "Tööaeg ja kohalolek",
+          "Puhkused",
+          "Palgaarvestuse sisendid"
+        ],
+        "direction": "Esmalt import · eksport vastavalt reeglitele",
+        "ownership": "Seadistatav objektipõhiselt"
+      },
+      "deel": {
+        "name": "Deel",
+        "logo_alt": "Deeli ajutine märk",
+        "category": "Palgatarkvara",
+        "description": "Kasuta globaalse palgaarvestuse ja ametliku tööandja teenuse andmeid büroo palgaarvestuse ülevaadatud sisenditena.",
+        "capabilities": [
+          "Töötajaandmed",
+          "Lepingud",
+          "Globaalse palgaarvestuse sisendid",
+          "Puhkused",
+          "Kulud"
+        ],
+        "direction": "Esmalt import · eksport vastavalt reeglitele",
+        "ownership": "Seadistatav objektipõhiselt"
+      },
+      "odoo_hr": {
+        "name": "Odoo HR",
+        "logo_alt": "Odoo HR-i ajutine märk",
+        "category": "Palgatarkvara",
+        "description": "Seadista iga kliendi Odoo URL ja andmebaasi nimi, et teha ülevaadatavaid importe XML-RPC või JSON-RPC kaudu.",
+        "capabilities": [
+          "Töötajaandmed",
+          "Tööaja arvestus",
+          "Puhkused",
+          "Värbamine",
+          "Kulud"
+        ],
+        "direction": "Esmalt import · eksport vastavalt reeglitele",
+        "ownership": "Seadistatav objektipõhiselt"
+      },
+      "persona_fujitsu": {
+        "name": "Fujitsu Persona",
+        "logo_alt": "Fujitsu Persona ajutine märk",
+        "category": "Palgatarkvara",
+        "description": "Eesti vanim personali- ja palgatarkvara on tegutsenud alates 1995. aastast. Selle moodulid saavad anda ülevaadatavaid töötaja- ja palgaarvestuse sisendeid.",
+        "capabilities": [
+          "Personaliandmed",
+          "Palgaarvestus",
+          "Tööaja arvestus",
+          "Iseteenindusportaal"
+        ],
+        "direction": "Esmalt import · eksport vastavalt reeglitele",
+        "ownership": "Seadistatav objektipõhiselt"
+      },
+      "wemply": {
+        "name": "Wemply",
+        "logo_alt": "Wemply ajutine märk",
+        "category": "Palgatarkvara",
+        "description": "Modulaarne personali-, tööaja- ja Eesti palgaarvestuse platvorm, mida kasutab üle 1000 ettevõtte. Wemply pälvis tiitli „Aasta HR lahendus 2025“.",
+        "capabilities": [
+          "Personalihaldus",
+          "Tööaja arvestus",
+          "Eesti palgaarvestus",
+          "TSD aruandlus",
+          "TÖR aruandlus"
+        ],
+        "direction": "Esmalt import · eksport vastavalt reeglitele",
+        "ownership": "Seadistatav objektipõhiselt"
+      },
+      "hours24": {
+        "name": "hours24",
+        "logo_alt": "hours24 ajutine märk",
+        "category": "Palgatarkvara",
+        "description": "Tehisintellekti toega tööaja arvestus ja graafikute koostamine, mida kasutatakse Eestis ja Soomes. Kuni viiele töötajale on tasuta pakett.",
+        "capabilities": [
+          "Tehisintellektiga aja sisestus",
+          "Tööajaandmed",
+          "Töögraafikud"
+        ],
+        "direction": "Esmalt import · eksport vastavalt reeglitele",
+        "ownership": "Seadistatav objektipõhiselt"
+      },
+      "yester": {
+        "name": "Yester",
+        "logo_alt": "Yesteri ajutine märk",
+        "category": "Palgatarkvara",
+        "description": "Alates 2000. aastast tegutsev Eesti tööjõuplatvorm katab tööle asumise, kulud, lähetused ja sõidupäevikud. See on tihedalt integreeritud Merit Tarkvaraga.",
+        "capabilities": [
+          "Tööle asumine",
+          "Kuluaruanded",
+          "Lähetused",
+          "Sõidupäevikud",
+          "Meriti liidestus"
+        ],
+        "direction": "Esmalt import · eksport vastavalt reeglitele",
+        "ownership": "Seadistatav objektipõhiselt"
+      },
+      "hrm4baltics": {
+        "name": "HRM4Baltics (Digmatix)",
+        "logo_alt": "HRM4Balticsi ajutine märk",
+        "category": "Palgatarkvara",
+        "description": "Microsoft Dynamics 365 Business Centralil põhinev personalilahendus katab Eesti, Läti ja Leedu palgaarvestuse. Lahendusel on X-tee liidestus.",
+        "capabilities": [
+          "Personaliandmed",
+          "Eesti palgaarvestus",
+          "Läti palgaarvestus",
+          "Leedu palgaarvestus",
+          "X-tee liidestus"
+        ],
+        "direction": "Esmalt import · eksport vastavalt reeglitele",
+        "ownership": "Seadistatav objektipõhiselt"
+      },
+      "merit_palk": {
+        "name": "Merit Palk",
+        "logo_alt": "Merit Palga ajutine märk",
+        "category": "Palgatarkvara",
+        "description": "Eesti enim kasutatud palgatarkvara teenindab üle 25 000 ettevõtte ja on kuni kahele töötajale tasuta. See sobib kokku olemasoleva Merit Aktiva raamatupidamisadapteriga.",
+        "capabilities": [
+          "Töötajaandmed",
+          "Palgaarvestus",
+          "Palgalehed",
+          "TSD ettevalmistus",
+          "Merit Aktiva sidumine"
+        ],
+        "direction": "Esmalt import · eksport vastavalt reeglitele",
+        "ownership": "Seadistatav objektipõhiselt"
+      },
+      "taavi_palk": {
+        "name": "Taavi Palk",
+        "logo_alt": "Taavi Palga ajutine märk",
+        "category": "Palgatarkvara",
+        "description": "Eesti palgatarkvara kasutab üle 1500 ettevõtte. See koostab kohustuslikke aruandeid ja ekspordib palgalehti Eesti raamatupidamissüsteemidesse.",
+        "capabilities": [
+          "TSD aruanded",
+          "Registriaruanded",
+          "Statistikaaruanded",
+          "Palgalehtede eksport"
+        ],
+        "direction": "Esmalt import · eksport vastavalt reeglitele",
+        "ownership": "Seadistatav objektipõhiselt"
+      },
+      "andevis": {
+        "name": "Andevis",
+        "logo_alt": "Andevise ajutine märk",
+        "category": "Palgatarkvara",
+        "description": "Kohandatav Eesti personalitarkvara, mille moodulid saavad anda ülevaadatavaid personali- ja palgaarvestuse sisendeid.",
+        "capabilities": [
+          "Personaliandmed",
+          "Tööaja arvestus",
+          "Palgaarvestus",
+          "Koolitused",
+          "Arenguvestlused"
+        ],
+        "direction": "Esmalt import · eksport vastavalt reeglitele",
+        "ownership": "Seadistatav objektipõhiselt"
+      },
+      "eeva": {
+        "name": "Eeva (Eetasoft)",
+        "logo_alt": "Eeva ajutine märk",
+        "category": "Palgatarkvara",
+        "description": "Eeva personalimoodul haldab põhilisi töösuhteandmeid ja on seotud Eeva palgaarvestusega. Andmed jõuaksid büroo palgaarvestusse ainult ülevaadatud impordina.",
+        "capabilities": [
+          "Lepingud",
+          "Käskkirjad",
+          "Puhkused",
+          "ISCO klassifikaator",
+          "Eeva palgaarvestuse seos"
+        ],
+        "direction": "Esmalt import · eksport vastavalt reeglitele",
+        "ownership": "Seadistatav objektipõhiselt"
+      }
     }
   },
   "auth": {
@@ -708,7 +1008,7 @@
     "Currency totals": "Summad valuutade kaupa",
     "Due on or before": "Maksetähtaeg hiljemalt",
     "No eligible bills.": "Maksmiseks sobivaid ostuarveid pole.",
-    "Outstanding": "Tasumata summa",
+    "Outstanding": "Tasumata",
     "Select": "Vali",
     "Excluded bills": "Välja jäetud ostuarved",
     "Reason": "Põhjus",
@@ -875,7 +1175,6 @@
     "Over 90 days": "Üle 90 päeva",
     "Due date": "Maksetähtaeg",
     "Days overdue": "Päevi üle tähtaja",
-    "Outstanding": "Tasumata",
     "Net cash movement": "Netorahavoog",
     "Movement": "Muutus",
     "Income": "Tulud",
@@ -1787,6 +2086,35 @@
       "Logo content and filename must match its image type": "Logo sisu ja failinimi peavad vastama pildi tüübile",
       "Logo not found": "Logo ei leitud",
       "Logo file not found": "Logofaili ei leitud"
+    }
+  },
+  "copilot": {
+    "nav": {
+      "assistant": "Assistent",
+      "copilot": "AI-kaaslane"
+    },
+    "workspace": {
+      "AI copilot": "AI-kaaslane",
+      "Ask about your books, scan documents and draft staged imports. The copilot never changes records on its own.": "Küsi oma raamatupidamise kohta, skaneeri dokumente ja koosta importimise ridade eelvaateid. Kaaslane ei muuda kunagi kirjeid iseseisvalt.",
+      "AI copilot is not configured on this service.": "AI-kaaslane pole selles teenuses seadistatud.",
+      "AI copilot is off for this organisation. An owner or administrator can enable it here.": "AI-kaaslane on selles organisatsioonis välja lülitatud. Omanik või administraator saab selle siin lubada.",
+      "Used today": "Täna kasutatud",
+      "Enable AI copilot for this organisation": "Luba selles organisatsioonis AI-kaaslane",
+      "Conversation": "Vestlus",
+      "Message": "Sõnum",
+      "Attach document": "Manusta dokument",
+      "No attachment": "Ilma manuseta",
+      "Send message": "Saada sõnum",
+      "Copilot replied": "Kaaslane vastas",
+      "No copilot messages yet.": "Kaaslase sõnumeid veel ei ole.",
+      "Input tokens": "Päringu tokenid",
+      "Output tokens": "Vastuse tokenid",
+      "Copilot usage": "Kaaslase kasutus",
+      "Per-user daily usage counts every message, scan and token billed to this organisation.": "Päevane kasutus kasutaja kaupa hõlmab kõik selle organisatsiooni eest arvatud sõnumid, skaneerimised ja tokenid.",
+      "Stage {rows} rows for import": "Lisa {rows} rida eelvaate importi",
+      "Stage import rows": "Impordi ridade eelvaade",
+      "Review these rows in Data import before they touch your books. Stage them now?": "Vaata read andmeimpordis üle enne, kui need raamatupidamisesse jõuavad. Lisa kohe eelvaatesse?",
+      "Import batch staged. Review it under Data import.": "Impordipartii lisati eelvaatesse. Vaata seda andmeimpordi all üle."
     }
   }
 }

@@ -74,13 +74,38 @@
       "lede": "Faktais pagrįsta FastAccounts prieinamų apsaugos priemonių, savarankiškos prieglobos atsakomybės ir iki gamybinio naudojimo peržiūrimų ar planuojamų darbų apžvalga.",
       "note": "Reikia peržiūrėti · įvertinta 2026 m. spalio 9 d.",
       "sections": [
-        {"title": "Prieglobos modelis", "body": "FastAccounts galima diegti savarankiškai; tuomet infrastruktūrą pasirenka ir saugo jos operatorius. Valdomas bandomasis variantas naudoja tą pačią Docker programą su PostgreSQL ir nuolatine įrodymų saugykla FastSME valdomoje infrastruktūroje. Infrastruktūros teikėjas priklauso nuo diegimo ir turi būti įvardytas gamybinio kliento sutartyje."},
-        {"title": "Šifravimas", "body": "Integracijų prisijungimo duomenys ramybės būsenoje šifruojami versijuotu Fernet raktu ir nepatenka į naršyklės atsakymus ar žurnalus. Priglobtas ryšys naudoja HTTPS/TLS. FastAccounts neteigia, kad kiekvienas duomenų bazės laukas ar įkeltas įrodymų failas yra šifruojamas programos lygmeniu ramybės būsenoje."},
-        {"title": "Atsarginės kopijos ir atkūrimas", "body": "Savarankiškos prieglobos operatorius atsako už duomenų bazės, įrodymų saugyklos, šifravimo ir atkūrimo procesą. Planuojama: šifruotos valdomos prieglobos kopijos ir išbandytas atkūrimas. Saugykloje neužfiksuotas baigtas atkūrimo bandymas, todėl atkūrimo laikas nežadamas."},
-        {"title": "Prieigos kontrolė", "body": "Prieinama: vietinės el. pašto ir slaptažodžio paskyros bei Google prisijungimas, narystė organizacijoje pagal kvietimą, pasirašytos sesijos, CSRF apsauga ir savininko, administratoriaus, buhalterio, tvirtintojo bei stebėtojo rolės. Slaptažodžiai maišomi naudojant scrypt; patvirtinimo ir atkūrimo nuorodos yra vienkartinės, o duomenų bazėje saugomos tik jų maišos. Pakartotiniai bandymai prisijungti ribojami. Verslo duomenys atskirti pagal organizaciją, o tarporganizacinė prieiga testuojama. Planuojama: valdomos paslaugos MFA politika ir užklausų ribojimas tinklo pakraštyje."},
-        {"title": "Saugumo incidentai", "body": "Apie įtariamą incidentą praneškite privačiai adresu info@predictivelabs.ai, temos eilutėje įrašę „FastAccounts saugumo incidentas“. Komanda išsaugos reikalingus įrašus, ištirs apimtį ir koordinuos ryšį su klientais. Sutartinis reagavimo laikas dar nesiūlomas.", "action": "Pranešti apie incidentą", "email_subject": "FastAccounts saugumo incidentas"},
-        {"title": "Priklausomybių pranešimai", "body": "Python priklausomybės nurodytos requirements.txt; CI kompiliuoja programą, vykdo testus, tikrina migracijas ir ieško dažnų paslapčių šablonų. Projektas neteigia vykdantis nuolatinę automatinę priklausomybių pažeidžiamumų stebėseną. Apie įtartiną priklausomybę praneškite privačiu saugumo kanalu."},
-        {"title": "Atsakingas pažeidžiamumų atskleidimas", "body": "Prieš viešą aptarimą praneškite privačiai ir nurodykite paveiktas versijas, atkūrimo veiksmus bei poveikį. Patvirtinsime ryšio kanalą, sąžiningai ištirsime ir su pranešėju suderinsime atskleidimo datą. Skirkite pagrįstą laiką pataisymui; atsakymo ar pataisymo termino dar negarantuojame.", "action": "Siųsti privatų pranešimą", "email_subject": "FastAccounts atsakingas pažeidžiamumo atskleidimas"}
+        {
+          "title": "Prieglobos modelis",
+          "body": "FastAccounts galima diegti savarankiškai; tuomet infrastruktūrą pasirenka ir saugo jos operatorius. Valdomas bandomasis variantas naudoja tą pačią Docker programą su PostgreSQL ir nuolatine įrodymų saugykla FastSME valdomoje infrastruktūroje. Infrastruktūros teikėjas priklauso nuo diegimo ir turi būti įvardytas gamybinio kliento sutartyje."
+        },
+        {
+          "title": "Šifravimas",
+          "body": "Integracijų prisijungimo duomenys ramybės būsenoje šifruojami versijuotu Fernet raktu ir nepatenka į naršyklės atsakymus ar žurnalus. Priglobtas ryšys naudoja HTTPS/TLS. FastAccounts neteigia, kad kiekvienas duomenų bazės laukas ar įkeltas įrodymų failas yra šifruojamas programos lygmeniu ramybės būsenoje."
+        },
+        {
+          "title": "Atsarginės kopijos ir atkūrimas",
+          "body": "Savarankiškos prieglobos operatorius atsako už duomenų bazės, įrodymų saugyklos, šifravimo ir atkūrimo procesą. Planuojama: šifruotos valdomos prieglobos kopijos ir išbandytas atkūrimas. Saugykloje neužfiksuotas baigtas atkūrimo bandymas, todėl atkūrimo laikas nežadamas."
+        },
+        {
+          "title": "Prieigos kontrolė",
+          "body": "Prieinama: vietinės el. pašto ir slaptažodžio paskyros bei Google prisijungimas, narystė organizacijoje pagal kvietimą, pasirašytos sesijos, CSRF apsauga ir savininko, administratoriaus, buhalterio, tvirtintojo bei stebėtojo rolės. Slaptažodžiai maišomi naudojant scrypt; patvirtinimo ir atkūrimo nuorodos yra vienkartinės, o duomenų bazėje saugomos tik jų maišos. Pakartotiniai bandymai prisijungti ribojami. Verslo duomenys atskirti pagal organizaciją, o tarporganizacinė prieiga testuojama. Planuojama: valdomos paslaugos MFA politika ir užklausų ribojimas tinklo pakraštyje."
+        },
+        {
+          "title": "Saugumo incidentai",
+          "body": "Apie įtariamą incidentą praneškite privačiai adresu info@predictivelabs.ai, temos eilutėje įrašę „FastAccounts saugumo incidentas“. Komanda išsaugos reikalingus įrašus, ištirs apimtį ir koordinuos ryšį su klientais. Sutartinis reagavimo laikas dar nesiūlomas.",
+          "action": "Pranešti apie incidentą",
+          "email_subject": "FastAccounts saugumo incidentas"
+        },
+        {
+          "title": "Priklausomybių pranešimai",
+          "body": "Python priklausomybės nurodytos requirements.txt; CI kompiliuoja programą, vykdo testus, tikrina migracijas ir ieško dažnų paslapčių šablonų. Projektas neteigia vykdantis nuolatinę automatinę priklausomybių pažeidžiamumų stebėseną. Apie įtartiną priklausomybę praneškite privačiu saugumo kanalu."
+        },
+        {
+          "title": "Atsakingas pažeidžiamumų atskleidimas",
+          "body": "Prieš viešą aptarimą praneškite privačiai ir nurodykite paveiktas versijas, atkūrimo veiksmus bei poveikį. Patvirtinsime ryšio kanalą, sąžiningai ištirsime ir su pranešėju suderinsime atskleidimo datą. Skirkite pagrįstą laiką pataisymui; atsakymo ar pataisymo termino dar negarantuojame.",
+          "action": "Siųsti privatų pranešimą",
+          "email_subject": "FastAccounts atsakingas pažeidžiamumo atskleidimas"
+        }
       ]
     },
     "privacy": {
@@ -88,12 +113,32 @@
       "lede": "Ši bandomojo etapo informacija paaiškina dabartinio produkto vaidmenis ir duomenų srautus. Gamybinę tvarką turi užbaigti su klientu sudaryta duomenų tvarkymo sutartis.",
       "note": "Bandomasis etapas · paprasta informacija, įvertinta 2026 m. spalio 9 d.",
       "sections": [
-        {"title": "Valdytojo ir tvarkytojo vaidmenys", "body": "Priglobtoje paslaugoje Predictive Labs Ltd yra paskyros, pagalbos ir paslaugos administravimo duomenų valdytojas bei organizacijos įvestų verslo, klientų, tiekėjų ir darbuotojų duomenų tvarkytojas. Klientas išlieka savo organizacijos duomenų valdytoju. Savarankiškame diegime operatorius pats nustato vaidmenis ir pranešimus."},
-        {"title": "Dabartiniai subtvarkytojai", "body": "Dabartinis kodas naudoja Google pasirenkamam prisijungimui ir Postmark paskyros, sąskaitų bei priminimų el. laiškams, kai ši funkcija sukonfigūruota. Be Postmark prisijungimo duomenų jis nenaudojamas. Saugykloje nenurodytas valdomos infrastruktūros teikėjas; jis turi būti įvardytas kliento duomenų tvarkymo sutartyje prieš priimant gamybinius duomenis. Prijungtos apskaitos, personalo ar bankų paslaugos yra kliento pasirinktos integracijos, ne numatytieji gavėjai."},
-        {"title": "Saugojimas", "body": "Apskaitos įrašai saugomi pagal kliento politiką ir taikomus terminus: plane numatyti šešeri metai įprastiems JK PVM įrašams ir septyneri metai nuo finansinių metų pabaigos Estijos apskaitai, prireikus ilgiau. Ištrynimas negali nepastebimai pašalinti registruotų didžiosios knygos įrašų ar teisiškai saugotinų duomenų. Planuojama: automatinis saugojimas valdomoje priegloboje."},
-        {"title": "Tarptautinis duomenų perdavimas", "body": "Savarankiškos prieglobos operatorius pasirenka duomenų vietą. Priglobtame bandyme Google ar Postmark gali tvarkyti duomenis pagal savo sąlygas ir perdavimo apsaugas. Gamybinėje duomenų tvarkymo sutartyje turi būti nurodyta prieglobos vieta, visi subtvarkytojai ir perdavimo priemonės; šiame puslapyje neišgalvojama saugykloje neužfiksuota vieta."},
-        {"title": "Analitika ir žurnalai", "body": "Viešojoje svetainėje ir programoje nėra analitikos ar reklamos SDK. Diegimas gali saugoti techninius žiniatinklio, autentifikavimo ir audito žurnalus, reikalingus paslaugai veikti ir apsaugoti. Juose negali būti teikėjų prisijungimo duomenų, o saugojimo trukmė turi būti dokumentuota gamyboje."},
-        {"title": "Duomenų subjektų prašymai", "body": "Dėl prieigos, taisymo, ištrynimo, apribojimo ar kitų duomenų teisių pirmiausia kreipkitės į organizaciją, kuri valdo atitinkamą apskaitą. Dėl FastAccounts paskyros ar paslaugos duomenų rašykite info@predictivelabs.ai. Gali reikėti patvirtinti tapatybę ir išsaugoti teisiškai privalomus įrašus.", "action": "Kreiptis dėl duomenų apsaugos", "email_subject": "FastAccounts duomenų apsaugos prašymas"}
+        {
+          "title": "Valdytojo ir tvarkytojo vaidmenys",
+          "body": "Priglobtoje paslaugoje Predictive Labs Ltd yra paskyros, pagalbos ir paslaugos administravimo duomenų valdytojas bei organizacijos įvestų verslo, klientų, tiekėjų ir darbuotojų duomenų tvarkytojas. Klientas išlieka savo organizacijos duomenų valdytoju. Savarankiškame diegime operatorius pats nustato vaidmenis ir pranešimus."
+        },
+        {
+          "title": "Dabartiniai subtvarkytojai",
+          "body": "Dabartinis kodas naudoja Google pasirenkamam prisijungimui ir Postmark paskyros, sąskaitų bei priminimų el. laiškams, kai ši funkcija sukonfigūruota. Be Postmark prisijungimo duomenų jis nenaudojamas. Saugykloje nenurodytas valdomos infrastruktūros teikėjas; jis turi būti įvardytas kliento duomenų tvarkymo sutartyje prieš priimant gamybinius duomenis. Prijungtos apskaitos, personalo ar bankų paslaugos yra kliento pasirinktos integracijos, ne numatytieji gavėjai."
+        },
+        {
+          "title": "Saugojimas",
+          "body": "Apskaitos įrašai saugomi pagal kliento politiką ir taikomus terminus: plane numatyti šešeri metai įprastiems JK PVM įrašams ir septyneri metai nuo finansinių metų pabaigos Estijos apskaitai, prireikus ilgiau. Ištrynimas negali nepastebimai pašalinti registruotų didžiosios knygos įrašų ar teisiškai saugotinų duomenų. Planuojama: automatinis saugojimas valdomoje priegloboje."
+        },
+        {
+          "title": "Tarptautinis duomenų perdavimas",
+          "body": "Savarankiškos prieglobos operatorius pasirenka duomenų vietą. Priglobtame bandyme Google ar Postmark gali tvarkyti duomenis pagal savo sąlygas ir perdavimo apsaugas. Gamybinėje duomenų tvarkymo sutartyje turi būti nurodyta prieglobos vieta, visi subtvarkytojai ir perdavimo priemonės; šiame puslapyje neišgalvojama saugykloje neužfiksuota vieta."
+        },
+        {
+          "title": "Analitika ir žurnalai",
+          "body": "Viešojoje svetainėje ir programoje nėra analitikos ar reklamos SDK. Diegimas gali saugoti techninius žiniatinklio, autentifikavimo ir audito žurnalus, reikalingus paslaugai veikti ir apsaugoti. Juose negali būti teikėjų prisijungimo duomenų, o saugojimo trukmė turi būti dokumentuota gamyboje."
+        },
+        {
+          "title": "Duomenų subjektų prašymai",
+          "body": "Dėl prieigos, taisymo, ištrynimo, apribojimo ar kitų duomenų teisių pirmiausia kreipkitės į organizaciją, kuri valdo atitinkamą apskaitą. Dėl FastAccounts paskyros ar paslaugos duomenų rašykite info@predictivelabs.ai. Gali reikėti patvirtinti tapatybę ir išsaugoti teisiškai privalomus įrašus.",
+          "action": "Kreiptis dėl duomenų apsaugos",
+          "email_subject": "FastAccounts duomenų apsaugos prašymas"
+        }
       ]
     },
     "about": {
@@ -101,10 +146,22 @@
       "lede": "FastAccounts yra atvirojo kodo apskaitos produktas Jungtinės Karalystės ir Estijos mažoms įmonėms bei apskaitos biurams.",
       "note": "Reikia peržiūrėti · nepriklausomas šalių patvirtinimas",
       "sections": [
-        {"title": "Juridinis asmuo", "body": "FastAccounts kuria ir valdo Predictive Labs Ltd, Anglijoje ir Velse registruota įmonė numeriu 14857334. Registruotos buveinės adresas: 155 Minories Street, Suite 275, London EC3N 1AD, Jungtinė Karalystė."},
-        {"title": "Komanda", "body": "Produktą, dokumentaciją ir viešą leidimų istoriją prižiūri nedidelė Predictive Labs komanda; 0.3.0 leidimo įraše Joosep Laats įvardytas už sujungtus produkto darbus. Nerodome didesnės komandos, klientų skaičiaus ar konsultantų tinklo, nei pagrindžia įrodymai."},
-        {"title": "Apskaitos rinkų kompetencija", "body": "Prieinama: testuoti JK PVM ir Estijos PVM deklaracijos (KMD) darbo dokumentai, šalių sąskaitų taisyklės, tikslūs Decimal skaičiavimai ir nekintami dvejybiniai apskaitos įrašai. Reikia peržiūrėti: nepriklausomas JK ir Estijos buhalterių UAT. FastAccounts yra programinė įranga, ne mokesčių ar teisinė konsultacija."},
-        {"title": "Produkto ribos", "body": "Prieinama: sąskaitos, pirkimo sąskaitos, įrodymai, banko išrašų importas ir derinimas, didžioji knyga, ataskaitos ir peržiūrimi PVM darbo dokumentai. Reikia peržiūrėti: Estijos darbo užmokesčio apskaitos biurų klientams gamybinis UAT turi būti užbaigtas. FastAccounts nėra ERP ir neapima atsargų, užsakymų, gamybos, CRM ar bendrojo personalo valdymo."}
+        {
+          "title": "Juridinis asmuo",
+          "body": "FastAccounts kuria ir valdo Predictive Labs Ltd, Anglijoje ir Velse registruota įmonė numeriu 14857334. Registruotos buveinės adresas: 155 Minories Street, Suite 275, London EC3N 1AD, Jungtinė Karalystė."
+        },
+        {
+          "title": "Komanda",
+          "body": "Produktą, dokumentaciją ir viešą leidimų istoriją prižiūri nedidelė Predictive Labs komanda; 0.3.0 leidimo įraše Joosep Laats įvardytas už sujungtus produkto darbus. Nerodome didesnės komandos, klientų skaičiaus ar konsultantų tinklo, nei pagrindžia įrodymai."
+        },
+        {
+          "title": "Apskaitos rinkų kompetencija",
+          "body": "Prieinama: testuoti JK PVM ir Estijos PVM deklaracijos (KMD) darbo dokumentai, šalių sąskaitų taisyklės, tikslūs Decimal skaičiavimai ir nekintami dvejybiniai apskaitos įrašai. Reikia peržiūrėti: nepriklausomas JK ir Estijos buhalterių UAT. FastAccounts yra programinė įranga, ne mokesčių ar teisinė konsultacija."
+        },
+        {
+          "title": "Produkto ribos",
+          "body": "Prieinama: sąskaitos, pirkimo sąskaitos, įrodymai, banko išrašų importas ir derinimas, didžioji knyga, ataskaitos ir peržiūrimi PVM darbo dokumentai. Reikia peržiūrėti: Estijos darbo užmokesčio apskaitos biurų klientams gamybinis UAT turi būti užbaigtas. FastAccounts nėra ERP ir neapima atsargų, užsakymų, gamybos, CRM ar bendrojo personalo valdymo."
+        }
       ]
     },
     "contact": {
@@ -112,10 +169,30 @@
       "lede": "Vienas veikiantis paštas ir aiški temos eilutė kiekvienam kreipimosi keliui. Neskelbiame nesukonfigūruotų adresų.",
       "note": "Prieinama · info@predictivelabs.ai",
       "sections": [
-        {"title": "Pardavimai", "body": "Klauskite apie priglobtą bandymą, savarankišką prieglobą ar apskaitos biuro vertinimą. Nurodykite rinką, organizacijos tipą ir norimą išbandyti darbo eigą.", "action": "Rašyti pardavimams", "email_subject": "FastAccounts pardavimo užklausa"},
-        {"title": "Pagalba", "body": "Dėl produkto pagalbos nurodykite FastAccounts versiją, puslapį ar darbo eigą, laukiamą ir faktinį rezultatą. El. paštu nesiųskite slaptažodžių, OAuth prieigos raktų, banko prisijungimų ar tikrų apskaitos eksportų.", "action": "Rašyti pagalbai", "email_subject": "FastAccounts pagalbos užklausa"},
-        {"title": "Saugumas", "body": "Apie galimą pažeidžiamumą ar incidentą praneškite privačiai. Nurodykite paveiktas versijas ir atkuriamą informaciją, bet nepridėkite veikiančių prisijungimo duomenų ar nereikalingų asmens duomenų.", "action": "Rašyti apie saugumą", "email_subject": "FastAccounts saugumo pranešimas"},
-        {"title": "Duomenų apsauga", "body": "Paskyros ar paslaugos duomenų prašyme nurodykite organizaciją ir susijusius duomenis. Prašymus dėl kliento apskaitos paprastai pirmiausia reikia pateikti ją valdančiai organizacijai.", "action": "Rašyti dėl duomenų apsaugos", "email_subject": "FastAccounts duomenų apsaugos prašymas"}
+        {
+          "title": "Pardavimai",
+          "body": "Klauskite apie priglobtą bandymą, savarankišką prieglobą ar apskaitos biuro vertinimą. Nurodykite rinką, organizacijos tipą ir norimą išbandyti darbo eigą.",
+          "action": "Rašyti pardavimams",
+          "email_subject": "FastAccounts pardavimo užklausa"
+        },
+        {
+          "title": "Pagalba",
+          "body": "Dėl produkto pagalbos nurodykite FastAccounts versiją, puslapį ar darbo eigą, laukiamą ir faktinį rezultatą. El. paštu nesiųskite slaptažodžių, OAuth prieigos raktų, banko prisijungimų ar tikrų apskaitos eksportų.",
+          "action": "Rašyti pagalbai",
+          "email_subject": "FastAccounts pagalbos užklausa"
+        },
+        {
+          "title": "Saugumas",
+          "body": "Apie galimą pažeidžiamumą ar incidentą praneškite privačiai. Nurodykite paveiktas versijas ir atkuriamą informaciją, bet nepridėkite veikiančių prisijungimo duomenų ar nereikalingų asmens duomenų.",
+          "action": "Rašyti apie saugumą",
+          "email_subject": "FastAccounts saugumo pranešimas"
+        },
+        {
+          "title": "Duomenų apsauga",
+          "body": "Paskyros ar paslaugos duomenų prašyme nurodykite organizaciją ir susijusius duomenis. Prašymus dėl kliento apskaitos paprastai pirmiausia reikia pateikti ją valdančiai organizacijai.",
+          "action": "Rašyti dėl duomenų apsaugos",
+          "email_subject": "FastAccounts duomenų apsaugos prašymas"
+        }
       ]
     },
     "terms": {
@@ -123,11 +200,26 @@
       "lede": "Šios bandomojo etapo sąlygos yra laikinos, o ne galutinės klientų sąlygos, ir nesukuria teiginių apie paslaugos lygį, atitiktį ar garantijas.",
       "note": "Bandomasis etapas · reikia teisinės peržiūros",
       "sections": [
-        {"title": "Paslaugos apimtis", "body": "FastAccounts teikia apskaitos programinę įrangą ir pasirenkamą priglobtą bandomąjį etapą. Prieinamumą nusako keturios būsenos: Prieinama, Reikia peržiūrėti, Bandomasis etapas ir Planuojama. Tiesioginis mokesčių pateikimas yra Planuojamas ir neįtrauktas, nebent pasirašytoje sutartyje aiškiai nurodyta kitaip."},
-        {"title": "Kliento atsakomybė", "body": "Klientas atsako už šaltinių duomenų tikslumą, naudotojų prieigą, apskaitos ir darbo užmokesčio rezultatų peržiūrą, privalomus pateikimus ir profesionalias konsultacijas. Sintetinės demonstracijos negalima laikyti gamybine apskaita."},
-        {"title": "Atvirojo kodo programinė įranga", "body": "Pirminio kodo saugykla skelbiama pagal MIT licenciją. Savarankišką naudojimą reglamentuoja ši licencija; diegimo veikimas, saugumas, atsarginės kopijos ir atnaujinimai lieka operatoriaus atsakomybė."},
-        {"title": "Priglobtas bandymas", "body": "Priglobto naudojimo prieinamumas, pagalba, duomenų tvarkymas, mokesčiai, atšaukimas ir paslaugos lygis turi būti nustatyti atskiroje kliento sutartyje. Šis projektas nežada nepertraukiamos paslaugos, atsakymo laiko ar gamybinio atkūrimo tikslo."},
-        {"title": "Dar nesuderintos teisinės sąlygos", "body": "Garantijoms, atsakomybės riboms, taikytinai teisei, ginčų tvarkai ir gamybinei duomenų tvarkymo sutarčiai reikia teisinės peržiūros; jos čia neišgalvotos. Prieš priglobdami tikrą apskaitą susisiekite su Predictive Labs Ltd."}
+        {
+          "title": "Paslaugos apimtis",
+          "body": "FastAccounts teikia apskaitos programinę įrangą ir pasirenkamą priglobtą bandomąjį etapą. Prieinamumą nusako keturios būsenos: Prieinama, Reikia peržiūrėti, Bandomasis etapas ir Planuojama. Tiesioginis mokesčių pateikimas yra Planuojamas ir neįtrauktas, nebent pasirašytoje sutartyje aiškiai nurodyta kitaip."
+        },
+        {
+          "title": "Kliento atsakomybė",
+          "body": "Klientas atsako už šaltinių duomenų tikslumą, naudotojų prieigą, apskaitos ir darbo užmokesčio rezultatų peržiūrą, privalomus pateikimus ir profesionalias konsultacijas. Sintetinės demonstracijos negalima laikyti gamybine apskaita."
+        },
+        {
+          "title": "Atvirojo kodo programinė įranga",
+          "body": "Pirminio kodo saugykla skelbiama pagal MIT licenciją. Savarankišką naudojimą reglamentuoja ši licencija; diegimo veikimas, saugumas, atsarginės kopijos ir atnaujinimai lieka operatoriaus atsakomybė."
+        },
+        {
+          "title": "Priglobtas bandymas",
+          "body": "Priglobto naudojimo prieinamumas, pagalba, duomenų tvarkymas, mokesčiai, atšaukimas ir paslaugos lygis turi būti nustatyti atskiroje kliento sutartyje. Šis projektas nežada nepertraukiamos paslaugos, atsakymo laiko ar gamybinio atkūrimo tikslo."
+        },
+        {
+          "title": "Dar nesuderintos teisinės sąlygos",
+          "body": "Garantijoms, atsakomybės riboms, taikytinai teisei, ginčų tvarkai ir gamybinei duomenų tvarkymo sutarčiai reikia teisinės peržiūros; jos čia neišgalvotos. Prieš priglobdami tikrą apskaitą susisiekite su Predictive Labs Ltd."
+        }
       ]
     },
     "roadmap": {
@@ -137,26 +229,94 @@
       "source_intro": "Visą įgyvendinimo istoriją rasite",
       "source_link": "pakeitimų žurnale",
       "stages": [
-        {"title": "Prieinama", "intro": "Įdiegtos produkto funkcijos, kurias galima naudoti laikantis čia nurodytų ribų.", "items": [
-          {"title": "Viešasis pagrindas", "date": "2026-08-10", "body": "Svetainė, integracijų katalogas, sveikatos patikra ir apsaugotas prisijungimas buvo išleisti prieš pirmą užfiksuotą programos versiją.", "market": "JK + Estija"},
-          {"title": "Pagrindinė apskaita 0.2.0", "date": "2026-08-10", "body": "Sąskaitos, pirkimo sąskaitos, įrodymai, išrašų importas ir derinimas, nekintami dvejybiniai įrašai, ataskaitos ir peržiūrimi PVM darbo dokumentai yra įdiegti.", "market": "JK + Estija"},
-          {"title": "Paskyros ir procesai 0.3.0–0.4.0", "date": "2026-10-09", "body": "Periodinės sąskaitos, priminimai, peržiūrimas failų ir FastHR darbuotojų importas bei el. pašto ir slaptažodžio paskyros yra įdiegtos ir išbandytos be tinklo ryšio.", "market": "JK + Estija"}
-        ]},
-        {"title": "Reikia peržiūrėti", "intro": "Įdiegtas darbas, kuriam reikia išorinio patvirtinimo arba gamybinio UAT.", "items": [
-          {"title": "Nepriklausomas buhalterių UAT", "body": "Prieš teigiant profesionalų patvirtinimą su kvalifikuotais buhalteriais patikrinti JK PVM, Estijos KMD ir Estijos biurų darbo užmokestį.", "market": "JK + Estija"},
-          {"title": "Teikėjų patikra", "body": "Patikrinti QuickBooks, Xero, Merit Aktiva, BambooHR ir Personio su leistinais kliento ar bandomosios įmonės prisijungimo duomenimis, išlaikant importą peržiūrimą ir atskirtą pagal organizaciją.", "market": "Abi rinkos"}
-        ]},
-        {"title": "Bandomasis etapas", "intro": "Ribotos funkcijos vertinimui su aiškiai nurodytomis gamybinio naudojimo ribomis.", "items": [
-          {"title": "Priglobta paslauga", "body": "Valdoma priegloba siūloma tik pagal atskirą kliento sutartį, kol baigiami veiklos įrodymai.", "market": "Abi rinkos"},
-          {"title": "Estijos biurų darbo užmokestis 0.2.1", "date": "2026-10-08", "body": "Ne viso etato ir valandinis darbo užmokestis, socialinio mokesčio minimumas bei sintetinės demonstracijos yra įdiegtos; gamybiniam naudojimui Reikia peržiūrėti.", "market": "Estija"},
-          {"title": "Mokesčių darbo dokumentai ir eksportas", "body": "JK PVM ir Estijos KMD darbo dokumentai bei eksportas prieinami vertinimui. Tiesioginis pateikimas yra Planuojamas.", "market": "JK + Estija"}
-        ]},
-        {"title": "Planuojama", "intro": "Funkcijos, kurios dar neįdiegtos arba neįtrauktos į dabartinį paslaugos pažadą.", "items": [
-          {"title": "Valdomos paslaugos veikla", "body": "Įvardyti prieglobos subtvarkytoją ir duomenų vietą, užbaigti šifruotų kopijų atkūrimo bandymą ir pridėti incidentų įspėjimus, užklausų ribojimą bei kenkėjiškų failų tikrinimą.", "market": "Abi rinkos"},
-          {"title": "Tik skaitoma atviroji bankininkystė", "body": "Po teisinės, komercinės ir bankų aprėpties peržiūros pridėti teikėjo pasirinkimą, pakartotinį prijungimą, planinį importą ir stebėseną.", "market": "JK + Estija"},
-          {"title": "Tiesioginis mokesčių pateikimas", "body": "Užbaigti teikėjų patvirtinimus ir apsaugotus HMRC bei e-MTA pateikimo procesus. Dabartinis rezultatas yra darbo dokumentai ir eksportas.", "market": "JK + Estija"},
-          {"title": "Platesnės privalomos ataskaitos", "body": "JK pelno mokestį ir Companies House ataskaitas bei Estijos metinių ataskaitų susiejimą svarstyti tik po pavyzdžių ir profesionalios peržiūros.", "market": "JK + Estija"}
-        ]}
+        {
+          "title": "Prieinama",
+          "intro": "Įdiegtos produkto funkcijos, kurias galima naudoti laikantis čia nurodytų ribų.",
+          "items": [
+            {
+              "title": "Viešasis pagrindas",
+              "date": "2026-08-10",
+              "body": "Svetainė, integracijų katalogas, sveikatos patikra ir apsaugotas prisijungimas buvo išleisti prieš pirmą užfiksuotą programos versiją.",
+              "market": "JK + Estija"
+            },
+            {
+              "title": "Pagrindinė apskaita 0.2.0",
+              "date": "2026-08-10",
+              "body": "Sąskaitos, pirkimo sąskaitos, įrodymai, išrašų importas ir derinimas, nekintami dvejybiniai įrašai, ataskaitos ir peržiūrimi PVM darbo dokumentai yra įdiegti.",
+              "market": "JK + Estija"
+            },
+            {
+              "title": "Paskyros ir procesai 0.3.0–0.4.0",
+              "date": "2026-10-09",
+              "body": "Periodinės sąskaitos, priminimai, peržiūrimas failų ir FastHR darbuotojų importas bei el. pašto ir slaptažodžio paskyros yra įdiegtos ir išbandytos be tinklo ryšio.",
+              "market": "JK + Estija"
+            }
+          ]
+        },
+        {
+          "title": "Reikia peržiūrėti",
+          "intro": "Įdiegtas darbas, kuriam reikia išorinio patvirtinimo arba gamybinio UAT.",
+          "items": [
+            {
+              "title": "Nepriklausomas buhalterių UAT",
+              "body": "Prieš teigiant profesionalų patvirtinimą su kvalifikuotais buhalteriais patikrinti JK PVM, Estijos KMD ir Estijos biurų darbo užmokestį.",
+              "market": "JK + Estija"
+            },
+            {
+              "title": "Teikėjų patikra",
+              "body": "Patikrinti QuickBooks, Xero, Merit Aktiva, BambooHR ir Personio su leistinais kliento ar bandomosios įmonės prisijungimo duomenimis, išlaikant importą peržiūrimą ir atskirtą pagal organizaciją.",
+              "market": "Abi rinkos"
+            }
+          ]
+        },
+        {
+          "title": "Bandomasis etapas",
+          "intro": "Ribotos funkcijos vertinimui su aiškiai nurodytomis gamybinio naudojimo ribomis.",
+          "items": [
+            {
+              "title": "Priglobta paslauga",
+              "body": "Valdoma priegloba siūloma tik pagal atskirą kliento sutartį, kol baigiami veiklos įrodymai.",
+              "market": "Abi rinkos"
+            },
+            {
+              "title": "Estijos biurų darbo užmokestis 0.2.1",
+              "date": "2026-10-08",
+              "body": "Ne viso etato ir valandinis darbo užmokestis, socialinio mokesčio minimumas bei sintetinės demonstracijos yra įdiegtos; gamybiniam naudojimui Reikia peržiūrėti.",
+              "market": "Estija"
+            },
+            {
+              "title": "Mokesčių darbo dokumentai ir eksportas",
+              "body": "JK PVM ir Estijos KMD darbo dokumentai bei eksportas prieinami vertinimui. Tiesioginis pateikimas yra Planuojamas.",
+              "market": "JK + Estija"
+            }
+          ]
+        },
+        {
+          "title": "Planuojama",
+          "intro": "Funkcijos, kurios dar neįdiegtos arba neįtrauktos į dabartinį paslaugos pažadą.",
+          "items": [
+            {
+              "title": "Valdomos paslaugos veikla",
+              "body": "Įvardyti prieglobos subtvarkytoją ir duomenų vietą, užbaigti šifruotų kopijų atkūrimo bandymą ir pridėti incidentų įspėjimus, užklausų ribojimą bei kenkėjiškų failų tikrinimą.",
+              "market": "Abi rinkos"
+            },
+            {
+              "title": "Tik skaitoma atviroji bankininkystė",
+              "body": "Po teisinės, komercinės ir bankų aprėpties peržiūros pridėti teikėjo pasirinkimą, pakartotinį prijungimą, planinį importą ir stebėseną.",
+              "market": "JK + Estija"
+            },
+            {
+              "title": "Tiesioginis mokesčių pateikimas",
+              "body": "Užbaigti teikėjų patvirtinimus ir apsaugotus HMRC bei e-MTA pateikimo procesus. Dabartinis rezultatas yra darbo dokumentai ir eksportas.",
+              "market": "JK + Estija"
+            },
+            {
+              "title": "Platesnės privalomos ataskaitos",
+              "body": "JK pelno mokestį ir Companies House ataskaitas bei Estijos metinių ataskaitų susiejimą svarstyti tik po pavyzdžių ir profesionalios peržiūros.",
+              "market": "JK + Estija"
+            }
+          ]
+        }
       ]
     },
     "changelog": {
@@ -166,11 +326,31 @@
       "source_intro": "Visus užfiksuotus pakeitimus skaitykite",
       "source_link": "techniniame pakeitimų žurnale",
       "releases": [
-        {"title": "0.4.0 · El. pašto ir slaptažodžio paskyros", "date": "2026-10-09", "body": "Šalia Google SSO pridėta registracija, prisijungimas ir slaptažodžio atkūrimas. Slaptažodžiai maišomi naudojant scrypt; patvirtinimo ir atkūrimo nuorodos yra vienkartinės, ribojamos ir siunčiamos per pasirenkamą Postmark konfigūraciją."},
-        {"title": "0.3.0 · Integracijos ir automatizavimas", "date": "2026-10-09", "body": "Pridėtos periodinės sąskaitos ir priminimai, organizacijoms atskirta ryšių kontrolė, FastHR jungtis, peržiūrimas darbuotojų importas, universalus CSV/TSV kelias ir dokumentuotos Personio bei BambooHR sąsajos. Reikia peržiūrėti: testai naudoja imituotą tinklą, o gamybinė patikra nebaigta."},
-        {"title": "0.2.1 · Estijos biurų darbo užmokestis", "date": "2026-10-08", "body": "Pridėtas ne visas etatas, valandinis atlygis, pensijų tarifai, 2026 m. socialinio mokesčio minimumas ir sintetinė darbo užmokesčio demonstracija. Reikia peržiūrėti: buhalterių gamybinis UAT nebaigtas."},
-        {"title": "0.2.0 · Inžinerinis bandymas", "date": "2026-08-10", "body": "Išleista apskaitos darbo erdvė, perkeliamos migracijos, sąskaitos, pirkimo sąskaitos, įrodymai, išrašų importas ir derinimas, nekintama subalansuota didžioji knyga, finansinės ataskaitos ir peržiūrimi JK bei Estijos PVM darbo dokumentai."},
-        {"title": "Pagrindas prieš versijuotus leidimus", "date": "2026-08-10", "body": "Paskelbta pirmoji svetainė, integracijų katalogas, sveikatos patikra ir apsaugoto autentifikavimo pagrindas. Saugyklos pakeitimų žurnale nėra 0.1.x leidimo."}
+        {
+          "title": "0.4.0 · El. pašto ir slaptažodžio paskyros",
+          "date": "2026-10-09",
+          "body": "Šalia Google SSO pridėta registracija, prisijungimas ir slaptažodžio atkūrimas. Slaptažodžiai maišomi naudojant scrypt; patvirtinimo ir atkūrimo nuorodos yra vienkartinės, ribojamos ir siunčiamos per pasirenkamą Postmark konfigūraciją."
+        },
+        {
+          "title": "0.3.0 · Integracijos ir automatizavimas",
+          "date": "2026-10-09",
+          "body": "Pridėtos periodinės sąskaitos ir priminimai, organizacijoms atskirta ryšių kontrolė, FastHR jungtis, peržiūrimas darbuotojų importas, universalus CSV/TSV kelias ir dokumentuotos Personio bei BambooHR sąsajos. Reikia peržiūrėti: testai naudoja imituotą tinklą, o gamybinė patikra nebaigta."
+        },
+        {
+          "title": "0.2.1 · Estijos biurų darbo užmokestis",
+          "date": "2026-10-08",
+          "body": "Pridėtas ne visas etatas, valandinis atlygis, pensijų tarifai, 2026 m. socialinio mokesčio minimumas ir sintetinė darbo užmokesčio demonstracija. Reikia peržiūrėti: buhalterių gamybinis UAT nebaigtas."
+        },
+        {
+          "title": "0.2.0 · Inžinerinis bandymas",
+          "date": "2026-08-10",
+          "body": "Išleista apskaitos darbo erdvė, perkeliamos migracijos, sąskaitos, pirkimo sąskaitos, įrodymai, išrašų importas ir derinimas, nekintama subalansuota didžioji knyga, finansinės ataskaitos ir peržiūrimi JK bei Estijos PVM darbo dokumentai."
+        },
+        {
+          "title": "Pagrindas prieš versijuotus leidimus",
+          "date": "2026-08-10",
+          "body": "Paskelbta pirmoji svetainė, integracijų katalogas, sveikatos patikra ir apsaugoto autentifikavimo pagrindas. Saugyklos pakeitimų žurnale nėra 0.1.x leidimo."
+        }
       ]
     }
   },
@@ -386,7 +566,7 @@
         "direction": "Iš FastAccounts buhalteriui",
         "ownership": "Buhalterio peržiūrėtas eksportas"
       },
-    "open_banking": {
+      "open_banking": {
         "name": "Atviroji bankininkystė",
         "logo_alt": "Atvirosios bankininkystės piktograma",
         "category": "Banko duomenys",
@@ -398,206 +578,326 @@
           "Suderinimo įvestis"
         ],
         "direction": "Pirmiausia tik skaitymas",
-      "ownership": "Bankas lieka duomenų šaltiniu"
-    },
-    "file_import": {
-      "name": "Darbuotojų failo importas",
-      "logo_alt": "Darbuotojų failo importo piktograma",
-      "category": "Personalo programinė įranga",
-      "description": "Importuokite darbuotojų pagrindinius duomenis iš bet kurios darbo užmokesčio ar personalo sistemos CSV arba TSV eksporto. Excel darbaknygę pirmiausia reikia eksportuoti CSV formatu.",
-      "capabilities": ["CSV/Excel eksporto importas", "Darbuotojų pagrindiniai duomenys"],
-      "direction": "Importas · įkelti failai",
-      "ownership": "Įkeltas eksportas lieka duomenų šaltiniu"
-    },
-    "fasthr": {
-      "name": "FastHR",
-      "logo_alt": "Laikinas FastHR ženklas",
-      "category": "Personalo programinė įranga",
-      "description": "Importuokite FastHR darbuotojų pagrindinius duomenis peržiūrimai apskaitos biuro darbo užmokesčio apskaitai. FastHR nėra Estijos asmens kodo.",
-      "capabilities": ["Darbuotojų pagrindiniai duomenys", "Darbo santykių būsena", "Bazinis atlyginimas", "Organizacijos duomenys"],
-      "direction": "Importas · darbuotojų pagrindiniai duomenys",
-      "ownership": "FastHR lieka duomenų šaltiniu"
-    },
-    "bamboohr": {
-      "name": "BambooHR",
-      "logo_alt": "Laikinas BambooHR ženklas",
-      "category": "Personalo programinė įranga",
-      "description": "Reikia peržiūrėti: dokumentuotos sutarties adapteris nepatikrintas su tiekėjo prisijungimo duomenimis, o atlyginimui reikia peržiūrėto lauko susiejimo arba vietinės įvesties.",
-      "capabilities": ["Darbuotojų katalogas", "Vardas ir el. paštas", "Būsena, kai pateikiama", "Pasirinktinių laukų išsaugojimas"],
-      "direction": "Importas · darbuotojų katalogas",
-      "ownership": "BambooHR lieka duomenų šaltiniu"
-    },
-    "personio": {
-      "name": "Personio",
-      "logo_alt": "Laikinas Personio ženklas",
-      "category": "Personalo programinė įranga",
-      "description": "Reikia peržiūrėti: dokumentuotos sutarties adapteris nepatikrintas su tiekėjo prisijungimo duomenimis, o atlyginimui reikia peržiūrėto atributo susiejimo arba vietinės įvesties.",
-      "capabilities": ["Darbuotojų atributai", "Darbo santykių būsena", "Darbo santykių pabaigos data", "Pasirinktinių atributų išsaugojimas"],
-      "direction": "Importas · darbuotojų pagrindiniai duomenys",
-      "ownership": "Personio lieka duomenų šaltiniu"
-    },
-    "hibob": {
-      "name": "Bob (HiBob)",
-      "logo_alt": "Laikinas Bob by HiBob ženklas",
-      "category": "Personalo programinė įranga",
-      "description": "Importuokite pasirinktus Bob personalo duomenis peržiūrai prieš apskaitos biuro darbo užmokesčio skaičiavimą.",
-      "capabilities": ["Darbuotojų katalogas", "Darbo santykių ciklas", "Darbo laiko valdymas"],
-      "direction": "Pirmiausia importas · eksportas pagal taisykles",
-      "ownership": "Konfigūruojama kiekvienam objektui"
-    },
-    "zoho_people": {
-      "name": "Zoho People",
-      "logo_alt": "Laikinas Zoho People ženklas",
-      "category": "Personalo programinė įranga",
-      "description": "Naudokite Zoho People darbuotojų ir darbo laiko duomenis kaip peržiūrėtą darbo užmokesčio įvestį.",
-      "capabilities": ["Darbuotojų duomenys", "Darbo laiko apskaita", "Atostogos", "Darbo laiko žiniaraščiai", "Formos"],
-      "direction": "Pirmiausia importas · eksportas pagal taisykles",
-      "ownership": "Konfigūruojama kiekvienam objektui"
-    },
-    "employment_hero": {
-      "name": "Employment Hero",
-      "logo_alt": "Laikinas Employment Hero ženklas",
-      "category": "Personalo programinė įranga",
-      "description": "Pateikite pasirinktus Employment Hero personalo duomenis peržiūrai prieš įtraukiant juos į apskaitos biuro darbo užmokesčio skaičiavimą.",
-      "capabilities": ["Darbuotojų duomenys", "Įdarbinimas", "Atostogos", "Darbo laiko žiniaraščiai", "Darbo užmokesčio įvestis"],
-      "direction": "Pirmiausia importas · eksportas pagal taisykles",
-      "ownership": "Konfigūruojama kiekvienam objektui"
-    },
-    "workday": {
-      "name": "Workday",
-      "logo_alt": "Laikinas Workday ženklas",
-      "category": "Personalo programinė įranga",
-      "description": "Naudokite įmonės lygio HCM darbuotojų ir atlygio duomenis kaip peržiūrimą apskaitos biuro darbo užmokesčio šaltinį.",
-      "capabilities": ["Darbuotojų duomenys", "Organizacijos struktūra", "Darbo laikas ir neatvykimai", "Atlygis", "Darbo užmokesčio įvestis"],
-      "direction": "Pirmiausia importas · eksportas pagal taisykles",
-      "ownership": "Konfigūruojama kiekvienam objektui"
-    },
-    "hrmaster": {
-      "name": "HRmaster (HR Master)",
-      "logo_alt": "Laikinas HRmaster ženklas",
-      "category": "Personalo programinė įranga",
-      "description": "Naudokite Vengrijos personalo sistemą kaip peržiūrimą darbuotojų ir darbo užmokesčio įvesties duomenų šaltinį.",
-      "capabilities": ["Personalo duomenys", "Darbo užmokesčio įvestis", "Darbuotojų atranka", "Vertinimai", "Cafeteria išmokos"],
-      "direction": "Pirmiausia importas · eksportas pagal taisykles",
-      "ownership": "Konfigūruojama kiekvienam objektui"
-    },
-    "gusto": {
-      "name": "Gusto",
-      "logo_alt": "Laikinas Gusto ženklas",
-      "category": "Personalo programinė įranga",
-      "description": "Naudokite JAV darbo užmokesčio platformą kaip peržiūrimą šaltinį, kai kliento įmonių grupėje yra JAV juridinis asmuo.",
-      "capabilities": ["Darbuotojų duomenys", "Darbo užmokesčio įvestis", "Atostogos", "Išmokų duomenys", "Rangovų duomenys"],
-      "direction": "Pirmiausia importas · eksportas pagal taisykles",
-      "ownership": "Konfigūruojama kiekvienam objektui"
-    },
-    "rippling": {
-      "name": "Rippling",
-      "logo_alt": "Laikinas Rippling ženklas",
-      "category": "Personalo programinė įranga",
-      "description": "Importuokite pasirinktus personalo duomenis peržiūrai prieš kliento darbo užmokesčio skaičiavimą.",
-      "capabilities": ["Darbuotojų duomenys", "Įdarbinimas", "Darbo laikas ir lankomumas", "Atostogos", "Darbo užmokesčio įvestis"],
-      "direction": "Pirmiausia importas · eksportas pagal taisykles",
-      "ownership": "Konfigūruojama kiekvienam objektui"
-    },
-    "deel": {
-      "name": "Deel",
-      "logo_alt": "Laikinas Deel ženklas",
-      "category": "Personalo programinė įranga",
-      "description": "Naudokite pasaulinio darbo užmokesčio ir oficialaus darbdavio duomenis kaip peržiūrėtą apskaitos biuro darbo užmokesčio įvestį.",
-      "capabilities": ["Darbuotojų duomenys", "Sutartys", "Pasaulinio darbo užmokesčio įvestis", "Atostogos", "Išlaidos"],
-      "direction": "Pirmiausia importas · eksportas pagal taisykles",
-      "ownership": "Konfigūruojama kiekvienam objektui"
-    },
-    "odoo_hr": {
-      "name": "Odoo HR",
-      "logo_alt": "Laikinas Odoo HR ženklas",
-      "category": "Personalo programinė įranga",
-      "description": "Kiekvienam klientui sukonfigūruokite Odoo URL ir duomenų bazės pavadinimą, kad galėtumėte atlikti peržiūrimus importus per XML-RPC arba JSON-RPC.",
-      "capabilities": ["Darbuotojų duomenys", "Darbo laiko apskaita", "Atostogos", "Darbuotojų atranka", "Išlaidos"],
-      "direction": "Pirmiausia importas · eksportas pagal taisykles",
-      "ownership": "Konfigūruojama kiekvienam objektui"
-    },
-    "persona_fujitsu": {
-      "name": "Fujitsu Persona",
-      "logo_alt": "Laikinas Fujitsu Persona ženklas",
-      "category": "Personalo programinė įranga",
-      "description": "Seniausia Estijos personalo ir darbo užmokesčio programinė įranga veikia nuo 1995 metų. Jos moduliai gali teikti peržiūrimus darbuotojų ir darbo užmokesčio įvesties duomenis.",
-      "capabilities": ["Personalo duomenys", "Darbo užmokesčio skaičiavimas", "Darbo laiko apskaita", "Savitarnos portalas"],
-      "direction": "Pirmiausia importas · eksportas pagal taisykles",
-      "ownership": "Konfigūruojama kiekvienam objektui"
-    },
-    "wemply": {
-      "name": "Wemply",
-      "logo_alt": "Laikinas Wemply ženklas",
-      "category": "Personalo programinė įranga",
-      "description": "Modulinę personalo, darbo laiko ir Estijos darbo užmokesčio platformą naudoja daugiau nei 1000 įmonių. Wemply pelnė titulą „Aasta HR lahendus 2025“.",
-      "capabilities": ["Personalo valdymas", "Darbo laiko apskaita", "Estijos darbo užmokestis", "TSD ataskaitos", "TÖR ataskaitos"],
-      "direction": "Pirmiausia importas · eksportas pagal taisykles",
-      "ownership": "Konfigūruojama kiekvienam objektui"
-    },
-    "hours24": {
-      "name": "hours24",
-      "logo_alt": "Laikinas hours24 ženklas",
-      "category": "Personalo programinė įranga",
-      "description": "Dirbtinio intelekto padedama darbo laiko apskaita ir grafikų planavimas, naudojami Estijoje ir Suomijoje. Iki penkių darbuotojų siūlomas nemokamas planas.",
-      "capabilities": ["DI padedamas laiko įvedimas", "Darbo laiko duomenys", "Darbo grafikai"],
-      "direction": "Pirmiausia importas · eksportas pagal taisykles",
-      "ownership": "Konfigūruojama kiekvienam objektui"
-    },
-    "yester": {
-      "name": "Yester",
-      "logo_alt": "Laikinas Yester ženklas",
-      "category": "Personalo programinė įranga",
-      "description": "Nuo 2000 metų veikianti Estijos darbo jėgos platforma apima įdarbinimą, išlaidas, komandiruotes ir kelionių žurnalus. Ji glaudžiai integruota su Merit Tarkvara.",
-      "capabilities": ["Įdarbinimas", "Išlaidų ataskaitos", "Komandiruotės", "Kelionių žurnalai", "Merit integracija"],
-      "direction": "Pirmiausia importas · eksportas pagal taisykles",
-      "ownership": "Konfigūruojama kiekvienam objektui"
-    },
-    "hrm4baltics": {
-      "name": "HRM4Baltics (Digmatix)",
-      "logo_alt": "Laikinas HRM4Baltics ženklas",
-      "category": "Personalo programinė įranga",
-      "description": "Microsoft Dynamics 365 Business Central personalo sprendimas apima Estijos, Latvijos ir Lietuvos darbo užmokesčio skaičiavimą. Jame yra X-tee integracija.",
-      "capabilities": ["Personalo duomenys", "Estijos darbo užmokestis", "Latvijos darbo užmokestis", "Lietuvos darbo užmokestis", "X-tee integracija"],
-      "direction": "Pirmiausia importas · eksportas pagal taisykles",
-      "ownership": "Konfigūruojama kiekvienam objektui"
-    },
-    "merit_palk": {
-      "name": "Merit Palk",
-      "logo_alt": "Laikinas Merit Palk ženklas",
-      "category": "Personalo programinė įranga",
-      "description": "Plačiausiai Estijoje naudojama darbo užmokesčio programinė įranga aptarnauja daugiau nei 25 000 įmonių ir yra nemokama iki dviejų darbuotojų. Ji gali veikti kartu su esamu Merit Aktiva apskaitos adapteriu.",
-      "capabilities": ["Darbuotojų duomenys", "Darbo užmokesčio skaičiavimas", "Algalapiai", "TSD parengimas", "Sąsaja su Merit Aktiva"],
-      "direction": "Pirmiausia importas · eksportas pagal taisykles",
-      "ownership": "Konfigūruojama kiekvienam objektui"
-    },
-    "taavi_palk": {
-      "name": "Taavi Palk",
-      "logo_alt": "Laikinas Taavi Palk ženklas",
-      "category": "Personalo programinė įranga",
-      "description": "Estijos darbo užmokesčio programinę įrangą naudoja daugiau nei 1500 įmonių. Ji rengia teisės aktuose numatytas ataskaitas ir eksportuoja algalapius į Estijos apskaitos sistemas.",
-      "capabilities": ["TSD ataskaitos", "Registrų ataskaitos", "Statistikos ataskaitos", "Algalapių eksportas"],
-      "direction": "Pirmiausia importas · eksportas pagal taisykles",
-      "ownership": "Konfigūruojama kiekvienam objektui"
-    },
-    "andevis": {
-      "name": "Andevis",
-      "logo_alt": "Laikinas Andevis ženklas",
-      "category": "Personalo programinė įranga",
-      "description": "Pritaikomas Estijos personalo sprendimas, kurio moduliai gali teikti peržiūrimus personalo ir darbo užmokesčio įvesties duomenis.",
-      "capabilities": ["Personalo duomenys", "Darbo laiko apskaita", "Darbo užmokesčio skaičiavimas", "Mokymai", "Tobulėjimo pokalbiai"],
-      "direction": "Pirmiausia importas · eksportas pagal taisykles",
-      "ownership": "Konfigūruojama kiekvienam objektui"
-    },
-    "eeva": {
-      "name": "Eeva (Eetasoft)",
-      "logo_alt": "Laikinas Eeva ženklas",
-      "category": "Personalo programinė įranga",
-      "description": "Eeva personalo modulis tvarko pagrindinius darbo santykių duomenis ir yra susietas su Eeva darbo užmokesčio sistema. Duomenys į apskaitos biuro darbo užmokestį patektų tik peržiūrėto importo būdu.",
-      "capabilities": ["Sutartys", "Įsakymai", "Atostogos", "ISCO klasifikatorius", "Sąsaja su Eeva darbo užmokesčiu"],
-      "direction": "Pirmiausia importas · eksportas pagal taisykles",
-      "ownership": "Konfigūruojama kiekvienam objektui"
-    }
+        "ownership": "Bankas lieka duomenų šaltiniu"
+      },
+      "file_import": {
+        "name": "Darbuotojų failo importas",
+        "logo_alt": "Darbuotojų failo importo piktograma",
+        "category": "Personalo programinė įranga",
+        "description": "Importuokite darbuotojų pagrindinius duomenis iš bet kurios darbo užmokesčio ar personalo sistemos CSV arba TSV eksporto. Excel darbaknygę pirmiausia reikia eksportuoti CSV formatu.",
+        "capabilities": [
+          "CSV/Excel eksporto importas",
+          "Darbuotojų pagrindiniai duomenys"
+        ],
+        "direction": "Importas · įkelti failai",
+        "ownership": "Įkeltas eksportas lieka duomenų šaltiniu"
+      },
+      "fasthr": {
+        "name": "FastHR",
+        "logo_alt": "Laikinas FastHR ženklas",
+        "category": "Personalo programinė įranga",
+        "description": "Importuokite FastHR darbuotojų pagrindinius duomenis peržiūrimai apskaitos biuro darbo užmokesčio apskaitai. FastHR nėra Estijos asmens kodo.",
+        "capabilities": [
+          "Darbuotojų pagrindiniai duomenys",
+          "Darbo santykių būsena",
+          "Bazinis atlyginimas",
+          "Organizacijos duomenys"
+        ],
+        "direction": "Importas · darbuotojų pagrindiniai duomenys",
+        "ownership": "FastHR lieka duomenų šaltiniu"
+      },
+      "bamboohr": {
+        "name": "BambooHR",
+        "logo_alt": "Laikinas BambooHR ženklas",
+        "category": "Personalo programinė įranga",
+        "description": "Reikia peržiūrėti: dokumentuotos sutarties adapteris nepatikrintas su tiekėjo prisijungimo duomenimis, o atlyginimui reikia peržiūrėto lauko susiejimo arba vietinės įvesties.",
+        "capabilities": [
+          "Darbuotojų katalogas",
+          "Vardas ir el. paštas",
+          "Būsena, kai pateikiama",
+          "Pasirinktinių laukų išsaugojimas"
+        ],
+        "direction": "Importas · darbuotojų katalogas",
+        "ownership": "BambooHR lieka duomenų šaltiniu"
+      },
+      "personio": {
+        "name": "Personio",
+        "logo_alt": "Laikinas Personio ženklas",
+        "category": "Personalo programinė įranga",
+        "description": "Reikia peržiūrėti: dokumentuotos sutarties adapteris nepatikrintas su tiekėjo prisijungimo duomenimis, o atlyginimui reikia peržiūrėto atributo susiejimo arba vietinės įvesties.",
+        "capabilities": [
+          "Darbuotojų atributai",
+          "Darbo santykių būsena",
+          "Darbo santykių pabaigos data",
+          "Pasirinktinių atributų išsaugojimas"
+        ],
+        "direction": "Importas · darbuotojų pagrindiniai duomenys",
+        "ownership": "Personio lieka duomenų šaltiniu"
+      },
+      "hibob": {
+        "name": "Bob (HiBob)",
+        "logo_alt": "Laikinas Bob by HiBob ženklas",
+        "category": "Personalo programinė įranga",
+        "description": "Importuokite pasirinktus Bob personalo duomenis peržiūrai prieš apskaitos biuro darbo užmokesčio skaičiavimą.",
+        "capabilities": [
+          "Darbuotojų katalogas",
+          "Darbo santykių ciklas",
+          "Darbo laiko valdymas"
+        ],
+        "direction": "Pirmiausia importas · eksportas pagal taisykles",
+        "ownership": "Konfigūruojama kiekvienam objektui"
+      },
+      "zoho_people": {
+        "name": "Zoho People",
+        "logo_alt": "Laikinas Zoho People ženklas",
+        "category": "Personalo programinė įranga",
+        "description": "Naudokite Zoho People darbuotojų ir darbo laiko duomenis kaip peržiūrėtą darbo užmokesčio įvestį.",
+        "capabilities": [
+          "Darbuotojų duomenys",
+          "Darbo laiko apskaita",
+          "Atostogos",
+          "Darbo laiko žiniaraščiai",
+          "Formos"
+        ],
+        "direction": "Pirmiausia importas · eksportas pagal taisykles",
+        "ownership": "Konfigūruojama kiekvienam objektui"
+      },
+      "employment_hero": {
+        "name": "Employment Hero",
+        "logo_alt": "Laikinas Employment Hero ženklas",
+        "category": "Personalo programinė įranga",
+        "description": "Pateikite pasirinktus Employment Hero personalo duomenis peržiūrai prieš įtraukiant juos į apskaitos biuro darbo užmokesčio skaičiavimą.",
+        "capabilities": [
+          "Darbuotojų duomenys",
+          "Įdarbinimas",
+          "Atostogos",
+          "Darbo laiko žiniaraščiai",
+          "Darbo užmokesčio įvestis"
+        ],
+        "direction": "Pirmiausia importas · eksportas pagal taisykles",
+        "ownership": "Konfigūruojama kiekvienam objektui"
+      },
+      "workday": {
+        "name": "Workday",
+        "logo_alt": "Laikinas Workday ženklas",
+        "category": "Personalo programinė įranga",
+        "description": "Naudokite įmonės lygio HCM darbuotojų ir atlygio duomenis kaip peržiūrimą apskaitos biuro darbo užmokesčio šaltinį.",
+        "capabilities": [
+          "Darbuotojų duomenys",
+          "Organizacijos struktūra",
+          "Darbo laikas ir neatvykimai",
+          "Atlygis",
+          "Darbo užmokesčio įvestis"
+        ],
+        "direction": "Pirmiausia importas · eksportas pagal taisykles",
+        "ownership": "Konfigūruojama kiekvienam objektui"
+      },
+      "hrmaster": {
+        "name": "HRmaster (HR Master)",
+        "logo_alt": "Laikinas HRmaster ženklas",
+        "category": "Personalo programinė įranga",
+        "description": "Naudokite Vengrijos personalo sistemą kaip peržiūrimą darbuotojų ir darbo užmokesčio įvesties duomenų šaltinį.",
+        "capabilities": [
+          "Personalo duomenys",
+          "Darbo užmokesčio įvestis",
+          "Darbuotojų atranka",
+          "Vertinimai",
+          "Cafeteria išmokos"
+        ],
+        "direction": "Pirmiausia importas · eksportas pagal taisykles",
+        "ownership": "Konfigūruojama kiekvienam objektui"
+      },
+      "gusto": {
+        "name": "Gusto",
+        "logo_alt": "Laikinas Gusto ženklas",
+        "category": "Personalo programinė įranga",
+        "description": "Naudokite JAV darbo užmokesčio platformą kaip peržiūrimą šaltinį, kai kliento įmonių grupėje yra JAV juridinis asmuo.",
+        "capabilities": [
+          "Darbuotojų duomenys",
+          "Darbo užmokesčio įvestis",
+          "Atostogos",
+          "Išmokų duomenys",
+          "Rangovų duomenys"
+        ],
+        "direction": "Pirmiausia importas · eksportas pagal taisykles",
+        "ownership": "Konfigūruojama kiekvienam objektui"
+      },
+      "rippling": {
+        "name": "Rippling",
+        "logo_alt": "Laikinas Rippling ženklas",
+        "category": "Personalo programinė įranga",
+        "description": "Importuokite pasirinktus personalo duomenis peržiūrai prieš kliento darbo užmokesčio skaičiavimą.",
+        "capabilities": [
+          "Darbuotojų duomenys",
+          "Įdarbinimas",
+          "Darbo laikas ir lankomumas",
+          "Atostogos",
+          "Darbo užmokesčio įvestis"
+        ],
+        "direction": "Pirmiausia importas · eksportas pagal taisykles",
+        "ownership": "Konfigūruojama kiekvienam objektui"
+      },
+      "deel": {
+        "name": "Deel",
+        "logo_alt": "Laikinas Deel ženklas",
+        "category": "Personalo programinė įranga",
+        "description": "Naudokite pasaulinio darbo užmokesčio ir oficialaus darbdavio duomenis kaip peržiūrėtą apskaitos biuro darbo užmokesčio įvestį.",
+        "capabilities": [
+          "Darbuotojų duomenys",
+          "Sutartys",
+          "Pasaulinio darbo užmokesčio įvestis",
+          "Atostogos",
+          "Išlaidos"
+        ],
+        "direction": "Pirmiausia importas · eksportas pagal taisykles",
+        "ownership": "Konfigūruojama kiekvienam objektui"
+      },
+      "odoo_hr": {
+        "name": "Odoo HR",
+        "logo_alt": "Laikinas Odoo HR ženklas",
+        "category": "Personalo programinė įranga",
+        "description": "Kiekvienam klientui sukonfigūruokite Odoo URL ir duomenų bazės pavadinimą, kad galėtumėte atlikti peržiūrimus importus per XML-RPC arba JSON-RPC.",
+        "capabilities": [
+          "Darbuotojų duomenys",
+          "Darbo laiko apskaita",
+          "Atostogos",
+          "Darbuotojų atranka",
+          "Išlaidos"
+        ],
+        "direction": "Pirmiausia importas · eksportas pagal taisykles",
+        "ownership": "Konfigūruojama kiekvienam objektui"
+      },
+      "persona_fujitsu": {
+        "name": "Fujitsu Persona",
+        "logo_alt": "Laikinas Fujitsu Persona ženklas",
+        "category": "Personalo programinė įranga",
+        "description": "Seniausia Estijos personalo ir darbo užmokesčio programinė įranga veikia nuo 1995 metų. Jos moduliai gali teikti peržiūrimus darbuotojų ir darbo užmokesčio įvesties duomenis.",
+        "capabilities": [
+          "Personalo duomenys",
+          "Darbo užmokesčio skaičiavimas",
+          "Darbo laiko apskaita",
+          "Savitarnos portalas"
+        ],
+        "direction": "Pirmiausia importas · eksportas pagal taisykles",
+        "ownership": "Konfigūruojama kiekvienam objektui"
+      },
+      "wemply": {
+        "name": "Wemply",
+        "logo_alt": "Laikinas Wemply ženklas",
+        "category": "Personalo programinė įranga",
+        "description": "Modulinę personalo, darbo laiko ir Estijos darbo užmokesčio platformą naudoja daugiau nei 1000 įmonių. Wemply pelnė titulą „Aasta HR lahendus 2025“.",
+        "capabilities": [
+          "Personalo valdymas",
+          "Darbo laiko apskaita",
+          "Estijos darbo užmokestis",
+          "TSD ataskaitos",
+          "TÖR ataskaitos"
+        ],
+        "direction": "Pirmiausia importas · eksportas pagal taisykles",
+        "ownership": "Konfigūruojama kiekvienam objektui"
+      },
+      "hours24": {
+        "name": "hours24",
+        "logo_alt": "Laikinas hours24 ženklas",
+        "category": "Personalo programinė įranga",
+        "description": "Dirbtinio intelekto padedama darbo laiko apskaita ir grafikų planavimas, naudojami Estijoje ir Suomijoje. Iki penkių darbuotojų siūlomas nemokamas planas.",
+        "capabilities": [
+          "DI padedamas laiko įvedimas",
+          "Darbo laiko duomenys",
+          "Darbo grafikai"
+        ],
+        "direction": "Pirmiausia importas · eksportas pagal taisykles",
+        "ownership": "Konfigūruojama kiekvienam objektui"
+      },
+      "yester": {
+        "name": "Yester",
+        "logo_alt": "Laikinas Yester ženklas",
+        "category": "Personalo programinė įranga",
+        "description": "Nuo 2000 metų veikianti Estijos darbo jėgos platforma apima įdarbinimą, išlaidas, komandiruotes ir kelionių žurnalus. Ji glaudžiai integruota su Merit Tarkvara.",
+        "capabilities": [
+          "Įdarbinimas",
+          "Išlaidų ataskaitos",
+          "Komandiruotės",
+          "Kelionių žurnalai",
+          "Merit integracija"
+        ],
+        "direction": "Pirmiausia importas · eksportas pagal taisykles",
+        "ownership": "Konfigūruojama kiekvienam objektui"
+      },
+      "hrm4baltics": {
+        "name": "HRM4Baltics (Digmatix)",
+        "logo_alt": "Laikinas HRM4Baltics ženklas",
+        "category": "Personalo programinė įranga",
+        "description": "Microsoft Dynamics 365 Business Central personalo sprendimas apima Estijos, Latvijos ir Lietuvos darbo užmokesčio skaičiavimą. Jame yra X-tee integracija.",
+        "capabilities": [
+          "Personalo duomenys",
+          "Estijos darbo užmokestis",
+          "Latvijos darbo užmokestis",
+          "Lietuvos darbo užmokestis",
+          "X-tee integracija"
+        ],
+        "direction": "Pirmiausia importas · eksportas pagal taisykles",
+        "ownership": "Konfigūruojama kiekvienam objektui"
+      },
+      "merit_palk": {
+        "name": "Merit Palk",
+        "logo_alt": "Laikinas Merit Palk ženklas",
+        "category": "Personalo programinė įranga",
+        "description": "Plačiausiai Estijoje naudojama darbo užmokesčio programinė įranga aptarnauja daugiau nei 25 000 įmonių ir yra nemokama iki dviejų darbuotojų. Ji gali veikti kartu su esamu Merit Aktiva apskaitos adapteriu.",
+        "capabilities": [
+          "Darbuotojų duomenys",
+          "Darbo užmokesčio skaičiavimas",
+          "Algalapiai",
+          "TSD parengimas",
+          "Sąsaja su Merit Aktiva"
+        ],
+        "direction": "Pirmiausia importas · eksportas pagal taisykles",
+        "ownership": "Konfigūruojama kiekvienam objektui"
+      },
+      "taavi_palk": {
+        "name": "Taavi Palk",
+        "logo_alt": "Laikinas Taavi Palk ženklas",
+        "category": "Personalo programinė įranga",
+        "description": "Estijos darbo užmokesčio programinę įrangą naudoja daugiau nei 1500 įmonių. Ji rengia teisės aktuose numatytas ataskaitas ir eksportuoja algalapius į Estijos apskaitos sistemas.",
+        "capabilities": [
+          "TSD ataskaitos",
+          "Registrų ataskaitos",
+          "Statistikos ataskaitos",
+          "Algalapių eksportas"
+        ],
+        "direction": "Pirmiausia importas · eksportas pagal taisykles",
+        "ownership": "Konfigūruojama kiekvienam objektui"
+      },
+      "andevis": {
+        "name": "Andevis",
+        "logo_alt": "Laikinas Andevis ženklas",
+        "category": "Personalo programinė įranga",
+        "description": "Pritaikomas Estijos personalo sprendimas, kurio moduliai gali teikti peržiūrimus personalo ir darbo užmokesčio įvesties duomenis.",
+        "capabilities": [
+          "Personalo duomenys",
+          "Darbo laiko apskaita",
+          "Darbo užmokesčio skaičiavimas",
+          "Mokymai",
+          "Tobulėjimo pokalbiai"
+        ],
+        "direction": "Pirmiausia importas · eksportas pagal taisykles",
+        "ownership": "Konfigūruojama kiekvienam objektui"
+      },
+      "eeva": {
+        "name": "Eeva (Eetasoft)",
+        "logo_alt": "Laikinas Eeva ženklas",
+        "category": "Personalo programinė įranga",
+        "description": "Eeva personalo modulis tvarko pagrindinius darbo santykių duomenis ir yra susietas su Eeva darbo užmokesčio sistema. Duomenys į apskaitos biuro darbo užmokestį patektų tik peržiūrėto importo būdu.",
+        "capabilities": [
+          "Sutartys",
+          "Įsakymai",
+          "Atostogos",
+          "ISCO klasifikatorius",
+          "Sąsaja su Eeva darbo užmokesčiu"
+        ],
+        "direction": "Pirmiausia importas · eksportas pagal taisykles",
+        "ownership": "Konfigūruojama kiekvienam objektui"
+      }
     }
   },
   "auth": {
@@ -708,7 +1008,7 @@
     "Currency totals": "Sumos pagal valiutą",
     "Due on or before": "Mokėjimo terminas iki",
     "No eligible bills.": "Nėra tinkamų mokėti sąskaitų.",
-    "Outstanding": "Nesumokėta suma",
+    "Outstanding": "Outstanding",
     "Select": "Pasirinkti",
     "Excluded bills": "Neįtrauktos sąskaitos",
     "Reason": "Priežastis",
@@ -875,7 +1175,6 @@
     "Over 90 days": "Over 90 days",
     "Due date": "Due date",
     "Days overdue": "Days overdue",
-    "Outstanding": "Outstanding",
     "Net cash movement": "Net cash movement",
     "Movement": "Movement",
     "Income": "Income",
@@ -1787,6 +2086,35 @@
       "Logo content and filename must match its image type": "Logotipo turinys ir failo pavadinimas turi atitikti paveikslėlio tipą",
       "Logo not found": "Logotipas nerastas",
       "Logo file not found": "Logotipo failas nerastas"
+    }
+  },
+  "copilot": {
+    "nav": {
+      "assistant": "Asistentas",
+      "copilot": "AI asistentas"
+    },
+    "workspace": {
+      "AI copilot": "AI asistentas",
+      "Ask about your books, scan documents and draft staged imports. The copilot never changes records on its own.": "Klauskite apie savo apskaitą, skenuokite dokumentus ir rengkite importo eilučių peržiūrą. Asistentas pats niekada nekeičia įrašų.",
+      "AI copilot is not configured on this service.": "AI asistentas šioje paslaugoje nesukonfigūruotas.",
+      "AI copilot is off for this organisation. An owner or administrator can enable it here.": "AI asistentas šioje organizacijoje išjungtas. Savininkas arba administratorius gali jį čia įjungti.",
+      "Used today": "Šiandien panaudota",
+      "Enable AI copilot for this organisation": "Leisti AI asistentą šioje organizacijoje",
+      "Conversation": "Pokalbis",
+      "Message": "Pranešimas",
+      "Attach document": "Pridėti dokumentą",
+      "No attachment": "Be priedo",
+      "Send message": "Siųsti pranešimą",
+      "Copilot replied": "Asistentas atsakė",
+      "No copilot messages yet.": "Asistento pranešimų dar nėra.",
+      "Input tokens": "Užklausos tokenai",
+      "Output tokens": "Atsako tokenai",
+      "Copilot usage": "Asistento naudojimas",
+      "Per-user daily usage counts every message, scan and token billed to this organisation.": "Kasdienis naudojimas naudotojui parodo visus pranešimus, skenavimus ir tokenus, kuriems ši organizacija moka.",
+      "Stage {rows} rows for import": "Įtraukti {rows} eilutes į importo peržiūrą",
+      "Stage import rows": "Importo eilučių peržiūra",
+      "Review these rows in Data import before they touch your books. Stage them now?": "Peržiūrėkite šias eilutes duomenų importe, kol jos nepateko į apskaitą. Įtraukti į peržiūrą dabar?",
+      "Import batch staged. Review it under Data import.": "Importo paketas įtrauktas į peržiūrą. Peržiūrėkite jį duomenų importe."
     }
   }
 }

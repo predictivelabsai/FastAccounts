@@ -177,7 +177,7 @@ def test_upsert_audit_and_idempotent_migration(sending):
 def test_locale_appended_and_merged(language):
     from web import i18n
     raw = json.loads((i18n.LOCALES_DIR / f'{language}.json').read_text(encoding='utf-8'))
-    assert list(raw)[-5:] == ['invoice_exports', 'bulk_sending', 'reminder_rules', 'fx_rates', 'document_settings']
+    assert list(raw)[-(6):] == ['invoice_exports', 'bulk_sending', 'reminder_rules', 'fx_rates', 'document_settings', 'copilot']
     assert set(raw['reminder_rules']) == {'nav', 'views', 'workspace'}
     for key, value in raw['reminder_rules']['workspace'].items():
         assert i18n.catalog(language)['workspace'][key] == value

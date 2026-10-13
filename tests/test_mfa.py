@@ -340,14 +340,14 @@ def test_migration_rerun_preserves_data(env):
     db, client, _ = env
     secret, codes = enable(client)
     original = db.rows("SELECT * FROM mfa_recovery_codes")
-    assert db.scalar("SELECT COUNT(*) FROM schema_migrations") == 28
+    assert db.scalar("SELECT COUNT(*) FROM schema_migrations") == 29
     for _ in range(2):
         with db.transaction() as tx:
             tx.execute("DELETE FROM schema_migrations WHERE version='0027_mfa'")
         assert db.migrate() == ["0027_mfa"]
     assert accounts.get(EMAIL)["totp_secret"] == secret
     assert db.rows("SELECT * FROM mfa_recovery_codes") == original
-    assert "'0025_fx_realised', '0026_fx_revaluations', '0027_mfa', '0028_document_settings']" in (ROOT / ".github/workflows/ci.yml").read_text()
+    assert "'0025_fx_realised', '0026_fx_revaluations', '0027_mfa', '0028_document_settings', '0029_copilot']" in (ROOT / ".github/workflows/ci.yml").read_text()
 
 
 @pytest.mark.parametrize("lang", ["en", "et", "lt", "lv"])
@@ -357,7 +357,7 @@ def test_locales_and_workspace(lang):
     keys = {k for k in english["auth"] if k.startswith("mfa_")}
     assert len(keys) == 22
     assert keys == {k for k in raw["auth"] if k.startswith("mfa_")}
-    assert list(raw)[-5:] == ["invoice_exports", "bulk_sending", "reminder_rules", "fx_rates", "document_settings"]
+    assert list(raw)[-(6):] == ["invoice_exports", "bulk_sending", "reminder_rules", "fx_rates", "document_settings", "copilot"]
     for key in keys:
         assert i18n.t("auth." + key, lang) == raw["auth"][key] and "\u2014" not in raw["auth"][key]
     from web.public import workspace_page

@@ -231,15 +231,20 @@ def test_upgrade_and_rerun_preserve_existing_data(tmp_path, monkeypatch):
     tables = ['organisations', 'accounts', 'contacts', 'invoices', 'invoice_lines', 'posting_batches', 'gl_entries', 'audit_events']
     before = {table: db.rows(f'SELECT * FROM {table} ORDER BY id') for table in tables}
     monkeypatch.setattr(database, 'MIGRATIONS', original)
-    assert db.migrate() == ['0022_payment_links', '0023_analytical_objects', '0024_reminder_rules', '0025_fx_realised', '0026_fx_revaluations', '0027_mfa', '0028_document_settings'] and db.migrate() == []
+    assert db.migrate() == ['0022_payment_links', '0023_analytical_objects', '0024_reminder_rules', '0025_fx_realised', '0026_fx_revaluations', '0027_mfa', '0028_document_settings', '0029_copilot'] and db.migrate() == []
     service = PaymentLinkService(db)
     method = service.create_config(org['id'], actor=ACTOR, **CONFIG)
     link = service.generate(org['id'], invoice['id'], method['id'])
     with db.transaction() as tx:
         tx.connection.executescript((original / 'sqlite' / '0022_payment_links.sql').read_text(encoding='utf-8'))
     assert service.generate(org['id'], invoice['id'], method['id']) == link
+    organisations_now = db.rows('SELECT * FROM organisations')
+    assert all(row.pop('copilot_enabled') == 0 for row in organisations_now)
     for table in tables:
+        if table == 'organisations':
+            continue
         assert all(row in db.rows(f'SELECT * FROM {table}') for row in before[table])
+    assert organisations_now == before['organisations']
     assert db.rows('PRAGMA foreign_key_check') == []
 
 
@@ -249,7 +254,7 @@ def test_append_only_locale_merge(language):
     path = f'web/locales/{language}.json'
     raw = Path(path).read_text(encoding='utf-8')
     data = json.loads(raw)
-    assert list(data)[-7:] == ['payment_links', 'analytical_objects', 'invoice_exports', 'bulk_sending', 'reminder_rules', 'fx_rates', 'document_settings']
+    assert list(data)[-8:] == ['payment_links', 'analytical_objects', 'invoice_exports', 'bulk_sending', 'reminder_rules', 'fx_rates', 'document_settings', 'copilot']
     for section, additions in data['payment_links'].items():
         assert not additions.keys() & data[section].keys()
         for key, value in additions.items():

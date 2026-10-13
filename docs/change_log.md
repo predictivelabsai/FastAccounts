@@ -78,6 +78,80 @@ delivered.
   validation and XLSX renderers for the remaining lists remain out of scope;
   objects/bank CSV column sets are intentionally minimal.
 
+## 2026-10-13: AI copilot with Grok (parity slate extension)
+
+- Added rerun-safe migration `0029_copilot` (count 29, CI list updated): the
+  `organisations.copilot_enabled` opt-in flag defaulting to off, per-user
+  copilot message transcripts and per-day usage counters. Partial upgrades
+  guard the ALTER the same way migration 0027 does.
+- Added a Grok-powered assistant with defence in depth against provider spend
+  abuse: a global environment kill switch (`FASTACCOUNTS_COPILOT_ENABLED` and
+  `FASTACCOUNTS_GROK_API_KEY`, both required), a per-organisation opt-in that
+  only owner/administrator can change, member-readable routes, hard daily
+  quotas (30 messages per user, 200 per organisation, 120k prompt characters
+  per user, 20 document scans, 2,048-token reply cap, ten messages per user
+  per minute) all checked in one transaction before any provider call, and
+  audited `copilot.*` events with token counts. The API key exists only in
+  the environment and never enters prompts, logs, audits or responses.
+- The assistant answers from server-computed context (organisation facts,
+  receivables and payables aging, unreviewed bank rows, awaiting quotes) and
+  never changes records: document evidence (PDFs via pypdf text extraction,
+  images as base64 vision parts) is delimited as untrusted data, and any
+  contacts/items import the model proposes stays a staged draft that a human
+  reviews and commits through the existing Data import pipeline.
+- Added the workspace Assistant > AI copilot view: transcript with token
+  counts, composer with an attachment picker, owner/administrator enable
+  toggle, per-user usage panel and staged-import buttons; English, Estonian,
+  Lithuanian and Latvian copy appended in a trailing `copilot` section.
+- Validation: focused copilot checks: 14 passed, 1 existing dependency warning
+  in 14.11s, covering kill-switch paths before any provider call, org opt-in
+  and role matrix, transcript/usage/audit persistence, PDF and image evidence
+  with injection delimiters, the key staying out of wire payloads and audit
+  rows, unsupported documents, cross-org scanning, quota/burst/size limits,
+  retryable provider errors, fence parsing, migration reruns, four-language
+  key parity and offline browser flows. Full `python -m pytest -q` on
+  Windows/Python 3.14.6: 1371 passed, 4 skipped, 5 existing dependency
+  warnings in 1288.55s.
+  JavaScript syntax, whitespace, em-dash and attribution checks passed.
+- Open follow-ups: deployment wiring for the dedicated FastAccounts Grok key
+  (FastDevOps environment only), accountant UAT, streaming responses,
+  employee-document staging via the integration pipeline and live PostgreSQL
+  validation.
+
+### Four-language copy QA
+
+All new strings are recorded verbatim below. Matching keys, section order,
+catalogue merges and punctuation are checked automatically. Independent
+native-language review, including Estonian estnltk QA, has been run once
+(spelling, abbreviation hyphenation and compound checks; the tokenid loanword
+follows the existing et.json precedent at line 1577).
+
+| Key | English | Estonian | Lithuanian | Latvian |
+| --- | --- | --- | --- | --- |
+| `copilot.nav.assistant` | Assistant | Assistent | Asistentas | Asistents |
+| `copilot.nav.copilot` | AI copilot | AI-kaaslane | AI asistentas | AI asistents |
+| `copilot.workspace.AI copilot` | AI copilot | AI-kaaslane | AI asistentas | AI asistents |
+| `copilot.workspace.Ask about your books, scan documents and draft staged imports. The copilot never changes records on its own.` | Ask about your books, scan documents and draft staged imports. The copilot never changes records on its own. | Küsi oma raamatupidamise kohta, skaneeri dokumente ja koosta importimise ridade eelvaateid. Kaaslane ei muuda kunagi kirjeid iseseisvalt. | Klauskite apie savo apskaitą, skenuokite dokumentus ir rengkite importo eilučių peržiūrą. Asistentas pats niekada nekeičia įrašų. | Jautiet par savām uzskaitēm, skenējiet dokumentus un sagatavojiet importēšanas rindu priekšskatījumu. Asistents pats nekad nemaina ierakstus. |
+| `copilot.workspace.AI copilot is not configured on this service.` | AI copilot is not configured on this service. | AI-kaaslane pole selles teenuses seadistatud. | AI asistentas šioje paslaugoje nesukonfigūruotas. | AI asistents šajā servisā nav konfigurēts. |
+| `copilot.workspace.AI copilot is off for this organisation. An owner or administrator can enable it here.` | AI copilot is off for this organisation. An owner or administrator can enable it here. | AI-kaaslane on selles organisatsioonis välja lülitatud. Omanik või administraator saab selle siin lubada. | AI asistentas šioje organizacijoje išjungtas. Savininkas arba administratorius gali jį čia įjungti. | AI asistents šajā organizācijā ir izslēgts. Īpašnieks vai administrators to var ieslēgt šeit. |
+| `copilot.workspace.Used today` | Used today | Täna kasutatud | Šiandien panaudota | Šodien izmantots |
+| `copilot.workspace.Enable AI copilot for this organisation` | Enable AI copilot for this organisation | Luba selles organisatsioonis AI-kaaslane | Leisti AI asistentą šioje organizacijoje | Atļaut AI asistentu šajā organizācijā |
+| `copilot.workspace.Conversation` | Conversation | Vestlus | Pokalbis | Saruna |
+| `copilot.workspace.Message` | Message | Sõnum | Pranešimas | Ziņojums |
+| `copilot.workspace.Attach document` | Attach document | Manusta dokument | Pridėti dokumentą | Pievienot dokumentu |
+| `copilot.workspace.No attachment` | No attachment | Ilma manuseta | Be priedo | Bez pielikuma |
+| `copilot.workspace.Send message` | Send message | Saada sõnum | Siųsti pranešimą | Sūtīt ziņojumu |
+| `copilot.workspace.Copilot replied` | Copilot replied | Kaaslane vastas | Asistentas atsakė | Asistents atbildēja |
+| `copilot.workspace.No copilot messages yet.` | No copilot messages yet. | Kaaslase sõnumeid veel ei ole. | Asistento pranešimų dar nėra. | Asistenta ziņojumu vēl nav. |
+| `copilot.workspace.Input tokens` | Input tokens | Päringu tokenid | Užklausos tokenai | Pieprasījuma tokeni |
+| `copilot.workspace.Output tokens` | Output tokens | Vastuse tokenid | Atsako tokenai | Atbildes tokeni |
+| `copilot.workspace.Copilot usage` | Copilot usage | Kaaslase kasutus | Asistento naudojimas | Asistenta lietošana |
+| `copilot.workspace.Per-user daily usage counts every message, scan and token billed to this organisation.` | Per-user daily usage counts every message, scan and token billed to this organisation. | Päevane kasutus kasutaja kaupa hõlmab kõik selle organisatsiooni eest arvatud sõnumid, skaneerimised ja tokenid. | Kasdienis naudojimas naudotojui parodo visus pranešimus, skenavimus ir tokenus, kuriems ši organizacija moka. | Ikdienas lietošana uz lietotāju rāda visus ziņojumus, skenējumus un tokenus, ko izrakstām šai organizācijai. |
+| `copilot.workspace.Stage {rows} rows for import` | Stage {rows} rows for import | Lisa {rows} rida eelvaate importi | Įtraukti {rows} eilutes į importo peržiūrą | Iekļaut {rows} rindas importēšanas priekšskatījumā |
+| `copilot.workspace.Stage import rows` | Stage import rows | Impordi ridade eelvaade | Importo eilučių peržiūra | Importēšanas rindu priekšskatījums |
+| `copilot.workspace.Review these rows in Data import before they touch your books. Stage them now?` | Review these rows in Data import before they touch your books. Stage them now? | Vaata read andmeimpordis üle enne, kui need raamatupidamisesse jõuavad. Lisa kohe eelvaatesse? | Peržiūrėkite šias eilutes duomenų importe, kol jos nepateko į apskaitą. Įtraukti į peržiūrą dabar? | Pārskatiet šīs rindas datu importēšanā, pirms tās nonāk uzskaitē. Iekļaut priekšskatījumā tagad? |
+| `copilot.workspace.Import batch staged. Review it under Data import.` | Import batch staged. Review it under Data import. | Impordipartii lisati eelvaatesse. Vaata seda andmeimpordi all üle. | Importo paketas įtrauktas į peržiūrą. Peržiūrėkite jį duomenų importe. | Importēšanas pakete iekļauta priekšskatījumā. Pārskatiet to datu importēšanā. |
+
 ## 2026-10-12: Document appearance settings (parity slate P2 item 4)
 
 - Added rerun-safe migration `0028_document_settings`, one optional row per

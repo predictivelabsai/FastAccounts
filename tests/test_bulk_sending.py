@@ -239,7 +239,7 @@ def test_disconnected_mailer_is_per_invoice_failure(sending, monkeypatch):
 def test_locale_section_appended_and_merged(language):
     from web import i18n
     raw = json.loads((i18n.LOCALES_DIR / f'{language}.json').read_text(encoding='utf-8'))
-    assert list(raw)[-4:] == ['bulk_sending', 'reminder_rules', 'fx_rates', 'document_settings']
+    assert list(raw)[-(5):] == ['bulk_sending', 'reminder_rules', 'fx_rates', 'document_settings', 'copilot']
     assert set(raw['bulk_sending']) == {'nav', 'views', 'workspace'}
     for key, value in raw['bulk_sending']['workspace'].items():
         assert i18n.catalog(language)['workspace'][key] == value
