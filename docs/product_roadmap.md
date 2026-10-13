@@ -1079,3 +1079,51 @@ pending.
   exactly and reruns apply nothing. Compilation, JavaScript syntax, diff checks
   and append-only locale verification passed. Tests used synthetic data and
   intercepted browser requests on Python 3.14.6.
+
+
+## Fixed assets and automatic depreciation (2026-10-12)
+
+- [x] Add additive migration `0018_fixed_assets`, CI migration-list parity and
+  tenant-scoped asset groups, acquired assets, depreciation runs and per-asset
+  run details. Add fixed asset, accumulated depreciation and depreciation expense
+  roles in both seeded charts and existing organisations, preserving custom
+  accounts, occupied codes, existing roles and posted books. Default groups are
+  created at first use by the service: equipment 20%, computers 25%, other 10%,
+  with locale-appropriate names and monthly depreciation.
+- [x] Post paid acquisitions as debit fixed assets / credit bank. Snapshot each
+  asset's percentage, frequency and accounting accounts at acquisition so later
+  group configuration cannot rewrite its policy or posted history. Use Decimal
+  money and stable acquisition vouchers in an atomic event transaction.
+- [x] Depreciate at calendar month, quarter or year end, including a full first
+  acquisition period. Each charge is the rounded cumulative straight-line target
+  less earlier charges, capped at acquisition cost. This avoids repeated rounding
+  drift and makes the final period top up exactly to cost. Keep reproducible
+  zero-cent instalments without an empty ledger batch. One organisation/period/
+  frequency run posts one balanced immutable batch for all eligible assets, with
+  asset-tagged expense and accumulated depreciation lines. Reruns return the
+  recorded result; completed runs cannot absorb later acquisitions.
+- [x] Dispose through one balanced event batch, catching up unpaid scheduled
+  charges through the disposal calendar period. Full periods apply without daily
+  prorating. Debit accumulated depreciation and bank proceeds, credit original
+  cost, and post any explicit gain to sales or loss to operating expenses.
+  Preserve acquisition and run history; disposed assets receive no later charges.
+- [x] Add authorised tenant-scoped asset group, acquisition, disposal, run,
+  register and schedule API routes through the existing web API mount. Add the
+  fixed assets page, register totals per asset/group, runs and schedule lists,
+  and acquisition, group, disposal and manual-run dialogs. Append natural
+  English, Estonian, Lithuanian and Latvian copy; Estonian uses põhivarad,
+  põhivara grupp and kulumi arvutus.
+- [x] Extend the existing default-off automation worker with due depreciation,
+  retaining `FASTACCOUNTS_AUTOMATION_WORKER`. Each organisation failure is isolated
+  and exposes a safe scheduling error, without stopping other worker operations.
+- [ ] Accountant UAT, acquisition reversal, tax-specific depreciation, residual
+  values, revaluation, impairment, asset transfers and VAT/foreign-currency
+  acquisition treatment remain follow-ups. Initial acquisitions use the
+  organisation base currency and a bank payment. Disposal gain/loss uses existing
+  sales and operating-expense roles; dedicated disposal roles remain a follow-up.
+- Validation: full pytest suite on Python 3.12.14 passed: 677 passed and four
+  opt-in PostgreSQL tests skipped because `TEST_POSTGRES_URL` was not set.
+  Critical acquisition, group, depreciation and disposal browser flows passed
+  in all four locales. All 18 migrations match CI exactly and an immediate
+  rerun is empty. Compilation, JavaScript syntax, append-only locale and
+  staged diff/secret-pattern checks passed.

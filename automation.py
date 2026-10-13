@@ -1,4 +1,4 @@
-"""Scheduled invoicing, payment reminders and daily bank feeds."""
+"""Scheduled invoices, payment reminders, bank feeds and depreciation."""
 from __future__ import annotations
 
 import calendar
@@ -15,6 +15,7 @@ from psycopg import IntegrityError as PostgresIntegrityError
 from core_utils import audit, db_number, decimal, money, new_id, utc_now
 from database import Database, get_database
 from documents import DocumentService
+from fixed_assets import FixedAssetService
 from open_banking import OpenBankingService
 
 REMINDER_STAGES = ((0, -3), (1, 7), (2, 14))
@@ -334,7 +335,7 @@ class AutomationService:
         return results
 
     def worker_tick(self, *, today=None) -> dict:
-        result = {"runs": [], "reminders": [], "bank_feeds": [], "errors": []}
+        result = {"runs": [], "reminders": [], "bank_feeds": [], "depreciation": [], "errors": []}
         for org_id in self._organisations(None):
             for key, method in (("runs", self.run_due), ("reminders", self.process_reminders)):
                 try:
@@ -346,4 +347,9 @@ class AutomationService:
             except Exception:
                 result["errors"].append({"organisation_id": org_id, "operation": "bank_feeds",
                                          "error_message": "Bank feed scheduling failed"})
+            try:
+                result["depreciation"].extend(FixedAssetService(self.db).run_due(org_id, today=today, actor=AUTOMATION_ACTOR))
+            except Exception:
+                result["errors"].append({"organisation_id": org_id, "operation": "depreciation",
+                                         "error_message": "Depreciation scheduling failed"})
         return result

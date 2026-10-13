@@ -274,7 +274,7 @@ def test_populated_upgrade_preserves_posted_data(tmp_path, monkeypatch):
     ledger = db.rows("SELECT * FROM gl_entries ORDER BY id")
     audits = db.rows("SELECT * FROM audit_events ORDER BY id")
     monkeypatch.setattr(database, "MIGRATIONS", original)
-    assert db.migrate() == ["0007_automation", "0008_import_staging", "0009_local_accounts", "0010_tsd_export", "0011_account_mappings", "0012_external_gl", "0013_sync_review", "0014_sync_push", "0015_payment_orders", "0016_bank_feed_schedules", "0017_prepayments"]
+    assert db.migrate() == ["0007_automation", "0008_import_staging", "0009_local_accounts", "0010_tsd_export", "0011_account_mappings", "0012_external_gl", "0013_sync_review", "0014_sync_push", "0015_payment_orders", "0016_bank_feed_schedules", "0017_prepayments", "0018_fixed_assets"]
     assert db.migrate() == []
     current = DocumentService(db).invoice(invoice["id"])
     assert current.pop("reminders_disabled") == 0
@@ -396,3 +396,28 @@ def test_enabled_worker_stop_and_exception_recovery(monkeypatch):
     monkeypatch.setattr(AutomationService, "worker_tick", tick)
     thread = automation.start_automation_worker(poll_seconds=17)
     assert thread.daemon and thread.stop_event.is_set() and len(calls) == 2
+
+
+def test_worker_depreciation_failure_isolated_between_organisations(db, uk_org, ee_org, monkeypatch):
+    calls = []
+
+    class Assets:
+        def __init__(self, database):
+            assert database is db
+
+        def run_due(self, organisation_id, *, today=None, actor=None):
+            calls.append((organisation_id, today, actor))
+            if organisation_id == uk_org["id"]:
+                raise RuntimeError("Synthetic private accounting error")
+            return [{"id": "synthetic-run", "organisation_id": organisation_id, "status": "Posted"}]
+
+    monkeypatch.setattr(automation, "FixedAssetService", Assets)
+    service = AutomationService(db)
+    monkeypatch.setattr(service, "run_due", lambda **kwargs: [])
+    monkeypatch.setattr(service, "process_reminders", lambda **kwargs: [])
+    monkeypatch.setattr(automation.OpenBankingService, "pull_due", lambda *args, **kwargs: [])
+    result = service.worker_tick(today="2026-02-28")
+    assert set(calls) == {(org["id"], "2026-02-28", "automation") for org in [uk_org, ee_org]}
+    assert result["depreciation"] == [{"id": "synthetic-run", "organisation_id": ee_org["id"], "status": "Posted"}]
+    assert result["errors"] == [{"organisation_id": uk_org["id"], "operation": "depreciation",
+                                  "error_message": "Depreciation scheduling failed"}]

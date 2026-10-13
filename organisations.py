@@ -23,6 +23,8 @@ UK_ACCOUNTS = (
     ("1100", "Trade receivables", "Asset", "Debit", "AR"),
     ("1200", "VAT receivable", "Asset", "Debit", "INPUT_VAT"),
     ("1300", "Supplier prepayments", "Asset", "Debit", "SUPPLIER_PREPAYMENTS"),
+    ("1500", "Fixed assets", "Asset", "Debit", "FIXED_ASSETS"),
+    ("1550", "Accumulated depreciation", "Asset", "Credit", "ACCUMULATED_DEPRECIATION"),
     ("2000", "Trade payables", "Liability", "Credit", "AP"),
     ("2100", "VAT payable", "Liability", "Credit", "OUTPUT_VAT"),
     ("2200", "Customer prepayments", "Liability", "Credit", "CUSTOMER_PREPAYMENTS"),
@@ -31,6 +33,7 @@ UK_ACCOUNTS = (
     ("4000", "Sales", "Income", "Credit", "SALES"),
     ("5000", "Cost of sales", "Expense", "Debit", "COST_OF_SALES"),
     ("6000", "Operating expenses", "Expense", "Debit", "EXPENSE"),
+    ("6500", "Depreciation expense", "Expense", "Debit", "DEPRECIATION_EXPENSE"),
 )
 
 EE_ACCOUNTS = (
@@ -45,6 +48,8 @@ EE_ACCOUNTS = (
     ("1010", "Arvelduskonto", "Asset", "Debit", "BANK"),
     ("1210", "Nõuded ostjate vastu", "Asset", "Debit", "AR"),
     ("1310", "Ettemaksed tarnijatele", "Asset", "Debit", "SUPPLIER_PREPAYMENTS"),
+    ("1410", "Põhivara", "Asset", "Debit", "FIXED_ASSETS"),
+    ("1419", "Põhivara kulum", "Asset", "Credit", "ACCUMULATED_DEPRECIATION"),
     ("1510", "Sisendkäibemaks", "Asset", "Debit", "INPUT_VAT"),
     ("2010", "Võlad tarnijatele", "Liability", "Credit", "AP"),
     ("2110", "Klientide ettemaksed", "Liability", "Credit", "CUSTOMER_PREPAYMENTS"),
@@ -54,6 +59,7 @@ EE_ACCOUNTS = (
     ("4010", "Müügitulu", "Income", "Credit", "SALES"),
     ("5010", "Müüdud kaupade kulu", "Expense", "Debit", "COST_OF_SALES"),
     ("6010", "Tegevuskulud", "Expense", "Debit", "EXPENSE"),
+    ("6410", "Põhivara kulumi kulu", "Expense", "Debit", "DEPRECIATION_EXPENSE"),
 )
 
 UK_TAXES = (
