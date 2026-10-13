@@ -41,6 +41,7 @@ One line icon set for the site and the portal. The canonical paths live in
 | `exchange` | Exchange rates |
 | `tag` | Objects (analytical dimensions) |
 | `appearance` | Document appearance |
+| `assistant` | AI copilot (a spark with a plus) |
 | `document` | Generic record, empty states |
 | `plus`, `close`, `menu`, `chevron-down` | Interface controls |
 | `external` | Links that open another site |

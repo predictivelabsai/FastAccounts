@@ -145,6 +145,7 @@
     exchange: "M4 8h14 M14.5 4.5 18 8l-3.5 3.5 M20 16H6 M9.5 12.5 6 16l3.5 3.5",
     tag: "M3.5 11.5V4h7.5l9 9-7.5 7.5z M8 8.5h.01",
     appearance: "M4 7h9 M17 7h3 M4 17h3 M11 17h9 M15 4.5v5 M9 14.5v5",
+    assistant: "M11 3.5c.6 3.9 2.6 5.9 6.5 6.5-3.9.6-5.9 2.6-6.5 6.5-.6-3.9-2.6-5.9-6.5-6.5 3.9-.6 5.9-2.6 6.5-6.5z M18.5 15.5v5 M16 18h5",
     document: "M6 3h8l4 4v14H6z M14 3v4h4",
     plus: "M12 5v14 M5 12h14",
     close: "M6 6l12 12 M18 6 6 18",
@@ -161,6 +162,7 @@
     "fixed-assets": "asset", tax: "tax", payroll: "payroll", integrations: "link",
     imports: "import", "payment-methods": "card", "reminder-rules": "bell",
     "exchange-rates": "exchange", objects: "tag", documents: "appearance",
+    copilot: "assistant",
   };
   const icon = (name = "document") =>
     `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${ICONS[name] || ICONS.document}"/></svg>`;

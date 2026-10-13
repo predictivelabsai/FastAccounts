@@ -6,9 +6,11 @@ delivered.
 
 ## 2026-10-13: Brand icon set and integration tiles
 
-- Replaced the ten-icon portal set with one 28-icon line set (24px grid, 1.75
+- Replaced the ten-icon portal set with one 29-icon line set (24px grid, 1.75
   stroke, round caps). Every sidebar destination now has its own icon; fifteen
   previously fell back to the same document icon and payroll reused contacts.
+  The AI copilot gets its own icon, and its conversation is styled as brand
+  message cards.
 - Replaced text glyphs used as icons (☰, ✓, ✗, ↗) with the same line icons on
   public and portal pages, through `fs_icon()` on the server.
 - Redrew the FastAccounts-made integration tiles: neutral placeholders for
