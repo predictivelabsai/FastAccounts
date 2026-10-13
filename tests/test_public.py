@@ -21,7 +21,7 @@ def test_landing_has_primary_product_and_sign_in_routes():
     assert "Bookkeeping that stays clear" in rendered
     assert 'href="/integrations"' in rendered
     assert 'href="/login"' in rendered
-    assert "For your business or your clients" in rendered
+    assert "For your business or your clients" in BeautifulSoup(rendered, "html.parser").select_one("#hero h1").get_text()
 
 
 @pytest.mark.parametrize("lang", ["en", "et", "lv", "lt"])
@@ -100,9 +100,11 @@ def test_public_pages_share_accessible_localized_shell(render, current, lang):
     assert page.html["lang"] == lang
     assert page.select_one('.fs-skip[href="#main-content"]')
     assert page.select_one("main#main-content")
-    assert page.select_one(".fs-nav .fs-brand").get_text() == "FFastAccounts"
-    assert page.select_one(".fs-mark").get_text() == "F"
-    assert not page.select_one(".fs-mark svg")
+    assert page.select_one(".fs-nav .fs-brand").get_text() == "FastAccounts"
+    mark = page.select_one(".fs-brand img.fs-mark")
+    assert mark["src"] == "/static/brand/fastaccounts-mark.svg"
+    assert mark["alt"] == ""
+    assert mark["width"] == mark["height"] == "32"
     assert len(page.select("#language-menu-button")) == 1
     assert len(page.select("#language-menu")) == 1
     assert len(page.select('[role="menuitem"]')) == 4
@@ -123,7 +125,7 @@ def test_public_pages_share_accessible_localized_shell(render, current, lang):
     ("/privacy", privacy_page, ("Privacy", "Current subprocessors", "no analytics or advertising SDK")),
     ("/about", about_page, ("Predictive Labs Ltd", "Joosep Laats", "not an ERP")),
     ("/contact", contact_page, ("Sales", "Support", "Data protection")),
-    ("/terms", terms_page, ("Terms — draft", "not final customer terms", "MIT License")),
+    ("/terms", terms_page, ("Terms: draft", "not final customer terms", "MIT License")),
     ("/roadmap", roadmap_page, ("Available", "Review required", "Pilot", "Planned", "0.3.0–0.4.0", "2026-10-09")),
     ("/changelog", changelog_page, ("Changelog", "0.2.1", "0.3.0", "0.4.0", "2026-10-09")),
 ])
@@ -358,12 +360,14 @@ def test_public_violet_tokens_and_new_locale_keys():
     from web.public import PUBLIC_CSS
 
     assert FASTPRODUCT.accent == "#7c3aed"
-    assert FASTPRODUCT.accent_strong == "#5b21b6"
-    for token in ("--on-accent:#ffffff", "--ink:#14062b", "--paper:#faf9fc",
-                  "--text:#1c1333", "--muted:#6b6580", "--line:#e8e5f0"):
+    assert FASTPRODUCT.accent_strong == "#6526d6"
+    for token in ("--on-accent: #ffffff", "--ink: #150a2c", "--bg: #f7f6fb",
+                  "--text: #1a1230", "--text-muted: #5f5875", "--line: #e3e0ec"):
         assert token in DESIGN_CSS
     assert "#c2f24f" not in DESIGN_CSS + PUBLIC_CSS
-    assert "linear-gradient(135deg,#6d28d9 0%,#7c3aed 45%,#4f46e5 100%)" in PUBLIC_CSS
+    assert "repeating-linear-gradient(to bottom" in PUBLIC_CSS
+    assert "radial-gradient" not in PUBLIC_CSS
+    assert "linear-gradient(135deg" not in PUBLIC_CSS
     keys = ["process_title", "process_body", "comparison_title", "old_title", "new_title",
             "stats_label", "stats_languages", "stats_languages_value", "stats_markets",
             "stats_markets_value"]

@@ -4,6 +4,48 @@ Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as
 delivered.
 
+## 2026-10-13: Books that balance brand system
+
+- Applied the canonical brand tokens to the public site and signed-in portal,
+  including system dark mode and explicit light/dark theme selectors. Kept
+  sibling-product accent overrides and compatible legacy token aliases.
+- Replaced decorative gradients with flat surfaces, added ledger ruling and
+  a double-rule headline, and retained the floating product frame. Unified
+  controls, cards, status colours, typography, focus rings and tabular amounts.
+- Used the primary mark in public and portal lockups, onboarding and favicon;
+  loaded the self-hosted fonts in the portal and added theme-colour metadata.
+  Styled sidebar footer links and existing cash-flow and asset total rows.
+  Long integration-status rows wrap within the mobile content gutter.
+- Added the engineer brand index, token/asset contracts and offline browser
+  checks for light/dark public pages, mobile navigation and portal surfaces.
+  Visible em dashes were replaced without changing translation lookup keys.
+- Validation: full requested venv `python -m pytest -q` from the brand worktree:
+  1321 passed, 4 skipped, 2 existing warnings in 1279.00s (0:21:18).
+  The four opt-in PostgreSQL tests were skipped because `TEST_POSTGRES_URL`
+  was unset. All browser tests passed. The focused brand and integrations
+  checks passed: 9 passed, 1 existing warning in 4.94s. JavaScript syntax,
+  diff checks and desktop light/dark visual review passed. Dotenv loading was
+  disabled; the run used an isolated, migrated synthetic test database and
+  no live provider calls.
+- Follow-up screenshot polish: reduced hero ruling to 4.5% opacity and kept
+  the double rule below a short, unbroken final phrase in all four languages.
+  Public language labels now use EN, ET, LV and LT with full accessible names.
+  Sidebar footer links use matching rows and line icons; empty navigation
+  labels are hidden. Country tags stay compact, ink shell borders separate
+  dark surfaces, and a closed mobile drawer no longer casts a stray shadow.
+- Follow-up validation: the full requested `python -m pytest -q` run
+  completed with 1326 passed, 4 skipped, 1 failed and 2 existing warnings in
+  1637.58s. Its sole failure was the old language-switcher accessible-name
+  assertion, corrected to include the full language name. All 11 localisation
+  tests then passed (1 existing warning, 2.20s); final `pytest -q --lf` passed
+  (1 passed, 14 deselected, 1 existing warning, 1.85s). The focused public/brand
+  checks passed (67 passed, 1 existing warning, 9.66s), including all four
+  languages at 1440px and 390px and both portal themes. JavaScript syntax and
+  diff checks passed. PostgreSQL skips were due to unset `TEST_POSTGRES_URL`.
+  The full suite was not repeated after the assertion-only correction.
+- Product scope and roadmap status are unchanged. No accounting workflows,
+  migration logic or document appearance settings changed.
+
 ## 2026-10-12: Document appearance settings (parity slate P2 item 4)
 
 - Added rerun-safe migration `0028_document_settings`, one optional row per

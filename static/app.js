@@ -108,7 +108,7 @@
   };
   const money = (v, c) =>
     v == null
-      ? "—"
+      ? "–"
       : new Intl.NumberFormat(lang === "et" ? "et-EE" : "en-GB", {
           style: "currency",
           currency: c || org?.base_currency || "EUR",
@@ -118,7 +118,7 @@
       ? new Intl.DateTimeFormat(lang === "et" ? "et-EE" : "en-GB").format(
           new Date(String(v).slice(0, 10) + "T12:00:00"),
         )
-      : "—";
+      : "–";
   const num = (v) => new Intl.NumberFormat(lang).format(Number(v || 0)),
     path = (s) => `/organisations/${encodeURIComponent(org.id)}${s}`;
   const icon = (name = "document") => {
@@ -132,6 +132,8 @@
       plus: "M12 5v14 M5 12h14",
       close: "M6 6l12 12 M6 18L18 6",
       menu: "M4 6h16 M4 12h16 M4 18h16",
+      external: "M14 3h7v7 M21 3L10 14 M10 3H3v18h18v-7",
+      shield: "M12 3l8 3v6c0 5-8 9-8 9s-8-4-8-9V6z M8 12l3 3 5-6",
     };
     return `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${p[name] || p.document}"/></svg>`;
   };
@@ -173,7 +175,7 @@
   };
   const td = (v, cls = "") => `<td class="${cls}">${v}</td>`,
     cash = (v, c) => td(esc(money(v, c)), "numeric"),
-    row = (cells) => `<tr>${cells.join("")}</tr>`;
+    row = (cells, cls = "") => `<tr${cls ? ` class="${cls}"` : ""}>${cells.join("")}</tr>`;
   const empty = (title = "Nothing here yet", action = "") =>
     `<div class="empty">${icon()}<h3>${tr(title)}</h3><p>${tr("Your records will appear here as you work.")}</p>${action}</div>`;
   const table = (heads, rows, action = "") =>
@@ -502,7 +504,7 @@
     wireOrganisation(d, () => closeDialog(d));
   }
   function onboarding() {
-    content.innerHTML = `<div class="onboarding"><section><div class="large-mark">F</div><h1>${tr("Every client. One clear workspace.")}</h1><p>${tr("Keep client books, bank reviews and payroll together.")}</p><ul><li>${tr("Separate books for every organisation")}</li><li>${tr("Clear approvals before anything posts")}</li><li>${tr("UK and Estonian accounting in one place")}</li></ul></section><section class="card"><h2>${tr("Create your first organisation")}</h2>${form(organisationFields(), "Create books")}</section></div>`;
+    content.innerHTML = `<div class="onboarding"><section><img class="large-mark" src="/static/brand/fastaccounts-mark.svg" alt="" width="48" height="48"><h1>${tr("Every client. One clear workspace.")}</h1><p>${tr("Keep client books, bank reviews and payroll together.")}</p><ul><li>${tr("Separate books for every organisation")}</li><li>${tr("Clear approvals before anything posts")}</li><li>${tr("UK and Estonian accounting in one place")}</li></ul></section><section class="card"><h2>${tr("Create your first organisation")}</h2>${form(organisationFields(), "Create books")}</section></div>`;
     content.querySelector("[data-action=cancel]").remove();
     wireOrganisation(content, () => {});
   }
@@ -942,7 +944,7 @@
             td(esc(x.contact_name)), td(esc(x.name)),
             td(esc(x.interval_kind === "custom_days" ? t("Every {days} days").replace("{days}", num(x.interval_days)) : t(intervals[x.interval_kind]))),
             td(date(x.next_run_date)), td(date(x.end_date)),
-            td(x.auto_email ? `<span aria-label="${tr("Auto-email")}">✓</span>` : "—"),
+            td(x.auto_email ? `<span aria-label="${tr("Auto-email")}">✓</span>` : "–"),
             td(pill(x.active ? "Active" : "Paused")),
             td(button(x.active ? "Pause" : "Resume", "toggleSchedule", false, `data-id="${esc(x.id)}"`) +
               button("Run now", "runSchedule", false, `data-id="${esc(x.id)}" ${!x.active || x.next_run_date > today() ? "disabled" : ""}`) +
@@ -1006,7 +1008,7 @@
           const schedule = await api(c.url(`/invoice-schedules/${b.dataset.id}`));
           if (org?.id !== c.oid || location.hash !== "#recurring") return;
           dialog("History", table(["Date", "Number", "Status", "Error"], schedule.runs.map((x) => row([
-            td(date(x.run_date)), td(esc(x.invoice_number || "—")), td(pill(x.status)), td(tr(x.error_message || "—")),
+            td(date(x.run_date)), td(esc(x.invoice_number || "–")), td(pill(x.status)), td(tr(x.error_message || "–")),
           ]))));
         },
         sendReminder: async (b) => {
@@ -1172,9 +1174,9 @@
               row([
                 td(esc(x.name)),
                 td(pill(x.contact_type)),
-                td(esc(x.email || "—")),
+                td(esc(x.email || "–")),
                 td(esc(x.country_code)),
-                td(esc(x.vat_no || "—")),
+                td(esc(x.vat_no || "–")),
                 td(button("Statement of account", "statement", false, `data-id="${x.id}"`) +
                    button("Outstanding prepayments", "contactPrepayments", false, `data-id="${esc(x.id)}"`)),
               ]),
@@ -1270,7 +1272,7 @@
         `<section class="section"><h2>${tr("Asset group totals")}</h2><p class="muted">${tr("Disposed assets retain historical cost and depreciation. Group totals include this history; carrying value is zero after disposal.")}</p>${table(
           ["Asset group", "Annual depreciation percentage", "Frequency", "Acquisition cost", "Accumulated depreciation", "Carrying value"],
           [...(register.groups || []).map((x) => row([td(esc(x.name || x.group_name)), td(esc(num(x.annual_percentage)) + "%"), td(tr(assetFrequencyLabel(x.frequency))), ...financialCells(x)])),
-            row([td(`<strong>${tr("Total")}</strong>`), td(""), td(""), ...financialCells(totals)])])}</section>` +
+            row([td(`<strong>${tr("Total")}</strong>`), td(""), td(""), ...financialCells(totals)], "total")])}</section>` +
         `<section class="section"><h2>${tr("Depreciation schedule")}</h2>${table(
           ["Asset", "Frequency", "Next depreciation date", "Depreciation amount"],
           schedule.map((x) => row([td(esc(x.name || x.asset_name)), td(tr(assetFrequencyLabel(x.frequency))),
@@ -1954,7 +1956,7 @@
         payload.name ||
         [payload.first_name, payload.last_name].filter(Boolean).join(" ") ||
         record.external_id ||
-        "—",
+        "–",
       detail = [payload.email, payload.personal_id]
         .filter(Boolean)
         .map(esc)
@@ -1964,7 +1966,7 @@
       td(`<strong>${esc(displayName)}</strong>${detail ? `<small>${detail}</small>` : ""}<details class="payload-details"><summary>${tr("View source record")}</summary><pre>${esc(JSON.stringify(payload, null, 2))}</pre></details>`),
       td(pill(record.status)),
       td(esc(record.matched_local_employee_name || t("No local match"))),
-      td(record.review_note ? esc(translateError(record.review_note)) : "—"),
+      td(record.review_note ? esc(translateError(record.review_note)) : "–"),
       td(
         eligible
           ? `<div class="decision-options" role="group" aria-label="${tr("Decision")}"><label class="check"><input type="checkbox" data-decision="apply" data-id="${esc(record.id)}">${tr(record.status === "Failed" ? "Retry apply" : "Approve")}</label><label class="check"><input type="checkbox" data-decision="reject" data-id="${esc(record.id)}">${tr("Reject")}</label></div>`
@@ -2212,8 +2214,8 @@
           row([td(tr("Opening balance")), td(""), td(""), cash(data.opening_balance, currency)]),
           ...Object.entries(data.buckets).map(([key, x]) => row([td(tr(cashFlowNames[key])),
             cash(x.inflows, currency), cash(x.outflows, currency), cash(x.net, currency)])),
-          row([td(tr("Total")), cash(data.inflows, currency), cash(data.outflows, currency), td("")]),
-          row([td(tr("Closing balance")), td(""), td(""), cash(data.closing_balance, currency)])]) +
+          row([td(tr("Total")), cash(data.inflows, currency), cash(data.outflows, currency), td("")], "total"),
+          row([td(tr("Closing balance")), td(""), td(""), cash(data.closing_balance, currency)], "total")]) +
         `<h3>${tr("Liquid account detail")}</h3>` + data.accounts.map((a) =>
           `<section class="section"><h4>${esc(a.code)} ${esc(a.name)}</h4><p>${tr("Opening balance")}: ${esc(money(a.opening_balance, currency))} · ${tr("Closing balance")}: ${esc(money(a.closing_balance, currency))}</p>` +
           table(["Date", "Reference", "Memo", "Contact", "Classification", ["Amount"]], a.movements.map((x) =>
@@ -3572,6 +3574,15 @@
       ),
     ),
   );
+  document.querySelectorAll(".app-side-link[data-icon]").forEach((a) =>
+    a.insertAdjacentHTML("afterbegin", icon(a.dataset.icon)),
+  );
+  document.querySelectorAll(".app-nav-list > div").forEach((group) => {
+    const hasVisibleItems = [...group.querySelectorAll(".app-nav")].some(
+      (a) => !a.hidden && getComputedStyle(a).display !== "none",
+    );
+    group.querySelector(".nav-group").hidden = !hasVisibleItems;
+  });
   boot().catch((e) => {
     toast(e.message, "error");
     content.innerHTML = page(

@@ -227,7 +227,10 @@ def test_workspace_integration_connection_and_review_flow(monkeypatch):
         ).to_be_visible()
         assert page.evaluate(
             "document.documentElement.scrollWidth <= document.documentElement.clientWidth"
-        )
+        ), page.evaluate("""() => [...document.querySelectorAll('#app-content *')]
+            .filter(el => el.getBoundingClientRect().right > innerWidth)
+            .map(el => ({tag: el.tagName, cls: el.className, text: el.textContent.slice(0, 80),
+                right: el.getBoundingClientRect().right}))""")
         page.set_viewport_size({"width": 1440, "height": 1000})
         file_import = page.locator('.integration-provider[data-provider="file_import"]')
         playwright.expect(file_import).to_contain_text("No connection needed")

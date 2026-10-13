@@ -9,8 +9,8 @@ from typing import Any
 
 DEFAULT_LANG = "en"
 LANGUAGES: dict[str, dict[str, str]] = {
-    "en": {"name": "English", "native": "English", "flag": "🇬🇧", "code": "GB"},
-    "et": {"name": "Estonian", "native": "Eesti", "flag": "🇪🇪", "code": "EE"},
+    "en": {"name": "English", "native": "English", "flag": "🇬🇧", "code": "EN"},
+    "et": {"name": "Estonian", "native": "Eesti", "flag": "🇪🇪", "code": "ET"},
     "lv": {"name": "Latvian", "native": "Latviešu", "flag": "🇱🇻", "code": "LV"},
     "lt": {"name": "Lithuanian", "native": "Lietuvių", "flag": "🇱🇹", "code": "LT"},
 }
