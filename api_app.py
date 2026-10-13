@@ -23,6 +23,8 @@ from database import get_database
 from documents import DocumentService, EInvoiceAlreadyImported
 from bulk_sending import BulkSendingService, MAX_BULK_INVOICES
 from invoice_list import InvoiceListService, validate_list_dates
+from csv_exports import CsvExportService
+from list_export_repository import ListExportRepository
 from quotes import QuoteService
 from periodisation import PeriodisationService
 from payment_links import PaymentLinkService
@@ -627,7 +629,14 @@ def list_tax_codes(organisation_id: str, user: User = Depends(current_user)):
 @api.get("/organisations/{organisation_id}/contacts")
 def list_contacts(organisation_id: str, user: User = Depends(current_user)):
     _require(organisation_id, user, {"owner", "administrator", "accountant", "approver", "viewer"})
-    return get_database().rows("SELECT * FROM contacts WHERE organisation_id=? ORDER BY name", (organisation_id,))
+    return ListExportRepository(get_database()).contacts(organisation_id)
+
+
+@api.get('/organisations/{organisation_id}/contacts/export.csv')
+def export_contacts(organisation_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, {'owner', 'administrator', 'accountant', 'approver', 'viewer'})
+    return Response(CsvExportService().export(organisation_id, 'contacts'), media_type='text/csv',
+                    headers={'Content-Disposition': 'attachment; filename="contacts.csv"'})
 
 
 class MasterDataImportIn(BaseModel):
@@ -705,6 +714,13 @@ def cancel_purchase_schedule(organisation_id: str, schedule_id: str, user: User 
 def list_quotes(organisation_id: str, user: User = Depends(current_user)):
     _require(organisation_id, user, {"owner", "administrator", "accountant", "approver", "viewer"})
     return QuoteService().list(organisation_id)
+
+
+@api.get('/organisations/{organisation_id}/quotes/export.csv')
+def export_quotes(organisation_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, {'owner', 'administrator', 'accountant', 'approver', 'viewer'})
+    return Response(CsvExportService().export(organisation_id, 'quotes'), media_type='text/csv',
+                    headers={'Content-Disposition': 'attachment; filename="quotes.csv"'})
 
 
 @api.get("/organisations/{organisation_id}/quotes/{quote_id}")
@@ -876,6 +892,13 @@ def get_document_logo(organisation_id: str, user: User = Depends(current_user)):
 def list_objects(organisation_id: str, user: User = Depends(current_user)):
     _require(organisation_id, user, {'owner', 'administrator', 'accountant', 'approver', 'viewer'})
     return ObjectService().list(organisation_id)
+
+
+@api.get('/organisations/{organisation_id}/objects/export.csv')
+def export_objects(organisation_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, {'owner', 'administrator', 'accountant', 'approver', 'viewer'})
+    return Response(CsvExportService().export(organisation_id, 'objects'), media_type='text/csv',
+                    headers={'Content-Disposition': 'attachment; filename="objects.csv"'})
 
 
 @api.get('/organisations/{organisation_id}/objects/{object_id}')
@@ -1240,9 +1263,14 @@ async def import_bank(organisation_id: str, bank_account_id: str,
 @api.get("/organisations/{organisation_id}/bank-transactions")
 def bank_transactions(organisation_id: str, user: User = Depends(current_user)):
     _require(organisation_id, user, {"owner", "administrator", "accountant", "approver", "viewer"})
-    return get_database().rows(
-        "SELECT * FROM bank_transactions WHERE organisation_id=? ORDER BY booking_date DESC", (organisation_id,)
-    )
+    return ListExportRepository(get_database()).bank_transactions(organisation_id)
+
+
+@api.get('/organisations/{organisation_id}/bank-transactions/export.csv')
+def export_bank_transactions(organisation_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, {'owner', 'administrator', 'accountant', 'approver', 'viewer'})
+    return Response(CsvExportService().export(organisation_id, 'bank-transactions'), media_type='text/csv',
+                    headers={'Content-Disposition': 'attachment; filename="bank-transactions.csv"'})
 
 
 @api.post("/organisations/{organisation_id}/bank-transactions/{transaction_id}/suggest")
@@ -1299,6 +1327,20 @@ def export_tax(organisation_id: str, return_id: str, user: User = Depends(curren
     _object_in_org("vat_returns", return_id, organisation_id)
     return Response(TaxService().export_csv(return_id, actor=user.email), media_type="text/csv",
                     headers={"Content-Disposition": f"attachment; filename=vat-{return_id}.csv"})
+
+
+@api.get('/organisations/{organisation_id}/reports/{tab}.csv')
+def export_report(organisation_id: str, tab: str, start: str | None = None, end: str | None = None,
+                  as_at: str | None = None, date_from: str | None = None, date_to: str | None = None,
+                  object_id: str | None = None, user: User = Depends(current_user)):
+    roles = {'owner', 'administrator', 'accountant', 'viewer'}
+    if tab in {'trial-balance', 'profit-and-loss', 'balance-sheet', 'cash-flow'}:
+        roles.add('approver')
+    _require(organisation_id, user, roles)
+    content = CsvExportService().report(organisation_id, tab, start=start, end=end, as_at=as_at,
+                                       date_from=date_from, date_to=date_to, object_id=object_id)
+    return Response(content, media_type='text/csv',
+                    headers={'Content-Disposition': f'attachment; filename="{tab}.csv"'})
 
 
 @api.get("/organisations/{organisation_id}/reports/trial-balance")
