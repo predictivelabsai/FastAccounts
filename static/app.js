@@ -1235,7 +1235,7 @@
       catalog.integrations?.items?.[item.key]?.direction || item.direction || "",
     integrationUrl = (c, provider, suffix = "") =>
       c.url(`/integrations/${encodeURIComponent(provider)}${suffix}`),
-    readyProviderOrder = ["file_import", "fasthr", "quickbooks", "xero", "merit"];
+    readyProviderOrder = ["file_import", "fasthr", "quickbooks", "xero", "merit", "open_banking"];
 
   function integrationCard(c, item, connection) {
     const provider = item.key,
@@ -1253,7 +1253,13 @@
             ? button("Recent runs", "integrationRuns", false, `data-provider="${esc(provider)}"`) +
               button("Run employee import", "runEmployeeImport", true, `data-provider="${esc(provider)}" ${canImport ? "" : `disabled title="${tr("Test the connection before importing.")}"`}`)
             : "");
-    return `<article class="card integration-provider" data-provider="${esc(provider)}"><div class="integration-provider-head"><img src="${esc(item.logo)}" alt="${esc(name)}"><div><h2>${esc(name)}</h2><div class="integration-statuses"><span>${tr("Registry status")}: ${pill(item.registry_status)}</span><span class="connection-status">${tr("Connection status")}: ${pill(status)}</span></div></div></div><p>${esc(integrationDescription(item))}</p><p class="integration-direction">${esc(integrationDirection(item))}</p><div class="integration-actions">${actions}</div></article>`;
+    const bankActions = provider === "open_banking"
+      ? button("Configure", "configureIntegration", false, `data-provider="open_banking"`) +
+        (connection ? button("Disconnect", "disconnectIntegration", false, `data-provider="open_banking"`) : "") +
+        button("Connect bank", "connectBank", true, connection && status !== "Disconnected" ? "" : "disabled") +
+        (connection?.config?.requisition_id && status !== "Disconnected" ? button("I've approved at the bank", "completeBankLink") : "")
+      : actions;
+    return `<article class="card integration-provider" data-provider="${esc(provider)}"><div class="integration-provider-head"><img src="${esc(item.logo)}" alt="${esc(name)}"><div><h2>${esc(name)}</h2><div class="integration-statuses"><span>${tr("Registry status")}: ${pill(item.registry_status)}</span><span class="connection-status">${tr("Connection status")}: ${pill(status)}</span></div></div></div><p>${esc(integrationDescription(item))}</p><p class="integration-direction">${esc(integrationDirection(item))}</p><div class="integration-actions">${bankActions}</div>${provider === "open_banking" && status === "Connected" ? `<div class="bank-feed-accounts" aria-live="polite"><p>${tr("Loading bank accounts")}</p></div>` : ""}</article>`;
   }
 
   function plannedIntegration(item) {
@@ -1330,6 +1336,12 @@
         catalogue.find((entry) => entry.key === button.dataset.provider),
       findConnection = (button) => byProvider.get(button.dataset.provider);
     bindActions(content, {
+      connectBank: () => bankConsentDialog(c),
+      completeBankLink: async () => {
+        const connection = await post(integrationUrl(c, "open_banking", "/complete-link"));
+        toast(t(connection.status === "Connected" ? "Bank consent completed" : "Bank consent is not complete. Approve at the bank and try again."));
+        await render();
+      },
       configureIntegration: (button) =>
         integrationDialog(c, findItem(button), findConnection(button)),
       testIntegration: (button) =>
@@ -1364,6 +1376,76 @@
         location.hash = `integrations/runs/${encodeURIComponent(button.dataset.provider)}`;
       },
     });
+    const target = content.querySelector(".bank-feed-accounts");
+    if (target) await bankFeedAccounts(c, target);
+  }
+
+  async function bankConsentDialog(c) {
+    const country = org.country_code === "EE" ? "EE" : "GB",
+      institutions = await api(integrationUrl(c, "open_banking", `/institutions?country=${country}`)),
+      d = dialog("Connect bank", form(
+        select("Bank institution", "institution_id", [["", t("Choose a bank")], ...institutions.map((bank) => [bank.id, bank.name])]),
+        "Connect bank"));
+    d.querySelector('[name="institution_id"]').required = true;
+    bindForm(d, async (data) => {
+      // Open during the submit gesture so the bank consent tab is not blocked.
+      const bankTab = window.open("about:blank", "_blank");
+      if (bankTab) bankTab.opener = null;
+      try {
+        const result = await post(integrationUrl(c, "open_banking", "/link"), {
+          institution_id: data.institution_id,
+          redirect_url: `${location.origin}${location.pathname}#integrations`,
+        });
+        const url = new URL(result.link);
+        if (url.protocol !== "https:") throw new Error(t("Invalid bank consent link"));
+        closeDialog(d);
+        await render();
+        const card = content.querySelector('.integration-provider[data-provider="open_banking"] .integration-actions');
+        if (card) card.insertAdjacentHTML("beforeend", `<a class="button" href="${esc(url.href)}" target="_blank" rel="noopener noreferrer">${tr("Open bank consent")}</a>`);
+        if (bankTab) bankTab.location.href = url.href;
+      } catch (error) {
+        bankTab?.close();
+        throw error;
+      }
+    });
+  }
+
+  async function bankFeedAccounts(c, target) {
+    try {
+      const [accounts, banks] = await Promise.all([
+        api(integrationUrl(c, "open_banking", "/accounts")), api(c.url("/bank-accounts")),
+      ]);
+      if (!target.isConnected) return;
+      target.innerHTML = `<h3>${tr("Linked bank accounts")}</h3>` + (accounts.length ? accounts.map((account) =>
+        `<div class="section"><p>${esc(account.iban || account.gocardless_account_id)}</p><p class="muted">${tr("Balances")}: ${account.balances.map((balance) => esc(`${balance.balanceAmount?.amount || ""} ${balance.balanceAmount?.currency || ""} (${balance.balanceType || ""})`)).join(" · ")}</p>${account.bank_account_id
+          ? `<p>${esc(banks.find((bank) => bank.id === account.bank_account_id)?.name || "")}</p>${button("Pull transactions", "pullBankTransactions", true, `data-account="${esc(account.gocardless_account_id)}"`)}`
+          : `${button("Link bank account", "mapBankAccount", false, `data-account="${esc(account.gocardless_account_id)}"`)}<p class="muted">${tr("Link an existing bank account before pulling transactions.")}</p>`}</div>`).join("")
+        : `<p>${tr("No bank accounts returned. Complete bank consent first.")}</p>`);
+      bindActions(target, {
+        mapBankAccount: (button) => {
+          const d = dialog("Link bank account", form(select("Bank account", "bank_account_id",
+            [["", t("Choose a bank account")], ...banks.map((bank) => [bank.id, `${bank.name} (${bank.currency})`])])));
+          d.querySelector('[name="bank_account_id"]').required = true;
+          bindForm(d, async (data) => {
+            await post(integrationUrl(c, "open_banking", "/link-account"), {
+              gocardless_account_id: button.dataset.account, bank_account_id: data.bank_account_id,
+            });
+            closeDialog(d);
+            await bankFeedAccounts(c, target);
+          });
+        },
+        pullBankTransactions: async (button) => {
+          button.disabled = true;
+          try {
+            const summary = await post(integrationUrl(c, "open_banking", "/pull"), {gocardless_account_id: button.dataset.account});
+            toast(t("Bank transactions imported: {imported}; skipped: {skipped}")
+              .replace("{imported}", num(summary.imported)).replace("{skipped}", num(summary.skipped)));
+          } finally { button.disabled = false; }
+        },
+      });
+    } catch (error) {
+      if (target.isConnected) target.innerHTML = `<p class="notice" role="alert">${esc(error.message)}</p>`;
+    }
   }
 
   function fileImportDialog(c, item) {
@@ -1446,7 +1528,7 @@
             integrationUrl(c, item.key, "/test"),
             { credentials: payload.credentials, config: payload.config },
           );
-          const status = checked.ok && checked.live ? "Connected" : "Error";
+          const status = checked.ok && checked.live ? (item.key === "open_banking" ? "Configured" : "Connected") : "Error";
           result.innerHTML = `<div class="test-result ${checked.ok && checked.live ? "success" : "danger"}"><div>${pill(status)}<strong>${tr(checked.live ? "Live connection" : "Configuration check")}</strong></div><p>${esc(translateError(checked.message))}</p></div>`;
           await refreshIntegrationStatus(c, item.key, connection);
         } catch (error) {

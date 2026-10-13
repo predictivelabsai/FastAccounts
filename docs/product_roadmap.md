@@ -929,3 +929,26 @@ pending.
   XSD-live-verified. Review supplier registry collisions and zero-rate or
   reverse-charge tax-code choices before approval. See
   [`e-invoices.md`](e-invoices.md) for schema details and intake boundaries.
+
+## PR4: GoCardless Bank Account Data bank feed (2026-10-11)
+
+- Implemented a read-only bank feed with encrypted user secrets, a bank consent
+  link, consent completion and tenant-scoped mapping to existing bank accounts.
+- Manual pulls import the last 90 days of booked transactions through the existing
+  source-hash and row-fingerprint deduplication path. Pending transactions are
+  excluded. Amounts retain their signs, and reconciliation remains review-first.
+- The integration card supports bank selection, consent completion, account
+  balances, local account mapping and per-account pulls in all four locales.
+- No schema migration or background worker. Scheduled pulls remain a follow-up.
+- Consent may last around 180 days depending on the bank and agreement; re-link
+  to renew it. GoCardless's documented default agreement currently gives 90 days
+  of account access. API access tokens expire separately, typically after one day,
+  and the adapter fetches them lazily and retries once after HTTP 401.
+- Acceptance: fake-provider and MockTransport tests cover consent state, encrypted
+  credentials, request contracts, imports, duplicates, routes and tenant isolation.
+  Live bank consent UAT remains pending.
+- Validation: `python -m pytest tests/ -q` passed with 533 tests and three optional
+  PostgreSQL skips. `python -m compileall -q .`, JavaScript syntax and diff checks
+  passed. The existing integration browser regression includes the seventh
+  connectable card; no new bank-consent browser test was added. Commands ran on
+  installed Python 3.14 because Python 3.12 is unavailable on this machine.

@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field, field_validator
 import integrations
 import version
 from automation import AutomationService, email_configured, email_status
+from open_banking import OpenBankingService
 from banking import BankingService
 from connectors.registry import provider_metadata
 from database import get_database
@@ -819,6 +820,55 @@ def integration_catalogue(user: User = Depends(current_user)):
 def organisation_integrations(organisation_id: str, user: User = Depends(current_user)):
     _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
     return IntegrationService().connections(organisation_id)
+
+
+class BankLinkIn(BaseModel):
+    institution_id: str
+    redirect_url: str
+
+
+class BankFeedAccountIn(BaseModel):
+    gocardless_account_id: str
+
+
+class BankFeedMappingIn(BankFeedAccountIn):
+    bank_account_id: str
+
+
+@api.post("/organisations/{organisation_id}/integrations/open_banking/link")
+def open_banking_link(organisation_id: str, payload: BankLinkIn, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return OpenBankingService().start_link(organisation_id, actor=user.email, **payload.model_dump())
+
+
+@api.post("/organisations/{organisation_id}/integrations/open_banking/complete-link")
+def open_banking_complete(organisation_id: str, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return OpenBankingService().complete_link(organisation_id, actor=user.email)
+
+
+@api.get("/organisations/{organisation_id}/integrations/open_banking/institutions")
+def open_banking_institutions(organisation_id: str, country: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {"viewer"})
+    return OpenBankingService().institutions(country, organisation_id=organisation_id)
+
+
+@api.get("/organisations/{organisation_id}/integrations/open_banking/accounts")
+def open_banking_accounts(organisation_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {"viewer"})
+    return OpenBankingService().accounts(organisation_id)
+
+
+@api.post("/organisations/{organisation_id}/integrations/open_banking/link-account")
+def open_banking_mapping(organisation_id: str, payload: BankFeedMappingIn, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return OpenBankingService().link_account(organisation_id, actor=user.email, **payload.model_dump())
+
+
+@api.post("/organisations/{organisation_id}/integrations/open_banking/pull")
+def open_banking_pull(organisation_id: str, payload: BankFeedAccountIn, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return OpenBankingService().pull(organisation_id, actor=user.email, **payload.model_dump())
 
 
 @api.post("/organisations/{organisation_id}/integrations/{provider}")

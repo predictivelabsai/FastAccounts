@@ -12,6 +12,7 @@ from .providers import (
     BambooHRProvider,
     FastHRProvider,
     MeritProvider,
+    OpenBankingProvider,
     SmartAccountsProvider,
     PersonioProvider,
     QuickBooksProvider,
@@ -193,12 +194,14 @@ REGISTRY: dict[str, ConnectorRegistration] = {
         ),
     ),
     "open_banking": ConnectorRegistration(
-        status="Planning stub",
-        factory=_planning_stub("open_banking"),
-        credential_note=(
-            "TBD: credential fields depend on the selected AISP and its consent "
-            "lifecycle."
+        status="Adapter ready",
+        factory=lambda credentials, config: OpenBankingProvider(
+            secret_id=credentials.get("secret_id", ""), secret_key=credentials.get("secret_key", "")),
+        credential_fields=(
+            CredentialField("secret_id", "Secret ID", "secret"),
+            CredentialField("secret_key", "Secret key", "secret"),
         ),
+        credential_note="Bank consent may last around 180 days, depending on the bank and agreement. Re-link to renew consent. API access tokens expire separately and are refreshed automatically.",
     ),
 }
 
