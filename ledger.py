@@ -201,12 +201,38 @@ class LedgerService:
             period = tx.one("SELECT * FROM fiscal_periods WHERE id=?", (period_id,))
             if not period:
                 raise KeyError("Period not found")
+            if period["status"] == "Locked":
+                raise ValueError("The fiscal period is already locked")
             tx.execute(
                 "UPDATE fiscal_periods SET status='Locked',locked_at=?,locked_by=?,lock_reason=? WHERE id=?",
                 (utc_now(), actor, reason.strip(), period_id),
             )
             audit(tx, period["organisation_id"], actor, "period.locked", "fiscal_period", period_id,
                   {"reason": reason.strip()})
+
+    def unlock_period(self, period_id: str, *, actor: str, reason: str) -> None:
+        if not reason.strip():
+            raise ValueError("A reopen reason is required")
+        with self.db.transaction() as tx:
+            period = tx.one("SELECT * FROM fiscal_periods WHERE id=?", (period_id,))
+            if not period:
+                raise KeyError("Period not found")
+            if period["status"] != "Locked":
+                raise ValueError("The fiscal period is not locked")
+            tx.execute(
+                "UPDATE fiscal_periods SET status='Open',locked_at=NULL,locked_by=NULL,lock_reason=NULL WHERE id=?",
+                (period_id,),
+            )
+            audit(tx, period["organisation_id"], actor, "period.reopened", "fiscal_period", period_id,
+                  {"reason": reason.strip(), "locked_at": period["locked_at"],
+                   "locked_by": period["locked_by"]})
+
+    def list_periods(self, organisation_id: str) -> list[dict]:
+        return self.db.rows(
+            "SELECT id,code,starts_on,ends_on,status,locked_at,locked_by,lock_reason "
+            "FROM fiscal_periods WHERE organisation_id=? ORDER BY starts_on",
+            (organisation_id,),
+        )
 
     def _object_filter(self, organisation_id, object_id):
         if not object_id:

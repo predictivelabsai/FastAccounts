@@ -2116,5 +2116,26 @@
       "Review these rows in Data import before they touch your books. Stage them now?": "Pārskatiet šīs rindas datu importēšanā, pirms tās nonāk uzskaitē. Iekļaut priekšskatījumā tagad?",
       "Import batch staged. Review it under Data import.": "Importēšanas pakete iekļauta priekšskatījumā. Pārskatiet to datu importēšanā."
     }
+  },
+  "periods": {
+    "nav": {
+      "periods": "Fiskālie periodi"
+    },
+    "workspace": {
+      "Fiscal periods": "Fiskālie periodi",
+      "Lock a period to stop changes to its postings. Reopening needs a note and is audited.": "Noslēdziet periodu, lai apturētu tā grāmatojumu izmaiņas. Atkārtotai atvēršanai vajadzīgs piezīmes ieraksts, un tas tiek fiksēts auditā.",
+      "Periods": "Periodi",
+      "Period": "Periods",
+      "From": "No",
+      "To": "Līdz",
+      "Locked at": "Noslēgts",
+      "Open": "Atvērts",
+      "Locked": "Noslēgts",
+      "Close period": "Noslēgt periodu",
+      "Reopen period": "Atkārtoti atvērt periodu",
+      "Reason": "Iemesls",
+      "Locked period": "Periods noslēgts",
+      "Period reopened": "Periods atkārtoti atvērts"
+    }
   }
 }

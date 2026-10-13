@@ -577,7 +577,7 @@ def _require(organisation_id: str, user: User, roles: set[str]) -> None:
 
 
 def _object_in_org(table: str, object_id: str, organisation_id: str) -> None:
-    allowed = {"bills", "bank_transactions", "vat_returns"}
+    allowed = {"bills", "bank_transactions", "vat_returns", "fiscal_periods"}
     if table not in allowed or not get_database().one(
         f"SELECT id FROM {table} WHERE id=? AND organisation_id=?", (object_id, organisation_id)
     ):
@@ -977,6 +977,36 @@ def copilot_settings(organisation_id: str, payload: CopilotToggleIn,
     _require(organisation_id, user, WRITE_ROLES & {'owner', 'administrator'})
     CopilotService().set_enabled(organisation_id, payload.enabled, actor=user.email)
     return CopilotService().status(organisation_id, user.email)
+
+
+# --- Fiscal period close and reopen -----------------------------------------
+
+@api.get("/organisations/{organisation_id}/periods")
+def list_fiscal_periods(organisation_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, READ_ROLES)
+    return LedgerService().list_periods(organisation_id)
+
+
+class PeriodActionIn(BaseModel):
+    reason: str = Field(min_length=1, max_length=500)
+
+
+@api.put("/organisations/{organisation_id}/periods/{period_id}/close")
+def close_fiscal_period(organisation_id: str, period_id: str, payload: PeriodActionIn,
+                        user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES & {'owner', 'administrator'})
+    _object_in_org("fiscal_periods", period_id, organisation_id)
+    LedgerService().lock_period(period_id, actor=user.email, reason=payload.reason)
+    return LedgerService().list_periods(organisation_id)
+
+
+@api.put("/organisations/{organisation_id}/periods/{period_id}/reopen")
+def reopen_fiscal_period(organisation_id: str, period_id: str, payload: PeriodActionIn,
+                         user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES & {'owner', 'administrator'})
+    _object_in_org("fiscal_periods", period_id, organisation_id)
+    LedgerService().unlock_period(period_id, actor=user.email, reason=payload.reason)
+    return LedgerService().list_periods(organisation_id)
 
 
 @api.get('/organisations/{organisation_id}/objects')

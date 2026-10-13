@@ -2116,5 +2116,26 @@
       "Review these rows in Data import before they touch your books. Stage them now?": "Peržiūrėkite šias eilutes duomenų importe, kol jos nepateko į apskaitą. Įtraukti į peržiūrą dabar?",
       "Import batch staged. Review it under Data import.": "Importo paketas įtrauktas į peržiūrą. Peržiūrėkite jį duomenų importe."
     }
+  },
+  "periods": {
+    "nav": {
+      "periods": "Finansiniai laikotarpiai"
+    },
+    "workspace": {
+      "Fiscal periods": "Finansiniai laikotarpiai",
+      "Lock a period to stop changes to its postings. Reopening needs a note and is audited.": "Užrakinkite laikotarpį, kad sustabdytumėte jo įrašų keitimą. Pakartotinai atverti reikia pastabos, o veiksmas užfiksuojamas audite.",
+      "Periods": "Laikotarpiai",
+      "Period": "Laikotarpis",
+      "From": "Nuo",
+      "To": "Iki",
+      "Locked at": "Užrakinta",
+      "Open": "Atidaryta",
+      "Locked": "Užrakinta",
+      "Close period": "Užrakinti laikotarpį",
+      "Reopen period": "Atverti laikotarpį",
+      "Reason": "Priežastis",
+      "Locked period": "Laikotarpis užrakintas",
+      "Period reopened": "Laikotarpis atvertas"
+    }
   }
 }

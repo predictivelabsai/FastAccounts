@@ -937,7 +937,7 @@ def workspace_page(user: dict, lang: str = "en"):
         ("automation", [("recurring", "recurring")]),
         ("money", [("banking", "banking")]),
         ("assistant", [("copilot", "copilot")]),
-        ("accounting", [("accounting", "accounting"), ("cash-flow", "cash_flow"), ("fixed-assets", "fixed_assets"), ("tax", "tax")]),
+        ("accounting", [("accounting", "accounting"), ("cash-flow", "cash_flow"), ("fixed-assets", "fixed_assets"), ("periods", "periods"), ("tax", "tax")]),
         ("payroll", [("payroll", "payroll")]),
         ("settings", [("integrations", "integrations"), ("imports", "data_import"), ("payment-methods", "payment_methods"), ("reminder-rules", "reminder_rules"), ("exchange-rates", "fx_rates"), ("objects", "objects"), ("documents", "document_settings")]),
     ]

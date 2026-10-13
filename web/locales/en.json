@@ -2116,5 +2116,26 @@
       "Review these rows in Data import before they touch your books. Stage them now?": "Review these rows in Data import before they touch your books. Stage them now?",
       "Import batch staged. Review it under Data import.": "Import batch staged. Review it under Data import."
     }
+  },
+  "periods": {
+    "nav": {
+      "periods": "Fiscal periods"
+    },
+    "workspace": {
+      "Fiscal periods": "Fiscal periods",
+      "Lock a period to stop changes to its postings. Reopening needs a note and is audited.": "Lock a period to stop changes to its postings. Reopening needs a note and is audited.",
+      "Periods": "Periods",
+      "Period": "Period",
+      "From": "From",
+      "To": "To",
+      "Locked at": "Locked at",
+      "Open": "Open",
+      "Locked": "Locked",
+      "Close period": "Close period",
+      "Reopen period": "Reopen period",
+      "Reason": "Reason",
+      "Locked period": "Locked period",
+      "Period reopened": "Period reopened"
+    }
   }
 }

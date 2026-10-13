@@ -78,6 +78,38 @@ delivered.
   validation and XLSX renderers for the remaining lists remain out of scope;
   objects/bank CSV column sets are intentionally minimal.
 
+## 2026-10-13: Fiscal period close and reopen (parity slate P2 item 6)
+
+- Extended the ledger service: `list_periods` returns the organisation's
+  fiscal periods ordered by start, `lock_period` now refuses an already
+  locked period with a dedicated message, and a new `unlock_period` reopens
+  a locked period with a mandatory note, clearing the lock fields and
+  recording the previous lock in the `period.reopened` audit event. No
+  migration: the schema already carried status, lock fields and a
+  two-value check from `0001_accounting_core`, and postings into locked
+  periods were already refused.
+- Added member-readable `GET /periods` and owner/administrator CSRF-guarded
+  `PUT /periods/{id}/close` and `PUT /periods/{id}/reopen` routes with
+  required reasons (at most 500 characters), organisation-scoped period
+  checks and `period.locked` / `period.reopened` audit events.
+- Added the Accounting > Fiscal periods workspace view: a period table with
+  status, lock note and owner/administrator close and reopen actions that
+  collect a reason in a dialog; English, Estonian, Lithuanian and Latvian
+  copy appended in a trailing `periods` section.
+- Validation: focused period-close checks: 15 passed, 1 existing dependency
+  warning in 17.65s, covering the close/reopen cycle with posting freeze
+  and resumption, duplicate-lock and wrong-state refusals, the
+  close/reopen role matrix, read roles, reason validation, tenant
+  isolation, audit events, four-language key parity and an offline browser
+  flow. Full `python -m pytest -q` on Windows/Python 3.14.6: 1400 passed,
+  4 skipped, 5 existing dependency warnings in 2292.00s.
+  JavaScript syntax, whitespace, em-dash and attribution checks passed; the
+  Estonian copy passed estnltk spelling and compound checks (`auditilogisse`
+  follows the existing et.json usage).
+- Open follow-ups: month-end checklist visibility in the periods view
+  (the existing governance checklist stays API-only), retention holds in
+  the same view and live PostgreSQL validation.
+
 ## 2026-10-13: AI copilot with Grok (parity slate extension)
 
 - Added rerun-safe migration `0029_copilot` (count 29, CI list updated): the

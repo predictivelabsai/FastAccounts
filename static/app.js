@@ -893,6 +893,36 @@
         await render();
       })});
     },
+    periods: async (c) => {
+      const editable = canEditMappings();
+      const rows = await api(c.url('/periods'));
+      if (!c.mount(page(t('Fiscal periods'), t('Lock a period to stop changes to its postings. Reopening needs a note and is audited.'), '',
+        `<section class="section"><h2>${tr('Periods')}</h2>${table(
+          ['Period', 'From', 'To', 'Status', 'Locked at', 'Actions'],
+          rows.map((x) => row([
+            td(esc(x.code)),
+            td(date(x.starts_on)),
+            td(date(x.ends_on)),
+            td(pill(tr(x.status))),
+            td(x.locked_at ? `${esc(date(x.locked_at))} · ${esc(x.locked_by || '')}${x.lock_reason ? ` · ${esc(x.lock_reason)}` : ''}` : ''),
+            td(editable ? (x.status === 'Locked'
+              ? button('Reopen period', 'reopenPeriod', false, `data-id="${esc(x.id)}"`)
+              : button('Close period', 'closePeriod', true, `data-id="${esc(x.id)}"`)) : ''),
+          ])))}</section>`))) return;
+      content.querySelector('[data-action=cancel]')?.remove();
+      const reasonDialog = (title, submit, path) => {
+        const d = dialog(title, form(`<label class="full-width">${tr('Reason')}<textarea name="reason" rows="2" maxlength="500" required></textarea><span class="field-error" data-error="reason"></span></label>`, submit));
+        d.querySelector('[data-action=cancel]').remove();
+        bindForm(d, async (v) => {
+          await post(path, {reason: v.reason}, 'PUT');
+          await saved(d);
+        });
+      };
+      bindActions(content, {
+        closePeriod: (b) => reasonDialog(tr('Close period'), 'Close period', c.url(`/periods/${b.dataset.id}/close`)),
+        reopenPeriod: (b) => reasonDialog(tr('Reopen period'), 'Reopen period', c.url(`/periods/${b.dataset.id}/reopen`)),
+      });
+    },
     "reminder-rules": async (c) => {
       const rules = await api(c.url('/reminder-rules'));
       const preview = rules.enabled ? rules.effective_stages.map((x) =>

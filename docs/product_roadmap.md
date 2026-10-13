@@ -1581,6 +1581,62 @@ native-language review, including Estonian estnltk QA, remains pending.
   validation and XLSX renderers for the remaining lists remain out of scope;
   objects/bank CSV column sets are intentionally minimal.
 
+## 2026-10-13: Fiscal period close and reopen (parity slate P2 item 6)
+
+- Extended the ledger service: `list_periods` returns the organisation's
+  fiscal periods ordered by start, `lock_period` now refuses an already
+  locked period with a dedicated message, and a new `unlock_period` reopens
+  a locked period with a mandatory note, clearing the lock fields and
+  recording the previous lock in the `period.reopened` audit event. No
+  migration: the schema already carried status, lock fields and a
+  two-value check from `0001_accounting_core`, and postings into locked
+  periods were already refused.
+- Added member-readable `GET /periods` and owner/administrator CSRF-guarded
+  `PUT /periods/{id}/close` and `PUT /periods/{id}/reopen` routes with
+  required reasons (at most 500 characters), organisation-scoped period
+  checks and `period.locked` / `period.reopened` audit events.
+- Added the Accounting > Fiscal periods workspace view: a period table with
+  status, lock note and owner/administrator close and reopen actions that
+  collect a reason in a dialog; English, Estonian, Lithuanian and Latvian
+  copy appended in a trailing `periods` section.
+- Validation: focused period-close checks: 15 passed, 1 existing dependency
+  warning in 17.65s, covering the close/reopen cycle with posting freeze
+  and resumption, duplicate-lock and wrong-state refusals, the
+  close/reopen role matrix, read roles, reason validation, tenant
+  isolation, audit events, four-language key parity and an offline browser
+  flow. Full `python -m pytest -q` (Windows, Python 3.14.6): 1400 passed,
+  4 skipped, 5 existing dependency warnings in 2292.00s.
+  JavaScript syntax, whitespace, em-dash and attribution checks passed; the
+  Estonian copy passed estnltk spelling and compound checks (`auditilogisse`
+  follows the existing et.json usage).
+- Open follow-ups: month-end checklist visibility in the periods view
+  (the existing governance checklist stays API-only), retention holds in
+  the same view and live PostgreSQL validation.
+
+### Four-language copy QA (fiscal periods)
+
+All new strings are recorded verbatim below. Matching keys, section order,
+catalogue merges and punctuation are checked automatically. Estonian was
+checked with estnltk spelling and compound checks on this machine.
+
+| Key | English | Estonian | Lithuanian | Latvian |
+| --- | --- | --- | --- | --- |
+| `periods.nav.periods` | Fiscal periods | Finantsperioodid | Finansiniai laikotarpiai | Fiskālie periodi |
+| `periods.workspace.Fiscal periods` | Fiscal periods | Finantsperioodid | Finansiniai laikotarpiai | Fiskālie periodi |
+| `periods.workspace.Lock a period to stop changes to its postings. Reopening needs a note and is audited.` | Lock a period to stop changes to its postings. Reopening needs a note and is audited. | Lukusta periood, et peatada selle kannete muutmine. Taasavamine vajab märkust ja kantakse auditilogisse. | Užrakinkite laikotarpį, kad sustabdytumėte jo įrašų keitimą. Pakartotinai atverti reikia pastabos, o veiksmas užfiksuojamas audite. | Noslēdziet periodu, lai apturētu tā grāmatojumu izmaiņas. Atkārtotai atvēršanai vajadzīgs piezīmes ieraksts, un tas tiek fiksēts auditā. |
+| `periods.workspace.Periods` | Periods | Perioodid | Laikotarpiai | Periodi |
+| `periods.workspace.Period` | Period | Periood | Laikotarpis | Periods |
+| `periods.workspace.From` | From | Alates | Nuo | No |
+| `periods.workspace.To` | To | Kuni | Iki | Līdz |
+| `periods.workspace.Locked at` | Locked at | Lukustatud | Užrakinta | Noslēgts |
+| `periods.workspace.Open` | Open | Avatud | Atidaryta | Atvērts |
+| `periods.workspace.Locked` | Locked | Lukus | Užrakinta | Noslēgts |
+| `periods.workspace.Close period` | Close period | Lukusta periood | Užrakinti laikotarpį | Noslēgt periodu |
+| `periods.workspace.Reopen period` | Reopen period | Ava periood uuesti | Atverti laikotarpį | Atkārtoti atvērt periodu |
+| `periods.workspace.Reason` | Reason | Põhjus | Priežastis | Iemesls |
+| `periods.workspace.Locked period` | Locked period | Periood lukustatud | Laikotarpis užrakintas | Periods noslēgts |
+| `periods.workspace.Period reopened` | Period reopened | Periood taasavatud | Laikotarpis atvertas | Periods atkārtoti atvērts |
+
 ## 2026-10-13: AI copilot with Grok (parity slate extension)
 
 - Added rerun-safe migration `0029_copilot` (count 29, CI list updated): the
