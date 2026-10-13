@@ -30,6 +30,7 @@ from organisations import APPROVE_ROLES, WRITE_ROLES, AccessDenied, Organisation
 from payroll import PayrollConflict, PayrollService
 from tax import TaxService
 from tsd import TSDExportService
+from payment_orders import PaymentOrderService
 
 
 class User(BaseModel):
@@ -54,6 +55,7 @@ class ContactIn(BaseModel):
     vat_no: str = ""
     registration_no: str = ""
     address: str = ""
+    iban: str = ""
     payment_terms_days: int = Field(default=14, ge=0, le=365)
 
 
@@ -121,6 +123,13 @@ class BankAccountIn(BaseModel):
     currency: str
     iban: str = ""
     sort_code: str = ""
+
+
+class PaymentOrderIn(BaseModel):
+    bank_account_id: str
+    execution_date: str
+    due_before: str | None = None
+    bill_ids: list[str] | None = None
 
 
 class ReconcileIn(BaseModel):
@@ -475,6 +484,60 @@ def approve_bill(organisation_id: str, bill_id: str, user: User = Depends(requir
     _require(organisation_id, user, APPROVE_ROLES)
     _object_in_org("bills", bill_id, organisation_id)
     return DocumentService().approve_bill(bill_id, actor=user.email)
+
+
+@api.get("/organisations/{organisation_id}/payment-orders/candidates")
+def payment_order_candidates(organisation_id: str, due_before: str | None = None,
+                             user: User = Depends(current_user)):
+    _require(organisation_id, user, {"owner", "administrator", "accountant", "approver", "viewer"})
+    return PaymentOrderService().candidates(organisation_id, due_before=due_before)
+
+
+@api.post("/organisations/{organisation_id}/payment-orders", status_code=201)
+def create_payment_order(organisation_id: str, payload: PaymentOrderIn, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return PaymentOrderService().create(organisation_id, actor=user.email, **payload.model_dump())
+
+
+@api.get("/organisations/{organisation_id}/payment-orders")
+def list_payment_orders(organisation_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, {"owner", "administrator", "accountant", "approver", "viewer"})
+    return PaymentOrderService().list(organisation_id)
+
+
+@api.get("/organisations/{organisation_id}/payment-orders/{order_id}.xml")
+def download_payment_order(organisation_id: str, order_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, {"owner", "administrator", "accountant", "approver", "viewer"})
+    from urllib.parse import quote
+    return Response(PaymentOrderService().xml(organisation_id, order_id), media_type="application/xml",
+                    headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote('payment-order-' + order_id + '.xml', safe='')}"})
+
+
+@api.post("/organisations/{organisation_id}/attachments/{owner_type}/{owner_id}", status_code=201)
+async def attach_evidence(organisation_id: str, owner_type: str, owner_id: str,
+                          file: UploadFile = File(...), user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    content = await file.read(int(os.getenv("MAX_ATTACHMENT_BYTES", "10485760")) + 1)
+    result = DocumentService().attach_evidence(
+        organisation_id, owner_type=owner_type, owner_id=owner_id, filename=file.filename or "attachment",
+        content_type=file.content_type or "application/octet-stream", content=content, actor=user.email)
+    return {key: value for key, value in result.items() if key != "storage_path"}
+
+
+@api.get("/organisations/{organisation_id}/attachments")
+def list_attachments(organisation_id: str, owner_type: str, owner_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, {"owner", "administrator", "accountant", "approver", "viewer"})
+    return DocumentService().attachments(organisation_id, owner_type=owner_type, owner_id=owner_id)
+
+
+@api.get("/organisations/{organisation_id}/attachments/{attachment_id}/download")
+def download_attachment(organisation_id: str, attachment_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, {"owner", "administrator", "accountant", "approver", "viewer"})
+    from urllib.parse import quote
+    attachment, content = DocumentService().evidence_download(organisation_id, attachment_id)
+    return Response(content, media_type="application/octet-stream", headers={
+        "Content-Disposition": f"attachment; filename*=UTF-8''{quote(attachment['filename'], safe='')}",
+        "X-Content-Type-Options": "nosniff"})
 
 
 @api.get("/organisations/{organisation_id}/bank-accounts")

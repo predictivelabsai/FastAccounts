@@ -180,7 +180,7 @@ def test_existing_books_upgrade(tmp_path, monkeypatch):
         tx.execute("DELETE FROM accounts WHERE organisation_id=? AND system_role LIKE 'PAYROLL_%'", (org['id'],))
     before = db.rows('SELECT * FROM accounts WHERE organisation_id=? ORDER BY code', (org['id'],))
     monkeypatch.setattr(database, 'MIGRATIONS', original)
-    assert db.migrate() == ['0005_payroll', '0006_payroll_part_time_hourly', '0007_automation', '0008_import_staging', '0009_local_accounts', '0010_tsd_export', '0011_account_mappings', '0012_external_gl', '0013_sync_review', '0014_sync_push']
+    assert db.migrate() == ['0005_payroll', '0006_payroll_part_time_hourly', '0007_automation', '0008_import_staging', '0009_local_accounts', '0010_tsd_export', '0011_account_mappings', '0012_external_gl', '0013_sync_review', '0014_sync_push', '0015_payment_orders']
     after = db.rows("SELECT * FROM accounts WHERE organisation_id=? AND system_role NOT LIKE 'PAYROLL_%' ORDER BY code", (org['id'],))
     assert before == after
     assert len(db.rows("SELECT * FROM accounts WHERE organisation_id=? AND system_role LIKE 'PAYROLL_%'", (org['id'],))) == 7

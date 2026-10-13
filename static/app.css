@@ -865,6 +865,19 @@ form {
   grid-template-columns: 1fr 1fr;
   gap: 15px 20px;
 }
+.payment-order-dialog .form-grid > *,
+.payment-order-dialog input,
+.payment-order-dialog select,
+.document-evidence-dialog input {
+  min-width: 0;
+}
+.payment-order-dialog input[type="checkbox"] {
+  width: 18px;
+  min-height: 18px;
+}
+.document-evidence-dialog [data-attachments] {
+  overflow-wrap: anywhere;
+}
 label {
   display: grid;
   gap: 7px;

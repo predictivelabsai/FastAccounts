@@ -846,3 +846,30 @@ This is file export only. There is no X-tee, SOAP, upload, submission,
 confirmation or network client, and the TSD provider boundary rejects direct
 submission. Production accountant UAT and e-MTA upload verification remain
 pending.
+
+## 33. Payment orders and document evidence (PR1, 2026-10-11)
+
+- [x] Add migration `0015_payment_orders`, full bank and supplier IBAN fields,
+  and frozen payment-order headers and lines. Retain the existing masked bank
+  IBAN field. Account mappings and external GL tables from migrations 0011–0014
+  contain no payment details and are not used as bank accounts.
+- [x] Preview approved and part-paid bills, outstanding balances, currency
+  totals and exclusion reasons, with an optional inclusive due-date cutoff.
+- [x] Create tenant-scoped, audited payment instructions for one paying bank
+  account. Explicit bill selections must all match its currency. Creation and
+  download never change bill status, paid totals, payments or ledger entries.
+- [x] Download pain.001.001.03 XML from frozen amounts, payer and payee details,
+  and references, with fixed two-decimal amounts and currency payment groups.
+  XML payment identifiers use UUIDs without hyphens to fit the 35-character
+  limit. Stored bill IDs remain unchanged and the mapping is reversible.
+- [x] Add payment-order creation and history within the bills view, and
+  attachment upload, listing and download within invoice and bill dialogs.
+- [x] Route the evidence service for invoices, bills and manual journal batches,
+  enforcing tenant ownership, size limits, duplicate hashes per owner and
+  download integrity. Browser responses do not expose stored file paths.
+- [ ] Add contact and bank-account update flows. IBANs can currently be entered
+  only when creating a contact or bank account; existing masked values cannot
+  recover the full IBAN.
+- [ ] Verify exports with the intended banks before production use, including
+  their bank-specific requirements and payment identifier limits. This feature
+  only creates downloadable instructions and does not submit or settle payments.

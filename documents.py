@@ -23,7 +23,7 @@ class DocumentService:
     def create_contact(self, organisation_id: str, *, name: str, country_code: str,
                        contact_type: str = "both", email: str = "", vat_no: str = "",
                        registration_no: str = "", address: str = "",
-                       payment_terms_days: int = 14, tx=None) -> dict:
+                       payment_terms_days: int = 14, iban: str = "", tx=None) -> dict:
         if contact_type not in {"customer", "supplier", "both"} or not name.strip():
             raise ValueError("Valid contact name and type are required")
         if tx is None:
@@ -32,18 +32,18 @@ class DocumentService:
                     organisation_id, name=name, country_code=country_code,
                     contact_type=contact_type, email=email, vat_no=vat_no,
                     registration_no=registration_no, address=address,
-                    payment_terms_days=payment_terms_days, tx=owned_tx,
+                    payment_terms_days=payment_terms_days, iban=iban, tx=owned_tx,
                 )
         contact_id, now = new_id(), utc_now()
         if not tx.one("SELECT id FROM organisations WHERE id=?", (organisation_id,)):
             raise KeyError("Organisation not found")
         tx.execute(
-            "INSERT INTO contacts(id,organisation_id,contact_type,name,registration_no,vat_no,email,address,country_code,payment_terms_days,created_at,updated_at) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+            "INSERT INTO contacts(id,organisation_id,contact_type,name,registration_no,vat_no,email,address,country_code,payment_terms_days,created_at,updated_at,iban) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (contact_id, organisation_id, contact_type, name.strip(),
              registration_no.strip() or None, vat_no.strip() or None,
              email.strip() or None, address.strip() or None, country_code.upper(),
-             payment_terms_days, now, now),
+             payment_terms_days, now, now, iban.replace(" ", "").upper() or None),
         )
         return tx.one("SELECT * FROM contacts WHERE id=?", (contact_id,)) or {}
 
@@ -389,10 +389,11 @@ class DocumentService:
                 (account_id, organisation_id, code, name, "Asset", "Debit"),
             )
             tx.execute(
-                "INSERT INTO bank_accounts(id,organisation_id,ledger_account_id,name,currency,iban_masked,sort_code_masked) VALUES (?,?,?,?,?,?,?)",
+                "INSERT INTO bank_accounts(id,organisation_id,ledger_account_id,name,currency,iban_masked,sort_code_masked,iban) VALUES (?,?,?,?,?,?,?,?)",
                 (bank_id, organisation_id, account_id, name, currency.upper(),
                  f"…{iban.replace(' ', '')[-4:]}" if iban else None,
-                 f"…{sort_code.replace('-', '')[-2:]}" if sort_code else None),
+                 f"…{sort_code.replace('-', '')[-2:]}" if sort_code else None,
+                 iban.replace(" ", "").upper() or None),
             )
         return self.db.one("SELECT * FROM bank_accounts WHERE id=?", (bank_id,)) or {}
 
@@ -471,22 +472,65 @@ class DocumentService:
         max_size = int(os.getenv("MAX_ATTACHMENT_BYTES", "10485760"))
         if not content or len(content) > max_size:
             raise ValueError("Attachment is empty or exceeds the configured size limit")
-        safe_name = Path(filename).name
+        safe_name = Path(filename.replace("\\", "/")).name
+        safe_name = "".join(c for c in safe_name if c.isalnum() or c in " ._-")[:180].strip(" .") or "attachment"
         attachment_id, digest, now = new_id(), sha256_bytes(content), utc_now()
         root = Path(os.getenv("FASTACCOUNTS_DATA_DIR", "./data")).resolve() / "attachments" / organisation_id
-        root.mkdir(parents=True, exist_ok=True)
         target = root / f"{attachment_id}-{safe_name}"
-        target.write_bytes(content)
-        with self.db.transaction() as tx:
-            tx.execute(
-                "INSERT INTO attachments(id,organisation_id,owner_type,owner_id,filename,content_type,size_bytes,sha256,storage_path,uploaded_by,created_at) "
-                "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-                (attachment_id, organisation_id, owner_type, owner_id, safe_name,
-                 content_type, len(content), digest, str(target), actor, now),
-            )
-            audit(tx, organisation_id, actor, "evidence.attached", "attachment", attachment_id,
-                  {"owner_type": owner_type, "owner_id": owner_id, "sha256": digest})
+        try:
+            with self.db.transaction() as tx:
+                self._evidence_owner(tx, organisation_id, owner_type, owner_id)
+                if tx.one("SELECT id FROM attachments WHERE organisation_id=? AND owner_type=? AND owner_id=? AND sha256=?",
+                          (organisation_id, owner_type, owner_id, digest)):
+                    raise ValueError("This evidence is already attached to this document")
+                root.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(content)
+                tx.execute(
+                    "INSERT INTO attachments(id,organisation_id,owner_type,owner_id,filename,content_type,size_bytes,sha256,storage_path,uploaded_by,created_at) "
+                    "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                    (attachment_id, organisation_id, owner_type, owner_id, safe_name,
+                     content_type, len(content), digest, str(target), actor, now),
+                )
+                audit(tx, organisation_id, actor, "evidence.attached", "attachment", attachment_id,
+                      {"owner_type": owner_type, "owner_id": owner_id, "sha256": digest})
+        except Exception:
+            target.unlink(missing_ok=True)
+            raise
         return self.db.one("SELECT * FROM attachments WHERE id=?", (attachment_id,)) or {}
+
+    @staticmethod
+    def _evidence_owner(tx, organisation_id, owner_type, owner_id):
+        tables = {"invoice": "invoices", "bill": "bills", "journal": "posting_batches"}
+        if owner_type not in tables:
+            raise ValueError("Evidence owner must be invoice, bill or journal")
+        query = f"SELECT id FROM {tables[owner_type]} WHERE organisation_id=? AND id=?"
+        if owner_type == "journal":
+            query += " AND voucher_type='manual_journal'"
+        if not tx.one(query, (organisation_id, owner_id)):
+            raise KeyError("Evidence owner not found")
+
+    def attachments(self, organisation_id, *, owner_type, owner_id):
+        with self.db.transaction() as tx:
+            self._evidence_owner(tx, organisation_id, owner_type, owner_id)
+            return tx.rows(
+                "SELECT id,owner_type,owner_id,filename,content_type,size_bytes,sha256,uploaded_by,created_at "
+                "FROM attachments WHERE organisation_id=? AND owner_type=? AND owner_id=? ORDER BY created_at,id",
+                (organisation_id, owner_type, owner_id))
+
+    def evidence_download(self, organisation_id, attachment_id):
+        with self.db.transaction() as tx:
+            attachment = tx.one("SELECT * FROM attachments WHERE organisation_id=? AND id=?",
+                                (organisation_id, attachment_id))
+            if not attachment:
+                raise KeyError("Attachment not found")
+            self._evidence_owner(tx, organisation_id, attachment["owner_type"], attachment["owner_id"])
+        try:
+            content = Path(attachment["storage_path"]).read_bytes()
+        except OSError:
+            raise KeyError("Attachment file not found") from None
+        if sha256_bytes(content) != attachment["sha256"] or len(content) != attachment["size_bytes"]:
+            raise ValueError("Attachment integrity check failed")
+        return attachment, content
 
     def invoice_pdf(self, invoice_id: str) -> bytes:
         from reportlab.lib.pagesizes import A4
