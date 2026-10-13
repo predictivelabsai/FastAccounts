@@ -1074,16 +1074,23 @@
           `<div class="notice" role="status">${tr("Payroll is available only for Estonian organisations with EUR books. Switch to an Estonian EUR organisation to manage payroll.")}</div>`));
         return;
       }
-      const [employees, runs, connections] = await Promise.all([
+      const [employees, runs, connections, tsdPreparations] = await Promise.all([
         optionalPayroll(c.url("/employees")),
         optionalPayroll(c.url("/pay-runs")),
         api(c.url("/integrations")),
+        optionalPayroll(c.url("/payroll/tsd-preparations")),
       ]);
       const accountingProviders = connections.filter((entry) => ["merit", "smartaccounts"].includes(entry.provider) && entry.status !== "Disconnected");
       await Promise.all((runs || []).map(async (run) => {
         run.pushes = await api(c.url(`/pay-runs/${run.id}/pushes`));
       }));
       const unavailable = employees === null || runs === null;
+      const tsdByRun = Object.fromEntries(
+        [...(tsdPreparations || [])].reverse().map((preparation) => [
+          String(preparation.pay_run_id),
+          preparation,
+        ]),
+      );
       if (
         !c.mount(
           page(
@@ -1129,7 +1136,13 @@
                       ["Employer cost"],
                       "Actions",
                     ],
-                    runs.map((r) => renderRun(r, c, accountingProviders)),
+                    runs.map((r) =>
+                      renderRun(
+                        { ...r, tsd_preparation: tsdByRun[String(r.id)] },
+                        c,
+                        accountingProviders,
+                      ),
+                    ),
                   )
                 : empty(
                     "No pay runs yet",
@@ -1176,6 +1189,20 @@
               await render();
             },
           ),
+        tsd_prepare: async (b) => {
+          const r = runs.find((x) => String(x.id) === b.dataset.id);
+          const preparation = await post(
+            c.url(`/pay-runs/${r.id}/tsd/prepare`),
+          );
+          tsdPreparationDialog(c, r, preparation);
+        },
+        tsd_review: async (b) => {
+          const r = runs.find((x) => String(x.id) === b.dataset.id);
+          const preparation = await api(
+            c.url(`/pay-runs/${r.id}/tsd/${b.dataset.preparationId}`),
+          );
+          tsdPreparationDialog(c, r, preparation);
+        },
       });
     },
     integrations: async (c) => {
@@ -2274,9 +2301,55 @@
       );
     });
   }
+  function tsdPreparationDialog(c, run, preparation) {
+    const reviewed = preparation.status === "Completed",
+      base = c.url(`/pay-runs/${run.id}/tsd/${preparation.id}`),
+      d = dialog(
+        "TSD preparation for accountant",
+        `<div class="notice" role="status">${tr("NOT live-verified against e-MTA. Review the payment records before manual upload.")} ${tr("Direct e-MTA submission is disabled.")}</div><dl class="detail-grid"><div><dt>${tr("Payment date")}</dt><dd>${esc(preparation.payment_date)}</dd></div><div><dt>${tr("Filing deadline")}</dt><dd>${esc(preparation.filing_deadline)}</dd></div><div><dt>${tr("Status")}</dt><dd>${pill(preparation.status)}</dd></div></dl>${table(
+          ["Employee", "Annex", ["Gross"], ["Income tax"], ["Social tax"], ["Net"]],
+          preparation.records.map((record) =>
+            row([
+              td(`<strong>${esc(record.recipient_name)}</strong><small>${esc(record.recipient_personal_id)}</small>`),
+              td(esc(record.annex), "numeric"),
+              cash(record.gross_amount, "EUR"),
+              cash(record.income_tax, "EUR"),
+              cash(record.social_tax, "EUR"),
+              cash(record.net_amount, "EUR"),
+            ]),
+          ),
+        )}<div class="dialog-actions">${
+          reviewed
+            ? link("TSD XBRL GL XML", `/api${base}/export.xbrl.xml`) +
+              link("TSD CSV (through 2027)", `/api${base}/export.csv`)
+            : button("Mark TSD reviewed", "tsd_confirm_review", true)
+        }</div>`,
+      );
+    bindActions(d, {
+      tsd_confirm_review: () =>
+        confirmAction(
+          "Mark TSD reviewed",
+          tr(
+            "Confirm that you reviewed the per-payment records. This unlocks file downloads; it does not submit anything.",
+          ),
+          async () => {
+            await post(`${base}/review`);
+            closeDialog(d);
+            toast(t("TSD preparation reviewed"));
+            await render();
+          },
+        ),
+    });
+  }
   function renderRun(r, c, providers = []) {
     const draft = String(r.status).toLowerCase() === "draft",
-      items = r.items || [];
+      items = r.items || [],
+      preparation = r.tsd_preparation,
+      tsdActions = preparation
+        ? preparation.status === "Completed"
+          ? `${pill("Reviewed")}${link("TSD XBRL GL XML", `/api${c.url(`/pay-runs/${r.id}/tsd/${preparation.id}/export.xbrl.xml`)}`)}${link("TSD CSV (through 2027)", `/api${c.url(`/pay-runs/${r.id}/tsd/${preparation.id}/export.csv`)}`)}`
+          : `${pill("Review Required")}${button("Review TSD preparation", "tsd_review", false, `data-id="${r.id}" data-preparation-id="${preparation.id}"`)}`
+        : button("Prepare TSD", "tsd_prepare", false, `data-id="${r.id}"`);
     return `${row([
       td(esc(r.period), "numeric"),
       td(pill(r.status)),
@@ -2290,7 +2363,7 @@
           : link(
               "Payslips PDF",
               `/api${c.url(`/pay-runs/${r.id}/payslips.pdf`)}`,
-            )) +
+            ) + tsdActions) +
           link(
             "Export workbook",
             `/api${c.url(`/pay-runs/${r.id}/workbook.xlsx`)}`,

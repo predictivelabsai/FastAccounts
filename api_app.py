@@ -29,6 +29,7 @@ from ledger import LedgerService, PostingLine
 from organisations import APPROVE_ROLES, WRITE_ROLES, AccessDenied, OrganisationService
 from payroll import PayrollConflict, PayrollService
 from tax import TaxService
+from tsd import TSDExportService
 
 
 class User(BaseModel):
@@ -992,3 +993,62 @@ def payroll_workbook(organisation_id: str, run_id: str, user: User = Depends(cur
         media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         headers={'Content-Disposition': 'attachment; filename="pay-run-workbook.xlsx"'},
     )
+
+
+@api.get('/organisations/{organisation_id}/payroll/tsd-preparations')
+def payroll_tsd_preparations(organisation_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    return TSDExportService().preparations(organisation_id)
+
+
+@api.post('/organisations/{organisation_id}/pay-runs/{run_id}/tsd/prepare')
+def payroll_prepare_tsd(organisation_id: str, run_id: str,
+                        user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return TSDExportService().prepare(organisation_id, run_id, actor=user.email)
+
+
+@api.get('/organisations/{organisation_id}/pay-runs/{run_id}/tsd/{preparation_id}')
+def payroll_get_tsd(organisation_id: str, run_id: str, preparation_id: str,
+                    user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    result = TSDExportService().get(organisation_id, preparation_id)
+    if result['pay_run_id'] != run_id:
+        raise KeyError('TSD preparation not found')
+    return result
+
+
+@api.post('/organisations/{organisation_id}/pay-runs/{run_id}/tsd/{preparation_id}/review')
+def payroll_review_tsd(organisation_id: str, run_id: str, preparation_id: str,
+                       user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    prepared = TSDExportService().get(organisation_id, preparation_id)
+    if prepared['pay_run_id'] != run_id:
+        raise KeyError('TSD preparation not found')
+    return TSDExportService().review(organisation_id, preparation_id, actor=user.email)
+
+
+@api.get('/organisations/{organisation_id}/pay-runs/{run_id}/tsd/{preparation_id}/export.xbrl.xml')
+def payroll_export_tsd_xbrl(organisation_id: str, run_id: str, preparation_id: str,
+                            user: User = Depends(current_user)):
+    _require(organisation_id, user, WRITE_ROLES)
+    prepared = TSDExportService().get(organisation_id, preparation_id)
+    if prepared['pay_run_id'] != run_id:
+        raise KeyError('TSD preparation not found')
+    payload = TSDExportService().export_xbrl_gl(organisation_id, preparation_id, actor=user.email)
+    return Response(payload, media_type='application/xml', headers={
+        'Content-Disposition': f'attachment; filename="tsd-{prepared["period"]}.xbrl.xml"'
+    })
+
+
+@api.get('/organisations/{organisation_id}/pay-runs/{run_id}/tsd/{preparation_id}/export.csv')
+def payroll_export_tsd_csv(organisation_id: str, run_id: str, preparation_id: str,
+                           user: User = Depends(current_user)):
+    _require(organisation_id, user, WRITE_ROLES)
+    prepared = TSDExportService().get(organisation_id, preparation_id)
+    if prepared['pay_run_id'] != run_id:
+        raise KeyError('TSD preparation not found')
+    payload = TSDExportService().export_csv(organisation_id, preparation_id, actor=user.email)
+    return Response(payload, media_type='text/csv', headers={
+        'Content-Disposition': f'attachment; filename="tsd-{prepared["period"]}.csv"'
+    })

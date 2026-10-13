@@ -1335,3 +1335,9 @@ class EMTAExportProvider:
     """Explicit export-only boundary until an X-Road service agreement exists."""
     def submit(self, *_args, **_kwargs):
         raise PermissionError("e-MTA direct filing is not enabled; use reviewed KMD export")
+
+
+class EMTATSDExportProvider:
+    """TSD stays file-only; this class deliberately has no network client."""
+    def submit(self, *_args, **_kwargs):
+        raise PermissionError("e-MTA direct TSD filing is not enabled; use a reviewed manual-upload export")
