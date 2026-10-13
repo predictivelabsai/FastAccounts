@@ -37,7 +37,8 @@
     "fixed_assets": "Põhivarad",
     "cash_flow": "Rahavoo aruanne",
     "data_import": "Andmete import",
-    "quotes": "Pakkumised"
+    "quotes": "Pakkumised",
+    "maintenance": "Andmete hooldus"
   },
   "footer": {
     "tagline": "Avatud lähtekoodiga raamatupidamine Ühendkuningriigis ja Eestis.",
@@ -1127,7 +1128,7 @@
     "This creates an immutable ledger posting. Corrections require a credit note.": "See loob muutumatu pearaamatukande. Parandamiseks tuleb koostada kreeditarve.",
     "Invoice issued": "Müügiarve väljastatud",
     "Supplier no.": "Tarnija arve nr",
-    "Supplier number": "Tarnija arve number",
+    "Supplier number": "Hankija viitenumber",
     "Review": "Vaata üle",
     "Approve": "Kinnita",
     "Review bill": "Vaata ostuarve üle",
@@ -1803,7 +1804,25 @@
     "Kind": "Liik",
     "Document": "Dokument",
     "Old VAT": "Vana käibemaks",
-    "New VAT": "Uus käibemaks"
+    "New VAT": "Uus käibemaks",
+    "Data maintenance": "Andmete hooldus",
+    "Find loose master data: contacts without documents, duplicates, missing identifiers and reused supplier numbers. Deleting needs a contact with no documents at all.": "Leia lahtine põhiandmestik: dokumentideta kontaktid, duplikaadid, puuduvad tunnused ja erinevate hankijate puhul korduvad viitenumbrid. Kustutamiseks peab kontakt olema täiesti dokumentideta.",
+    "Unused contacts": "Kasutamata kontaktid",
+    "Duplicate contacts": "Duplikaatkontaktid",
+    "Contacts missing identifiers": "Kontaktid, millel puuduvad tunnused",
+    "Reused supplier numbers": "Erinevate hankijate vahel korduvad numbrid",
+    "Suppliers": "Hankijaid",
+    "Missing VAT number and registration number": "Puudub KMKR-number ja registrikood",
+    "Delete contact": "Kustuta kontakt",
+    "Deactivate": "Deaktiveeri",
+    "Reactivate": "Aktiveeri uuesti",
+    "Deactivate contact": "Kontakti deaktiveerimine",
+    "Reactivate contact": "Kontakti taasaktiveerimine",
+    "The contact disappears from pickers while keeping its history. Deactivate it?": "Kontakt kaob valijatest, aga säilitab ajaloo. Deaktiveerida?",
+    "The contact becomes selectable again. Reactivate it?": "Kontakt muutub jälle valitavaks. Taasaktiveerida?",
+    "Only contacts without any documents or payments can be deleted. This cannot be undone. Delete it?": "Kustutada saab ainult kontakti, millel pole ühtegi dokumenti ega makset. Seda ei saa tagasi võtta. Kustutada?",
+    "Deleted successfully": "Kustutatud",
+    "maintenance": "Andmete hooldus"
   },
   "views": {
     "overview": "Ülevaade",

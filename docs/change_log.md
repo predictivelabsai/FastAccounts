@@ -96,6 +96,39 @@ delivered.
   validation and XLSX renderers for the remaining lists remain out of scope;
   objects/bank CSV column sets are intentionally minimal.
 
+## 2026-10-13: Master-data maintenance (parity slate P2 item 8)
+
+- Added rerun-safe migration `0030_master_data_maintenance` (count 30, CI
+  list updated): contacts gain an `active` flag defaulting to on; items had
+  one since `0003_operations`. Partial upgrades guard the ALTER the same way
+  migrations 0027 and 0029 do.
+- Added `master_data_maintenance.py` with a read-only analysis and audited
+  lifecycle actions. The analysis finds contacts without any invoice, bill,
+  quote, prepayment or journal reference; duplicate contacts that share a
+  normalised name, VAT number or registration number; in-use contacts
+  missing both a VAT number and a registration number; and supplier numbers
+  reused across different suppliers (the database only forbids duplicates
+  within one supplier).
+- Actions under owner/administrator plus CSRF: deactivate and reactivate a
+  contact (organisation-locked, audited `contact.deactivated` /
+  `contact.reactivated`), delete a contact only when it carries no
+  documents or payments at all (`contact.deleted`), and deactivate or
+  delete catalogue items. The contacts list hides deactivated contacts by
+  default and accepts `include_inactive=true`; exports keep the full list.
+- Added Settings > Data maintenance in the workspace with the four findings
+  tables and per-contact actions behind confirmation dialogs; English,
+  Estonian, Lithuanian and Latvian keys appended in place (brand-system
+  convention); Estonian passed estnltk spelling checks.
+- Validation: focused maintenance checks: 9 passed, 1 existing dependency
+  warning in 7.18s, covering the four findings on crafted data, the
+  contact lifecycle with the list filter and audit trail, item actions,
+  the role matrix, tenant scoping, migration rerun and CI count and a
+  four-language offline browser flow. Full `python -m pytest -q` on
+  Windows/Python 3.14.6 counts land with this PR's suite
+  run: 1420 passed, 4 skipped, 5 existing dependency warnings in 1591.59s.
+- Open follow-ups: merge-into-existing-contact tooling for duplicates,
+  identifier backfill suggestions, live PostgreSQL validation.
+
 ## 2026-10-13: Bulk VAT replacement for drafts (parity slate P2 item 7)
 
 - Added `tax_replacement.py`: a preview and an audited apply that replace one

@@ -952,6 +952,55 @@
         reopenPeriod: (b) => reasonDialog(tr('Reopen period'), 'Reopen period', c.url(`/periods/${b.dataset.id}/reopen`)),
       });
     },
+    maintenance: async (c) => {
+      const editable = canEditMappings();
+      const data = await api(c.url('/master-data/maintenance'));
+      if (!c.mount(page(t('Data maintenance'), t('Find loose master data: contacts without documents, duplicates, missing identifiers and reused supplier numbers. Deleting needs a contact with no documents at all.'), '',
+        `<section class="section"><h2>${tr('Unused contacts')}</h2>${table(
+          ['Name', 'Type', 'Status', 'Actions'],
+          data.unused_contacts.map((x) => row([
+            td(esc(x.name)), td(tr(x.contact_type)), td(pill(tr(x.active ? 'Active' : 'Inactive'))),
+            td(editable ? actionButtons(x) : ''),
+          ])))}</section>` +
+        `<section class="section"><h2>${tr('Duplicate contacts')}</h2>${table(
+          ['Name', 'Type', 'VAT number', 'Registration number', 'Status'],
+          data.duplicate_contacts.map((x) => row([
+            td(esc(x.name)), td(tr(x.contact_type)), td(esc(x.vat_no || '')), td(esc(x.registration_no || '')),
+            td(pill(tr(x.active ? 'Active' : 'Inactive'))),
+          ])))}</section>` +
+        `<section class="section"><h2>${tr('Contacts missing identifiers')}</h2>${table(
+          ['Name', 'Type', 'Tax point hint'],
+          data.contacts_missing_identifiers.map((x) => row([
+            td(esc(x.name)), td(tr(x.contact_type)), td(tr('Missing VAT number and registration number')),
+          ])))}</section>` +
+        `<section class="section"><h2>${tr('Reused supplier numbers')}</h2>${table(
+          ['Supplier number', 'Suppliers'],
+          data.reused_supplier_numbers.map((x) => row([
+            td(esc(x.supplier_number)), td(num(x.suppliers)),
+          ])))}</section>`))) return;
+      function actionButtons(x) {
+        const base = `data-id="${esc(x.id)}"`;
+        const remove = button('Delete contact', 'deleteContact', false, base);
+        return x.active ? `<span class="actions">${remove}${button('Deactivate', 'deactivateContact', false, base)}</span>` : `<span class="actions">${button('Reactivate', 'reactivateContact', false, base)}</span>`;
+      }
+      bindActions(content, {
+        deactivateContact: (b) => confirmAction(tr('Deactivate contact'), tr('The contact disappears from pickers while keeping its history. Deactivate it?'), async () => {
+          await post(c.url(`/master-data/contacts/${b.dataset.id}/deactivate`), {});
+          toast(t('Saved successfully'));
+          await render();
+        }),
+        reactivateContact: (b) => confirmAction(tr('Reactivate contact'), tr('The contact becomes selectable again. Reactivate it?'), async () => {
+          await post(c.url(`/master-data/contacts/${b.dataset.id}/reactivate`), {});
+          toast(t('Saved successfully'));
+          await render();
+        }),
+        deleteContact: (b) => confirmAction(tr('Delete contact'), tr('Only contacts without any documents or payments can be deleted. This cannot be undone. Delete it?'), async () => {
+          await post(c.url(`/master-data/contacts/${b.dataset.id}/delete`), {});
+          toast(t('Deleted successfully'));
+          await render();
+        }),
+      });
+    },
     "reminder-rules": async (c) => {
       const rules = await api(c.url('/reminder-rules'));
       const preview = rules.enabled ? rules.effective_stages.map((x) =>

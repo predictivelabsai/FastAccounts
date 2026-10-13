@@ -37,7 +37,8 @@
     "fixed_assets": "Ilgalaikis turtas",
     "cash_flow": "Pinigų srautų ataskaita",
     "data_import": "Duomenų importas",
-    "quotes": "Pasiūlymai"
+    "quotes": "Pasiūlymai",
+    "maintenance": "Duomenų priežiūra"
   },
   "footer": {
     "tagline": "Atvirojo kodo buhalterinė apskaita Jungtinei Karalystei ir Estijai.",
@@ -1127,7 +1128,7 @@
     "This creates an immutable ledger posting. Corrections require a credit note.": "This creates an immutable ledger posting. Corrections require a credit note.",
     "Invoice issued": "Invoice issued",
     "Supplier no.": "Supplier no.",
-    "Supplier number": "Supplier number",
+    "Supplier number": "Tiekėjo numeris",
     "Review": "Review",
     "Approve": "Patvirtinti",
     "Review bill": "Review bill",
@@ -1803,7 +1804,25 @@
     "Kind": "Rūšis",
     "Document": "Dokumentas",
     "Old VAT": "Ankstesnis PVM",
-    "New VAT": "Naujas PVM"
+    "New VAT": "Naujas PVM",
+    "Data maintenance": "Duomenų priežiūra",
+    "Find loose master data: contacts without documents, duplicates, missing identifiers and reused supplier numbers. Deleting needs a contact with no documents at all.": "Suraskite nesusietus pagrindinius duomenis: kontaktus be dokumentų, dublikatus, trūkstamus identifikatorius ir skirtingiems tiekėjams pakartotus tiekėjo numerius. Ištrinti galima tik kontaktą, kurio apskritai nėra dokumentų.",
+    "Unused contacts": "Nenaudojami kontaktai",
+    "Duplicate contacts": "Dubliuoti kontaktai",
+    "Contacts missing identifiers": "Kontaktai be identifikatorių",
+    "Reused supplier numbers": "Pakartoti tiekėjo numeriai",
+    "Suppliers": "Tiekėjų",
+    "Missing VAT number and registration number": "Trūksta PVM kodo ir registracijos numerio",
+    "Delete contact": "Ištrinti kontaktą",
+    "Deactivate": "Deaktyvuoti",
+    "Reactivate": "Vėl aktyvuoti",
+    "Deactivate contact": "Kontakto deaktyvavimas",
+    "Reactivate contact": "Kontakto pakartotinis aktyvavimas",
+    "The contact disappears from pickers while keeping its history. Deactivate it?": "Kontaktas dings iš paieškos sąrašų, bet istorija lieka. Deaktyvuoti?",
+    "The contact becomes selectable again. Reactivate it?": "Kontaktas vėl taps pasirenkamas. Vėl aktyvuoti?",
+    "Only contacts without any documents or payments can be deleted. This cannot be undone. Delete it?": "Ištrinti galima tik kontaktą be jokių dokumentų ar mokėjimų. Atšaukti negalima. Ištrinti?",
+    "Deleted successfully": "Ištrinta",
+    "maintenance": "Duomenų priežiūra"
   },
   "views": {
     "overview": "Overview",

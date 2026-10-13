@@ -37,7 +37,8 @@
     "fixed_assets": "Fixed assets",
     "cash_flow": "Cash-flow statement",
     "data_import": "Data import",
-    "quotes": "Quotes"
+    "quotes": "Quotes",
+    "maintenance": "Data maintenance"
   },
   "footer": {
     "tagline": "Open-source bookkeeping for the UK and Estonia.",
@@ -1803,7 +1804,25 @@
     "Kind": "Kind",
     "Document": "Document",
     "Old VAT": "Old VAT",
-    "New VAT": "New VAT"
+    "New VAT": "New VAT",
+    "Data maintenance": "Data maintenance",
+    "Find loose master data: contacts without documents, duplicates, missing identifiers and reused supplier numbers. Deleting needs a contact with no documents at all.": "Find loose master data: contacts without documents, duplicates, missing identifiers and reused supplier numbers. Deleting needs a contact with no documents at all.",
+    "Unused contacts": "Unused contacts",
+    "Duplicate contacts": "Duplicate contacts",
+    "Contacts missing identifiers": "Contacts missing identifiers",
+    "Reused supplier numbers": "Reused supplier numbers",
+    "Suppliers": "Suppliers",
+    "Missing VAT number and registration number": "Missing VAT number and registration number",
+    "Delete contact": "Delete contact",
+    "Deactivate": "Deactivate",
+    "Reactivate": "Reactivate",
+    "Deactivate contact": "Deactivate contact",
+    "Reactivate contact": "Reactivate contact",
+    "The contact disappears from pickers while keeping its history. Deactivate it?": "The contact disappears from pickers while keeping its history. Deactivate it?",
+    "The contact becomes selectable again. Reactivate it?": "The contact becomes selectable again. Reactivate it?",
+    "Only contacts without any documents or payments can be deleted. This cannot be undone. Delete it?": "Only contacts without any documents or payments can be deleted. This cannot be undone. Delete it?",
+    "Deleted successfully": "Deleted successfully",
+    "maintenance": "Data maintenance"
   },
   "views": {
     "overview": "Overview",

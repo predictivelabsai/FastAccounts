@@ -37,7 +37,8 @@
     "fixed_assets": "Pamatlīdzekļi",
     "cash_flow": "Naudas plūsmas pārskats",
     "data_import": "Datu imports",
-    "quotes": "Piedāvājumi"
+    "quotes": "Piedāvājumi",
+    "maintenance": "Datu uzturēšana"
   },
   "footer": {
     "tagline": "Atvērtā pirmkoda grāmatvedība Apvienotajai Karalistei un Igaunijai.",
@@ -1127,7 +1128,7 @@
     "This creates an immutable ledger posting. Corrections require a credit note.": "This creates an immutable ledger posting. Corrections require a credit note.",
     "Invoice issued": "Invoice issued",
     "Supplier no.": "Supplier no.",
-    "Supplier number": "Supplier number",
+    "Supplier number": "Piegādātāja numurs",
     "Review": "Review",
     "Approve": "Apstiprināt",
     "Review bill": "Review bill",
@@ -1803,7 +1804,25 @@
     "Kind": "Veids",
     "Document": "Dokuments",
     "Old VAT": "Iepriekšējais PVN",
-    "New VAT": "Jaunais PVN"
+    "New VAT": "Jaunais PVN",
+    "Data maintenance": "Datu uzturēšana",
+    "Find loose master data: contacts without documents, duplicates, missing identifiers and reused supplier numbers. Deleting needs a contact with no documents at all.": "Atrodiet brīvos pamatdatus: kontaktus bez dokumentiem, dublikātus, trūkstošus identifikatorus un dažādu piegādātāju atkārtotus piegādātāja numurus. Dzēst var tikai kontaktu, kuram vispār nav dokumentu.",
+    "Unused contacts": "Nelietoti kontakti",
+    "Duplicate contacts": "Dublēti kontakti",
+    "Contacts missing identifiers": "Kontakti bez identifikatoriem",
+    "Reused supplier numbers": "Atkārtoti piegādātāja numuri",
+    "Suppliers": "Piegādātāju",
+    "Missing VAT number and registration number": "Trūkst PVN numurs un reģistrācijas numurs",
+    "Delete contact": "Dzēst kontaktu",
+    "Deactivate": "Deaktivizēt",
+    "Reactivate": "Atkal aktivizēt",
+    "Deactivate contact": "Kontakta deaktivizēšana",
+    "Reactivate contact": "Kontakta atkārtota aktivizēšana",
+    "The contact disappears from pickers while keeping its history. Deactivate it?": "Kontakts pazūd no izvēļu sarakstiem, bet vēsture paliek. Deaktivizēt?",
+    "The contact becomes selectable again. Reactivate it?": "Kontakts atkal būs atlasāms. Atkal aktivizēt?",
+    "Only contacts without any documents or payments can be deleted. This cannot be undone. Delete it?": "Dzēst var tikai kontaktu bez jebkādiem dokumentiem vai maksājumiem. To nevar atsaukt. Dzēst?",
+    "Deleted successfully": "Dzēsts",
+    "maintenance": "Dat u uzturēšana"
   },
   "views": {
     "overview": "Overview",

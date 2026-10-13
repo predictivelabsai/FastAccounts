@@ -228,7 +228,7 @@ def test_migration_rerun_preserves_data_and_checks(env):
     upload(d)
     original = d['db'].rows('SELECT * FROM document_settings')
     attachments = d['db'].rows('SELECT * FROM attachments')
-    assert d['db'].scalar('SELECT COUNT(*) FROM schema_migrations') == 29
+    assert d['db'].scalar('SELECT COUNT(*) FROM schema_migrations') == 30
     for _ in range(2):
         with d['db'].transaction() as tx:
             tx.execute("DELETE FROM schema_migrations WHERE version='0028_document_settings'")
@@ -236,7 +236,7 @@ def test_migration_rerun_preserves_data_and_checks(env):
     assert d['db'].rows('SELECT * FROM document_settings') == original
     assert d['db'].rows('SELECT * FROM attachments') == attachments
     assert d['db'].rows('PRAGMA foreign_key_check') == []
-    assert "'0027_mfa', '0028_document_settings', '0029_copilot']" in (ROOT / '.github/workflows/ci.yml').read_text()
+    assert "'0027_mfa', '0028_document_settings', '0029_copilot', '0030_master_data_maintenance']" in (ROOT / '.github/workflows/ci.yml').read_text()
     for column, value in [('accent_colour', '#GG0000'), ('accent_colour', '#1234567'), ('footer_text', 'a' * 501)]:
         with pytest.raises(sqlite3.IntegrityError), d['db'].transaction() as tx:
             tx.execute(f'UPDATE document_settings SET {column}=? WHERE organisation_id=?', (value, d['org']['id']))

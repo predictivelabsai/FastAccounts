@@ -41,6 +41,7 @@ from excel_export import (employees_workbook, general_ledger_workbook,
                           invoices_workbook, vat_returns_workbook)
 from governance import GovernanceService
 from import_service import OBJECT_TYPES, ImportService, MasterDataImportService
+from master_data_maintenance import MasterDataMaintenanceService
 from push_service import PushService
 from integration_service import AccountMappingService, IntegrationService
 from ledger import LedgerService, PostingLine
@@ -639,9 +640,57 @@ def list_tax_codes(organisation_id: str, user: User = Depends(current_user)):
 
 
 @api.get("/organisations/{organisation_id}/contacts")
-def list_contacts(organisation_id: str, user: User = Depends(current_user)):
+def list_contacts(organisation_id: str, include_inactive: bool = False,
+                  user: User = Depends(current_user)):
     _require(organisation_id, user, {"owner", "administrator", "accountant", "approver", "viewer"})
-    return ListExportRepository(get_database()).contacts(organisation_id)
+    if include_inactive:
+        return ListExportRepository(get_database()).contacts(organisation_id)
+    return get_database().rows(
+        "SELECT * FROM contacts WHERE organisation_id=? AND active<>0 ORDER BY name",
+        (organisation_id,))
+
+
+# --- Master data maintenance ------------------------------------------------
+
+@api.get('/organisations/{organisation_id}/master-data/maintenance')
+def master_data_maintenance(organisation_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, READ_ROLES)
+    return MasterDataMaintenanceService().analyse(organisation_id)
+
+
+@api.post('/organisations/{organisation_id}/master-data/contacts/{contact_id}/deactivate')
+def deactivate_contact(organisation_id: str, contact_id: str, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES & {'owner', 'administrator'})
+    MasterDataMaintenanceService().deactivate_contact(organisation_id, contact_id, actor=user.email)
+    return {'deactivated': True}
+
+
+@api.post('/organisations/{organisation_id}/master-data/contacts/{contact_id}/reactivate')
+def reactivate_contact(organisation_id: str, contact_id: str, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES & {'owner', 'administrator'})
+    MasterDataMaintenanceService().reactivate_contact(organisation_id, contact_id, actor=user.email)
+    return {'reactivated': True}
+
+
+@api.post('/organisations/{organisation_id}/master-data/contacts/{contact_id}/delete')
+def delete_contact(organisation_id: str, contact_id: str, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES & {'owner', 'administrator'})
+    MasterDataMaintenanceService().delete_contact(organisation_id, contact_id, actor=user.email)
+    return {'deleted': True}
+
+
+@api.post('/organisations/{organisation_id}/master-data/items/{item_id}/deactivate')
+def deactivate_item(organisation_id: str, item_id: str, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES & {'owner', 'administrator'})
+    MasterDataMaintenanceService().deactivate_item(organisation_id, item_id, actor=user.email)
+    return {'deactivated': True}
+
+
+@api.post('/organisations/{organisation_id}/master-data/items/{item_id}/delete')
+def delete_item(organisation_id: str, item_id: str, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES & {'owner', 'administrator'})
+    MasterDataMaintenanceService().delete_item(organisation_id, item_id, actor=user.email)
+    return {'deleted': True}
 
 
 @api.get('/organisations/{organisation_id}/contacts/export.csv')
