@@ -29,6 +29,7 @@ from list_export_repository import ListExportRepository
 from quotes import QuoteService
 from periodisation import PeriodisationService
 from payment_links import PaymentLinkService
+from tax_replacement import TaxReplacementService
 from exchange_rates import ExchangeRateService
 from fx_revaluation import FxRevaluationService
 from reminder_rules import ReminderRuleService, validate_rule
@@ -1448,6 +1449,27 @@ def export_tax(organisation_id: str, return_id: str, user: User = Depends(curren
     _object_in_org("vat_returns", return_id, organisation_id)
     return Response(TaxService().export_csv(return_id, actor=user.email), media_type="text/csv",
                     headers={"Content-Disposition": f"attachment; filename=vat-{return_id}.csv"})
+
+
+class TaxReplacementIn(BaseModel):
+    from_code_id: str = Field(min_length=1)
+    to_code_id: str = Field(min_length=1)
+
+
+@api.post("/organisations/{organisation_id}/tax/replacement/preview")
+def tax_replacement_preview(organisation_id: str, payload: TaxReplacementIn,
+                            user: User = Depends(require_csrf)):
+    _require(organisation_id, user, APPROVE_ROLES)
+    return TaxReplacementService().preview(organisation_id, payload.from_code_id,
+                                           payload.to_code_id)
+
+
+@api.post("/organisations/{organisation_id}/tax/replacement")
+def tax_replacement_apply(organisation_id: str, payload: TaxReplacementIn,
+                          user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES & {"owner", "administrator"})
+    return TaxReplacementService().apply(organisation_id, payload.from_code_id,
+                                         payload.to_code_id, actor=user.email)
 
 
 @api.get('/organisations/{organisation_id}/reports/{tab}.csv')

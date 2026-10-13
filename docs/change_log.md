@@ -78,6 +78,39 @@ delivered.
   validation and XLSX renderers for the remaining lists remain out of scope;
   objects/bank CSV column sets are intentionally minimal.
 
+## 2026-10-13: Bulk VAT replacement for drafts (parity slate P2 item 7)
+
+- Added `tax_replacement.py`: a preview and an audited apply that replace one
+  tax code with another across every DRAFT invoice and bill of an
+  organisation. Recomputation keeps each document's amount basis (exclusive
+  lines keep net and recompute tax/gross; inclusive sales lines keep gross
+  and recompute the net/tax split), replaced bill lines take the target
+  code's recoverable percentage, and header subtotals, VAT totals and totals
+  are rewritten atomically under an organisation lock.
+- Posted documents are never touched: previews report how many issued
+  invoices and approved bills still use the source code so accountants can
+  reverse and rebook them deliberately. Voided documents are excluded from
+  the skipped counts.
+- Added owner/administrator apply and approve-plus-accountant preview routes
+  (both CSRF-guarded), and the Tax workspace view gained a VAT replacement
+  panel: from/to tax code selectors, a preview table with per-document old
+  and new VAT, the skipped-posted note, an apply button for owners and
+  administrators and result copy. English, Estonian, Lithuanian and Latvian
+  workspace keys were appended in place (the merged brand-system convention).
+- Validation: focused VAT-replacement checks: 11 passed, 1 existing
+  dependency warning in 9.54s, covering draft-only replacement for invoices
+  and bills with recoverable tax, inclusive split recalculation, preview
+  dry runs changing nothing, the role matrix, validation errors (same code,
+  missing source, inactive target, no candidates), tenant isolation, audit
+  events, four-language key parity and an offline tax-view browser flow
+  with the preview applied.
+Full `python -m pytest -q` on Windows/Python 3.14.6: 1411 passed,
+  4 skipped, 5 existing dependency warnings in 1374.65s. `node --check static/app.js`, whitespace,
+  em-dash and attribution checks passed; Estonian copy passed estnltk
+  spelling checks (`auditilogisse` follows existing usage).
+- Open follow-ups: replacing codes on in-review bills, replacing the tax
+  code on quotes before conversion and live PostgreSQL validation.
+
 ## 2026-10-13: Fiscal period close and reopen (parity slate P2 item 6)
 
 - Extended the ledger service: `list_periods` returns the organisation's
