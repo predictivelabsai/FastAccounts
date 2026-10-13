@@ -1606,5 +1606,37 @@
       "Enabled": "Įjungta",
       "Custom": "Pasirinktinis"
     }
+  },
+  "analytical_objects": {
+    "nav": {
+      "objects": "Objektai"
+    },
+    "workspace": {
+      "Objects": "Objektai",
+      "Object": "Objektas",
+      "Project": "Projektas",
+      "Location": "Vieta",
+      "Person": "Asmuo",
+      "Object type": "Objekto tipas",
+      "Add object": "Pridėti objektą",
+      "Edit object": "Redaguoti objektą",
+      "Delete object": "Ištrinti objektą",
+      "Tag income and costs by project, location, person or object.": "Žymėkite pajamas ir išlaidas pagal projektą, vietą, asmenį ar objektą.",
+      "Delete this object? Objects in use must be deactivated instead.": "Ištrinti šį objektą? Naudojamus objektus reikia išjungti.",
+      "Object filter": "Objekto filtras",
+      "All objects": "Visi objektai",
+      "No object": "Be objekto",
+      "Object not found": "Objektas nerastas",
+      "Valid object type and active boolean are required": "Reikia tinkamo objekto tipo ir aktyvumo loginės reikšmės",
+      "Invalid object fields": "Netinkami objekto laukai",
+      "An object requires a code and name within the length limits": "Objektui reikia leistino ilgio kodo ir pavadinimo",
+      "Object code already exists for this type": "Šio tipo objekto kodas jau yra",
+      "A referenced object cannot change type": "Naudojamo objekto tipo keisti negalima",
+      "This object is in use. Deactivate it instead.": "Šis objektas naudojamas. Išjunkite jį.",
+      "Object dimension must match its type and be active": "Objektas turi atitikti dimensijos tipą ir būti aktyvus",
+      "Object fields cannot be null": "Objekto laukai negali būti tušti",
+      "Active": "Active",
+      "Inactive": "Inactive"
+    }
   }
 }

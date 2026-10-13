@@ -19,6 +19,8 @@ from core_utils import audit, db_number, decimal, money, new_id, sha256_bytes, u
 from database import Database, get_database
 from ledger import LedgerService, PostingLine
 from periodisation_repository import PeriodisationRepository
+from objects import dimensions, validate_dimensions
+from objects_repository import ObjectRepository, DIMENSIONS
 
 
 class EInvoiceAlreadyImported(ValueError):
@@ -88,7 +90,11 @@ class DocumentService:
         if declared_vat is not None and len(declared_vat) != len(items):
             raise ValueError("Declared VAT must correspond to every bill line")
         result, subtotal, tax_total = [], Decimal("0"), Decimal("0")
+        objects = ObjectRepository(tx, organisation_id)
+        if any(any(dimensions(item).values()) for item in items):
+            objects.lock_organisation()
         for index, item in enumerate(items, 1):
+            tags = validate_dimensions(objects, item)
             quantity = decimal(item.get("quantity", 1))
             unit_price = decimal(item.get("unit_price", 0))
             if quantity <= 0 or unit_price < 0:
@@ -134,6 +140,7 @@ class DocumentService:
                 "tax_rate": rate, "net_amount": net, "tax_amount": tax_amount,
                 "recoverable_tax": money(tax_amount * decimal(tax["recoverable_percent"] if tax else 100) / 100),
                 "gross_amount": gross,
+                **tags,
             }
             result.append(row)
             subtotal += net
@@ -180,6 +187,7 @@ class DocumentService:
                  line["tax_code_id"], db_number(line["tax_rate"]), db_number(line["net_amount"]),
                  db_number(line["tax_amount"]), db_number(line["gross_amount"])),
             )
+            ObjectRepository(tx, organisation_id).save_dimensions('invoice', invoice_id, line['id'], dimensions(line))
         audit(tx, organisation_id, actor, "invoice.created", "invoice", invoice_id,
               {"document_type": document_type, "total": str(total)})
         row = tx.one(
@@ -187,7 +195,7 @@ class DocumentService:
             "FROM invoices i JOIN contacts c ON c.id=i.contact_id "
             "WHERE i.id=? AND i.organisation_id=?", (invoice_id, organisation_id),
         ) or {}
-        row["lines"] = tx.rows("SELECT * FROM invoice_lines WHERE invoice_id=? ORDER BY line_number", (invoice_id,))
+        row["lines"] = ObjectRepository(tx, organisation_id).document_lines('invoice', invoice_id)
         return row
 
     def invoice(self, invoice_id: str, organisation_id: str | None = None) -> dict:
@@ -199,7 +207,8 @@ class DocumentService:
         )
         if not row:
             raise KeyError("Invoice not found")
-        row["lines"] = self.db.rows("SELECT * FROM invoice_lines WHERE invoice_id=? ORDER BY line_number", (invoice_id,))
+        with self.db.transaction() as tx:
+            row["lines"] = ObjectRepository(tx, row['organisation_id']).document_lines('invoice', invoice_id)
         return row
 
     def _next_number(self, tx, organisation_id: str, document_type: str) -> str:
@@ -233,7 +242,7 @@ class DocumentService:
                 "SELECT i.*,c.name contact_name,c.email contact_email,c.address contact_address,c.vat_no contact_vat_no "
                 "FROM invoices i JOIN contacts c ON c.id=i.contact_id WHERE i.id=?", (invoice_id,),
             )
-            row["lines"] = tx.rows("SELECT * FROM invoice_lines WHERE invoice_id=? ORDER BY line_number", (invoice_id,))
+            row["lines"] = ObjectRepository(tx, row['organisation_id']).document_lines('invoice', invoice_id)
             return row
 
         invoice = tx.one("SELECT * FROM invoices WHERE id=?", (invoice_id,))
@@ -241,13 +250,13 @@ class DocumentService:
             raise KeyError("Invoice not found")
         if invoice["status"] != "Draft":
             return result()
-        lines = tx.rows("SELECT * FROM invoice_lines WHERE invoice_id=? ORDER BY line_number", (invoice_id,))
+        lines = ObjectRepository(tx, invoice['organisation_id']).document_lines('invoice', invoice_id)
         number = self._next_number(tx, invoice["organisation_id"], invoice["document_type"])
         ar = self._role_account(tx, invoice["organisation_id"], "AR")
         output_vat = self._role_account(tx, invoice["organisation_id"], "OUTPUT_VAT")
-        grouped: dict[str, Decimal] = defaultdict(Decimal)
+        grouped = defaultdict(Decimal)
         for line in lines:
-            grouped[line["account_id"]] += money(line["net_amount"])
+            grouped[(line['account_id'], *dimensions(line).values())] += money(line["net_amount"])
         is_credit = invoice["document_type"] == "credit_note"
         posting_lines = [PostingLine(
             account_id=ar,
@@ -256,12 +265,15 @@ class DocumentService:
             contact_id=invoice["contact_id"], due_date=invoice["due_date"],
             memo=number, source_line_type="invoice", source_line_id=invoice_id,
         )]
-        for account_id, amount in grouped.items():
+        for (account_id, *tags), amount in grouped.items():
+            if not amount:
+                continue
             posting_lines.append(PostingLine(
                 account_id=account_id, debit=amount if is_credit else Decimal("0"),
                 credit=Decimal("0") if is_credit else amount,
                 contact_id=invoice["contact_id"], memo=number,
                 source_line_type="invoice", source_line_id=invoice_id,
+                **dict(zip(DIMENSIONS, tags)),
             ))
         if money(invoice["tax_total"]):
             posting_lines.append(PostingLine(
@@ -275,6 +287,7 @@ class DocumentService:
             voucher_id=invoice_id, voucher_code=number, posting_date=invoice["tax_point_date"],
             lines=posting_lines, actor=actor, currency=invoice["currency"],
             exchange_rate=decimal(invoice["exchange_rate"]), tx=tx,
+            allow_inactive_objects=True,
         )
         now = utc_now()
         tx.execute(
@@ -322,13 +335,14 @@ class DocumentService:
                  line["tax_code_id"], db_number(line["tax_rate"]), db_number(line["net_amount"]),
                  db_number(line["tax_amount"]), db_number(line["recoverable_tax"]), db_number(line["gross_amount"])),
             )
+            ObjectRepository(tx, organisation_id).save_dimensions('bill', bill_id, line['id'], dimensions(line))
         audit(tx, organisation_id, actor, "bill.created", "bill", bill_id,
               {"supplier_number": supplier_number, "total": str(total)})
         row = tx.one(
             "SELECT b.*,c.name contact_name FROM bills b JOIN contacts c ON c.id=b.contact_id WHERE b.id=?",
             (bill_id,),
         ) or {}
-        row["lines"] = tx.rows("SELECT * FROM bill_lines WHERE bill_id=? ORDER BY line_number", (bill_id,))
+        row["lines"] = ObjectRepository(tx, organisation_id).document_lines('bill', bill_id)
         return row
 
     def bill(self, bill_id: str) -> dict:
@@ -337,7 +351,8 @@ class DocumentService:
         )
         if not row:
             raise KeyError("Bill not found")
-        row["lines"] = self.db.rows("SELECT * FROM bill_lines WHERE bill_id=? ORDER BY line_number", (bill_id,))
+        with self.db.transaction() as tx:
+            row["lines"] = ObjectRepository(tx, row['organisation_id']).document_lines('bill', bill_id)
         return row
 
     def import_einvoice(self, organisation_id: str, *, content: bytes,
@@ -440,7 +455,7 @@ class DocumentService:
                 bill = tx.one("SELECT * FROM bills WHERE id=? AND organisation_id=?", (bill_id, bill['organisation_id']))
             if not bill or bill["status"] not in {"Draft", "In Review"}:
                 raise ValueError("Only a draft or in-review bill can be approved")
-            lines = tx.rows("SELECT * FROM bill_lines WHERE bill_id=? ORDER BY line_number", (bill_id,))
+            lines = ObjectRepository(tx, bill['organisation_id']).document_lines('bill', bill_id)
             schedule = period_repo.for_bill(bill_id)
             if schedule and schedule['status'] == 'Cancelled':
                 schedule = None
@@ -462,16 +477,18 @@ class DocumentService:
                     account_id=schedule['deferred_account_id'] if schedule else line["account_id"], debit=Decimal("0") if is_credit else amount,
                     credit=amount if is_credit else Decimal("0"), contact_id=bill["contact_id"],
                     memo=bill["supplier_number"], source_line_type="bill", source_line_id=bill_id,
+                    **dimensions(line),
                 ))
             tax = sum((money(line["recoverable_tax"]) for line in lines), Decimal("0"))
             nonrecoverable = money(bill["tax_total"]) - tax
             if nonrecoverable:
-                first_expense = lines[0]["account_id"]
-                postings.append(PostingLine(
-                    account_id=first_expense, debit=Decimal("0") if is_credit else nonrecoverable,
-                    credit=nonrecoverable if is_credit else Decimal("0"), memo="Non-recoverable tax",
-                    source_line_type="bill", source_line_id=bill_id,
-                ))
+                for line in lines:
+                    amount = money(line['tax_amount']) - money(line['recoverable_tax'])
+                    if amount:
+                        postings.append(PostingLine(
+                            account_id=line['account_id'], debit=Decimal('0') if is_credit else amount,
+                            credit=amount if is_credit else Decimal('0'), memo='Non-recoverable tax',
+                            source_line_type='bill', source_line_id=bill_id, **dimensions(line)))
             if tax:
                 postings.append(PostingLine(
                     account_id=input_vat, debit=Decimal("0") if is_credit else tax,
@@ -489,6 +506,7 @@ class DocumentService:
                 voucher_id=bill_id, voucher_code=bill["supplier_number"], posting_date=bill["bill_date"],
                 lines=postings, actor=actor, currency=bill["currency"],
                 exchange_rate=decimal(bill["exchange_rate"]), tx=tx,
+                allow_inactive_objects=True,
             )
             now = utc_now()
             if schedule:

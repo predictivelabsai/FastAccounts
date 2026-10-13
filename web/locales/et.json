@@ -1606,5 +1606,37 @@
       "Enabled": "Lubatud",
       "Custom": "Kohandatud"
     }
+  },
+  "analytical_objects": {
+    "nav": {
+      "objects": "Objektid"
+    },
+    "workspace": {
+      "Objects": "Objektid",
+      "Object": "Objekt",
+      "Project": "Projekt",
+      "Location": "Asukoht",
+      "Person": "Isik",
+      "Object type": "Objekti tüüp",
+      "Add object": "Lisa objekt",
+      "Edit object": "Muuda objekti",
+      "Delete object": "Kustuta objekt",
+      "Tag income and costs by project, location, person or object.": "Märgi tulud ja kulud projekti, asukoha, isiku või objektiga.",
+      "Delete this object? Objects in use must be deactivated instead.": "Kas kustutada see objekt? Kasutuses olev objekt tuleb kustutamise asemel mitteaktiivseks muuta.",
+      "Object filter": "Objekti filter",
+      "All objects": "Kõik objektid",
+      "No object": "Objekt puudub",
+      "Object not found": "Objekti ei leitud",
+      "Valid object type and active boolean are required": "Vaja on kehtivat objekti tüüpi ja aktiivsuse tõeväärtust",
+      "Invalid object fields": "Vigased objekti väljad",
+      "An object requires a code and name within the length limits": "Objekt vajab lubatud pikkusega koodi ja nime",
+      "Object code already exists for this type": "Selle tüübi objekti kood on juba olemas",
+      "A referenced object cannot change type": "Kasutuses oleva objekti tüüpi ei saa muuta",
+      "This object is in use. Deactivate it instead.": "See objekt on kasutuses. Muuda see mitteaktiivseks.",
+      "Object dimension must match its type and be active": "Objekt peab vastama mõõtme tüübile ja olema aktiivne",
+      "Object fields cannot be null": "Objekti väljad ei või olla tühiväärtusega",
+      "Active": "Aktiivne",
+      "Inactive": "Mitteaktiivne"
+    }
   }
 }

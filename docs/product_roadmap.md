@@ -1276,3 +1276,33 @@ pending.
   opt-in PostgreSQL checks. Tests used synthetic data and no live provider calls.
   JavaScript syntax, focused Python compilation, existing locale preservation,
   diff and staged secret-pattern checks passed.
+
+### Analytical objects (2026-10-12)
+
+- [x] Deliver P1 item 10 with additive, rerunnable migration
+  `0023_analytical_objects.sql`. The base had no project catalogue or dimension
+  fields; the similarly named sibling-server tool was not present here.
+- Add project, location, person and generic object records with code, name,
+  notes, active status, tenant/type composite foreign keys, parent unique indexes,
+  owner/administrator CRUD, CSRF protection and audit events. Referenced objects
+  must be deactivated rather than deleted or retyped.
+- Carry optional `projects_*` IDs through invoice, bill and journal lines into
+  immutable ledger dimension companion rows in the same posting transaction.
+  Preserve tags on reversals, credit documents, purchase periodisation and
+  recurring invoices inherited from their source invoice. Distinct tags prevent
+  invoice revenue aggregation from losing line attribution.
+- Add `object_id` filters to trial balance, general ledger and P&L, including
+  every P&L comparison period. Add a Settings Objects list/dialog, optional
+  invoice/bill selectors and a report filter including inactive historical objects.
+  Append all four locales through the `analytical_objects` merge section;
+  Estonian navigation and title are `Objektid`.
+- Leave existing untagged postings unchanged. Object merging, multiple objects
+  per dimension, combined filters, manual journal SPA editing, quote/schedule
+  dimension authoring, dimension exports and production UAT remain deferred.
+  See `docs/specs/analytical-objects.md` for storage and attribution details.
+- Validation: Python 3.12.14, `python -m pytest -q`:
+  `936 passed, 4 skipped in 741.21s (0:12:21)`. All 20 new analytical object
+  checks passed, including browser flows in all four locales. The skips are the
+  existing PostgreSQL opt-in checks. JavaScript syntax, Python compilation,
+  existing locale preservation, desktop/mobile visual review, diff and staged
+  secret-pattern checks passed. All data used by the new tests is synthetic.

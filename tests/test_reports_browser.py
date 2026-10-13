@@ -58,9 +58,9 @@ def test_cash_flow_and_comparisons_in_workspace(monkeypatch, language):
                         data['comparative'] = {**source, 'start': '2024-01-01', 'end': '2024-01-31',
                                                'as_at': '2024-01-31'} if 'as_at' in source else {**source, 'start': '2024-01-01', 'end': '2024-01-31'}
                     return route.fulfill(json=data)
-                return route.fulfill(json=[])
+                return route.fulfill(json=[], content_type='application/json')
             if path.startswith('/api/'):
-                return route.fulfill(json=[])
+                return route.fulfill(json=[], content_type='application/json')
             if path == '/app':
                 return route.fulfill(body=html, content_type='text/html')
             if path in ('/static/app.js', '/static/app.css'):

@@ -208,6 +208,8 @@ class Database:
                     script = _POSTGRES_DOCUMENT_TRIGGERS
                 elif path.stem == "0006_payroll_part_time_hourly":
                     script = _POSTGRES_PAYROLL_0006
+                elif path.stem == "0023_analytical_objects":
+                    script = script.split('-- SQLITE_ANALYTICAL_IMMUTABILITY', 1)[0] + _postgres_object_triggers()
                 connection.execute(script)
                 connection.execute(
                     "INSERT INTO schema_migrations(version) VALUES (%s)",
@@ -221,6 +223,37 @@ class Database:
         finally:
             self._release(connection)
         return applied
+
+
+def _postgres_object_triggers():
+    """Protect dimension companion rows just as their posted parents are protected."""
+    script = ''
+    for kind, header in [('invoice', 'invoices'), ('bill', 'bills'), ('gl', 'posting_batches')]:
+        table = 'gl_entry_objects' if kind == 'gl' else kind + '_line_objects'
+        condition = "IN ('Approved','Part Paid','Paid','Voided')" if kind == 'bill' else "<>'Draft'"
+        script += f"""
+CREATE OR REPLACE FUNCTION guard_{table}() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP <> 'INSERT' THEN
+        IF EXISTS (SELECT 1 FROM {header} WHERE organisation_id=OLD.organisation_id
+                   AND id=OLD.parent_id AND status {condition}) THEN
+            RAISE EXCEPTION 'posted analytical dimensions are immutable';
+        END IF;
+    END IF;
+    IF TG_OP <> 'DELETE' THEN
+        IF EXISTS (SELECT 1 FROM {header} WHERE organisation_id=NEW.organisation_id
+                   AND id=NEW.parent_id AND status {condition}) THEN
+            RAISE EXCEPTION 'posted analytical dimensions are immutable';
+        END IF;
+        RETURN NEW;
+    END IF;
+    RETURN OLD;
+END; $$;
+DROP TRIGGER IF EXISTS {table}_immutable ON {table};
+CREATE TRIGGER {table}_immutable BEFORE INSERT OR UPDATE OR DELETE ON {table}
+FOR EACH ROW EXECUTE FUNCTION guard_{table}();
+"""
+    return script
 
 
 _cached: tuple[tuple[str, str, str], Database] | None = None

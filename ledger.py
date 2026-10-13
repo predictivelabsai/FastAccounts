@@ -8,6 +8,8 @@ from decimal import Decimal
 
 from core_utils import audit, db_number, decimal, money, new_id, utc_now
 from database import Database, get_database
+from objects import dimensions, validate_dimensions
+from objects_repository import ObjectRepository, DIMENSIONS
 
 
 def comparison_periods(start: str, end: str, compare: str) -> tuple[str, str, str, str]:
@@ -63,6 +65,10 @@ class PostingLine:
     transaction_amount: Decimal = Decimal("0")
     transaction_currency: str = ""
     reverses_entry_id: str | None = None
+    projects_project_id: str | None = None
+    projects_location_id: str | None = None
+    projects_person_id: str | None = None
+    projects_object_id: str | None = None
 
 
 class LedgerService:
@@ -82,7 +88,7 @@ class LedgerService:
     def post(self, *, organisation_id: str, voucher_type: str, voucher_id: str,
              voucher_code: str, posting_date: str, lines: list[PostingLine],
              actor: str, currency: str, exchange_rate: Decimal = Decimal("1"),
-             reverses_batch_id: str | None = None, tx=None) -> dict:
+             reverses_batch_id: str | None = None, tx=None, allow_inactive_objects: bool = False) -> dict:
         if len(lines) < 2:
             raise ValueError("A posting needs at least two lines")
         debit = sum((money(line.debit) for line in lines), Decimal("0"))
@@ -94,12 +100,17 @@ class LedgerService:
                 raise ValueError("Each posting line must contain exactly one debit or credit")
 
         def perform(work):
+            objects = ObjectRepository(work, organisation_id)
+            if any(any(dimensions(line).values()) for line in lines):
+                objects.lock_organisation()
             existing = work.one(
                 "SELECT * FROM posting_batches WHERE organisation_id=? AND voucher_type=? AND voucher_id=?",
                 (organisation_id, voucher_type, voucher_id),
             )
             if existing:
                 return existing
+            for line in lines:
+                validate_dimensions(objects, line, active=not (allow_inactive_objects or bool(line.reverses_entry_id)))
             self._validate_period(work, organisation_id, posting_date)
             account_ids = {row["id"] for row in work.rows(
                 "SELECT id FROM accounts WHERE organisation_id=? AND active=1", (organisation_id,)
@@ -114,17 +125,19 @@ class LedgerService:
                  posting_date, reverses_batch_id, now),
             )
             for index, line in enumerate(lines, 1):
+                entry_id = new_id()
                 transaction_currency = line.transaction_currency or currency
                 transaction_amount = line.transaction_amount or (line.debit - line.credit)
                 work.execute(
                     "INSERT INTO gl_entries(id,organisation_id,posting_batch_id,line_number,entry_date,account_id,debit,credit,currency,transaction_amount,transaction_currency,exchange_rate,contact_id,due_date,memo,source_line_type,source_line_id,reverses_entry_id) "
                     "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                    (new_id(), organisation_id, batch_id, index, posting_date, line.account_id,
+                    (entry_id, organisation_id, batch_id, index, posting_date, line.account_id,
                      db_number(money(line.debit)), db_number(money(line.credit)), currency,
                      db_number(money(transaction_amount)), transaction_currency,
                      db_number(decimal(exchange_rate)), line.contact_id, line.due_date,
                      line.memo, line.source_line_type, line.source_line_id, line.reverses_entry_id),
                 )
+                objects.save_dimensions('gl', batch_id, entry_id, dimensions(line))
             work.execute(
                 "UPDATE posting_batches SET status='Posted',posted_at=?,posted_by=? WHERE id=?",
                 (now, actor, batch_id),
@@ -148,6 +161,9 @@ class LedgerService:
             entries = tx.rows(
                 "SELECT * FROM gl_entries WHERE posting_batch_id=? ORDER BY line_number", (batch_id,)
             )
+            for row in entries:
+                row.update(tx.one('SELECT * FROM gl_entry_objects WHERE organisation_id=? AND line_id=?',
+                                  (batch['organisation_id'], row['id'])) or {})
             lines = [PostingLine(
                 account_id=row["account_id"], debit=decimal(row["credit"]),
                 credit=decimal(row["debit"]), contact_id=row["contact_id"],
@@ -155,6 +171,7 @@ class LedgerService:
                 source_line_type=row["source_line_type"], source_line_id=row["source_line_id"],
                 transaction_amount=-decimal(row["transaction_amount"]),
                 transaction_currency=row["transaction_currency"], reverses_entry_id=row["id"],
+                **{key: row.get(key) for key in DIMENSIONS},
             ) for row in entries]
             reversal = self.post(
                 organisation_id=batch["organisation_id"], voucher_type="reversal",
@@ -181,15 +198,26 @@ class LedgerService:
             audit(tx, period["organisation_id"], actor, "period.locked", "fiscal_period", period_id,
                   {"reason": reason.strip()})
 
-    def trial_balance(self, organisation_id: str, *, start: str, end: str) -> list[dict]:
+    def _object_filter(self, organisation_id, object_id):
+        if not object_id:
+            return '', ()
+        with self.db.transaction() as tx:
+            ObjectRepository(tx, organisation_id).get(object_id)
+        fields = DIMENSIONS
+        predicate = ' OR '.join(f'd.{key}=?' for key in fields)
+        return (' AND EXISTS (SELECT 1 FROM gl_entry_objects d WHERE d.organisation_id=g.organisation_id '
+                'AND d.line_id=g.id AND (' + predicate + ')) ', tuple(object_id for _ in fields))
+
+    def trial_balance(self, organisation_id: str, *, start: str, end: str, object_id: str | None = None) -> list[dict]:
+        condition, params = self._object_filter(organisation_id, object_id)
         rows = self.db.rows(
             "SELECT a.code,a.name,a.account_type,COALESCE(SUM(g.debit),0) debit,COALESCE(SUM(g.credit),0) credit "
             "FROM accounts a LEFT JOIN gl_entries g ON g.account_id=a.id AND g.entry_date BETWEEN ? AND ? "
-            "AND g.organisation_id=a.organisation_id "
+            "AND g.organisation_id=a.organisation_id " + condition +
             "AND EXISTS (SELECT 1 FROM posting_batches p WHERE p.id=g.posting_batch_id "
             "AND p.organisation_id=g.organisation_id AND p.status IN ('Posted','Reversed')) "
             "WHERE a.organisation_id=? GROUP BY a.id,a.code,a.name,a.account_type ORDER BY a.code",
-            (start, end, organisation_id),
+            (start, end, *params, organisation_id),
         )
         for row in rows:
             row["debit"] = money(row["debit"])
@@ -197,13 +225,13 @@ class LedgerService:
             row["balance"] = money(row["debit"] - row["credit"])
         return rows
 
-    def profit_and_loss(self, organisation_id: str, *, start: str, end: str, compare: str = "none") -> dict:
+    def profit_and_loss(self, organisation_id: str, *, start: str, end: str, compare: str = "none", object_id: str | None = None) -> dict:
         if compare != "none":
             start, end, before_start, before_end = comparison_periods(start, end, compare)
             return _add_comparison(
-                self.profit_and_loss(organisation_id, start=start, end=end),
-                self.profit_and_loss(organisation_id, start=before_start, end=before_end), compare)
-        rows = [r for r in self.trial_balance(organisation_id, start=start, end=end)
+                self.profit_and_loss(organisation_id, start=start, end=end, object_id=object_id),
+                self.profit_and_loss(organisation_id, start=before_start, end=before_end, object_id=object_id), compare)
+        rows = [r for r in self.trial_balance(organisation_id, start=start, end=end, object_id=object_id)
                 if r["account_type"] in {"Income", "Expense"}]
         income = sum((-r["balance"] for r in rows if r["account_type"] == "Income"), Decimal("0"))
         expenses = sum((r["balance"] for r in rows if r["account_type"] == "Expense"), Decimal("0"))
@@ -230,15 +258,19 @@ class LedgerService:
                 "equity": money(equity), "current_earnings": money(current_earnings),
                 "liabilities_and_equity": money(liabilities + equity + current_earnings), "accounts": rows}
 
-    def general_ledger(self, organisation_id: str, *, start: str, end: str) -> list[dict]:
+    def general_ledger(self, organisation_id: str, *, start: str, end: str, object_id: str | None = None) -> list[dict]:
+        condition, params = self._object_filter(organisation_id, object_id)
         return self.db.rows(
             "SELECT g.id,g.entry_date,a.code account_code,a.name account_name,g.debit,g.credit,g.currency,"
-            "g.memo,p.voucher_type,p.voucher_code,p.status,c.name contact_name "
+            "g.memo,p.voucher_type,p.voucher_code,p.status,c.name contact_name,"
+            "d.projects_project_id,d.projects_location_id,d.projects_person_id,d.projects_object_id "
             "FROM gl_entries g JOIN accounts a ON a.id=g.account_id "
             "JOIN posting_batches p ON p.id=g.posting_batch_id LEFT JOIN contacts c ON c.id=g.contact_id "
+            "LEFT JOIN gl_entry_objects d ON d.organisation_id=g.organisation_id AND d.line_id=g.id "
             "WHERE g.organisation_id=? AND g.entry_date BETWEEN ? AND ? AND p.status IN ('Posted','Reversed') "
+            + condition +
             "ORDER BY g.entry_date,p.created_at,g.line_number",
-            (organisation_id, start, end),
+            (organisation_id, start, end, *params),
         )
 
     def receivables_aging(self, organisation_id: str, *, as_at: str) -> dict:
