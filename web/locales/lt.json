@@ -1698,5 +1698,28 @@
       "Reminder offsets must increase strictly within 1 to 14 days after due": "Priminimų dienos turi griežtai didėti nuo 1 iki 14 dienų po mokėjimo termino",
       "Stop stage must be 0, 1 or 2": "Paskutinis etapas turi būti 0, 1 arba 2"
     }
+  },
+  "fx_rates": {
+    "nav": {
+      "fx_rates": "Valiutų kursai"
+    },
+    "views": {},
+    "workspace": {
+      "Exchange rates": "Valiutų kursai",
+      "Rates are units of the to currency per one unit of the from currency.": "Kursas rodo tikslinės valiutos vienetų skaičių už vieną pradinės valiutos vienetą.",
+      "From currency": "Pradinė valiuta",
+      "To currency": "Tikslinė valiuta",
+      "Exchange rate": "Valiutos kursas",
+      "Source": "Šaltinis",
+      "Add rate": "Pridėti kursą",
+      "Delete rate": "Ištrinti kursą",
+      "Exchange rate must be positive": "Valiutos kursas turi būti teigiamas",
+      "Rate date must use YYYY-MM-DD": "Kurso data turi būti formato YYYY-MM-DD",
+      "Currencies must be three uppercase letters": "Valiutų kodai turi būti trys didžiosios raidės",
+      "From and to currencies must differ": "Pradinė ir tikslinė valiutos turi skirtis",
+      "Rate must fit NUMERIC(20,10)": "Kursas turi tilpti į NUMERIC(20,10)",
+      "A manual exchange rate already exists for this date and currency pair": "Šios datos ir valiutų poros rankinis kursas jau yra",
+      "Exchange rate not found": "Valiutos kursas nerastas"
+    }
   }
 }

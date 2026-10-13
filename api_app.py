@@ -26,6 +26,7 @@ from invoice_list import InvoiceListService, validate_list_dates
 from quotes import QuoteService
 from periodisation import PeriodisationService
 from payment_links import PaymentLinkService
+from exchange_rates import ExchangeRateService
 from reminder_rules import ReminderRuleService, validate_rule
 from objects import ObjectService
 from statements import StatementService
@@ -117,11 +118,32 @@ class ObjectPatch(BaseModel):
         return value
 
 
+class ExchangeRateIn(BaseModel):
+    model_config = {'extra': 'forbid'}
+    rate_date: str = Field(pattern=r'^\d{4}-\d{2}-\d{2}$')
+    from_currency: str = Field(pattern=r'^[A-Z]{3}$')
+    to_currency: str = Field(pattern=r'^[A-Z]{3}$')
+    rate: Decimal = Field(gt=0, max_digits=20, decimal_places=10)
+
+    @field_validator('rate_date')
+    @classmethod
+    def valid_date(cls, value):
+        date.fromisoformat(value)
+        return value
+
+    @model_validator(mode='after')
+    def different_currencies(self):
+        if self.from_currency == self.to_currency:
+            raise ValueError('From and to currencies must differ')
+        return self
+
+
 class InvoiceIn(BaseModel):
     contact_id: str
     issue_date: str
     due_date: str | None = None
     currency: str | None = None
+    exchange_rate: Decimal | None = Field(default=None, gt=0)
     amount_type: Literal["exclusive", "inclusive", "no_tax"] = "exclusive"
     reference: str = ""
     notes: str = ""
@@ -243,6 +265,7 @@ class BillIn(BaseModel):
     bill_date: str
     due_date: str
     currency: str | None = None
+    exchange_rate: Decimal | None = Field(default=None, gt=0)
     reference: str = ""
     notes: str = ""
     document_type: Literal["bill", "supplier_credit"] = "bill"
@@ -745,6 +768,24 @@ def invoice_list_export(organisation_id: str, format_: str, request: Request,
                   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     return Response(content, media_type=media_type,
                     headers={"Content-Disposition": f'attachment; filename="{kind}.{format_}"'})
+
+
+@api.get('/organisations/{organisation_id}/exchange-rates')
+def list_exchange_rates(organisation_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, {'owner', 'administrator', 'accountant', 'approver', 'viewer'})
+    return ExchangeRateService().list(organisation_id)
+
+
+@api.post('/organisations/{organisation_id}/exchange-rates', status_code=201)
+def create_exchange_rate(organisation_id: str, payload: ExchangeRateIn, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, {'owner', 'administrator'})
+    return ExchangeRateService().create(organisation_id, **payload.model_dump(), actor=user.email)
+
+
+@api.delete('/organisations/{organisation_id}/exchange-rates/{rate_id}')
+def delete_exchange_rate(organisation_id: str, rate_id: str, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, {'owner', 'administrator'})
+    return ExchangeRateService().delete(organisation_id, rate_id, actor=user.email)
 
 
 @api.get('/organisations/{organisation_id}/payment-methods')

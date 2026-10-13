@@ -10,6 +10,7 @@ from core_utils import audit, db_number, decimal, money, new_id, utc_now
 from database import Database, get_database
 from objects import dimensions, validate_dimensions
 from objects_repository import ObjectRepository, DIMENSIONS
+from exchange_rates import positive_rate
 
 
 def comparison_periods(start: str, end: str, compare: str) -> tuple[str, str, str, str]:
@@ -91,6 +92,7 @@ class LedgerService:
              reverses_batch_id: str | None = None, tx=None, allow_inactive_objects: bool = False) -> dict:
         if len(lines) < 2:
             raise ValueError("A posting needs at least two lines")
+        exchange_rate = positive_rate(exchange_rate)
         debit = sum((money(line.debit) for line in lines), Decimal("0"))
         credit = sum((money(line.credit) for line in lines), Decimal("0"))
         if debit <= 0 or debit != credit:
@@ -117,6 +119,14 @@ class LedgerService:
             )}
             if any(line.account_id not in account_ids for line in lines):
                 raise ValueError("Posting contains an account from another organisation or an inactive account")
+            base_currency = work.scalar('SELECT base_currency FROM organisations WHERE id=?', (organisation_id,))
+            converted = [(money(decimal(line.debit) * exchange_rate), money(decimal(line.credit) * exchange_rate))
+                         if (line.transaction_currency or currency) != base_currency
+                         else (money(line.debit), money(line.credit)) for line in lines]
+            base_debit = sum((amounts[0] for amounts in converted), Decimal('0'))
+            base_credit = sum((amounts[1] for amounts in converted), Decimal('0'))
+            if base_debit <= 0 or base_debit != base_credit:
+                raise ValueError(f'Unbalanced posting after exchange rate rounding: debit {base_debit} credit {base_credit}')
             batch_id, now = new_id(), utc_now()
             work.execute(
                 "INSERT INTO posting_batches(id,organisation_id,voucher_type,voucher_id,voucher_code,posting_date,status,reverses_batch_id,created_at) "
@@ -132,7 +142,7 @@ class LedgerService:
                     "INSERT INTO gl_entries(id,organisation_id,posting_batch_id,line_number,entry_date,account_id,debit,credit,currency,transaction_amount,transaction_currency,exchange_rate,contact_id,due_date,memo,source_line_type,source_line_id,reverses_entry_id) "
                     "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                     (entry_id, organisation_id, batch_id, index, posting_date, line.account_id,
-                     db_number(money(line.debit)), db_number(money(line.credit)), currency,
+                     db_number(converted[index - 1][0]), db_number(converted[index - 1][1]), base_currency,
                      db_number(money(transaction_amount)), transaction_currency,
                      db_number(decimal(exchange_rate)), line.contact_id, line.due_date,
                      line.memo, line.source_line_type, line.source_line_id, line.reverses_entry_id),
@@ -144,7 +154,7 @@ class LedgerService:
             )
             audit(work, organisation_id, actor, "ledger.posted", "posting_batch", batch_id,
                   {"voucher_type": voucher_type, "voucher_code": voucher_code,
-                   "debit": str(debit), "credit": str(credit)})
+                   "debit": str(base_debit), "credit": str(base_credit)})
             return work.one("SELECT * FROM posting_batches WHERE id=?", (batch_id,)) or {}
 
         if tx is not None:

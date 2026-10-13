@@ -1698,5 +1698,28 @@
       "Reminder offsets must increase strictly within 1 to 14 days after due": "Meeldetuletuste vahed peavad rangelt kasvama 1 kuni 14 päeva piires pärast maksetähtaega",
       "Stop stage must be 0, 1 or 2": "Lõppetapp peab olema 0, 1 või 2"
     }
+  },
+  "fx_rates": {
+    "nav": {
+      "fx_rates": "Valuutakursid"
+    },
+    "views": {},
+    "workspace": {
+      "Exchange rates": "Valuutakursid",
+      "Rates are units of the to currency per one unit of the from currency.": "Kurss näitab sihtvaluuta ühikute arvu lähtevaluuta ühe ühiku kohta.",
+      "From currency": "Lähtevaluuta",
+      "To currency": "Sihtvaluuta",
+      "Exchange rate": "Valuutakurss",
+      "Source": "Allikas",
+      "Add rate": "Lisa kurss",
+      "Delete rate": "Kustuta kurss",
+      "Exchange rate must be positive": "Valuutakurss peab olema positiivne",
+      "Rate date must use YYYY-MM-DD": "Kursi kuupäev peab olema kujul AAAA-KK-PP",
+      "Currencies must be three uppercase letters": "Valuutakood peab koosnema kolmest suurtähest",
+      "From and to currencies must differ": "Lähtevaluuta ja sihtvaluuta peavad erinema",
+      "Rate must fit NUMERIC(20,10)": "Kurss peab mahtuma vormingusse NUMERIC(20,10)",
+      "A manual exchange rate already exists for this date and currency pair": "Selle kuupäeva ja valuutapaari käsitsi sisestatud kurss on juba olemas",
+      "Exchange rate not found": "Valuutakurssi ei leitud"
+    }
   }
 }
