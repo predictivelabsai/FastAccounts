@@ -26,7 +26,7 @@ from cash_flow import CashFlowService
 from excel_export import (employees_workbook, general_ledger_workbook,
                           invoices_workbook, vat_returns_workbook)
 from governance import GovernanceService
-from import_service import OBJECT_TYPES, ImportService
+from import_service import OBJECT_TYPES, ImportService, MasterDataImportService
 from push_service import PushService
 from integration_service import AccountMappingService, IntegrationService
 from ledger import LedgerService, PostingLine
@@ -432,6 +432,35 @@ def list_tax_codes(organisation_id: str, user: User = Depends(current_user)):
 def list_contacts(organisation_id: str, user: User = Depends(current_user)):
     _require(organisation_id, user, {"owner", "administrator", "accountant", "approver", "viewer"})
     return get_database().rows("SELECT * FROM contacts WHERE organisation_id=? ORDER BY name", (organisation_id,))
+
+
+class MasterDataImportIn(BaseModel):
+    kind: Literal['contacts', 'items']
+    csv_content: str = Field(min_length=1, max_length=2_000_000)
+
+
+@api.post('/organisations/{organisation_id}/imports', status_code=201)
+def stage_master_data(organisation_id: str, payload: MasterDataImportIn, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return MasterDataImportService().stage(organisation_id, **payload.model_dump(), actor=user.email)
+
+
+@api.get('/organisations/{organisation_id}/imports/{batch_id}')
+def get_master_data_import(organisation_id: str, batch_id: str, limit: int = 100, offset: int = 0, user: User = Depends(current_user)):
+    _require(organisation_id, user, {'owner', 'administrator', 'accountant', 'approver', 'viewer'})
+    return MasterDataImportService().get(organisation_id, batch_id, limit=limit, offset=offset)
+
+
+@api.post('/organisations/{organisation_id}/imports/{batch_id}/commit')
+def commit_master_data_import(organisation_id: str, batch_id: str, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return MasterDataImportService().commit(organisation_id, batch_id, actor=user.email)
+
+
+@api.post('/organisations/{organisation_id}/imports/{batch_id}/discard')
+def discard_master_data_import(organisation_id: str, batch_id: str, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return MasterDataImportService().discard(organisation_id, batch_id, actor=user.email)
 
 
 @api.post("/organisations/{organisation_id}/contacts", status_code=201)

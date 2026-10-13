@@ -24,6 +24,7 @@ from database import Database, get_database
 from documents import DocumentService
 from integration_service import AccountMappingService, IntegrationService
 from payroll import PayrollConflict, PayrollService
+from master_data_import import MasterDataImportService
 
 EMPLOYEE_FIELDS = {
     "name",
