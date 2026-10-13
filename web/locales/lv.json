@@ -1254,7 +1254,19 @@
     "GoCardless request failed. Try again later.": "GoCardless pieprasījums neizdevās. Mēģiniet vēlāk.",
     "GoCardless credentials verified; link a bank to approve access": "GoCardless piekļuves dati pārbaudīti; pievienojiet banku, lai apstiprinātu piekļuvi",
     "GoCardless connection failed": "Savienojums ar GoCardless neizdevās",
-    "GoCardless secret ID and secret key are required": "Nepieciešams GoCardless slepenais ID un slepenā atslēga"
+    "GoCardless secret ID and secret key are required": "Nepieciešams GoCardless slepenais ID un slepenā atslēga",
+    "Daily bank feed": "Ikdienas bankas datu imports",
+    "Mapped bank accounts are pulled once daily.": "Piesaistīto bankas kontu darījumi tiek importēti reizi dienā.",
+    "Daily bank feed worker is disabled.": "Ikdienas automātiskais bankas datu imports ir izslēgts.",
+    "Last scheduled pull": "Pēdējais automātiskais imports",
+    "Last pull result": "Pēdējā importa rezultāts",
+    "Not yet pulled": "Vēl nav importēts",
+    "Link a bank account to enable daily pulls.": "Piesaistiet bankas kontu, lai ieslēgtu ikdienas importu.",
+    "Pull now": "Importēt tagad",
+    "Bank consent has expired. Re-link the bank to resume daily pulls.": "Bankas piekrišanas termiņš ir beidzies. Pievienojiet banku atkārtoti, lai turpinātu ikdienas importu.",
+    "Scheduled bank feed pull failed. Try again or check the bank connection.": "Automātiskais bankas datu imports neizdevās. Mēģiniet vēlreiz vai pārbaudiet savienojumu ar banku.",
+    "Bank feed scheduling failed": "Neizdevās ieplānot bankas datu importu",
+    "Success": "Izdevās"
   },
   "views": {
     "overview": "Overview",

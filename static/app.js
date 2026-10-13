@@ -1261,7 +1261,7 @@
         button("Connect bank", "connectBank", true, connection && status !== "Disconnected" ? "" : "disabled") +
         (connection?.config?.requisition_id && status !== "Disconnected" ? button("I've approved at the bank", "completeBankLink") : "")
       : actions;
-    return `<article class="card integration-provider" data-provider="${esc(provider)}"><div class="integration-provider-head"><img src="${esc(item.logo)}" alt="${esc(name)}"><div><h2>${esc(name)}</h2><div class="integration-statuses"><span>${tr("Registry status")}: ${pill(item.registry_status)}</span><span class="connection-status">${tr("Connection status")}: ${pill(status)}</span></div></div></div><p>${esc(integrationDescription(item))}</p><p class="integration-direction">${esc(integrationDirection(item))}</p><div class="integration-actions">${bankActions}</div>${provider === "open_banking" && status === "Connected" ? `<div class="bank-feed-accounts" aria-live="polite"><p>${tr("Loading bank accounts")}</p></div>` : ""}</article>`;
+    return `<article class="card integration-provider" data-provider="${esc(provider)}"><div class="integration-provider-head"><img src="${esc(item.logo)}" alt="${esc(name)}"><div><h2>${esc(name)}</h2><div class="integration-statuses"><span>${tr("Registry status")}: ${pill(item.registry_status)}</span><span class="connection-status">${tr("Connection status")}: ${pill(status)}</span></div></div></div><p>${esc(integrationDescription(item))}</p><p class="integration-direction">${esc(integrationDirection(item))}</p><div class="integration-actions">${bankActions}</div>${provider === "open_banking" && connection ? `<div class="bank-feed-status" aria-live="polite"></div>` : ""}${provider === "open_banking" && status === "Connected" ? `<div class="bank-feed-accounts" aria-live="polite"><p>${tr("Loading bank accounts")}</p></div>` : ""}</article>`;
   }
 
   function plannedIntegration(item) {
@@ -1378,6 +1378,8 @@
         location.hash = `integrations/runs/${encodeURIComponent(button.dataset.provider)}`;
       },
     });
+    const statusTarget = content.querySelector(".bank-feed-status");
+    if (statusTarget) await bankFeedStatus(c, statusTarget);
     const target = content.querySelector(".bank-feed-accounts");
     if (target) await bankFeedAccounts(c, target);
   }
@@ -1412,6 +1414,20 @@
     });
   }
 
+  async function bankFeedStatus(c, target) {
+    try {
+      const state = await api(integrationUrl(c, "open_banking", "/pull-status"));
+      if (!target.isConnected) return;
+      const reauth = state.connection_status === "Reauth Required";
+      target.innerHTML = `<h3>${tr("Daily bank feed")}</h3><p class="muted">${tr(state.worker_enabled ? "Mapped bank accounts are pulled once daily." : "Daily bank feed worker is disabled.")}</p>` +
+        (reauth ? `<p class="notice" role="alert">${tr("Bank consent has expired. Re-link the bank to resume daily pulls.")}</p>` : "") +
+        (state.schedules.length ? state.schedules.map((schedule) =>
+          `<div class="section"><p>${esc(schedule.gocardless_account_id)} · ${tr(schedule.active ? "Active" : "Inactive")}</p><p>${tr("Last scheduled pull")}: ${esc(schedule.last_pull_at || t("Not yet pulled"))}</p><p>${tr("Last pull result")}: ${tr(schedule.last_result || "Not yet pulled")}</p>${schedule.last_error_message ? `<p class="notice">${tr(schedule.last_error_message)}</p>` : ""}</div>`).join("") : `<p>${tr("Link a bank account to enable daily pulls.")}</p>`);
+    } catch (error) {
+      if (target.isConnected) target.innerHTML = `<p class="notice" role="alert">${esc(error.message)}</p>`;
+    }
+  }
+
   async function bankFeedAccounts(c, target) {
     try {
       const [accounts, banks] = await Promise.all([
@@ -1420,7 +1436,7 @@
       if (!target.isConnected) return;
       target.innerHTML = `<h3>${tr("Linked bank accounts")}</h3>` + (accounts.length ? accounts.map((account) =>
         `<div class="section"><p>${esc(account.iban || account.gocardless_account_id)}</p><p class="muted">${tr("Balances")}: ${account.balances.map((balance) => esc(`${balance.balanceAmount?.amount || ""} ${balance.balanceAmount?.currency || ""} (${balance.balanceType || ""})`)).join(" · ")}</p>${account.bank_account_id
-          ? `<p>${esc(banks.find((bank) => bank.id === account.bank_account_id)?.name || "")}</p>${button("Pull transactions", "pullBankTransactions", true, `data-account="${esc(account.gocardless_account_id)}"`)}`
+          ? `<p>${esc(banks.find((bank) => bank.id === account.bank_account_id)?.name || "")}</p>${button("Pull now", "pullBankTransactions", true, `data-account="${esc(account.gocardless_account_id)}"`)}`
           : `${button("Link bank account", "mapBankAccount", false, `data-account="${esc(account.gocardless_account_id)}"`)}<p class="muted">${tr("Link an existing bank account before pulling transactions.")}</p>`}</div>`).join("")
         : `<p>${tr("No bank accounts returned. Complete bank consent first.")}</p>`);
       bindActions(target, {
@@ -1434,6 +1450,8 @@
             });
             closeDialog(d);
             await bankFeedAccounts(c, target);
+            const statusTarget = content.querySelector(".bank-feed-status");
+            if (statusTarget) await bankFeedStatus(c, statusTarget);
           });
         },
         pullBankTransactions: async (button) => {
@@ -1442,11 +1460,17 @@
             const summary = await post(integrationUrl(c, "open_banking", "/pull"), {gocardless_account_id: button.dataset.account});
             toast(t("Bank transactions imported: {imported}; skipped: {skipped}")
               .replace("{imported}", num(summary.imported)).replace("{skipped}", num(summary.skipped)));
-          } finally { button.disabled = false; }
+          } finally {
+            button.disabled = false;
+            const statusTarget = content.querySelector(".bank-feed-status");
+            if (statusTarget) await bankFeedStatus(c, statusTarget);
+          }
         },
       });
     } catch (error) {
       if (target.isConnected) target.innerHTML = `<p class="notice" role="alert">${esc(error.message)}</p>`;
+      const statusTarget = content.querySelector(".bank-feed-status");
+      if (statusTarget) await bankFeedStatus(c, statusTarget);
     }
   }
 

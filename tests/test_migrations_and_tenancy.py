@@ -10,9 +10,9 @@ from organisations import AccessDenied, OrganisationService
 
 def test_empty_migration_is_idempotent(tmp_path):
     db = Database(path=str(tmp_path / "empty.sqlite"))
-    assert db.migrate() == ["0001_accounting_core", "0002_integrations", "0003_operations", "0004_document_immutability", "0005_payroll", "0006_payroll_part_time_hourly", "0007_automation", "0008_import_staging", "0009_local_accounts", "0010_tsd_export", "0011_account_mappings", "0012_external_gl", "0013_sync_review", "0014_sync_push", "0015_payment_orders"]
+    assert db.migrate() == ["0001_accounting_core", "0002_integrations", "0003_operations", "0004_document_immutability", "0005_payroll", "0006_payroll_part_time_hourly", "0007_automation", "0008_import_staging", "0009_local_accounts", "0010_tsd_export", "0011_account_mappings", "0012_external_gl", "0013_sync_review", "0014_sync_push", "0015_payment_orders", "0016_bank_feed_schedules"]
     assert db.migrate() == []
-    assert db.scalar("SELECT COUNT(*) FROM schema_migrations") == 15
+    assert db.scalar("SELECT COUNT(*) FROM schema_migrations") == 16
     assert db.scalar(
         "SELECT COUNT(*) FROM sqlite_master WHERE type='table' "
         "AND name IN ('account_mappings','external_gl_entries')"
@@ -109,3 +109,43 @@ def test_database_foreign_keys_are_enforced(db):
     with pytest.raises(sqlite3.IntegrityError):
         with db.transaction() as tx:
             tx.execute("INSERT INTO memberships(id,organisation_id,email,role,created_at) VALUES ('x','missing','x@x.test','viewer','now')")
+
+
+def test_migration_list_matches_ci_exactly(tmp_path):
+    import ast
+    import re
+    from pathlib import Path
+    workflow = (Path(__file__).resolve().parents[1] / '.github/workflows/ci.yml').read_text(encoding='utf-8')
+    expected = ast.literal_eval(re.search(r'assert db\.migrate\(\) == (\[[^\n]+\])', workflow).group(1))
+    db = Database(path=str(tmp_path / 'ci-migrations.sqlite'))
+    assert db.migrate() == expected
+    assert db.migrate() == []
+
+
+def test_bank_feed_migration_preserves_previous_schema_data(tmp_path, monkeypatch):
+    import shutil
+    import database
+    from documents import DocumentService
+    from core_utils import canonical_json, utc_now
+    directory = tmp_path / 'migrations' / 'sqlite'
+    directory.mkdir(parents=True)
+    original = database.MIGRATIONS
+    for source in (original / 'sqlite').glob('*.sql'):
+        if source.stem < '0016':
+            shutil.copyfile(source, directory / source.name)
+    monkeypatch.setattr(database, 'MIGRATIONS', directory.parent)
+    db = Database(path=str(tmp_path / 'bank-upgrade.sqlite'))
+    db.migrate()
+    org = OrganisationService(db).create(name='Synthetic preserved company', country_code='EE',
+        entity_type='EE_OU', owner_email='owner@example.test')
+    bank = DocumentService(db).create_bank_account(org['id'], name='Synthetic preserved bank', currency='EUR')
+    now = utc_now()
+    with db.transaction() as tx:
+        tx.execute("INSERT INTO integration_connections(id,organisation_id,provider,status,config_json,created_at,updated_at) VALUES (?,?,?,'Connected',?,?,?)",
+                   ('synthetic-connection', org['id'], 'open_banking', canonical_json({'requisition_status': 'LN', 'account_ids': ['synthetic-account'], 'account_mappings': {'synthetic-account': bank['id']}}), now, now))
+    tables = ['organisations', 'bank_accounts', 'integration_connections', 'audit_events', 'gl_entries']
+    before = {name: db.rows(f'SELECT * FROM {name} ORDER BY id') for name in tables}
+    shutil.copyfile(original / 'sqlite' / '0016_bank_feed_schedules.sql', directory / '0016_bank_feed_schedules.sql')
+    assert db.migrate() == ['0016_bank_feed_schedules']
+    assert {name: db.rows(f'SELECT * FROM {name} ORDER BY id') for name in tables} == before
+    assert db.rows('SELECT * FROM bank_feed_schedules') == []

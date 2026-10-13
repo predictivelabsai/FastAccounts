@@ -4,6 +4,44 @@ Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as
 delivered.
 
+## 2026-10-12: Daily GoCardless bank feed worker
+
+### Added
+
+- Added additive migration `0016_bank_feed_schedules`, per-organisation/account
+  daily schedules, last attempt/result, safe errors and timestamps. Updated the
+  inline CI migration list, health migration count and all affected migration
+  expectations, with an exact CI-list regression and a data-preserving upgrade
+  check.
+- Extended the existing opt-in automation worker to discover valid bank mappings
+  and pull due accounts as `system`. Atomic claims prevent concurrent daily
+  pulls. Discovery preserves inactive schedules until explicitly linked again.
+  Missed days require one overlapping 90-day import; success, failure and
+  interrupted attempts next become due tomorrow. Dates use the server calendar
+  and timestamps use UTC. Existing imports remain idempotent and review-first.
+- Isolated feed/account/organisation errors and recheck transient Error
+  connections' consent on the next daily run. Reauth Required connections make
+  no bank requests until consent and account mappings are restored. The worker
+  retains its default-off switch and 60-second poll interval.
+- Added a local authorised status GET route and a small integration-card section
+  with last scheduled pull, result and renewal warnings, including when account
+  loading fails. Added append-only copy in all four locales, using Estonian
+  pangafeed and "Impordi kohe". Updated the worker description in `.env.sample`.
+
+### Validation and boundaries
+
+- Validation: `python -m pytest tests/ -q` passed with 582 tests, three optional
+  PostgreSQL skips and one existing dependency warning. The final focused run
+  passed 101 tests, including 12 intercepted browser cases across four languages
+  covering mobile layout, manual pull refresh and expiry during account loading.
+  Fresh `db.migrate()` matches CI exactly; reruns and preservation checks passed.
+  Python compilation, JavaScript syntax and diff checks passed.
+- Tests used synthetic feeds and blocked or intercepted HTTP. Live bank consent
+  UAT, GB/EE coverage and legal/commercial acceptance remain pending. No automatic
+  ledger reconciliation or payment initiation is added. Local validation used
+  Python 3.14.6 because Python 3.12 is unavailable; optional PostgreSQL checks
+  still require an explicit test database.
+
 ## 2026-10-12: Customer and supplier statements of account (PR6)
 
 ### Added

@@ -1254,7 +1254,19 @@
     "GoCardless request failed. Try again later.": "GoCardless užklausa nepavyko. Bandykite vėliau.",
     "GoCardless credentials verified; link a bank to approve access": "GoCardless prisijungimo duomenys patikrinti; prijunkite banką, kad patvirtintumėte prieigą",
     "GoCardless connection failed": "Nepavyko prisijungti prie GoCardless",
-    "GoCardless secret ID and secret key are required": "Būtini GoCardless slaptasis ID ir slaptasis raktas"
+    "GoCardless secret ID and secret key are required": "Būtini GoCardless slaptasis ID ir slaptasis raktas",
+    "Daily bank feed": "Kasdienis banko duomenų importas",
+    "Mapped bank accounts are pulled once daily.": "Susietų banko sąskaitų operacijos importuojamos kartą per dieną.",
+    "Daily bank feed worker is disabled.": "Kasdienis automatinis banko duomenų importas išjungtas.",
+    "Last scheduled pull": "Paskutinis automatinis importas",
+    "Last pull result": "Paskutinio importo rezultatas",
+    "Not yet pulled": "Dar neimportuota",
+    "Link a bank account to enable daily pulls.": "Susiekite banko sąskaitą, kad įjungtumėte kasdienį importą.",
+    "Pull now": "Importuoti dabar",
+    "Bank consent has expired. Re-link the bank to resume daily pulls.": "Banko sutikimas nebegalioja. Iš naujo prijunkite banką, kad tęstumėte kasdienį importą.",
+    "Scheduled bank feed pull failed. Try again or check the bank connection.": "Automatinis banko duomenų importas nepavyko. Bandykite dar kartą arba patikrinkite ryšį su banku.",
+    "Bank feed scheduling failed": "Nepavyko suplanuoti banko duomenų importo",
+    "Success": "Pavyko"
   },
   "views": {
     "overview": "Overview",
