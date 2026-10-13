@@ -25,6 +25,7 @@ from bulk_sending import BulkSendingService, MAX_BULK_INVOICES
 from invoice_list import InvoiceListService, validate_list_dates
 from csv_exports import CsvExportService
 from copilot import CopilotDisabled, CopilotQuotaExceeded, CopilotService
+from contact_groups import GroupService
 from list_export_repository import ListExportRepository
 from quotes import QuoteService
 from periodisation import PeriodisationService
@@ -41,6 +42,7 @@ from excel_export import (employees_workbook, general_ledger_workbook,
                           invoices_workbook, vat_returns_workbook)
 from governance import GovernanceService
 from import_service import OBJECT_TYPES, ImportService, MasterDataImportService
+from master_data_maintenance import MasterDataMaintenanceService
 from push_service import PushService
 from integration_service import AccountMappingService, IntegrationService
 from ledger import LedgerService, PostingLine
@@ -639,9 +641,139 @@ def list_tax_codes(organisation_id: str, user: User = Depends(current_user)):
 
 
 @api.get("/organisations/{organisation_id}/contacts")
-def list_contacts(organisation_id: str, user: User = Depends(current_user)):
+def list_contacts(organisation_id: str, include_inactive: bool = False,
+                  group_id: str | None = None, user: User = Depends(current_user)):
     _require(organisation_id, user, {"owner", "administrator", "accountant", "approver", "viewer"})
-    return ListExportRepository(get_database()).contacts(organisation_id)
+    if group_id:
+        GroupService().members(organisation_id, "contact", group_id)
+        return get_database().rows(
+            "SELECT c.* FROM contacts c JOIN contact_group_members m ON m.contact_id=c.id "
+            "AND m.organisation_id=c.organisation_id WHERE c.organisation_id=? AND m.group_id=? "
+            "AND c.active<>0 ORDER BY c.name", (organisation_id, group_id))
+    if include_inactive:
+        return ListExportRepository(get_database()).contacts(organisation_id)
+    return get_database().rows(
+        "SELECT * FROM contacts WHERE organisation_id=? AND active<>0 ORDER BY name",
+        (organisation_id,))
+
+
+# --- Master data maintenance ------------------------------------------------
+
+@api.get('/organisations/{organisation_id}/master-data/maintenance')
+def master_data_maintenance(organisation_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, READ_ROLES)
+    return MasterDataMaintenanceService().analyse(organisation_id)
+
+
+@api.post('/organisations/{organisation_id}/master-data/contacts/{contact_id}/deactivate')
+def deactivate_contact(organisation_id: str, contact_id: str, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES & {'owner', 'administrator'})
+    MasterDataMaintenanceService().deactivate_contact(organisation_id, contact_id, actor=user.email)
+    return {'deactivated': True}
+
+
+@api.post('/organisations/{organisation_id}/master-data/contacts/{contact_id}/reactivate')
+def reactivate_contact(organisation_id: str, contact_id: str, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES & {'owner', 'administrator'})
+    MasterDataMaintenanceService().reactivate_contact(organisation_id, contact_id, actor=user.email)
+    return {'reactivated': True}
+
+
+@api.post('/organisations/{organisation_id}/master-data/contacts/{contact_id}/delete')
+def delete_contact(organisation_id: str, contact_id: str, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES & {'owner', 'administrator'})
+    MasterDataMaintenanceService().delete_contact(organisation_id, contact_id, actor=user.email)
+    return {'deleted': True}
+
+
+@api.post('/organisations/{organisation_id}/master-data/items/{item_id}/deactivate')
+def deactivate_item(organisation_id: str, item_id: str, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES & {'owner', 'administrator'})
+    MasterDataMaintenanceService().deactivate_item(organisation_id, item_id, actor=user.email)
+    return {'deactivated': True}
+
+
+@api.post('/organisations/{organisation_id}/master-data/items/{item_id}/delete')
+def delete_item(organisation_id: str, item_id: str, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES & {'owner', 'administrator'})
+    MasterDataMaintenanceService().delete_item(organisation_id, item_id, actor=user.email)
+    return {'deleted': True}
+
+
+# --- Contact and user groups -------------------------------------------------
+
+class GroupCreateIn(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+
+
+class GroupMemberIn(BaseModel):
+    member: str = Field(min_length=1, max_length=320)
+
+
+GROUP_KINDS = {'contact', 'user'}
+
+
+def _group_roles(write: bool):
+    if write:
+        return WRITE_ROLES & {'owner', 'administrator'}
+    return READ_ROLES
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def _register_group_routes(kind: str) -> None:
+    """Explicit per-kind registrations; asset-groups keeps its own handler."""
+
+    @api.get(f'/organisations/{{organisation_id}}/{kind}-groups')
+    def _list_groups(organisation_id: str, user: User = Depends(current_user)):
+        _require(organisation_id, user, READ_ROLES)
+        return GroupService().list_groups(organisation_id, kind)
+
+    @api.post(f'/organisations/{{organisation_id}}/{kind}-groups', status_code=201)
+    def _create_group(organisation_id: str, payload: GroupCreateIn,
+                      user: User = Depends(require_csrf)):
+        _require(organisation_id, user, _group_roles(True))
+        return GroupService().create_group(organisation_id, kind, payload.name, actor=user.email)
+
+    @api.get(f'/organisations/{{organisation_id}}/{kind}-groups/{{group_id}}/members')
+    def _group_members(organisation_id: str, group_id: str, user: User = Depends(current_user)):
+        _require(organisation_id, user, READ_ROLES)
+        return GroupService().members(organisation_id, kind, group_id)
+
+    @api.post(f'/organisations/{{organisation_id}}/{kind}-groups/{{group_id}}/members', status_code=201)
+    def _add_group_member(organisation_id: str, group_id: str, payload: GroupMemberIn,
+                          user: User = Depends(require_csrf)):
+        _require(organisation_id, user, _group_roles(True))
+        GroupService().add_member(organisation_id, kind, group_id, payload.member, actor=user.email)
+        return GroupService().members(organisation_id, kind, group_id)
+
+    @api.delete(f'/organisations/{{organisation_id}}/{kind}-groups/{{group_id}}/members/{{member}}')
+    def _remove_group_member(organisation_id: str, group_id: str, member: str,
+                             user: User = Depends(require_csrf)):
+        _require(organisation_id, user, _group_roles(True))
+        GroupService().remove_member(organisation_id, kind, group_id, member, actor=user.email)
+        return {'removed': True}
+
+    @api.delete(f'/organisations/{{organisation_id}}/{kind}-groups/{{group_id}}')
+    def _delete_group(organisation_id: str, group_id: str, user: User = Depends(require_csrf)):
+        _require(organisation_id, user, _group_roles(True))
+        GroupService().delete_group(organisation_id, kind, group_id, actor=user.email)
+        return {'deleted': True}
+
+
+_register_group_routes('contact')
+_register_group_routes('user')
+
 
 
 @api.get('/organisations/{organisation_id}/contacts/export.csv')

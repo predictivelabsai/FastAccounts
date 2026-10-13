@@ -340,14 +340,14 @@ def test_migration_rerun_preserves_data(env):
     db, client, _ = env
     secret, codes = enable(client)
     original = db.rows("SELECT * FROM mfa_recovery_codes")
-    assert db.scalar("SELECT COUNT(*) FROM schema_migrations") == 29
+    assert db.scalar("SELECT COUNT(*) FROM schema_migrations") == 31
     for _ in range(2):
         with db.transaction() as tx:
             tx.execute("DELETE FROM schema_migrations WHERE version='0027_mfa'")
         assert db.migrate() == ["0027_mfa"]
     assert accounts.get(EMAIL)["totp_secret"] == secret
     assert db.rows("SELECT * FROM mfa_recovery_codes") == original
-    assert "'0025_fx_realised', '0026_fx_revaluations', '0027_mfa', '0028_document_settings', '0029_copilot']" in (ROOT / ".github/workflows/ci.yml").read_text()
+    assert "'0025_fx_realised', '0026_fx_revaluations', '0027_mfa', '0028_document_settings', '0029_copilot', '0030_master_data_maintenance', '0031_master_data_groups']" in (ROOT / ".github/workflows/ci.yml").read_text()
 
 
 @pytest.mark.parametrize("lang", ["en", "et", "lt", "lv"])

@@ -123,6 +123,9 @@
     path = (s) => `/organisations/${encodeURIComponent(org.id)}${s}`;
   // FastAccounts line icons: 24px grid, 1.75 stroke, round caps and joins (docs/brand/icons.md).
   const ICONS = {
+    calendar: "M4 6h16v14H4z M4 10h16 M8 3.5V7 M16 3.5V7",
+    wrench: "M14.5 6.5a4.5 4.5 0 0 0-6 6L4 17l3 3 4.5-4.5a4.5 4.5 0 0 0 6-6L14 12l-2.5-2.5z",
+    team: "M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M2.5 20v-1a5 5 0 0 1 8-4 M17 13.5a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M13.5 20v-1a5 5 0 0 1 8-4",
     home: "M4 10.5 12 4l8 6.5V20H4z M10 20v-5h4v5",
     invoice: "M6 3h8l4 4v14H6z M14 3v4h4 M9 11h6 M9 14.5h6 M9 18h3",
     quote: "M4 5h16v11H10l-4.5 3.5V16H4z M8 9h8 M8 12.5h5",
@@ -163,6 +166,9 @@
     imports: "import", "payment-methods": "card", "reminder-rules": "bell",
     "exchange-rates": "exchange", objects: "tag", documents: "appearance",
     copilot: "assistant",
+    periods: "calendar",
+    maintenance: "wrench",
+    groups: "team",
   };
   const icon = (name = "document") =>
     `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${ICONS[name] || ICONS.document}"/></svg>`;
@@ -950,6 +956,132 @@
       bindActions(content, {
         closePeriod: (b) => reasonDialog(tr('Close period'), 'Close period', c.url(`/periods/${b.dataset.id}/close`)),
         reopenPeriod: (b) => reasonDialog(tr('Reopen period'), 'Reopen period', c.url(`/periods/${b.dataset.id}/reopen`)),
+      });
+    },
+    maintenance: async (c) => {
+      const editable = canEditMappings();
+      const data = await api(c.url('/master-data/maintenance'));
+      if (!c.mount(page(t('Data maintenance'), t('Find loose master data: contacts without documents, duplicates, missing identifiers and reused supplier numbers. Deleting needs a contact with no documents at all.'), '',
+        `<section class="section"><h2>${tr('Unused contacts')}</h2>${table(
+          ['Name', 'Type', 'Status', 'Actions'],
+          data.unused_contacts.map((x) => row([
+            td(esc(x.name)), td(tr(x.contact_type)), td(pill(tr(x.active ? 'Active' : 'Inactive'))),
+            td(editable ? actionButtons(x) : ''),
+          ])))}</section>` +
+        `<section class="section"><h2>${tr('Duplicate contacts')}</h2>${table(
+          ['Name', 'Type', 'VAT number', 'Registration number', 'Status'],
+          data.duplicate_contacts.map((x) => row([
+            td(esc(x.name)), td(tr(x.contact_type)), td(esc(x.vat_no || '')), td(esc(x.registration_no || '')),
+            td(pill(tr(x.active ? 'Active' : 'Inactive'))),
+          ])))}</section>` +
+        `<section class="section"><h2>${tr('Contacts missing identifiers')}</h2>${table(
+          ['Name', 'Type', 'Tax point hint'],
+          data.contacts_missing_identifiers.map((x) => row([
+            td(esc(x.name)), td(tr(x.contact_type)), td(tr('Missing VAT number and registration number')),
+          ])))}</section>` +
+        `<section class="section"><h2>${tr('Reused supplier numbers')}</h2>${table(
+          ['Supplier number', 'Suppliers'],
+          data.reused_supplier_numbers.map((x) => row([
+            td(esc(x.supplier_number)), td(num(x.suppliers)),
+          ])))}</section>`))) return;
+      function actionButtons(x) {
+        const base = `data-id="${esc(x.id)}"`;
+        const remove = button('Delete contact', 'deleteContact', false, base);
+        return x.active ? `<span class="actions">${remove}${button('Deactivate', 'deactivateContact', false, base)}</span>` : `<span class="actions">${button('Reactivate', 'reactivateContact', false, base)}</span>`;
+      }
+      bindActions(content, {
+        deactivateContact: (b) => confirmAction(tr('Deactivate contact'), tr('The contact disappears from pickers while keeping its history. Deactivate it?'), async () => {
+          await post(c.url(`/master-data/contacts/${b.dataset.id}/deactivate`), {});
+          toast(t('Saved successfully'));
+          await render();
+        }),
+        reactivateContact: (b) => confirmAction(tr('Reactivate contact'), tr('The contact becomes selectable again. Reactivate it?'), async () => {
+          await post(c.url(`/master-data/contacts/${b.dataset.id}/reactivate`), {});
+          toast(t('Saved successfully'));
+          await render();
+        }),
+        deleteContact: (b) => confirmAction(tr('Delete contact'), tr('Only contacts without any documents or payments can be deleted. This cannot be undone. Delete it?'), async () => {
+          await post(c.url(`/master-data/contacts/${b.dataset.id}/delete`), {});
+          toast(t('Deleted successfully'));
+          await render();
+        }),
+      });
+    },
+    groups: async (c) => {
+      const editable = canEditMappings();
+      const [contactGroups, userGroups, contacts] = await Promise.all([
+        api(c.url('/contact-groups')),
+        api(c.url('/user-groups')),
+        api(c.url('/contacts')),
+      ]);
+      const groupActions = (kind, g) => {
+        if (!editable) return '';
+        const attrs = `data-kind="${kind}" data-id="${esc(g.id)}" data-name="${esc(g.name)}"`;
+        return `<span class="actions">${button('Manage members', 'manageMembers', false, attrs) +
+          button('Delete group', 'deleteGroup', false, attrs)}</span>`;
+      };
+      const section = (kind, label, intro, groups) => {
+        const rows = table(['Name', 'Members', 'Actions'],
+          groups.map((g) => row([
+            td(esc(g.name)),
+            td(num(g.members), 'numeric'),
+            td(groupActions(kind, g)),
+          ])));
+        const create = editable ? form(field('New group name', 'name', '', 'text', 'required maxlength="100"'), 'Create group') : '';
+        return `<section class="section" data-groups="${kind}"><h2>${tr(label)}</h2><p class="muted">${esc(intro)}</p>${rows}${create}</section>`;
+      };
+      if (!c.mount(page(t('Groups'), t('Group clients, suppliers and workspace users for filtering and reporting. Groups are labels and do not change access controls.'), '',
+        section('contact', 'Contact groups', tr('Tag customers and suppliers into groups such as retail or wholesale.'), contactGroups) +
+        section('user', 'User groups', tr('Tag workspace users into teams. Access roles stay separate.'), userGroups)))) return;
+      content.querySelectorAll('[data-action=cancel]').forEach((x) => x.remove());
+      if (!editable) content.querySelectorAll('input, button').forEach((x) => { x.disabled = true; });
+      const memberDialog = async (kind, group) => {
+        const payload = await api(c.url(`/${kind}-groups/${group.id}/members`));
+        const options = [['', t('Choose a member')], ...contacts.filter((x) => !payload.members.includes(x.id))
+          .map((x) => [x.id, x.name])];
+        const memberField = kind === 'contact'
+          ? select('Add member', 'member', options)
+          : field('Add member email', 'member', '', 'email', 'required maxlength="320"');
+        const membersTable = payload.members.length
+          ? table([tr('Member'), tr('Actions')], payload.members.map((m) => row([
+              td(kind === 'contact' ? esc((contacts.find((x) => x.id === m) || {}).name || m) : esc(m)),
+              td(editable ? button('Remove', 'removeMember', false, `data-member="${esc(m)}"`) : ''),
+            ])))
+          : `<p class="muted">${tr('No members yet.')}</p>`;
+        const d = dialog(tr('Members of {name}').replace('{name}', group.name),
+          membersTable + form(memberField, tr('Add member')));
+        d.querySelectorAll('[data-action=cancel]').forEach((x) => x.remove());
+        bindForm(d, async (values) => {
+          await post(c.url(`/${kind}-groups/${group.id}/members`), {member: values.member});
+          toast(t('Saved successfully'));
+          closeDialog(d);
+          await render();
+        });
+        d.querySelectorAll('[data-action=removeMember]').forEach((b) => (b.onclick = async () => {
+          await post(c.url(`/${kind}-groups/${group.id}/members/${encodeURIComponent(b.dataset.member)}`), {}, 'DELETE');
+          toast(t('Saved successfully'));
+          closeDialog(d);
+          await render();
+        }));
+      };
+      const createForm = (kind) => {
+        const holder = content.querySelector(`[data-groups="${kind}"]`);
+        if (!editable) return;
+        bindForm(holder, async (values) => {
+          await post(c.url(`/${kind}-groups`), {name: values.name});
+          toast(t('Saved successfully'));
+          await render();
+        });
+      };
+      createForm('contact');
+      createForm('user');
+      bindActions(content, {
+        manageMembers: (b) => memberDialog(b.dataset.kind, { id: b.dataset.id, name: b.dataset.name }),
+        deleteGroup: (b) => confirmAction(tr('Delete group'), tr('Memberships go with the group; contacts and users stay. Delete {name}?').replace('{name}', b.dataset.name), async () => {
+          await post(c.url(`/${b.dataset.kind}-groups/${b.dataset.id}`), {}, 'DELETE');
+          toast(t('Deleted successfully'));
+          await render();
+        }),
       });
     },
     "reminder-rules": async (c) => {

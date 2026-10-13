@@ -300,7 +300,7 @@ def test_upgrade_preserves_data_and_custom_chart(tmp_path, monkeypatch, country,
             tx.execute("INSERT INTO accounts(id,organisation_id,code,name,account_type,normal_balance,system_role) VALUES (?,?,?,'Custom deferred','Asset','Debit','PERIODISED_PURCHASES')", (new_id(), oid, '9999'))
     before = {t: db.rows(f'SELECT * FROM {t} ORDER BY id') for t in ['organisations', 'accounts', 'contacts', 'bills', 'gl_entries', 'posting_batches', 'audit_events']}
     monkeypatch.setattr(database, 'MIGRATIONS', original)
-    assert db.migrate() == ['0021_periodisation', '0022_payment_links', '0023_analytical_objects', '0024_reminder_rules', '0025_fx_realised', '0026_fx_revaluations', '0027_mfa', '0028_document_settings', '0029_copilot'] and db.migrate() == []
+    assert db.migrate() == ['0021_periodisation', '0022_payment_links', '0023_analytical_objects', '0024_reminder_rules', '0025_fx_realised', '0026_fx_revaluations', '0027_mfa', '0028_document_settings', '0029_copilot', '0030_master_data_maintenance', '0031_master_data_groups'] and db.migrate() == []
     organisations_now = db.rows("SELECT * FROM organisations ORDER BY id")
     assert all(row.pop('copilot_enabled') == 0 for row in organisations_now)
     for table, rows in before.items():
@@ -308,6 +308,10 @@ def test_upgrade_preserves_data_and_custom_chart(tmp_path, monkeypatch, country,
             assert all(r in db.rows('SELECT * FROM accounts') for r in rows)
         elif table == 'organisations':
             assert organisations_now == rows
+        elif table == 'contacts':
+            contacts_now = db.rows('SELECT * FROM contacts ORDER BY id')
+            assert all(row.pop('active') == 1 for row in contacts_now)
+            assert contacts_now == rows  # active added by 0030_master_data_maintenance
         else:
             assert db.rows(f'SELECT * FROM {table} ORDER BY id') == rows
     assert db.scalar("SELECT code FROM accounts WHERE organisation_id=? AND system_role='PERIODISED_PURCHASES'", (oid,)) == ('9999' if existing_role else str(preferred + 2))

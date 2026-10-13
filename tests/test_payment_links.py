@@ -231,7 +231,7 @@ def test_upgrade_and_rerun_preserve_existing_data(tmp_path, monkeypatch):
     tables = ['organisations', 'accounts', 'contacts', 'invoices', 'invoice_lines', 'posting_batches', 'gl_entries', 'audit_events']
     before = {table: db.rows(f'SELECT * FROM {table} ORDER BY id') for table in tables}
     monkeypatch.setattr(database, 'MIGRATIONS', original)
-    assert db.migrate() == ['0022_payment_links', '0023_analytical_objects', '0024_reminder_rules', '0025_fx_realised', '0026_fx_revaluations', '0027_mfa', '0028_document_settings', '0029_copilot'] and db.migrate() == []
+    assert db.migrate() == ['0022_payment_links', '0023_analytical_objects', '0024_reminder_rules', '0025_fx_realised', '0026_fx_revaluations', '0027_mfa', '0028_document_settings', '0029_copilot', '0030_master_data_maintenance', '0031_master_data_groups'] and db.migrate() == []
     service = PaymentLinkService(db)
     method = service.create_config(org['id'], actor=ACTOR, **CONFIG)
     link = service.generate(org['id'], invoice['id'], method['id'])
@@ -240,8 +240,13 @@ def test_upgrade_and_rerun_preserve_existing_data(tmp_path, monkeypatch):
     assert service.generate(org['id'], invoice['id'], method['id']) == link
     organisations_now = db.rows('SELECT * FROM organisations')
     assert all(row.pop('copilot_enabled') == 0 for row in organisations_now)
+    contacts_now = db.rows('SELECT * FROM contacts')
+    assert all(row.pop('active') == 1 for row in contacts_now)  # added by 0030_master_data_maintenance
     for table in tables:
         if table == 'organisations':
+            continue
+        if table == 'contacts':
+            assert contacts_now == before['contacts']
             continue
         assert all(row in db.rows(f'SELECT * FROM {table}') for row in before[table])
     assert organisations_now == before['organisations']

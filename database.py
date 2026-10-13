@@ -188,6 +188,11 @@ class Database:
                         script = re.sub(
                             r"ALTER TABLE organisations ADD COLUMN (\w+)[^;]*;",
                             lambda match: "" if match[1] in columns else match[0], script)
+                    if path.stem == "0030_master_data_maintenance":
+                        columns = {row[1] for row in connection.execute("PRAGMA table_info(contacts)")}
+                        script = re.sub(
+                            r"ALTER TABLE contacts ADD COLUMN (\w+)[^;]*;",
+                            lambda match: "" if match[1] in columns else match[0], script)
                     connection.executescript(script)
                     connection.execute(
                         "INSERT INTO schema_migrations(version,applied_at) VALUES (?,datetime('now'))",
