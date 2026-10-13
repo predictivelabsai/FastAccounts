@@ -21,6 +21,7 @@ from banking import BankingService
 from connectors.registry import provider_metadata
 from database import get_database
 from documents import DocumentService, EInvoiceAlreadyImported
+from bulk_sending import BulkSendingService, MAX_BULK_INVOICES
 from invoice_list import InvoiceListService, validate_list_dates
 from quotes import QuoteService
 from periodisation import PeriodisationService
@@ -126,6 +127,11 @@ class InvoiceIn(BaseModel):
     document_type: Literal["invoice", "credit_note"] = "invoice"
     original_invoice_id: str | None = None
     lines: list[ObjectLineIn] = Field(min_length=1)
+
+
+class BulkSendIn(BaseModel):
+    model_config = {'extra': 'forbid'}
+    invoice_ids: list[str] = Field(min_length=1, max_length=MAX_BULK_INVOICES)
 
 
 class QuoteIn(BaseModel):
@@ -789,6 +795,15 @@ def issue_invoice(organisation_id: str, invoice_id: str, user: User = Depends(re
     invoice = DocumentService().invoice(invoice_id, organisation_id)
     del invoice
     return DocumentService().issue_invoice(invoice_id, actor=user.email)
+
+
+@api.post('/organisations/{organisation_id}/invoices/send-bulk')
+def send_bulk_invoices(organisation_id: str, payload: BulkSendIn,
+                       user: User = Depends(require_csrf),
+                       idempotency_key: str | None = Header(default=None, min_length=1, max_length=180)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return BulkSendingService().send(organisation_id, payload.invoice_ids,
+                                     actor=user.email, idempotency_key=idempotency_key)
 
 
 @api.get("/organisations/{organisation_id}/invoices/{invoice_id}.pdf")

@@ -1330,3 +1330,29 @@ pending.
   The skips are the existing opt-in PostgreSQL checks. JavaScript syntax,
   Python compilation, existing locale preservation and staged diff/copy/secret
   checks passed. Tests used synthetic data and no live network calls.
+
+### Bulk invoice PDF sending (2026-10-12)
+
+- [x] Deliver P1 item 12 through the existing `DocumentService.send_invoice_email`
+  Postmark path, shared with reminders. Retain the single-send PDF renderer,
+  subject, body, filename and stream. No migration or parallel mailer.
+- Add the write-role/CSRF-protected `invoices/send-bulk` API with strict input,
+  a 50-entry cap and independent ordered sent/failed results. Refuse foreign or
+  missing IDs, credit notes, ineligible status and missing contact email.
+  Duplicate IDs never trigger a second email within a request.
+- Store the exact sent PDF in existing attachments and link its ID in the
+  existing delivery audit trail. Reserve Prepared before HTTP and persist each
+  final outcome separately, preserving earlier successes and all ledger rows.
+  Optional retry keys reuse outcomes and require review of uncertain Prepared
+  records before an intentional resend with a new key.
+- Add invoice-list checkboxes, confirmation and results, plus invoice-detail
+  email history and retained PDF links. Append all four locale catalogues.
+- Defer queues, automatic retries, provider callbacks, template/subject editing,
+  saved selection, column configuration, larger batches and production UAT.
+  See `docs/specs/bulk-sending.md` for eligibility and retry semantics.
+- Validation: Python 3.12.14, `python -m pytest -q`:
+  `987 passed, 4 skipped in 863.98s (0:14:23)`. All 27 new checks passed,
+  including offline browser flows in all four locales. The four skips are the
+  existing opt-in PostgreSQL checks. `node --check static/app.js`, catalogue
+  preservation, staged diff/copy and credential-pattern checks passed. All new
+  data is synthetic and no live provider calls were made.

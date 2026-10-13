@@ -1255,3 +1255,33 @@ the entries below, plus one connector fix:
   The skips are the existing opt-in PostgreSQL checks. JavaScript syntax,
   Python compilation, existing locale preservation and staged diff/copy/secret
   checks passed. Tests used synthetic data and no live network calls.
+
+## 2026-10-12: Bulk invoice PDF sending
+
+- Added P1 item 12 using the existing document sender and reminders' Postmark
+  client boundary. The single-send subject, body, PDF and filename are reused.
+- Added a strict write-role/CSRF-protected bulk API with a 50-entry cap,
+  independent outcomes, tenant/contact scoping and eligibility gates. Duplicate
+  IDs are reported without repeat sending; optional retry keys reuse audited
+  outcomes, including explicit review instructions for interrupted sends.
+- Retained exact emailed PDFs in the existing attachments store and linked them
+  in invoice.delivery audit details. Existing delivery records reserve Prepared
+  before HTTP and record Sent/Failed afterwards in separate transactions per
+  invoice. Provider errors retain evidence and do not undo earlier successes.
+- Added list selection, email confirmation/results and invoice-detail delivery
+  history/PDF links. Appended English, Estonian, Lithuanian and Latvian strings
+  and extended the two existing locale-tail checks. No ledger changes, migration,
+  new dependency or live provider calls are introduced.
+- Added synthetic tests for both countries, body/PDF consistency, audit readback,
+  independent failures, roles/CSRF, tenant isolation, duplicates/cap, strict
+  payloads, retry keys and interrupted persistence, plus four-locale offline
+  browser confirmation, results and delivery history.
+- Deferred queues, automatic retries, provider callbacks, template/subject editing,
+  saved selection, columns, larger batches and production UAT. Roadmap scope and
+  `docs/specs/bulk-sending.md` are synchronised.
+- Validation: Python 3.12.14, `python -m pytest -q`:
+  `987 passed, 4 skipped in 863.98s (0:14:23)`. All 27 new checks passed,
+  including offline browser flows in all four locales. The four skips are the
+  existing opt-in PostgreSQL checks. `node --check static/app.js`, catalogue
+  preservation, staged diff/copy and credential-pattern checks passed. All new
+  data is synthetic and no live provider calls were made.
