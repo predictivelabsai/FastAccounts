@@ -4,6 +4,38 @@ Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as
 delivered.
 
+## 2026-10-12: Cash-flow statement and comparative reports
+
+- Added a read-only, tenant-scoped direct-method cash-flow service and authorised
+  API route. Base-currency opening and closing liquid balances reconcile to
+  external inflows/outflows. Classifications cover trade receipts, supplier
+  payments, payroll roles, VAT, revenue, expenses, financing and Other. Account
+  details retain journal memos, contact ids and per-bucket allocated amounts.
+- Internal liquid transfers have equal gross inflows/outflows and zero net
+  effect, and are excluded from headline totals. Ambiguous mixed journals match
+  liquid sides first and allocate the remaining cash proportionally across
+  opposite non-liquid contra amounts, with deterministic cent rounding.
+- Added optional previous-period, prior-year and YTD comparisons to existing
+  P&L and balance-sheet reports, keeping single-period callers compatible.
+  Whole calendar periods use preceding calendar periods; custom ranges use equal
+  day counts. Full prior-year periods honour leap-year month ends. YTD covers
+  January through the selected end month against the prior calendar year.
+  Balance-sheet columns remain cumulative snapshots at the two period ends.
+- Added a cash-flow accounting view, liquid-account details, period presets and
+  comparison selectors and columns. Appended translations in English, Estonian,
+  Lithuanian and Latvian. No schema or configuration change is required.
+- Scope and follow-up: only BANK-role accounts are liquid. Existing migrations
+  preserve that role, and fresh charts seed it. The schema permits one account
+  per role per organisation, while payment-service-created bank accounts have
+  no BANK role. Including those accounts or storing multiple BANK roles needs a
+  separate account-role/schema decision. The UI states the report's scope.
+- Validation: Python 3.12.14, `python -m pytest -q`: `724 passed, 4 skipped in 482.16s (0:08:02)`. The four skipped tests
+  are opt-in PostgreSQL checks. Service arithmetic, boundary and status tests,
+  tenant isolation, split allocations, transfer netting, calendar/leap-year
+  comparatives, upgrade preservation and browser views in all four locales
+  passed. Existing translation keys and values are preserved; JavaScript
+  syntax and diff checks passed. No live provider calls were made.
+
 ## 2026-10-12: Fixed assets and automatic depreciation
 
 ### Added

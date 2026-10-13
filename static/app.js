@@ -1023,11 +1023,15 @@
         disposeAsset: (b) => assetDisposalDialog(assets.find((x) => String(x.id) === b.dataset.id)),
       });
     },
+    "cash-flow": async (c) => {
+      reportTab = "cash-flow";
+      await views.accounting(c);
+    },
     accounting: async (c) => {
       if (
         !c.mount(
           page(
-            t("Accounting"),
+            t(reportTab === "cash-flow" ? "Cash-flow statement" : "Accounting"),
             t("Reports from your posted ledger."),
             button("Opening balances", "openingBalances") +
               button("Opening receivables/payables", "openingItems") +
@@ -1039,7 +1043,7 @@
               )
               .join(
                 "",
-              )}</div><form id="report-dates" class="date-range"><label id="report-start-label">${tr("From")}<input type="date" name="start" required></label><label><span id="report-end-label">${tr("To")}</span><input type="date" name="end" required></label><button class="button primary">${tr("Apply")}</button></form><div id="report-result" class="report-result"></div>`,
+              )}</div><form id="report-dates" class="date-range"><label id="report-start-label">${tr("From")}<input type="date" name="start" required></label><label><span id="report-end-label">${tr("To")}</span><input type="date" name="end" required></label><span id="report-period">${select("Report period", "period", [["range", t("Date range")], ["month", t("Month")], ["quarter", t("Quarter")], ["year", t("Year")]], "range")}</span><span id="report-comparison">${select("Comparison", "compare", [["none", t("No comparison")], ["previous", t("Previous period")], ["prior_year", t("Prior year")], ["ytd", t("Year to date (prior year)")]], "none")}</span><button class="button primary">${tr("Apply")}</button></form><div id="report-result" class="report-result"></div>`,
           ),
         )
       )
@@ -1058,10 +1062,27 @@
       const defaults = () => {
         f.elements.start.value = today().slice(0, 4) + "-01-01";
         f.elements.end.value = today();
-        document.getElementById("report-start-label").hidden = asAt();
+        f.elements.period.value = "range";
+        updateControls();
         document.getElementById("report-end-label").textContent = t(
           asAt() ? "As at" : "To",
         );
+      };
+      const comparative = () => ["profit-and-loss", "balance-sheet"].includes(reportTab);
+      const updateControls = () => {
+        document.getElementById("report-comparison").hidden = !comparative();
+        document.getElementById("report-period").hidden = !comparative();
+        document.getElementById("report-start-label").hidden = asAt() &&
+          !(comparative() && f.elements.compare.value === "previous");
+      };
+      const applyPeriod = () => {
+        const [year, month] = f.elements.end.value.split("-").map(Number);
+        const period = f.elements.period.value;
+        if (period === "range") return;
+        const firstMonth = period === "year" ? 1 : period === "quarter" ? Math.floor((month - 1) / 3) * 3 + 1 : month;
+        const lastMonth = period === "year" ? 12 : period === "quarter" ? firstMonth + 2 : month;
+        f.elements.start.value = `${year}-${String(firstMonth).padStart(2, "0")}-01`;
+        f.elements.end.value = `${year}-${String(lastMonth).padStart(2, "0")}-${new Date(year, lastMonth, 0).getDate()}`;
       };
       const load = async () => {
         const ticket = ++request;
@@ -1073,9 +1094,14 @@
         result.innerHTML = skeleton();
         const tab = reportTab;
         try {
-          const q = asAt()
-            ? `as_at=${f.elements.end.value}`
-            : `start=${f.elements.start.value}&end=${f.elements.end.value}`;
+          const q = new URLSearchParams(tab === "cash-flow"
+            ? {date_from: f.elements.start.value, date_to: f.elements.end.value}
+            : asAt() ? {as_at: f.elements.end.value}
+            : {start: f.elements.start.value, end: f.elements.end.value});
+          if (comparative()) {
+            q.set("compare", f.elements.compare.value);
+            if (asAt()) q.set("start", f.elements.start.value);
+          }
           const data = await api(c.url(`/reports/${tab}?${q}`));
           if (ticket !== request || !result.isConnected) return;
           result.innerHTML = `<div class="report-heading"><h2>${tr(reportNames[tab])}</h2><p>${esc(org.name)} · ${date(f.elements.end.value)}</p></div>${renderReport(tab, data)}`;
@@ -1090,12 +1116,17 @@
       await load();
       f.onsubmit = (e) => {
         e.preventDefault();
+        if (comparative()) applyPeriod();
         load();
       };
+      f.elements.compare.onchange = updateControls;
+      f.elements.period.onchange = applyPeriod;
       content.querySelectorAll("[data-report]").forEach(
         (b) =>
           (b.onclick = () => {
             reportTab = b.dataset.report;
+            content.querySelector(".page-title h1").textContent = t(
+              reportTab === "cash-flow" ? "Cash-flow statement" : "Accounting");
             content.querySelectorAll("[data-report]").forEach((x) => {
               x.classList.toggle("active", x === b);
               x.setAttribute("aria-selected", String(x === b));
@@ -1898,8 +1929,38 @@
     "receivables-aging": "Receivables aging",
     "payables-aging": "Payables aging",
     "cash-summary": "Cash summary",
+    "cash-flow": "Cash-flow statement",
   };
+  const cashFlowNames = {receipts: "Trade receivable receipts", supplier_payments: "Supplier payments",
+    payroll: "Payroll", vat: "VAT settlements", revenue: "Revenue", expenses: "Expenses",
+    financing: "Financing and capital", internal: "Internal transfers", other: "Other"};
   function renderReport(tab, data) {
+    if (tab === "cash-flow") {
+      const currency = data.base_currency;
+      return `<p class="muted">${tr("Liquid accounts with the BANK role only. Internal transfers are excluded from totals.")}</p>` +
+        table(["Description", ["Inflows"], ["Outflows"], ["Balance"]], [
+          row([td(tr("Opening balance")), td(""), td(""), cash(data.opening_balance, currency)]),
+          ...Object.entries(data.buckets).map(([key, x]) => row([td(tr(cashFlowNames[key])),
+            cash(x.inflows, currency), cash(x.outflows, currency), cash(x.net, currency)])),
+          row([td(tr("Total")), cash(data.inflows, currency), cash(data.outflows, currency), td("")]),
+          row([td(tr("Closing balance")), td(""), td(""), cash(data.closing_balance, currency)])]) +
+        `<h3>${tr("Liquid account detail")}</h3>` + data.accounts.map((a) =>
+          `<section class="section"><h4>${esc(a.code)} ${esc(a.name)}</h4><p>${tr("Opening balance")}: ${esc(money(a.opening_balance, currency))} · ${tr("Closing balance")}: ${esc(money(a.closing_balance, currency))}</p>` +
+          table(["Date", "Reference", "Memo", "Contact", "Classification", ["Amount"]], a.movements.map((x) =>
+            row([td(date(x.date)), td(esc(x.document_number)), td(esc(x.memo)), td(esc(x.contact_id || "")),
+              td(Object.entries(x.allocations).map(([key, value]) => `${tr(cashFlowNames[key])}: ${esc(money(value, currency))}`).join("<br>")),
+              cash(x.amount, currency)]))) + `</section>`).join("");
+    }
+    if (data.comparative) {
+      const keys = tab === "profit-and-loss" ? {income: "Income", expenses: "Expenses", profit: "Profit"}
+        : {assets: "Assets", liabilities: "Liabilities", equity: "Equity", current_earnings: "Current earnings", liabilities_and_equity: "Liabilities and equity"};
+      const period = (r) => r.as_at ? date(r.as_at) : `${date(r.start)} / ${date(r.end)}`;
+      return `<p>${tr("Current period")}: ${esc(period(data))} · ${tr("Comparative period")}: ${esc(period(data.comparative))}</p>` +
+        table(["Description", ["Current period"], ["Comparative period"]], Object.entries(keys).map(([key, label]) =>
+          row([td(tr(label)), cash(data[key]), cash(data.comparative[key])]))) +
+        table(["Code", "Account", ["Current period"], ["Comparative period"]], data.accounts.map((x) =>
+          row([td(esc(x.code)), td(esc(x.name)), cash(x.balance), cash(x.comparative_balance)])));
+    }
     if (tab === "general-ledger")
       return table(
         [
