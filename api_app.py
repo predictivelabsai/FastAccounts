@@ -21,6 +21,7 @@ from banking import BankingService
 from connectors.registry import provider_metadata
 from database import get_database
 from documents import DocumentService, EInvoiceAlreadyImported
+from invoice_list import InvoiceListService, validate_list_dates
 from quotes import QuoteService
 from periodisation import PeriodisationService
 from payment_links import PaymentLinkService
@@ -686,13 +687,38 @@ def convert_quote(organisation_id: str, quote_id: str, user: User = Depends(requ
     return QuoteService().convert(organisation_id, quote_id, actor=user.email)
 
 
+def _invoice_list_filters(status: str | None = None, contact_id: str | None = None,
+                          date_from: str | None = None, date_to: str | None = None,
+                          currency: str | None = None, q: str | None = None):
+    try:
+        validate_list_dates(date_from, date_to)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return dict(status=status, contact_id=contact_id, date_from=date_from,
+                date_to=date_to, currency=currency, q=q)
+
+
 @api.get("/organisations/{organisation_id}/invoices")
-def list_invoices(organisation_id: str, user: User = Depends(current_user)):
+def list_invoices(organisation_id: str, user: User = Depends(current_user),
+                  filters: dict = Depends(_invoice_list_filters)):
     _require(organisation_id, user, {"owner", "administrator", "accountant", "approver", "viewer"})
-    return get_database().rows(
-        "SELECT i.*,c.name contact_name FROM invoices i JOIN contacts c ON c.id=i.contact_id "
-        "WHERE i.organisation_id=? ORDER BY i.issue_date DESC,i.created_at DESC", (organisation_id,)
-    )
+    return InvoiceListService().list(organisation_id, "invoices", **filters)
+
+
+@api.get("/organisations/{organisation_id}/invoices/export.{format_}")
+@api.get("/organisations/{organisation_id}/bills/export.{format_}")
+def invoice_list_export(organisation_id: str, format_: str, request: Request,
+                        user: User = Depends(current_user),
+                        filters: dict = Depends(_invoice_list_filters)):
+    _require(organisation_id, user, {"owner", "administrator", "accountant", "approver", "viewer"})
+    if format_ not in {"csv", "xlsx"}:
+        raise HTTPException(status_code=404, detail="Document export not found")
+    kind = request.url.path.split("/")[-2]
+    content = InvoiceListService().export(organisation_id, kind, format_, **filters)
+    media_type = ("text/csv" if format_ == "csv" else
+                  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    return Response(content, media_type=media_type,
+                    headers={"Content-Disposition": f'attachment; filename="{kind}.{format_}"'})
 
 
 @api.get('/organisations/{organisation_id}/payment-methods')
@@ -839,12 +865,10 @@ def send_reminder(organisation_id: str, invoice_id: str, stage: int, user: User 
 
 
 @api.get("/organisations/{organisation_id}/bills")
-def list_bills(organisation_id: str, user: User = Depends(current_user)):
+def list_bills(organisation_id: str, user: User = Depends(current_user),
+               filters: dict = Depends(_invoice_list_filters)):
     _require(organisation_id, user, {"owner", "administrator", "accountant", "approver", "viewer"})
-    return get_database().rows(
-        "SELECT b.*,c.name contact_name FROM bills b JOIN contacts c ON c.id=b.contact_id "
-        "WHERE b.organisation_id=? ORDER BY b.bill_date DESC,b.created_at DESC", (organisation_id,)
-    )
+    return InvoiceListService().list(organisation_id, "bills", **filters)
 
 
 @api.post("/organisations/{organisation_id}/bills", status_code=201)
@@ -1168,7 +1192,7 @@ def _iso_date_bound(value: str | None, default: str) -> str:
 
 
 def _report_workbook(organisation_id: str, book: str, date_from: str | None,
-                     date_to: str | None) -> bytes:
+                     date_to: str | None, filters: dict | None = None) -> bytes:
     if book not in {"general_ledger", "invoices", "employees", "vat_returns"}:
         raise KeyError("Report workbook not found")
     database = get_database()
@@ -1184,11 +1208,8 @@ def _report_workbook(organisation_id: str, book: str, date_from: str | None,
             organisation, LedgerService(database).general_ledger(organisation_id, start=start, end=end)
         )
     if book == "invoices":
-        rows = database.rows(
-            "SELECT i.*,c.name contact_name FROM invoices i "
-            "JOIN contacts c ON c.id=i.contact_id AND c.organisation_id=i.organisation_id "
-            "WHERE i.organisation_id=? ORDER BY i.issue_date DESC,i.created_at DESC", (organisation_id,)
-        )
+        rows = InvoiceListService(database).list(
+            organisation_id, "invoices", date_from=date_from, date_to=date_to, **(filters or {}))
         return invoices_workbook(organisation, rows)
     if book == "employees":
         return employees_workbook(organisation, PayrollService(database).employees(organisation_id))
@@ -1201,9 +1222,12 @@ def _report_workbook(organisation_id: str, book: str, date_from: str | None,
 
 @api.get("/organisations/{organisation_id}/reports/{book}.xlsx")
 def report_workbook(organisation_id: str, book: str, date_from: str | None = None,
-                    date_to: str | None = None, user: User = Depends(current_user)):
+                    date_to: str | None = None, user: User = Depends(current_user),
+                    status: str | None = None, contact_id: str | None = None,
+                    currency: str | None = None, q: str | None = None):
     _require(organisation_id, user, {"owner", "administrator", "accountant", "approver", "viewer"})
-    content = _report_workbook(organisation_id, book, date_from, date_to)
+    content = _report_workbook(organisation_id, book, date_from, date_to,
+                               dict(status=status, contact_id=contact_id, currency=currency, q=q))
     return Response(
         content,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

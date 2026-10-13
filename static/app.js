@@ -40,8 +40,34 @@
     org = null,
     generation = 0,
     reportTab = "trial-balance",
-    invoiceFilter = "All",
     contactFilter = "All";
+  const documentFilters = new Map();
+  const listFilters = (c, kind) => documentFilters.get(`${c.oid}:${kind}`) || {};
+  const listQuery = (c, kind) => {
+    const query = new URLSearchParams(Object.entries(listFilters(c, kind)).filter(([, v]) => v));
+    return query.size ? `?${query}` : "";
+  };
+  function documentFilterControls(c, kind, contacts) {
+    const values = listFilters(c, kind), sales = kind === "invoices";
+    const choice = (label, name, options) => `<label>${tr(label)}<select data-document-filter="${name}"><option value="">${tr("All")}</option>${options.map(([value, text]) => `<option value="${esc(value)}" ${values[name] === value ? "selected" : ""}>${esc(text)}</option>`).join("")}</select></label>`;
+    const input = (label, name, type) => `<label>${tr(label)}<input type="${type}" data-document-filter="${name}" value="${esc(values[name] || "")}"></label>`;
+    const statuses = sales ? ["Draft", "Issued", "Overdue", "Part Paid", "Paid", "Voided", "Credited"] : ["Draft", "In Review", "Approved", "Part Paid", "Paid", "Rejected", "Voided"];
+    return `<div class="form-grid document-list-filters">` +
+      choice("Status", "status", statuses.map((v) => [v, t(v)])) +
+      choice(sales ? "Customer" : "Supplier", "contact_id", contacts.filter((v) => [sales ? "customer" : "supplier", "both"].includes(v.contact_type)).map((v) => [v.id, v.name])) +
+      input("Date from", "date_from", "date") + input("Date to", "date_to", "date") +
+      input("Search", "q", "search") + input("Currency", "currency", "text") +
+      `</div><div class="actions">${link("Export CSV", `/api${c.url(`/${kind}/export.csv`)}${listQuery(c, kind)}`)}${link("Export Excel", `/api${c.url(`/${kind}/export.xlsx`)}${listQuery(c, kind)}`)}</div>`;
+  }
+  function bindDocumentFilters(c, kind) {
+    content.querySelectorAll("[data-document-filter]").forEach((control) => {
+      control.onchange = async () => {
+        const values = { ...listFilters(c, kind), [control.dataset.documentFilter]: control.value };
+        documentFilters.set(`${c.oid}:${kind}`, values);
+        await render();
+      };
+    });
+  }
   const payBases = [
       ["monthly", "Monthly salary"],
       ["hourly", "Hourly pay"],
@@ -611,8 +637,8 @@
         .forEach((b) => (b.onclick = () => switchOrg(b.dataset.client)));
     },
     invoices: async (c) => {
-      const [rows, prepayments] = await Promise.all([
-        api(c.url("/invoices")), api(c.url("/prepayments?side=customer")),
+      const [rows, prepayments, contacts] = await Promise.all([
+        api(c.url("/invoices") + listQuery(c, "invoices")), api(c.url("/prepayments?side=customer")), api(c.url("/contacts")),
       ]);
       if (
         !c.mount(
@@ -622,23 +648,15 @@
             button("New contact", "newContact") +
               button("Record customer prepayment", "newPrepayment", false, canExecutePush() ? "" : "disabled") +
               button("New invoice", "newInvoice", true),
-            `<div class="chips">${["All", "Draft", "Issued", "Overdue"].map((s) => `<button class="chip ${invoiceFilter === s ? "active" : ""}" data-filter="${s}">${tr(s)}</button>`).join("")}</div><div id="invoice-table"></div>${prepaymentSection(prepayments, "customer")}`,
+            documentFilterControls(c, "invoices", contacts) + `<div id="invoice-table"></div>${prepaymentSection(prepayments, "customer")}`,
           ),
         )
       )
         return;
       const draw = () => {
-        const filtered = rows.filter(
-          (x) =>
-            invoiceFilter === "All" ||
-            (invoiceFilter === "Overdue"
-              ? ["Issued", "Part Paid"].includes(x.status) &&
-                x.due_date < today()
-              : x.status === invoiceFilter),
-        );
         document.getElementById("invoice-table").innerHTML = table(
           ["Number", "Customer", "Date", "Status", ["Paid / total"], "Actions"],
-          filtered.map((x) =>
+          rows.map((x) =>
             row([
               td(esc(x.number || t("Draft"))),
               td(esc(x.contact_name)),
@@ -678,16 +696,7 @@
         });
       };
       draw();
-      content.querySelectorAll("[data-filter]").forEach(
-        (b) =>
-          (b.onclick = () => {
-            invoiceFilter = b.dataset.filter;
-            content
-              .querySelectorAll("[data-filter]")
-              .forEach((x) => x.classList.toggle("active", x === b));
-            draw();
-          }),
-      );
+      bindDocumentFilters(c, "invoices");
     },
     quotes: async (c) => {
       const rows = await api(c.url("/quotes"));
@@ -894,8 +903,8 @@
       });
     },
     bills: async (c) => {
-      const [rows, orders, prepayments] = await Promise.all([
-        api(c.url("/bills")), api(c.url("/payment-orders")), api(c.url("/prepayments?side=supplier")),
+      const [rows, orders, prepayments, contacts] = await Promise.all([
+        api(c.url("/bills") + listQuery(c, "bills")), api(c.url("/payment-orders")), api(c.url("/prepayments?side=supplier")), api(c.url("/contacts")),
       ]);
       if (
         !c.mount(
@@ -907,7 +916,7 @@
               button("Import e-invoice", "importEInvoice") +
               button("Create payment order", "paymentOrder") +
               button("New bill", "bill", true),
-            table(
+            documentFilterControls(c, "bills", contacts) + table(
               [
                 "Supplier no.",
                 "Supplier",
@@ -978,6 +987,7 @@
             },
           ),
       });
+      bindDocumentFilters(c, "bills");
     },
     imports: async (c) => {
       if (!c.route[0]) {

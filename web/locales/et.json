@@ -1638,5 +1638,18 @@
       "Active": "Aktiivne",
       "Inactive": "Mitteaktiivne"
     }
+  },
+  "invoice_exports": {
+    "nav": {},
+    "views": {},
+    "workspace": {
+      "Date from": "Alates kuupäevast",
+      "Date to": "Kuni kuupäevani",
+      "Search": "Otsing",
+      "Export Excel": "Ekspordi Exceli",
+      "Document dates must use YYYY-MM-DD format": "Dokumendi kuupäevad peavad olema vormingus AAAA-KK-PP",
+      "Document date_from cannot be after date_to": "Alguskuupäev ei või olla lõppkuupäevast hilisem",
+      "Document export not found": "Dokumendieksporti ei leitud"
+    }
   }
 }

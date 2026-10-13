@@ -1306,3 +1306,27 @@ pending.
   existing PostgreSQL opt-in checks. JavaScript syntax, Python compilation,
   existing locale preservation, desktop/mobile visual review, diff and staged
   secret-pattern checks passed. All data used by the new tests is synthetic.
+
+### Invoice list exports and filters (2026-10-12)
+
+- [x] Deliver P1 item 11 for UK and Estonian books: existing sales invoice and
+  purchase bill lists accept status, contact, inclusive document-date range,
+  currency and number/reference/contact search filters. Preserve the sales
+  Overdue shortcut and scope every contact join to the organisation.
+- Add viewer-readable CSV and Excel downloads for both document kinds using
+  the same selection service and existing workbook style. Preserve Decimal
+  money, quote CSV text, prevent spreadsheet formulas and retain per-row
+  currencies without mixed-currency totals. Existing invoice report downloads
+  also honour these filters while retaining their established layout.
+- Add compact labelled controls and matching download links to both existing
+  SPA lists. Keep session filters separate per book and kind, support narrow
+  screens and append new English, Estonian, Lithuanian and Latvian copy.
+- No migration, new dependency, saved filters or per-user columns. Persisted
+  preferences, large-list pagination/streaming and production accountant UAT
+  remain follow-ups. See `docs/specs/invoice-list-exports.md`.
+- Validation: Python 3.12.14, `python -m pytest -q`:
+  `960 passed, 4 skipped in 858.84s (0:14:18)`. All 24 new checks passed,
+  including four-locale browser controls and both country/kind combinations.
+  The skips are the existing opt-in PostgreSQL checks. JavaScript syntax,
+  Python compilation, existing locale preservation and staged diff/copy/secret
+  checks passed. Tests used synthetic data and no live network calls.
