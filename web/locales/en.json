@@ -36,7 +36,8 @@
     "recurring": "Recurring & reminders",
     "fixed_assets": "Fixed assets",
     "cash_flow": "Cash-flow statement",
-    "data_import": "Data import"
+    "data_import": "Data import",
+    "quotes": "Quotes"
   },
   "footer": {
     "tagline": "Open-source bookkeeping for the UK and Estonia.",
@@ -1529,7 +1530,47 @@
     "Import batch not found": "Import batch not found",
     "Only a staged batch can be committed or discarded": "Only a staged batch can be committed or discarded",
     "CSV columns must match the supported columns for contacts": "CSV columns must match the supported columns for contacts",
-    "CSV columns must match the supported columns for items": "CSV columns must match the supported columns for items"
+    "CSV columns must match the supported columns for items": "CSV columns must match the supported columns for items",
+    "Quotes": "Quotes",
+    "Quote": "Quote",
+    "Quote lines": "Quote lines",
+    "Quote line": "Quote line",
+    "Valid until": "Valid until",
+    "Quote date": "Quote date",
+    "New quote": "New quote",
+    "Edit quote": "Edit quote",
+    "Accept": "Accept",
+    "Decline": "Decline",
+    "Expired": "Expired",
+    "Converted": "Converted",
+    "Accepted": "Accepted",
+    "Declined": "Declined",
+    "Mark sent": "Mark sent",
+    "Expire": "Expire",
+    "Convert": "Convert",
+    "Convert to invoice": "Convert to invoice",
+    "Customer offers before invoicing.": "Customer offers before invoicing.",
+    "Add line": "Add line",
+    "Remove line": "Remove line",
+    "Amount type": "Amount type",
+    "Exclusive": "Exclusive",
+    "Inclusive": "Inclusive",
+    "No tax": "No tax",
+    "Mark this quote as sent. Email delivery is not available yet.": "Mark this quote as sent. Email delivery is not available yet.",
+    "This creates and issues a sales invoice with an immutable ledger posting.": "This creates and issues a sales invoice with an immutable ledger posting.",
+    "Quote validity cannot precede the quote date": "Quote validity cannot precede the quote date",
+    "Quotes require the organisation base currency": "Quotes require the organisation base currency",
+    "Quote line amounts must be finite with at most four decimal places": "Quote line amounts must be finite with at most four decimal places",
+    "Invalid quote line amount": "Invalid quote line amount",
+    "Quote total exceeds the supported amount": "Quote total exceeds the supported amount",
+    "Only Draft quotes can be edited": "Only Draft quotes can be edited",
+    "Invalid quote status transition": "Invalid quote status transition",
+    "Quote has expired": "Quote has expired",
+    "Quote is still valid": "Quote is still valid",
+    "Only Accepted quotes can be converted": "Only Accepted quotes can be converted",
+    "Quote not found": "Quote not found",
+    "Quote fields cannot be null": "Quote fields cannot be null",
+    "Notes": "Notes"
   },
   "views": {
     "overview": "Overview",
@@ -1540,7 +1581,8 @@
     "accounting": "Accounting",
     "tax": "Tax",
     "payroll": "Payroll",
-    "integrations": "Integrations"
+    "integrations": "Integrations",
+    "quotes": "Quotes"
   },
   "actions": {
     "create_organisation": "Create organisation",
@@ -1560,7 +1602,12 @@
     "In bank": "In bank",
     "Overdue": "Overdue",
     "Active": "Active",
-    "Inactive": "Inactive"
+    "Inactive": "Inactive",
+    "Sent": "Sent",
+    "Accepted": "Accepted",
+    "Declined": "Declined",
+    "Expired": "Expired",
+    "Converted": "Converted"
   },
   "bureau": {
     "title": "For accounting bureaus",

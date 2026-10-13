@@ -4,6 +4,31 @@ Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as
 delivered.
 
+## 2026-10-12: Sales quotes
+
+- Added tenant-scoped quotes and quote lines with migration `0020_quotes`,
+  base-currency and exact decimal guards, and a separate `QUO-` series using the
+  existing document sequences. CI and upgrade migration expectations include
+  the new migration, preserving existing records and sequence counters.
+- Quotes have no voucher or ledger posting. Draft offers can be edited, marked
+  sent, accepted or declined after sending, or expired after their inclusive
+  validity date. Stale acceptance is refused. A tenant-scoped daily-worker
+  helper expires overdue Draft and Sent offers without affecting accepted ones.
+- Accepted offers convert atomically through the existing invoice service into
+  issued invoices with balanced postings, original lines, tax codes, amount type
+  and notes. Invoices use the quote date, customer payment terms and the invoice
+  series. Failed posting rolls back the invoice, numbering and conversion link;
+  repeated and concurrent conversion returns the same invoice.
+- Added viewer-readable and write-role, CSRF-protected API routes, a Documents
+  Quotes view, multiple-line draft editing, status actions and confirmation of
+  invoice posting on conversion. All four locales have append-only additions.
+- Verified with offline service, API, migration and all-four-locale browser
+  checks. Python 3.12.14, `python -m pytest -q`:
+  `832 passed, 4 skipped in 595.30s (0:09:55)`. The four skips are existing
+  opt-in PostgreSQL checks. No live provider calls were made.
+- Quote email delivery, scheduling the daily expiry helper and production UAT
+  remain deferred. Mark sent records status only, with explicit interface copy.
+
 ## 2026-10-12: Staged contact and item CSV import
 
 - Added a shared master-data CSV pipeline with contact and item validators,

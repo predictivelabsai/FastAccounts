@@ -1186,3 +1186,27 @@ pending.
   The four skipped tests are opt-in PostgreSQL checks.
 - [ ] Production UAT remains pending. Spreadsheet workbook parsing and updates
   to existing master data are outside this CSV import scope.
+
+### Sales quotes (2026-10-12)
+
+- [x] Add tenant-scoped quotes and quote lines with migration `0020_quotes`, exact
+  decimal amounts, base-currency validation and a separate `QUO-` series in the
+  existing document sequences. Update the CI migration list and upgrade checks.
+- [x] Quotes remain outside the ledger through Draft, Sent, Accepted, Declined and
+  Expired. Only Draft is editable; only Sent can be accepted or declined.
+  Validity includes the last valid day. Stale offers cannot be sent or accepted;
+  the daily-worker helper expires only overdue Draft and Sent offers.
+- [x] Convert an Accepted quote into a created and issued sales invoice through the
+  existing invoice service, preserving lines, taxes, amount type and notes.
+  The invoice uses the quote date, contact payment terms and invoice numbering.
+  Invoice posting and the quote link commit atomically, including locked-period
+  rejection. Repeated or concurrent conversion returns the same invoice.
+- [x] Provide viewer-readable and write-role, CSRF-protected API routes and a Quotes
+  view in Documents, with multiple editable lines, status actions and a posting
+  confirmation on conversion. Append translations in all four locales.
+- Validation: offline pytest workflow, API, migration and all-four-locale browser
+  regressions passed. Python 3.12.14, `python -m pytest -q`:
+  `832 passed, 4 skipped in 595.30s (0:09:55)`. The four skips are existing
+  opt-in PostgreSQL checks. No live provider calls were made.
+- [ ] Deferred: quote email delivery, scheduling the daily expiry helper and
+  production UAT. Mark sent records status only and says so in the interface.

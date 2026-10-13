@@ -36,7 +36,8 @@
     "recurring": "Periodinės sąskaitos ir priminimai",
     "fixed_assets": "Ilgalaikis turtas",
     "cash_flow": "Pinigų srautų ataskaita",
-    "data_import": "Duomenų importas"
+    "data_import": "Duomenų importas",
+    "quotes": "Pasiūlymai"
   },
   "footer": {
     "tagline": "Atvirojo kodo buhalterinė apskaita Jungtinei Karalystei ir Estijai.",
@@ -1421,7 +1422,47 @@
     "Import batch not found": "Importas nerastas",
     "Only a staged batch can be committed or discarded": "Galima importuoti arba atmesti tik paruoštus duomenis",
     "CSV columns must match the supported columns for contacts": "CSV stulpeliai turi atitikti kontaktų stulpelius",
-    "CSV columns must match the supported columns for items": "CSV stulpeliai turi atitikti prekių stulpelius"
+    "CSV columns must match the supported columns for items": "CSV stulpeliai turi atitikti prekių stulpelius",
+    "Quotes": "Pasiūlymai",
+    "Quote": "Pasiūlymas",
+    "Quote lines": "Pasiūlymo eilutės",
+    "Quote line": "Pasiūlymo eilutė",
+    "Valid until": "Galioja iki",
+    "Quote date": "Pasiūlymo data",
+    "New quote": "Naujas pasiūlymas",
+    "Edit quote": "Redaguoti pasiūlymą",
+    "Accept": "Priimti",
+    "Decline": "Atmesti",
+    "Expired": "Nebegalioja",
+    "Converted": "Paverstas sąskaita",
+    "Accepted": "Priimtas",
+    "Declined": "Atmestas",
+    "Mark sent": "Pažymėti išsiųstu",
+    "Expire": "Pažymėti nebegaliojančiu",
+    "Convert": "Paversti sąskaita",
+    "Convert to invoice": "Paversti pasiūlymą sąskaita",
+    "Customer offers before invoicing.": "Pasiūlymai klientams prieš išrašant sąskaitą.",
+    "Add line": "Pridėti eilutę",
+    "Remove line": "Pašalinti eilutę",
+    "Amount type": "Sumos tipas",
+    "Exclusive": "Be PVM",
+    "Inclusive": "Su PVM",
+    "No tax": "Be mokesčių",
+    "Mark this quote as sent. Email delivery is not available yet.": "Pažymėti pasiūlymą išsiųstu. Siuntimas el. paštu dar nepasiekiamas.",
+    "This creates and issues a sales invoice with an immutable ledger posting.": "Sukuriama ir išrašoma pardavimo sąskaita su nekeičiamu didžiosios knygos įrašu.",
+    "Quote validity cannot precede the quote date": "Pasiūlymo galiojimo pabaiga negali būti ankstesnė už pasiūlymo datą",
+    "Quotes require the organisation base currency": "Pasiūlymai turi būti organizacijos bazine valiuta",
+    "Quote line amounts must be finite with at most four decimal places": "Pasiūlymo eilutės sumos turi būti baigtinės ir turėti ne daugiau kaip keturis skaitmenis po kablelio",
+    "Invalid quote line amount": "Netinkama pasiūlymo eilutės suma",
+    "Quote total exceeds the supported amount": "Pasiūlymo suma viršija leistiną ribą",
+    "Only Draft quotes can be edited": "Redaguoti galima tik pasiūlymų juodraščius",
+    "Invalid quote status transition": "Netinkamas pasiūlymo būsenos pakeitimas",
+    "Quote has expired": "Pasiūlymas nebegalioja",
+    "Quote is still valid": "Pasiūlymas dar galioja",
+    "Only Accepted quotes can be converted": "Sąskaita galima paversti tik priimtus pasiūlymus",
+    "Quote not found": "Pasiūlymas nerastas",
+    "Quote fields cannot be null": "Pasiūlymo laukai negali turėti null reikšmės",
+    "Notes": "Pastabos"
   },
   "views": {
     "overview": "Overview",
@@ -1432,7 +1473,8 @@
     "accounting": "Accounting",
     "tax": "Tax",
     "payroll": "Payroll",
-    "integrations": "Integrations"
+    "integrations": "Integrations",
+    "quotes": "Pasiūlymai"
   },
   "actions": {
     "create_organisation": "Create organisation",
@@ -1452,7 +1494,12 @@
     "In bank": "In bank",
     "Overdue": "Overdue",
     "Active": "Active",
-    "Inactive": "Inactive"
+    "Inactive": "Inactive",
+    "Sent": "Išsiųstas",
+    "Accepted": "Priimtas",
+    "Declined": "Atmestas",
+    "Expired": "Nebegalioja",
+    "Converted": "Paverstas sąskaita"
   },
   "bureau": {
     "title": "Apskaitos biurams",
