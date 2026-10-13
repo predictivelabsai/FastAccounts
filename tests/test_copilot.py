@@ -302,7 +302,7 @@ def test_stage_fences_parse_leniently():
 
 def test_locale_tail_keys_merge():
     en = i18n.catalog("en")
-    assert list(en)[-1] == "copilot"
+    assert list(en)[-2:-1] == ["copilot"] and list(en)[-1] == "periods"
     assert en["nav"]["assistant"] == "Assistant"
     for language in ("et", "lt", "lv"):
         raw = i18n.catalog(language)

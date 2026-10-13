@@ -2116,5 +2116,26 @@
       "Review these rows in Data import before they touch your books. Stage them now?": "Vaata read andmeimpordis üle enne, kui need raamatupidamisesse jõuavad. Lisa kohe eelvaatesse?",
       "Import batch staged. Review it under Data import.": "Impordipartii lisati eelvaatesse. Vaata seda andmeimpordi all üle."
     }
+  },
+  "periods": {
+    "nav": {
+      "periods": "Finantsperioodid"
+    },
+    "workspace": {
+      "Fiscal periods": "Finantsperioodid",
+      "Lock a period to stop changes to its postings. Reopening needs a note and is audited.": "Lukusta periood, et peatada selle kannete muutmine. Taasavamine vajab märkust ja kantakse auditilogisse.",
+      "Periods": "Perioodid",
+      "Period": "Periood",
+      "From": "Alates",
+      "To": "Kuni",
+      "Locked at": "Lukustatud",
+      "Open": "Avatud",
+      "Locked": "Lukus",
+      "Close period": "Lukusta periood",
+      "Reopen period": "Ava periood uuesti",
+      "Reason": "Põhjus",
+      "Locked period": "Periood lukustatud",
+      "Period reopened": "Periood taasavatud"
+    }
   }
 }

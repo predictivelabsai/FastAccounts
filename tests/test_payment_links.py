@@ -254,7 +254,7 @@ def test_append_only_locale_merge(language):
     path = f'web/locales/{language}.json'
     raw = Path(path).read_text(encoding='utf-8')
     data = json.loads(raw)
-    assert list(data)[-8:] == ['payment_links', 'analytical_objects', 'invoice_exports', 'bulk_sending', 'reminder_rules', 'fx_rates', 'document_settings', 'copilot']
+    assert list(data)[-(9):] == ['payment_links', 'analytical_objects', 'invoice_exports', 'bulk_sending', 'reminder_rules', 'fx_rates', 'document_settings', 'copilot', 'periods']
     for section, additions in data['payment_links'].items():
         assert not additions.keys() & data[section].keys()
         for key, value in additions.items():
