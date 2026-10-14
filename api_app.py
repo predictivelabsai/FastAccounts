@@ -24,7 +24,8 @@ from documents import DocumentService, EInvoiceAlreadyImported
 from bulk_sending import BulkSendingService, MAX_BULK_INVOICES
 from invoice_list import InvoiceListService, validate_list_dates
 from csv_exports import CsvExportService
-from copilot import CopilotDisabled, CopilotQuotaExceeded, CopilotService
+from copilot import (CopilotAccessDenied, CopilotDisabled, CopilotQuotaExceeded,
+                     CopilotService)
 from contact_groups import GroupService
 from list_export_repository import ListExportRepository
 from quotes import QuoteService
@@ -540,6 +541,11 @@ async def missing_value(_request: Request, error: KeyError):
 @api.exception_handler(CopilotDisabled)
 async def copilot_disabled(_request: Request, error: CopilotDisabled):
     return JSONResponse({"detail": str(error)}, status_code=409)
+
+
+@api.exception_handler(CopilotAccessDenied)
+async def copilot_access_denied(_request: Request, error: CopilotAccessDenied):
+    return JSONResponse({"detail": str(error)}, status_code=403)
 
 
 @api.exception_handler(CopilotQuotaExceeded)
@@ -1110,6 +1116,25 @@ def copilot_settings(organisation_id: str, payload: CopilotToggleIn,
     _require(organisation_id, user, WRITE_ROLES & {'owner', 'administrator'})
     CopilotService().set_enabled(organisation_id, payload.enabled, actor=user.email)
     return CopilotService().status(organisation_id, user.email)
+
+
+class CopilotAccessIn(BaseModel):
+    email: str = Field(min_length=3, max_length=320)
+
+
+@api.post('/organisations/{organisation_id}/copilot/access', status_code=201)
+def copilot_grant_access(organisation_id: str, payload: CopilotAccessIn,
+                         user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES & {'owner', 'administrator'})
+    return CopilotService().grant_access(organisation_id, payload.email, actor=user.email)
+
+
+@api.delete('/organisations/{organisation_id}/copilot/access/{email}')
+def copilot_revoke_access(organisation_id: str, email: str,
+                          user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES & {'owner', 'administrator'})
+    CopilotService().revoke_access(organisation_id, email, actor=user.email)
+    return {'revoked': True}
 
 
 # --- Fiscal period close and reopen -----------------------------------------

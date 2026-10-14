@@ -1842,7 +1842,15 @@
     "Choose a member": "Vali liige",
     "No members yet.": "Liikmeid veel ei ole.",
     "Members of {name}": "Grupi {name} liikmed",
-    "Memberships go with the group; contacts and users stay. Delete {name}?": "Liikmesus kaob koos grupiga; kontaktid ja kasutajad jäävad. Kustutada {name}?"
+    "Memberships go with the group; contacts and users stay. Delete {name}?": "Liikmesus kaob koos grupiga; kontaktid ja kasutajad jäävad. Kustutada {name}?",
+    "Copilot access": "Kaaslase ligipääs",
+    "Owners and administrators always have access. Grant members of this organisation individually; grants are audited.": "Omanikel ja administraatoritel on ligipääs alati. Anna selle organisatsiooni liikmetele ligipääs ükshaaval; iga andmine kantakse auditilogisse.",
+    "Grant member email": "Anna ligipääs liikme e-postile",
+    "Grant access": "Anna ligipääs",
+    "Revoke": "Eemalda",
+    "Revoke copilot access": "Kaaslase ligipääsu eemaldamine",
+    "{email} loses copilot access immediately. Revoke?": "{email} kaotab kaaslase ligipääsu kohe. Eemaldada?",
+    "AI copilot access has not been granted to this account.": "Sellele kasutajale ei ole AI-kaaslase ligipääsu antud."
   },
   "views": {
     "overview": "Ülevaade",

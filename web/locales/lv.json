@@ -1842,7 +1842,15 @@
     "Choose a member": "Izvēlieties dalībnieku",
     "No members yet.": "Dalībnieku vēl nav.",
     "Members of {name}": "{name} dalībnieki",
-    "Memberships go with the group; contacts and users stay. Delete {name}?": "Dalība izzūd kopā ar grupu; kontakti un lietotāji paliek. Dzēst {name}?"
+    "Memberships go with the group; contacts and users stay. Delete {name}?": "Dalība izzūd kopā ar grupu; kontakti un lietotāji paliek. Dzēst {name}?",
+    "Copilot access": "Asistenta piekļuve",
+    "Owners and administrators always have access. Grant members of this organisation individually; grants are audited.": "Īpašniekiem un administratoriem piekļuve ir vienmēr. Piešķiriet šīs organizācijas dalībniekiem piekļuvi atsevišķi; piešķirumi tiek fiksēti auditā.",
+    "Grant member email": "Piešķirt dalībnieka e-pastu",
+    "Grant access": "Piešķirt piekļuvi",
+    "Revoke": "Atsaukt",
+    "Revoke copilot access": "Atsaukt asistenta piekļuvi",
+    "{email} loses copilot access immediately. Revoke?": "{email} uzreiz zaudē asistenta piekļuvi. Atsaukt?",
+    "AI copilot access has not been granted to this account.": "Šim kontam nav piešķirta AI asistenta piekļuve."
   },
   "views": {
     "overview": "Overview",

@@ -1842,7 +1842,15 @@
     "Choose a member": "Choose a member",
     "No members yet.": "No members yet.",
     "Members of {name}": "Members of {name}",
-    "Memberships go with the group; contacts and users stay. Delete {name}?": "Memberships go with the group; contacts and users stay. Delete {name}?"
+    "Memberships go with the group; contacts and users stay. Delete {name}?": "Memberships go with the group; contacts and users stay. Delete {name}?",
+    "Copilot access": "Copilot access",
+    "Owners and administrators always have access. Grant members of this organisation individually; grants are audited.": "Owners and administrators always have access. Grant members of this organisation individually; grants are audited.",
+    "Grant member email": "Grant member email",
+    "Grant access": "Grant access",
+    "Revoke": "Revoke",
+    "Revoke copilot access": "Revoke copilot access",
+    "{email} loses copilot access immediately. Revoke?": "{email} loses copilot access immediately. Revoke?",
+    "AI copilot access has not been granted to this account.": "AI copilot access has not been granted to this account."
   },
   "views": {
     "overview": "Overview",

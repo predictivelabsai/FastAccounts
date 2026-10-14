@@ -66,6 +66,10 @@ class CopilotDisabled(RuntimeError):
     """The copilot is off: no configuration, missing key or org opt-out."""
 
 
+class CopilotAccessDenied(RuntimeError):
+    """The account has not been granted copilot access in this organisation."""
+
+
 class CopilotQuotaExceeded(RuntimeError):
     """A quota, burst or size limit blocked the call before cost is incurred."""
 
@@ -117,13 +121,37 @@ class CopilotService:
 
     # gates ---------------------------------------------------------------
 
+    ADMIN_ROLES = ("owner", "administrator")
+
     @staticmethod
-    def _gate(organisation_id):
+    def _gate(organisation_id, user_email):
         if not configured():
             raise CopilotDisabled("AI copilot is not configured.")
         service = CopilotService()
         if not service.enabled(organisation_id):
             raise CopilotDisabled("AI copilot is off for this organisation.")
+        access = service.access(organisation_id, user_email)
+        if not access["granted"]:
+            raise CopilotAccessDenied("AI copilot access has not been granted to this account.")
+
+    def _membership_role(self, tx, organisation_id, user_email):
+        row = tx.one(
+            "SELECT role FROM memberships WHERE organisation_id=? AND lower(email)=lower(?)",
+            (organisation_id, user_email))
+        return row["role"] if row else None
+
+    def access(self, organisation_id, user_email):
+        """Access decision for one account: admins always, others by grant."""
+        with self.db.transaction() as tx:
+            role = self._membership_role(tx, organisation_id, user_email)
+            admins = role in self.ADMIN_ROLES
+            grant = None if admins else tx.one(
+                "SELECT id,granted_by,created_at FROM copilot_access_grants "
+                "WHERE organisation_id=? AND lower(email)=lower(?)",
+                (organisation_id, user_email))
+        return {"role": role, "admin": admins,
+                "granted": bool(admins or grant),
+                "grant": grant}
 
     def enabled(self, organisation_id):
         row = self.db.one(
@@ -140,9 +168,13 @@ class CopilotService:
         org = self.db.one(
             "SELECT COALESCE(SUM(messages),0) messages, COALESCE(SUM(prompt_chars),0) chars "
             "FROM copilot_usage WHERE organisation_id=? AND day=?", (organisation_id, _day()))
+        access = self.access(organisation_id, user_email)
         return {
             "available": bool(configured()),
             "enabled": self.enabled(organisation_id),
+            "access": {"role": access["role"], "admin": access["admin"],
+                       "granted": access["granted"]},
+            "grants": self.grants(organisation_id) if access["admin"] else None,
             "quotas": {
                 "user_messages": int(user.get("messages", 0)),
                 "user_scans": int(user.get("scans", 0)),
@@ -192,6 +224,46 @@ class CopilotService:
             audit(tx, organisation_id, actor, "copilot.settings_updated",
                   "organisation", organisation_id, {"enabled": bool(enabled)})
 
+    def grants(self, organisation_id):
+        return self.db.rows(
+            "SELECT email,granted_by,created_at FROM copilot_access_grants "
+            "WHERE organisation_id=? ORDER BY created_at,email", (organisation_id,))
+
+    def grant_access(self, organisation_id, email, *, actor):
+        email = (email or "").strip().lower()
+        if "@" not in email or len(email) > 320:
+            raise ValueError("A valid account email is required")
+        with self.db.transaction() as tx:
+            locked = tx.execute("UPDATE organisations SET name=name WHERE id=?", (organisation_id,))
+            if not locked.rowcount:
+                raise KeyError("Organisation not found")
+            if not tx.one("SELECT role FROM memberships WHERE organisation_id=? AND lower(email)=?",
+                          (organisation_id, email)):
+                raise KeyError("Account not found")
+            if tx.one("SELECT id FROM copilot_access_grants WHERE organisation_id=? AND email=?",
+                      (organisation_id, email)):
+                raise ValueError("Access has already been granted to this account")
+            tx.execute(
+                "INSERT INTO copilot_access_grants(id,organisation_id,email,granted_by,created_at) "
+                "VALUES (?,?,?,?,?)", (new_id(), organisation_id, email, actor, utc_now()))
+            audit(tx, organisation_id, actor, "copilot.access_granted",
+                  "copilot", organisation_id, {"email": email})
+        return {"email": email}
+
+    def revoke_access(self, organisation_id, email, *, actor):
+        email = (email or "").strip().lower()
+        with self.db.transaction() as tx:
+            locked = tx.execute("UPDATE organisations SET name=name WHERE id=?", (organisation_id,))
+            if not locked.rowcount:
+                raise KeyError("Organisation not found")
+            deleted = tx.execute(
+                "DELETE FROM copilot_access_grants WHERE organisation_id=? AND email=?",
+                (organisation_id, email))
+            if not deleted.rowcount:
+                raise KeyError("Grant not found")
+            audit(tx, organisation_id, actor, "copilot.access_revoked",
+                  "copilot", organisation_id, {"email": email})
+
     def stage(self, organisation_id, user_email, kind, csv_content, *, message_id=None):
         from master_data_import import MasterDataImportService
         batch = MasterDataImportService(self.db).stage(
@@ -206,7 +278,7 @@ class CopilotService:
 
     def send(self, organisation_id, user_email, content, *,
              attachment_ids=None, client=None):
-        self._gate(organisation_id)
+        self._gate(organisation_id, user_email)
         content = self._check_text(content)
         attachments = self._attachments(organisation_id, attachment_ids or [])
         evidence = [self._load_evidence(organisation_id, a) for a in attachments]
