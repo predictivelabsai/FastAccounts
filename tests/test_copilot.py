@@ -98,7 +98,7 @@ STAGED_CSV = "code,name\nP1,Synthetic widget\nP2,Another widget"
 
 def test_migration_count_rerun_and_ci(env):
     d = env
-    assert d["db"].scalar("SELECT COUNT(*) FROM schema_migrations") == 31
+    assert d["db"].scalar("SELECT COUNT(*) FROM schema_migrations") == 32
     assert d["db"].rows("SELECT * FROM copilot_messages") == []
     assert d["db"].rows("SELECT * FROM copilot_usage") == []
     for _ in range(2):
@@ -106,7 +106,7 @@ def test_migration_count_rerun_and_ci(env):
             tx.execute("DELETE FROM schema_migrations WHERE version='0029_copilot'")
         assert d["db"].migrate() == ["0029_copilot"]
     assert d["db"].rows("SELECT * FROM copilot_messages") == []
-    assert "'0028_document_settings', '0029_copilot', '0030_master_data_maintenance', '0031_master_data_groups']" in (ROOT / ".github/workflows/ci.yml").read_text()
+    assert "'0028_document_settings', '0029_copilot', '0030_master_data_maintenance', '0031_master_data_groups', '0032_copilot_access']" in (ROOT / ".github/workflows/ci.yml").read_text()
 
 
 def test_kill_switches_block_before_any_provider_call(env, monkeypatch):
@@ -196,6 +196,11 @@ def test_scan_document_pdf_and_stage_flow(env, monkeypatch):
     listing = d["client"].get(f"{d['base']}/imports/{batch_id}").json()
     assert listing["kind"] == "items"
     assert d["db"].one("SELECT action FROM audit_events WHERE action='copilot.staged'")
+    # Accountants are restricted until granted; a grant turns scanning on.
+    scan = d["client"].post(d["base"] + "/copilot/scan", json={"attachment_id": pdf["id"]},
+                            headers={"X-Test-User": "accountant@example.test"})
+    assert scan.status_code == 403 and "not been granted" in scan.text
+    assert d["client"].post(d["base"] + "/copilot/access", json={"email": "accountant@example.test"}).status_code == 201
     scan = d["client"].post(d["base"] + "/copilot/scan", json={"attachment_id": pdf["id"]},
                             headers={"X-Test-User": "accountant@example.test"})
     assert scan.status_code == 201
@@ -362,3 +367,75 @@ def test_workspace_copilot_view_offline(language, monkeypatch):
         assert notice_key in page.locator("[data-copilot-settings]").inner_text()
         assert not errors
         browser.close()
+
+
+def test_admins_always_and_members_need_grants(env, monkeypatch):
+    d = env
+    enable(d)
+    provider, _ = fake_reply("ok")
+    monkeypatch.setattr(copilot, "chat_completion", provider)
+    # Owner and administrator work without any grant.
+    assert d["client"].post(d["base"] + "/copilot/messages", json={"content": "hi"}).status_code == 201
+    assert d["client"].post(d["base"] + "/copilot/messages", json={"content": "hi"},
+                            headers={"X-Test-User": "administrator@example.test"}).status_code == 201
+    # Other roles are refused until granted.
+    for role in ("accountant", "approver", "viewer"):
+        response = d["client"].post(d["base"] + "/copilot/messages", json={"content": "hi"},
+                                    headers={"X-Test-User": role + "@example.test"})
+        assert response.status_code == 403, (role, response.text)
+        assert "not been granted" in response.text
+    grant = d["client"].post(d["base"] + "/copilot/access", json={"email": "accountant@example.test"})
+    assert grant.status_code == 201, grant.text
+    assert grant.json()["email"] == "accountant@example.test"
+    assert d["client"].post(d["base"] + "/copilot/messages", json={"content": "hi"},
+                            headers={"X-Test-User": "accountant@example.test"}).status_code == 201
+    # Status reflects the grant for the granted member; admins see the list.
+    accountant_status = d["client"].get(d["base"] + "/copilot/status",
+                                        headers={"X-Test-User": "accountant@example.test"}).json()
+    assert accountant_status["access"] == {"role": "accountant", "admin": False, "granted": True}
+    owner_status = d["client"].get(d["base"] + "/copilot/status").json()
+    assert owner_status["access"]["admin"] is True
+    assert [row["email"] for row in owner_status["grants"]] == ["accountant@example.test"]
+    viewer_status = d["client"].get(d["base"] + "/copilot/status",
+                                    headers={"X-Test-User": "viewer@example.test"}).json()
+    assert viewer_status["access"]["granted"] is False and viewer_status["grants"] is None
+    # Duplicate grant refused; unknown account refused; revoked access blocks again.
+    assert d["client"].post(d["base"] + "/copilot/access",
+                            json={"email": "ACCOUNTANT@example.test"}).status_code == 422
+    unknown = d["client"].post(d["base"] + "/copilot/access", json={"email": "nobody@example.test"})
+    assert unknown.status_code == 404 and "Account not found" in unknown.text
+    revoke = d["client"].delete(d["base"] + "/copilot/access/accountant@example.test")
+    assert revoke.status_code == 200
+    assert d["client"].post(d["base"] + "/copilot/messages", json={"content": "hi"},
+                            headers={"X-Test-User": "accountant@example.test"}).status_code == 403
+    second = d["client"].delete(d["base"] + "/copilot/access/accountant@example.test")
+    assert second.status_code == 404 and "Grant not found" in second.text
+    events = d["db"].rows(
+        "SELECT action,actor FROM audit_events WHERE action LIKE 'copilot.access%' ORDER BY created_at")
+    assert [(row["action"], row["actor"]) for row in events] == [
+        ("copilot.access_granted", ACTOR), ("copilot.access_revoked", ACTOR)]
+
+
+def test_access_grant_routes_roles(env, monkeypatch):
+    d = env
+    enable(d)
+    payload = {"email": "viewer@example.test"}
+    headers = {"X-Test-User": "accountant@example.test"}
+    assert d["client"].get(d["base"] + "/copilot/status", headers=headers).json()["grants"] is None
+    assert d["client"].post(d["base"] + "/copilot/access", json=payload, headers=headers).status_code == 403
+    assert d["client"].delete(d["base"] + "/copilot/access/viewer@example.test",
+                              headers=headers).status_code == 403
+    assert d["db"].rows("SELECT id FROM copilot_access_grants") == []
+    bad = d["client"].post(d["base"] + "/copilot/access", json={"email": "not-an-email"})
+    assert bad.status_code == 422
+
+
+def test_disabled_org_blocks_even_admins(env, monkeypatch):
+    d = env
+    provider, call = fake_reply("ok")
+    monkeypatch.setattr(copilot, "chat_completion", provider)
+    assert d["client"].put(d["base"] + "/copilot/settings", json={"enabled": True}).status_code == 200
+    assert d["client"].put(d["base"] + "/copilot/settings", json={"enabled": False}).status_code == 200
+    response = d["client"].post(d["base"] + "/copilot/messages", json={"content": "hi"})
+    assert response.status_code == 409 and "off for this organisation" in response.text
+    assert call["captured"] is None

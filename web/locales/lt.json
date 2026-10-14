@@ -1842,7 +1842,15 @@
     "Choose a member": "Pasirinkite narį",
     "No members yet.": "Narių dar nėra.",
     "Members of {name}": "{name} nariai",
-    "Memberships go with the group; contacts and users stay. Delete {name}?": "Narystės dingsta kartu su grupe; kontaktai ir naudotojai lieka. Ištrinti {name}?"
+    "Memberships go with the group; contacts and users stay. Delete {name}?": "Narystės dingsta kartu su grupe; kontaktai ir naudotojai lieka. Ištrinti {name}?",
+    "Copilot access": "Asistento prieiga",
+    "Owners and administrators always have access. Grant members of this organisation individually; grants are audited.": "Savininkai ir administratoriai turi prieigą visada. Suteikite šios organizacijos nariams prieigą atskirai; suteikimai užfiksuojami audite.",
+    "Grant member email": "Suteikti nario el. paštą",
+    "Grant access": "Suteikti prieigą",
+    "Revoke": "Atšaukti",
+    "Revoke copilot access": "Atšaukti asistento prieigą",
+    "{email} loses copilot access immediately. Revoke?": "{email} iškart praranda asistento prieigą. Atšaukti?",
+    "AI copilot access has not been granted to this account.": "Šiai paskyrai nesuteikta AI asistento prieiga."
   },
   "views": {
     "overview": "Overview",

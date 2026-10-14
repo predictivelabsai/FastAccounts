@@ -880,9 +880,12 @@
       ]);
       const active = status.available && status.enabled;
       const quotaLine = `${num(status.quotas.user_messages)} / ${num(status.quotas.messages_per_user_day)}`;
+      const accessLine = status.access && !status.access.granted
+        ? t('AI copilot access has not been granted to this account.')
+        : null;
       const notice = !status.available ? t('AI copilot is not configured on this service.')
         : !status.enabled ? t('AI copilot is off for this organisation. An owner or administrator can enable it here.')
-        : `${tr('Used today')}: ${quotaLine}`;
+        : accessLine || `${tr('Used today')}: ${quotaLine}`;
       const stages = Object.fromEntries((history || []).filter((x) => x.stage_proposal_json)
         .map((x) => [x.id, JSON.parse(x.stage_proposal_json)]));
       const composer = form(`<label class="full-width">${tr('Message')}<textarea name="content" rows="3" maxlength="8000" required></textarea><span class="field-error" data-error="content"></span></label>` +
@@ -901,11 +904,20 @@
             ]))) +
           `</section>`
         : '';
+      const grantsPanel = status.grants
+        ? `<section class="section" data-copilot-access><h2>${tr('Copilot access')}</h2><p class="muted">${tr('Owners and administrators always have access. Grant members of this organisation individually; grants are audited.')}</p>` +
+          table(['Account', 'Granted by', 'Actions'],
+            (status.grants || []).map((g) => row([
+              td(esc(g.email)), td(esc(g.granted_by)),
+              td(editable ? button('Revoke', 'revokeCopilotAccess', false, `data-email="${esc(g.email)}"`) : ''),
+            ]))) +
+          form(field('Grant member email', 'grant_email', '', 'email', 'required maxlength="320"'), 'Grant access') +
+        `</section>` : '';
       const body = `<section class="section" data-copilot-settings><h2>${tr('AI copilot')}</h2>` +
         (admins ? form(check('Enable AI copilot for this organisation', 'copilot_enabled', !!status.enabled)) : '') +
         `<p class="muted" data-copilot-notice aria-live="polite">${esc(notice)}</p></section>` +
         `<section class="section" data-copilot-chat><h2>${tr('Conversation')}</h2><div id="copilot-transcript">${copilotTranscript(history || [])}</div>` +
-        composer + `</section>` + usageUsage;
+        composer + `</section>` + grantsPanel + usageUsage;
       if (!c.mount(page(t('AI copilot'), t('Ask about your books, scan documents and draft staged imports. The copilot never changes records on its own.'), '', body))) return;
       content.querySelectorAll('[data-action=cancel]').forEach((x) => x.remove());
       if (!active) content.querySelectorAll('[data-copilot-chat] textarea, [data-copilot-chat] select, [data-copilot-chat] button').forEach((x) => { x.disabled = true; });
@@ -915,6 +927,19 @@
         toast(t('Saved successfully'));
         await render();
       });
+      const accessPanel = content.querySelector('[data-copilot-access]');
+      if (accessPanel) {
+        bindForm(accessPanel, async (values) => {
+          await post(c.url('/copilot/access'), {email: values.grant_email});
+          toast(t('Saved successfully'));
+          await render();
+        });
+        bindActions(content, {revokeCopilotAccess: (b) => confirmAction(tr('Revoke copilot access'), tr('{email} loses copilot access immediately. Revoke?').replace('{email}', b.dataset.email), async () => {
+          await post(c.url('/copilot/access/' + encodeURIComponent(b.dataset.email)), {}, 'DELETE');
+          toast(t('Saved successfully'));
+          await render();
+        })});
+      }
       bindForm(content.querySelector('[data-copilot-chat]'), async (data) => {
         const payload = {content: data.content, attachment_ids: data.attachment_id ? [data.attachment_id] : []};
         await post(c.url('/copilot/messages'), payload);

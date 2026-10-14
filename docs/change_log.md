@@ -96,6 +96,36 @@ delivered.
   validation and XLSX renderers for the remaining lists remain out of scope;
   objects/bank CSV column sets are intentionally minimal.
 
+## 2026-10-14: Copilot access grants (extension of copilot)
+
+- Added rerun-safe migration `0032_copilot_access` (count 32, CI list
+  updated): `copilot_access_grants` with one row per granted account per
+  organisation. The provider key itself is never stored, logged or exposed.
+- Changed the copilot access model: owners and administrators of an enabled
+  organisation always have access; every other member is refused with 403
+  until an administrator grants access to their account, and revoking is
+  immediate. Grant and revocation write audited `copilot.access_granted` /
+  `copilot.access_revoked` events under an organisation lock, validate that
+  the granted address belongs to a member, deduplicate (case-insensitively)
+  and surface to administrators in the status payload.
+- Added owner/administrator CSRF-guarded grant and revoke routes and a
+  Copilot access panel in the workspace view with granted accounts, granted
+  by, revoke confirmations and an email grant form; viewer gating follows
+  the enable toggle. English, Estonian, Lithuanian and Latvian keys appended
+  in place; Estonian passed estnltk checks on this machine.
+- Validation: focused copilot suite: 17 passed, 1 existing dependency
+  warning in 18.99s, adding the admin-always/member-grant matrix, granted
+  status views per role, duplicate/unknown/invalid grants, immediate
+  revocation, audit order and role checks on the new routes; a disabled
+  organisation still blocks administrators with 409 before any provider
+  call. Full `python -m pytest -q` counts land with this PR's suite
+  run: 1441 passed, 4 skipped, 5 existing dependency warnings in 1433.67s.
+- Deployment note: the dedicated key goes ONLY into the server environment
+  (`FASTACCOUNTS_GROK_API_KEY` plus `FASTACCOUNTS_COPILOT_ENABLED=true` in
+  the FastDevOps/Coolify service environment, then redeploy); it never
+  enters the repository or any user's hands. Administrators manage access
+  to the copilot, not to the key.
+
 ## 2026-10-13: Contact and user groups (parity slate P2 item 9)
 
 - Added rerun-safe migration `0031_master_data_groups` (count 31, CI list
