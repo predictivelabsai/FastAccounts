@@ -327,7 +327,7 @@ class ImportService:
         return str(value).strip() or None
 
     @staticmethod
-    def _employee_match(tx, organisation_id: str, payload: Mapping[str, Any]) -> tuple[str | None, str | None, dict | None]:
+    def _employee_match(tx, organisation_id: str, payload: Mapping[str, Any], *, match_name: bool = False) -> tuple[str | None, str | None, dict | None]:
         email = payload.get("email")
         personal_id = payload.get("personal_id")
         email = email.strip() if isinstance(email, str) else ""
@@ -341,6 +341,19 @@ class ImportService:
             clauses.append("trim(personal_id)=?")
             params.append(personal_id)
         if not clauses:
+            if not match_name:
+                return None, None, None
+            name = payload.get("name")
+            if not isinstance(name, str) or not name.strip():
+                return None, None, None
+            matches = tx.rows(
+                "SELECT id,name FROM employees WHERE organisation_id=? AND lower(trim(name))=lower(?)",
+                (organisation_id, name.strip()),
+            )
+            if len(matches) == 1:
+                return matches[0]["id"], None, {"strategy": "name", "name": name.strip()}
+            if len(matches) > 1:
+                return None, "Ambiguous employee match: " + ", ".join(item["name"] for item in matches), None
             return None, None, None
         matches = tx.rows(
             "SELECT id,name,email,personal_id FROM employees WHERE organisation_id=? AND ("
@@ -372,7 +385,7 @@ class ImportService:
                     "strategy": "external_mapping", "external_id": external_id
                 }
         if canonical_type == "employee":
-            return self._employee_match(tx, organisation_id, payload)
+            return self._employee_match(tx, organisation_id, payload, match_name=provider == "smartaccounts")
         if canonical_type == "contact":
             registration = self._text(payload, "registration_no", "registry_code", "registration_code")
             email = self._text(payload, "email")

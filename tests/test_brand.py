@@ -22,7 +22,7 @@ def test_primary_mark_and_favicon():
         page = BeautifulSoup(rendered, "html.parser")
         assert page.select_one('img[src="/static/brand/fastaccounts-mark.svg"]')
         assert page.select_one('meta[name="theme-color"]')["content"] == "#150a2c"
-        assert page.select_one('link[href="/static/fonts/fonts.css"]')
+        assert page.select_one('link[href^="/static/fonts/fonts.css?v="]')
 
 
 @pytest.mark.parametrize("css", [DESIGN_CSS + PUBLIC_CSS, APP_CSS], ids=["public", "portal"])

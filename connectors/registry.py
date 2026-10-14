@@ -46,6 +46,7 @@ class ConnectorRegistration:
     factory: ConnectorFactory
     credential_fields: tuple[CredentialField, ...] = ()
     credential_note: str = ""
+    connector_class: type[Connector] | None = None
 
 
 def _planning_stub(key: str) -> ConnectorFactory:
@@ -70,6 +71,7 @@ _ROADMAP_NOTE = (
 
 REGISTRY: dict[str, ConnectorRegistration] = {
     "personio": ConnectorRegistration(
+        connector_class=PersonioProvider,
         status="Documented contract · not live-verified",
         factory=lambda credentials, config: PersonioProvider(
             client_id=credentials.get("client_id", ""),
@@ -87,6 +89,7 @@ REGISTRY: dict[str, ConnectorRegistration] = {
         ),
     ),
     "bamboohr": ConnectorRegistration(
+        connector_class=BambooHRProvider,
         status="Documented contract · not live-verified",
         factory=lambda credentials, config: BambooHRProvider(
             subdomain=credentials.get("subdomain") or config.get("subdomain", ""),
@@ -103,6 +106,7 @@ REGISTRY: dict[str, ConnectorRegistration] = {
         ),
     ),
     "file_import": ConnectorRegistration(
+        connector_class=FileImportConnector,
         status="Adapter ready",
         factory=lambda credentials, config: FileImportConnector(
             credentials.get("csv_content", ""), config
@@ -110,6 +114,7 @@ REGISTRY: dict[str, ConnectorRegistration] = {
         credential_note="Offline CSV or TSV employee import; no provider credentials required.",
     ),
     "fasthr": ConnectorRegistration(
+        connector_class=FastHRProvider,
         status="Adapter ready",
         factory=lambda credentials, config: FastHRProvider(
             base_url=credentials.get("base_url") or config.get("base_url") or FastHRProvider.default_base_url,
@@ -122,6 +127,7 @@ REGISTRY: dict[str, ConnectorRegistration] = {
         credential_note="Pull-only employee master-data access.",
     ),
     "quickbooks": ConnectorRegistration(
+        connector_class=QuickBooksProvider,
         status="Adapter ready",
         factory=lambda credentials, config: QuickBooksProvider(
             access_token=credentials.get("access_token", ""),
@@ -135,6 +141,7 @@ REGISTRY: dict[str, ConnectorRegistration] = {
         ),
     ),
     "xero": ConnectorRegistration(
+        connector_class=XeroProvider,
         status="Adapter ready",
         factory=lambda credentials, config: XeroProvider(
             access_token=credentials.get("access_token", ""),
@@ -146,6 +153,7 @@ REGISTRY: dict[str, ConnectorRegistration] = {
         ),
     ),
     "merit": ConnectorRegistration(
+        connector_class=MeritProvider,
         status="Adapter ready",
         factory=lambda credentials, config: MeritProvider(
             api_id=credentials.get("api_id") or config.get("api_id", ""),
@@ -157,6 +165,7 @@ REGISTRY: dict[str, ConnectorRegistration] = {
         ),
     ),
     "smartaccounts": ConnectorRegistration(
+        connector_class=SmartAccountsProvider,
         status="Documented contract · not live-verified",
         factory=lambda credentials, config: SmartAccountsProvider(
             api_key=credentials.get("api_key", ""), secret_key=credentials.get("secret_key", ""),
@@ -194,6 +203,7 @@ REGISTRY: dict[str, ConnectorRegistration] = {
         ),
     ),
     "open_banking": ConnectorRegistration(
+        connector_class=OpenBankingProvider,
         status="Adapter ready",
         factory=lambda credentials, config: OpenBankingProvider(
             secret_id=credentials.get("secret_id", ""), secret_key=credentials.get("secret_key", "")),
@@ -235,7 +245,13 @@ def connector_for(
 
 def provider_metadata(provider: str) -> dict[str, Any]:
     registration = registration_for(provider)
+    employee_only = registration.connector_class in (
+        FastHRProvider, PersonioProvider, BambooHRProvider, FileImportConnector,
+    )
     return {
+        "pull_object_types": list(getattr(
+            registration.connector_class, "PULL_OBJECT_TYPES", ("employee",) if employee_only else (),
+        )),
         "registry_status": registration.status,
         "credential_fields": [asdict(field) for field in registration.credential_fields],
         "credential_note": registration.credential_note,

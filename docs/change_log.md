@@ -4,6 +4,42 @@ Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as
 delivered.
 
+## 2026-10-14: Workspace audit fixes and faster page delivery
+
+- Completed workspace and integration catalogue translations, including
+  SmartAccounts accounting-data and payroll-worker imports. Added translation
+  coverage checks for workspace labels, table headings and every provider.
+- Restored native checkbox and radio sizing, added invoice select-all with mixed
+  selection feedback, and clarified invoice details and individual payslip links.
+- Close stale dialogs after navigation or organisation changes while preserving
+  pending submissions. New invoices and bills follow a 14-day due date until
+  manually edited and support ordered lines, per-line objects and net totals.
+- Wrapped long status pills and stacked mobile integration headings at 375px.
+- Exposed credential-free connector pull types in the integration catalogue.
+  Connected Merit and SmartAccounts cards now offer reviewed data imports and
+  recent runs, including SmartAccounts workers. Reviews and run lists show the
+  object type, use record-specific summaries and retain existing employee copy.
+  API pull failures appear in the import form; staging leaves local data unchanged.
+- Grouped invoice and bill lines in bordered, numbered fieldsets with translated
+  legends and numbered accessible remove labels, retaining existing field names.
+- Added root HTTP gzip compression, content-versioned assets and static cache
+  policies. Moved shared public CSS into cacheable stylesheets without changing
+  its rules; retained small product accent overrides inline.
+- Testing a saved integration with blank secret fields now reuses the stored,
+  encrypted credentials server-side, and saving with blank secrets keeps them.
+  Missing input returns a clear message without downgrading the connection
+  status. Configuration dialog labels and provider notes are translated.
+- Added "Load demo company": any signed-in account can create one clearly
+  labelled, synthetic Estonian company ("Demo OÜ (sample data)") with invoices,
+  bills, bank lines and payroll, from the organisation menu or first-run screen.
+  Repeat requests reuse the same company; other organisations are untouched.
+- Validation: focused public, i18n, brand, invoice, document, integration, object
+  and payroll tests, including offline browser flows in all four languages;
+  JavaScript syntax and diff whitespace checks. The reviewed-import follow-up
+  passed all 138 tests across workspace integrations, i18n, import pipeline and
+  objects, SmartAccounts workers, object forms, bulk sending, API and connectors
+  (one existing FastCore deprecation warning). Provider acceptance status is unchanged.
+
 ## 2026-10-13: Brand icon set and integration tiles
 
 - Replaced the ten-icon portal set with one 29-icon line set (24px grid, 1.75

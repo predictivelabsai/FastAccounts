@@ -5,6 +5,52 @@ import pytest
 from fastapi.testclient import TestClient
 
 
+@pytest.mark.parametrize('language', ['en', 'et', 'lt', 'lv'])
+def test_payslip_accessible_names_include_employee(monkeypatch, language):
+    playwright = pytest.importorskip('playwright.sync_api')
+    from urllib.parse import urlsplit
+    from web import i18n
+    from web_app import app
+
+    monkeypatch.setenv('FASTACCOUNTS_DEFAULT_LANG', language)
+    html = TestClient(app).get('/auth/test').text
+    root = Path(__file__).resolve().parents[1]
+    names = ['Synthetic Mari <one>', 'Synthetic Jaan']
+    items = [dict(employee_name=name, gross='1000', income_tax='100', net='900', social_tax='330', employer_cost='1330', pension='0') for name in names]
+    with playwright.sync_playwright() as runtime:
+        browser = runtime.chromium.launch()
+        page = browser.new_page(viewport={'width': 375, 'height': 844})
+
+        def respond(route):
+            path = urlsplit(route.request.url).path
+            if path == '/app':
+                return route.fulfill(body=html, content_type='text/html')
+            if path.startswith('/static/'):
+                file = root / path.lstrip('/')
+                if file.is_file():
+                    return route.fulfill(path=str(file))
+            if path == '/api/organisations':
+                return route.fulfill(json=[dict(id='org', name='Synthetic books', country_code='EE', base_currency='EUR', role='owner')])
+            if path == '/api/csrf':
+                return route.fulfill(json={'csrf_token': 'synthetic'})
+            if path.endswith('/pay-runs'):
+                return route.fulfill(json=[dict(id='run', period='2026-10', status='Approved', total_gross='2000', total_net='1800', total_employer_cost='2660', items=items)])
+            if path.startswith('/api/'):
+                return route.fulfill(json=[], content_type="application/json")
+            return route.fulfill(status=404)
+
+        page.route('**/*', respond)
+        page.goto('http://workspace.test/app#payroll')
+        page.locator('.run-detail summary').click()
+        for index, name in enumerate(names):
+            label = i18n.catalog(language)['workspace']['Payslip: {name}'].replace('{name}', name)
+            link = page.get_by_role('link', name=label, exact=True)
+            playwright.expect(link).to_be_visible()
+            assert link.get_attribute('href').endswith(f'#page={index + 1}')
+        assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+        browser.close()
+
+
 @pytest.mark.parametrize('language', ['en', 'et'])
 def test_payroll_scope_and_single_error(monkeypatch, language):
     playwright = pytest.importorskip('playwright.sync_api')

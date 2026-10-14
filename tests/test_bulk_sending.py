@@ -291,8 +291,21 @@ def test_workspace_confirmation_results_and_history(monkeypatch, language):
         playwright.expect(send_button).to_be_disabled()
         playwright.expect(page.locator('[data-select-invoice="2"]')).to_be_disabled()
         playwright.expect(page.locator('[data-select-invoice="3"]')).to_be_disabled()
+        select_all = page.get_by_role('checkbox', name=words['Select invoices'], exact=True)
+        select_all.check()
         for i in ['0', '1']:
-            page.locator(f'[data-select-invoice="{i}"]').check()
+            playwright.expect(page.locator(f'[data-select-invoice="{i}"]')).to_be_checked()
+        playwright.expect(page.locator('[data-select-invoice="2"]')).not_to_be_checked()
+        page.locator('[data-select-invoice="0"]').uncheck()
+        assert select_all.evaluate('el => el.indeterminate')
+        select_all.check()
+        select_all.uncheck()
+        playwright.expect(send_button).to_be_disabled()
+        select_all.check()
+        assert not select_all.evaluate('el => el.indeterminate')
+        for checkbox in (select_all, page.locator('[data-select-invoice="0"]')):
+            size = checkbox.bounding_box()
+            assert 12 <= size['width'] <= 20 and 12 <= size['height'] <= 20
         send_button.click()
         assert not calls
         page.locator('.dialog [data-action=cancel]').click()
@@ -306,12 +319,21 @@ def test_workspace_confirmation_results_and_history(monkeypatch, language):
         assert calls[0][0] == {'invoice_ids': ['0', '1']}
         assert calls[0][1]['x-csrf-token'] == 'synthetic' and calls[0][1]['idempotency-key']
         assert page.locator('#app-content customer').count() == 0
-        page.set_viewport_size({'width': 390, 'height': 844})
+        page.set_viewport_size({'width': 375, 'height': 844})
         assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
         result.locator('[data-close]').click()
         playwright.expect(send_button).to_be_disabled()
-        page.locator('[data-action=invoiceAttachments][data-id="0"]').click()
+        assert not select_all.evaluate('el => el.checked || el.indeterminate')
+        details = page.locator('[data-action=invoiceAttachments][data-id="0"]')
+        playwright.expect(details).to_have_text(words['Details'])
+        playwright.expect(details).to_have_attribute('aria-label', words['Details: {number}'].replace('{number}', 'INV-0'))
+        details.click()
         playwright.expect(page.get_by_role('heading', name=words['Email history'])).to_be_visible()
         playwright.expect(page.locator('.dialog a[href$="/attachments/pdf-id/download"]')).to_be_visible()
+        page.evaluate("location.hash = 'bills'")
+        playwright.expect(page.locator('.dialog')).to_have_count(0)
+        page.go_back()
+        playwright.expect(details).to_be_visible()
+        playwright.expect(page.locator('.dialog')).to_have_count(0)
         assert not errors
         browser.close()

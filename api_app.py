@@ -617,6 +617,13 @@ def create_organisation(payload: OrganisationIn, user: User = Depends(require_cs
     return OrganisationService().create(**payload.model_dump(), owner_email=user.email)
 
 
+@api.post("/demo-organisation", status_code=201)
+def create_demo_organisation(user: User = Depends(require_csrf)):
+    """Give the signed-in account its own labelled, synthetic Estonian demo company."""
+    from seed import seed_demo_company
+    return seed_demo_company(user.email)
+
+
 @api.get("/organisations/{organisation_id}/accounts")
 def list_accounts(organisation_id: str, user: User = Depends(current_user)):
     _require(organisation_id, user, {"owner", "administrator", "accountant", "approver", "viewer"})

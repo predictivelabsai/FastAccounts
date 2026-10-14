@@ -174,8 +174,8 @@
     `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${ICONS[name] || ICONS.document}"/></svg>`;
   const button = (label, action, primary = false, attrs = "") =>
     `<button type="button" class="button${primary ? " primary" : ""}" data-action="${action}" ${attrs}>${tr(label)}</button>`;
-  const link = (label, href) =>
-    `<a class="button" href="${esc(href)}">${tr(label)}</a>`;
+  const link = (label, href, attrs = "") =>
+    `<a class="button" href="${esc(href)}" ${attrs}>${tr(label)}</a>`;
   const pill = (v) => {
     const s = String(v || ""),
       tone =
@@ -359,6 +359,10 @@
           }
       } finally {
         b.disabled = false;
+        if (d.classList.contains("dialog") && d._originView !== undefined) {
+          d.dataset.pending = "false";
+          if (d._originView !== location.hash || d._originOrg !== org?.id) closeDialog(d);
+        }
       }
     };
   }
@@ -404,7 +408,8 @@
             `<button type="button" role="menuitem" data-org="${esc(o.id)}"><span>${esc(o.name)}</span><span class="country-badge">${esc(o.country_code)}</span></button>`,
         )
         .join("") +
-      `<button type="button" role="menuitem" data-create-org>${icon("plus")}${tr("Create organisation")}</button>`;
+      `<button type="button" role="menuitem" data-create-org>${icon("plus")}${tr("Create organisation")}</button>` +
+      `<button type="button" role="menuitem" data-demo-org>${icon("plus")}${tr("Load demo company")}</button>`;
     document
       .querySelectorAll("[data-org]")
       .forEach((b) => (b.onclick = () => switchOrg(b.dataset.org)));
@@ -412,6 +417,7 @@
       document.getElementById("org-menu").hidden = true;
       organisationDialog();
     };
+    document.querySelector("[data-demo-org]").onclick = loadDemoCompany;
     document.getElementById("current-org").textContent =
       org?.name || t("Workspace");
   }
@@ -430,6 +436,10 @@
       route = location.hash.slice(1) || "overview",
       routeParts = route.split("/").filter(Boolean),
       view = routeParts[0] || "overview";
+    document.querySelectorAll('.dialog').forEach((d) => {
+      if (d._originView === undefined || d.dataset.pending === "true") return;
+      if (d._originView !== location.hash || d._originOrg !== org?.id) closeDialog(d);
+    });
     app.classList.remove("menu-open");
     document.querySelectorAll(".app-nav").forEach((a) => {
       const disabled = a.dataset.view === "payroll" && !payrollSupported(org);
@@ -538,10 +548,24 @@
     );
     wireOrganisation(d, () => closeDialog(d));
   }
+  function loadDemoCompany() {
+    document.getElementById("org-menu").hidden = true;
+    confirmAction(
+      "Load demo company",
+      tr("Creates a clearly labelled demo company with synthetic invoices, bills, bank transactions and payroll in your account. Your other companies are not changed."),
+      async () => {
+        const created = await post("/demo-organisation", {});
+        localStorage.setItem("fastaccounts_org", created.id);
+        toast(t("Demo company ready"));
+        await boot();
+      },
+    );
+  }
   function onboarding() {
-    content.innerHTML = `<div class="onboarding"><section><img class="large-mark" src="/static/brand/fastaccounts-mark.svg" alt="" width="48" height="48"><h1>${tr("Every client. One clear workspace.")}</h1><p>${tr("Keep client books, bank reviews and payroll together.")}</p><ul><li>${tr("Separate books for every organisation")}</li><li>${tr("Clear approvals before anything posts")}</li><li>${tr("UK and Estonian accounting in one place")}</li></ul></section><section class="card"><h2>${tr("Create your first organisation")}</h2>${form(organisationFields(), "Create books")}</section></div>`;
+    content.innerHTML = `<div class="onboarding"><section><img class="large-mark" src="/static/brand/fastaccounts-mark.svg" alt="" width="48" height="48"><h1>${tr("Every client. One clear workspace.")}</h1><p>${tr("Keep client books, bank reviews and payroll together.")}</p><ul><li>${tr("Separate books for every organisation")}</li><li>${tr("Clear approvals before anything posts")}</li><li>${tr("UK and Estonian accounting in one place")}</li></ul></section><section class="card"><h2>${tr("Create your first organisation")}</h2>${form(organisationFields(), "Create books")}<p class="muted">${tr("Prefer to look around first?")}</p>${button("Load demo company", "loadDemoCompany")}</section></div>`;
     content.querySelector("[data-action=cancel]").remove();
     wireOrganisation(content, () => {});
+    bindActions(content, { loadDemoCompany });
   }
   // Aggregate displayed monetary values in integer cents; the API owns all postings.
   const cents = (value) => {
@@ -703,7 +727,7 @@
         return;
       const draw = () => {
         document.getElementById("invoice-table").innerHTML = table(
-          ["Select invoices", "Number", "Customer", "Date", "Status", ["Paid / total"], "Actions"],
+          ["", "Number", "Customer", "Date", "Status", ["Paid / total"], "Actions"],
           rows.map((x) =>
             row([
               td(`<input type="checkbox" data-select-invoice="${esc(x.id)}" aria-label="${esc(t('Select invoice {number}').replace('{number}', x.number || t('Draft')))}" ${canExecutePush() && x.document_type === 'invoice' && ['Issued', 'Part Paid'].includes(x.status) ? '' : 'disabled'}>`),
@@ -716,7 +740,7 @@
                 "numeric",
               ),
               td(
-                button("Invoice", "invoiceAttachments", false, `data-id="${esc(x.id)}"`) + (x.status === "Draft"
+                button("Details", "invoiceAttachments", false, `data-id="${esc(x.id)}" aria-label="${esc(t("Details: {number}").replace("{number}", x.number || t("Draft")))}"`) + (x.status === "Draft"
                   ? button("Issue", "issue", false, `data-id="${esc(x.id)}"`)
                   : link("PDF", `/api${c.url(`/invoices/${x.id}.pdf`)}`) +
                       link("XML", `/api${c.url(`/invoices/${x.id}.xml`)}`)),
@@ -740,7 +764,7 @@
               if (org?.id !== c.oid) return;
               selected.clear();
               content.querySelectorAll('[data-select-invoice]').forEach((input) => { input.checked = false; });
-              content.querySelector('[data-action=sendBulk]').disabled = true;
+              syncSelection();
               dialog('Email results', table(['Number', 'Status', 'Reason'], outcome.results.map((item) => row([
                 td(esc(rows.find((invoice) => invoice.id === item.invoice_id)?.number || item.invoice_id)),
                 td(pill(item.status === 'sent' ? 'Sent' : 'Failed')),
@@ -761,13 +785,35 @@
               },
             ),
         });
-        content.querySelectorAll('[data-select-invoice]').forEach((input) => {
+        const header = content.querySelector('#invoice-table thead th');
+        if (header) header.innerHTML = `<input type="checkbox" data-select-all-invoices aria-label="${esc(t('Select invoices'))}">`;
+        const all = content.querySelector('[data-select-all-invoices]');
+        const enabled = [...content.querySelectorAll('[data-select-invoice]:not(:disabled)')];
+        const syncSelection = () => {
+          const count = enabled.filter((input) => input.checked).length;
+          if (all) {
+            all.checked = enabled.length > 0 && count === enabled.length;
+            all.indeterminate = count > 0 && count < enabled.length;
+            all.disabled = !enabled.length;
+          }
+          content.querySelector('[data-action=sendBulk]').disabled = !selected.size || selected.size > 50;
+        };
+        enabled.forEach((input) => {
           input.onchange = () => {
             if (input.checked) selected.add(input.dataset.selectInvoice);
             else selected.delete(input.dataset.selectInvoice);
-            content.querySelector('[data-action=sendBulk]').disabled = !selected.size || selected.size > 50;
+            syncSelection();
           };
         });
+        if (all) all.onchange = () => {
+          enabled.forEach((input) => {
+            input.checked = all.checked;
+            if (input.checked) selected.add(input.dataset.selectInvoice);
+            else selected.delete(input.dataset.selectInvoice);
+          });
+          syncSelection();
+        };
+        syncSelection();
       };
       draw();
       bindDocumentFilters(c, "invoices");
@@ -1283,7 +1329,7 @@
             const count = result.runs.filter((x) => x.status === "Issued").length;
             const schedule = schedules.find((x) => String(x.id) === b.dataset.id);
             toast(count > 0 ? t("Invoices created: {count}").replace("{count}", num(count)) :
-              t("Not due yet — next run {date}").replace("{date}", date(schedule.next_run_date)));
+              t("Not due yet \u2014 next run {date}").replace("{date}", date(schedule.next_run_date)));
             result.runs.filter((x) => x.status === "Failed").forEach((x) => toast(t(x.error_message || "Failed"), "error"));
             await render();
           } finally { b.disabled = false; }
@@ -1936,14 +1982,21 @@
       catalog.integrations?.items?.[item.key]?.direction || item.direction || "",
     integrationUrl = (c, provider, suffix = "") =>
       c.url(`/integrations/${encodeURIComponent(provider)}${suffix}`),
-    readyProviderOrder = ["file_import", "fasthr", "quickbooks", "xero", "merit", "open_banking"];
+    readyProviderOrder = ["file_import", "fasthr", "quickbooks", "xero", "merit", "smartaccounts", "open_banking"];
+
+  const importTypeLabel = (objectType) => t({
+    employee: "Employees", employees: "Employees", account: "Chart of accounts",
+    contact: "Contacts", sales_invoice: "Sales invoices", purchase_invoice: "Purchase invoices",
+    payment: "Payments", gl_entry: "General ledger entries",
+  }[objectType] || objectType);
 
   function integrationCard(c, item, connection) {
     const provider = item.key,
       name = integrationName(item),
       fileImport = provider === "file_import",
       status = fileImport ? "No connection needed" : connection?.status || "Not configured",
-      canImport = provider === "fasthr" && status === "Connected",
+      accountingImport = ["merit", "smartaccounts"].includes(provider),
+      canImport = status === "Connected",
       actions = fileImport
         ? button("Recent runs", "integrationRuns", false, `data-provider="${esc(provider)}"`) +
           button("Import file", "importEmployeeFile", true, `data-provider="${esc(provider)}"`)
@@ -1953,7 +2006,10 @@
           (provider === "fasthr"
             ? button("Recent runs", "integrationRuns", false, `data-provider="${esc(provider)}"`) +
               button("Run employee import", "runEmployeeImport", true, `data-provider="${esc(provider)}" ${canImport ? "" : `disabled title="${tr("Test the connection before importing.")}"`}`)
-            : "");
+            : accountingImport
+              ? button("Recent runs", "integrationRuns", false, `data-provider="${esc(provider)}"`) +
+                button("Import data", "importIntegrationData", true, `data-provider="${esc(provider)}" ${canImport ? "" : `disabled title="${tr("Test the connection before importing.")}"`}`)
+              : "");
     const bankActions = provider === "open_banking"
       ? button("Configure", "configureIntegration", false, `data-provider="open_banking"`) +
         (connection ? button("Disconnect", "disconnectIntegration", false, `data-provider="open_banking"`) : "") +
@@ -2073,6 +2129,8 @@
       },
       importEmployeeFile: (button) =>
         fileImportDialog(c, findItem(button)),
+      importIntegrationData: (button) =>
+        integrationImportDialog(c, findItem(button)),
       integrationRuns: (button) => {
         location.hash = `integrations/runs/${encodeURIComponent(button.dataset.provider)}`;
       },
@@ -2081,6 +2139,34 @@
     if (statusTarget) await bankFeedStatus(c, statusTarget);
     const target = content.querySelector(".bank-feed-accounts");
     if (target) await bankFeedAccounts(c, target);
+  }
+
+  function integrationImportDialog(c, item) {
+    const d = dialog("Import data", form(
+      select("Object type", "object_type", (item.pull_object_types || []).map((type) =>
+        [type, importTypeLabel(type)])) +
+      `<p class="full-width">${tr("Records are staged for review. Nothing changes until decisions are applied.")}</p>`,
+      "Import data",
+    ));
+    d.querySelector('[name="object_type"]').required = true;
+    bindForm(d, async (data) => {
+      d.dataset.pending = "true";
+      let summary;
+      try {
+        summary = await post(integrationUrl(c, item.key, "/sync"), {
+          object_type: data.object_type,
+        });
+      } finally {
+        d.dataset.pending = "false";
+      }
+      if (d._originOrg !== org?.id || d._originView !== location.hash) return closeDialog(d);
+      closeDialog(d);
+      const stagedCount = Object.values(summary.staged_counts || {}).reduce(
+        (sum, value) => sum + Number(value || 0), 0,
+      );
+      toast(t("Records staged: {count}").replace("{count}", num(stagedCount)));
+      location.hash = `integrations/review/${encodeURIComponent(item.key)}/${encodeURIComponent(summary.id)}`;
+    });
   }
 
   async function bankConsentDialog(c) {
@@ -2208,7 +2294,7 @@
         meta.input_type === "secret"
           ? ""
           : connection?.config?.[meta.name] ?? meta.default ?? "",
-      required = meta.required ? "required" : "",
+      required = meta.required && !connection ? "required" : "",
       note = meta.note ? `<small class="field-help">${tr(meta.note)}</small>` : "";
     if (meta.input_type === "boolean")
       return `<label class="check integration-check"><input type="checkbox" name="${esc(meta.name)}" ${value ? "checked" : ""}>${tr(meta.label)}${note}</label>`;
@@ -2238,7 +2324,7 @@
       ),
       d = dialog(
         "Configure integration",
-        `<div class="integration-dialog-intro"><strong>${esc(name)}</strong>${item.credential_note ? `<p>${tr(item.credential_note)}</p>` : ""}${hasSecret && connection ? `<p class="notice">${tr("Saved secrets are never shown. Enter the secret again to test or replace this configuration.")}</p>` : ""}</div><form novalidate><div class="form-grid integration-form">${(item.credential_fields || []).map((meta) => integrationCredentialField(meta, connection)).join("")}${field("External tenant ID", "external_tenant_id", connection?.external_tenant_id || "")}</div><div class="connection-test-result" role="status" aria-live="polite"></div><p class="form-error" role="alert"></p><div class="dialog-actions">${button("Cancel", "cancel")}${button("Test connection", "testConnection")}<button class="button primary" type="submit">${tr("Save configuration")}</button></div></form>`,
+        `<div class="integration-dialog-intro"><strong>${esc(name)}</strong>${item.credential_note ? `<p>${tr(item.credential_note)}</p>` : ""}${hasSecret && connection ? `<p class="notice">${tr("Saved secrets are never shown. Leave secret fields blank to keep and test the saved values, or enter new ones to replace them.")}</p>` : ""}</div><form novalidate><div class="form-grid integration-form">${(item.credential_fields || []).map((meta) => integrationCredentialField(meta, connection)).join("")}${field("External tenant ID", "external_tenant_id", connection?.external_tenant_id || "")}</div><div class="connection-test-result" role="status" aria-live="polite"></div><p class="form-error" role="alert"></p><div class="dialog-actions">${button("Cancel", "cancel")}${button("Test connection", "testConnection")}<button class="button primary" type="submit">${tr("Save configuration")}</button></div></form>`,
       ),
       testButton = d.querySelector("[data-action=testConnection]"),
       result = d.querySelector(".connection-test-result");
@@ -2286,7 +2372,7 @@
         `.integration-provider[data-provider="${CSS.escape(provider)}"]`,
       ),
       target = card?.querySelector(".connection-status"),
-      importButton = card?.querySelector('[data-action="runEmployeeImport"]');
+      importButton = card?.querySelector('[data-action="runEmployeeImport"], [data-action="importIntegrationData"]');
     if (target)
       target.innerHTML = `${tr("Connection status")}: ${pill(current?.status || "Not configured")}`;
     if (importButton) {
@@ -2300,22 +2386,37 @@
   const stagedDecisionEligible = (record) =>
     ["Pending", "Failed"].includes(record.status);
 
-  function stagedRecordRow(record) {
-    const payload = record.external_payload || {},
-      displayName =
+  function stagedRecordRow(record, objectType) {
+    const payload = record.external_payload || {};
+    let displayName =
         payload.name ||
         [payload.first_name, payload.last_name].filter(Boolean).join(" ") ||
         record.external_id ||
         "–",
-      detail = [payload.email, payload.personal_id]
-        .filter(Boolean)
-        .map(esc)
-        .join(" · "),
+      details = [payload.email, payload.personal_id];
+    if (objectType === "contact") {
+      details = [payload.registration_no || payload.registry_code, payload.email];
+    } else if (["sales_invoice", "purchase_invoice"].includes(objectType)) {
+      displayName = payload.external_number || payload.number || payload.supplier_number || record.external_id;
+      details = [payload.buyer_name || payload.supplier_name, payload.total, payload.currency];
+    } else if (objectType === "payment") {
+      displayName = payload.reference || record.external_id;
+      details = [payload.amount, payload.currency];
+    } else if (objectType === "account") {
+      displayName = [payload.code, payload.name].filter(Boolean).join(" · ") || record.external_id;
+      details = [];
+    } else if (objectType === "gl_entry") {
+      displayName = payload.document || payload.document_number || record.external_id;
+      details = [payload.external_account_code,
+        payload.debit != null ? `${t("Debit")}: ${payload.debit}` : null,
+        payload.credit != null ? `${t("Credit")}: ${payload.credit}` : null];
+    }
+    const detail = details.filter((value) => value != null && value !== "").map(esc).join(" · "),
       eligible = stagedDecisionEligible(record);
     return row([
       td(`<strong>${esc(displayName)}</strong>${detail ? `<small>${detail}</small>` : ""}<details class="payload-details"><summary>${tr("View source record")}</summary><pre>${esc(JSON.stringify(payload, null, 2))}</pre></details>`),
       td(pill(record.status)),
-      td(esc(record.matched_local_employee_name || t("No local match"))),
+      td(esc(record.matched_local_name || record.matched_local_employee_name || t("No local match"))),
       td(record.review_note ? esc(translateError(record.review_note)) : "–"),
       td(
         eligible
@@ -2346,13 +2447,15 @@
         ),
       ),
       records = review.records || [],
+      objectType = review.summary.object_type || "employee",
+      employeeRun = ["employee", "employees"].includes(objectType),
       eligible = records.filter(stagedDecisionEligible),
       stagedBody = records.length
         ? table(
-            ["Source record", "Status", "Matched employee", "Review note", "Decision"],
-            records.map(stagedRecordRow),
+            ["Source record", "Status", employeeRun ? "Matched employee" : "Matched record", "Review note", "Decision"],
+            records.map((record) => stagedRecordRow(record, objectType)),
           )
-        : `<div class="empty integration-empty">${icon()}<h3>${tr("No records were staged")}</h3><p>${tr("The sync completed without new employee records.")}</p></div>`,
+        : `<div class="empty integration-empty">${icon()}<h3>${tr("No records were staged")}</h3><p>${tr(employeeRun ? "The sync completed without new employee records." : "The sync completed without new records.")}</p></div>`,
       noDecisions =
         records.length && !eligible.length
           ? `<div class="notice" role="status">${tr("No records are awaiting a decision.")}</div>`
@@ -2360,14 +2463,14 @@
     if (
       !c.mount(
         page(
-          t("Review employee import"),
-          `${integrationName(item)} · ${t("Review staged records before payroll data changes.")}`,
+          employeeRun ? t("Review employee import") : t("Review import: {type label}").replace("{type label}", importTypeLabel(objectType)),
+          `${integrationName(item)} · ${t(employeeRun ? "Review staged records before payroll data changes." : "Review staged records before applying changes.")}`,
           link("Back to integrations", "#integrations") +
             link(
               "Recent runs",
               `#integrations/runs/${encodeURIComponent(provider)}`,
             ),
-          `${integrationOutcomeSummary(outcome)}<div class="review-summary">${kpi("Records read", num(review.summary.read_count))}${kpi("Pending", num(review.summary.staged_counts?.Pending))}${kpi("Failed", num(review.summary.staged_counts?.Failed))}</div>${noDecisions}<section class="section"><div class="section-head"><h2>${tr("Staged employees")}</h2>${button("Apply decisions", "applyImportDecisions", true, "disabled")}</div>${stagedBody}</section>`,
+          `${integrationOutcomeSummary(outcome)}<div class="review-summary">${kpi("Records read", num(review.summary.read_count))}${kpi("Pending", num(review.summary.staged_counts?.Pending))}${kpi("Failed", num(review.summary.staged_counts?.Failed))}</div>${noDecisions}<section class="section"><div class="section-head"><h2>${tr(employeeRun ? "Staged employees" : "Staged records")}</h2>${button("Apply decisions", "applyImportDecisions", true, "disabled")}</div>${stagedBody}</section>`,
         ),
       )
     )
@@ -2421,18 +2524,20 @@
   }
 
   async function integrationRuns(c, item, provider) {
-    const runs = await api(integrationUrl(c, provider, "/syncs"));
+    const runs = await api(integrationUrl(c, provider, "/syncs")),
+      employeeOnly = ["fasthr", "file_import", "personio", "bamboohr"].includes(provider);
     if (
       !c.mount(
         page(
-          t("Employee import runs"),
-          `${integrationName(item)} · ${t("Open a run to review staged employee records.")}`,
+          t(employeeOnly ? "Employee import runs" : "Import runs"),
+          `${integrationName(item)} · ${t(employeeOnly ? "Open a run to review staged employee records." : "Open a run to review staged records.")}`,
           link("Back to integrations", "#integrations"),
           table(
-            ["Started", "Status", "Records read", "Staged", "Actions"],
+            ["Started", "Object type", "Status", "Records read", "Staged", "Actions"],
             runs.map((run) =>
               row([
                 td(date(run.started_at), "numeric"),
+                td(esc(importTypeLabel(run.object_type || "employee"))),
                 td(pill(run.status)),
                 td(num(run.read_count), "numeric"),
                 td(
@@ -2800,79 +2905,97 @@
       toast(t("Add a contact before creating a document."), "info");
       return contactDialog(invoice ? "customer" : "supplier");
     }
+    const lineFields = (index) => {
+      const suffix = index ? `_${index}` : '';
+      const fields = field("Description", "description", "", "text", "required") +
+        field("Quantity", "quantity", 1, "number", 'required min="0.0001" step="0.0001"') +
+        field("Unit price", "unit_price", "", "number", 'required min="0" step="0.01"') +
+        select(invoice ? "Income account" : "Expense account", "account_id",
+          accounts.filter((x) => x.account_type === (invoice ? "Income" : "Expense"))
+            .map((x) => [x.id, `${x.code} ${x.name}`])) +
+        select("Tax code", "tax_code_id", taxes.map((x) => [x.id, `${x.code} · ${num(x.rate)}%`]),
+          taxes.find((x) => x.kind === "standard")?.id) + objectSelectors(objects);
+      return `<fieldset class="document-line full-width" data-line-index="${index}"><legend>${esc(t('Line {number}').replace('{number}', num(index + 1)))}</legend><div class="form-grid">${fields.replace(/(name|data-error)="([^"]+)"/g, (_, attr, name) => `${attr}="${name}${suffix}"`)}${index ? button('Remove line', 'removeLine', false, `aria-label="${esc(t('Remove line {number}').replace('{number}', num(index + 1)))}"`) : ''}</div></fieldset>`;
+    };
+    const dueDate = (value) => {
+      if (!value) return '';
+      const day = new Date(`${value}T12:00:00Z`);
+      day.setUTCDate(day.getUTCDate() + 14);
+      return day.toISOString().slice(0, 10);
+    };
     const d = dialog(
       invoice ? "New invoice" : "New bill",
       form(
-        select(
-          invoice ? "Customer" : "Supplier",
-          "contact_id",
-          choices.map((x) => [x.id, x.name]),
-        ) +
-          (invoice
-            ? field("Issue date", "issue_date", today(), "date", "required")
-            : field(
-                "Supplier number",
-                "supplier_number",
-                "",
-                "text",
-                "required",
-              ) +
-              field("Bill date", "bill_date", today(), "date", "required")) +
-          field("Due date", "due_date", today(), "date", "required") +
-          field("Description", "description", "", "text", "required") +
-          field(
-            "Quantity",
-            "quantity",
-            1,
-            "number",
-            'required min="0.0001" step="0.0001"',
-          ) +
-          field(
-            "Unit price",
-            "unit_price",
-            "",
-            "number",
-            'required min="0" step="0.01"',
-          ) +
-          select(
-            invoice ? "Income account" : "Expense account",
-            "account_id",
-            accounts
-              .filter(
-                (x) => x.account_type === (invoice ? "Income" : "Expense"),
-              )
-              .map((x) => [x.id, `${x.code} ${x.name}`]),
-          ) +
-          select(
-            "Tax code",
-            "tax_code_id",
-            taxes.map((x) => [x.id, `${x.code} · ${num(x.rate)}%`]),
-            taxes.find((x) => x.kind === "standard")?.id,
-          ) + objectSelectors(objects),
+        select(invoice ? "Customer" : "Supplier", "contact_id", choices.map((x) => [x.id, x.name])) +
+          (invoice ? field("Issue date", "issue_date", today(), "date", "required") :
+            field("Supplier number", "supplier_number", "", "text", "required") +
+            field("Bill date", "bill_date", today(), "date", "required")) +
+          field("Due date", "due_date", dueDate(today()), "date", "required") +
+          `<div class="document-lines full-width">${lineFields(0)}</div>` +
+          button('Add line', 'addLine') + `<p class="full-width" data-net-total role="status"></p>`,
         "Create draft",
       ),
     );
+    const issue = d.querySelector(invoice ? '[name=issue_date]' : '[name=bill_date]');
+    const due = d.querySelector('[name=due_date]');
+    let dueEdited = false, nextLine = 1;
+    due.addEventListener('input', () => { dueEdited = true; });
+    due.addEventListener('change', () => { dueEdited = true; });
+    const followIssue = () => { if (!dueEdited) due.value = dueDate(issue.value); };
+    issue.addEventListener('input', followIssue);
+    issue.addEventListener('change', followIssue);
+    // Keep the display estimate in scaled integers. The API remains authoritative.
+    const updateTotal = () => {
+      const scaled = (value, places) => {
+        const parts = (value || '0').match(/^(\d*)(?:\.(\d*))?(?:e([+-]?\d+))?$/i);
+        if (!parts) return 0n;
+        const fraction = parts[2] || '', digits = BigInt((parts[1] + fraction) || '0');
+        const shift = places + Number(parts[3] || 0) - fraction.length;
+        if (Math.abs(shift) > 100) return 0n;
+        return shift >= 0 ? digits * 10n ** BigInt(shift) : digits / 10n ** BigInt(-shift);
+      };
+      const total = [...d.querySelectorAll('[data-line-index]')].reduce((sum, group) =>
+        sum + (scaled(group.querySelector('[name^=quantity]').value, 4) *
+          scaled(group.querySelector('[name^=unit_price]').value, 2) + 5000n) / 10000n, 0n);
+      const amount = `${total / 100n}.${String(total % 100n).padStart(2, '0')}`;
+      d.querySelector('[data-net-total]').textContent = `${t('Net total')}: ${money(amount, org.base_currency)}`;
+    };
+    d.querySelector('.document-lines').addEventListener('input', updateTotal);
+    d.querySelector('[data-action=addLine]').onclick = () => {
+      const lines = d.querySelector('.document-lines');
+      lines.insertAdjacentHTML('beforeend', lineFields(nextLine++));
+      const group = lines.lastElementChild;
+      group.querySelector('[data-action=removeLine]').onclick = () => { group.remove(); updateTotal(); };
+      group.querySelector('input').focus();
+      updateTotal();
+    };
+    updateTotal();
     bindForm(d, async (data) => {
-      const line = {};
-      [
-        "description",
-        "quantity",
-        "unit_price",
-        "account_id",
-        "tax_code_id",
-        'projects_project_id', 'projects_location_id', 'projects_person_id', 'projects_object_id',
-      ].forEach((k) => {
-        line[k] = k.startsWith('projects_') ? data[k] || null : data[k];
-        delete data[k];
+      const keys = ['description', 'quantity', 'unit_price', 'account_id', 'tax_code_id',
+        'projects_project_id', 'projects_location_id', 'projects_person_id', 'projects_object_id'];
+      data.lines = [...d.querySelectorAll('[data-line-index]')].map((group) => {
+        const line = {}, suffix = group.dataset.lineIndex === '0' ? '' : `_${group.dataset.lineIndex}`;
+        keys.forEach((key) => {
+          line[key] = key.startsWith('projects_') ? data[key + suffix] || null : data[key + suffix];
+          delete data[key + suffix];
+        });
+        return line;
       });
-      data.lines = [line];
-      const record = await post(base + (invoice ? "/invoices" : "/bills"), data);
+      d.dataset.pending = "true";
+      let record;
+      try {
+        record = await post(base + (invoice ? "/invoices" : "/bills"), data);
+      } finally {
+        d.dataset.pending = "false";
+      }
+      if (d._originOrg !== org?.id || d._originView !== location.hash) return closeDialog(d);
       d.querySelector("form").remove();
       await attachmentsSection(d, base, kind, record.id);
       toast(t("Saved successfully"));
       await render();
     });
   }
+
   const objectTypeLabel = (kind) => ({project: 'Project', location: 'Location', person: 'Person', object: 'Object'})[kind];
   const objectSelectors = (objects) => ['project', 'location', 'person', 'object'].map((kind) =>
     select(objectTypeLabel(kind), `projects_${kind}_id`, [['', t('No object')],
@@ -3872,6 +3995,7 @@
               : link(
                   "Payslip",
                   `/api${c.url(`/pay-runs/${r.id}/payslips.pdf`)}#page=${i + 1}`,
+                  `aria-label="${esc(t('Payslip: {name}').replace('{name}', x.employee_name || x.name || x.employee?.name || ''))}"`,
                 ),
           ),
         ]),

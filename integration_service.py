@@ -60,18 +60,21 @@ class IntegrationService:
             raise ValueError(
                 "File import does not use stored connections; use the file import endpoint"
             )
-        if key == "open_banking":
-            if not credentials.get("secret_id") or not credentials.get("secret_key"):
-                raise ValueError("GoCardless secret ID and secret key are required")
-            # Consent state must come from GoCardless, never caller-supplied config.
-            config = {}
         connection_id, now = new_id(), utc_now()
-        encrypted = self.vault.encrypt(credentials)
         with self.db.transaction() as tx:
             existing = tx.one(
-                "SELECT id FROM integration_connections WHERE organisation_id=? AND provider=?",
+                "SELECT * FROM integration_connections WHERE organisation_id=? AND provider=?",
                 (organisation_id, key),
             )
+            credentials, merged_config = self._merge_saved_input(existing, credentials, config)
+            if key == "open_banking":
+                if not credentials.get("secret_id") or not credentials.get("secret_key"):
+                    raise ValueError("GoCardless secret ID and secret key are required")
+                # Consent state must come from GoCardless, never caller-supplied config.
+                config = {}
+            else:
+                config = merged_config
+            encrypted = self.vault.encrypt(credentials)
             if existing:
                 connection_id = existing["id"]
                 tx.execute(
@@ -140,18 +143,41 @@ class IntegrationService:
         row.pop("encrypted_credentials", None)
         return row
 
+    @staticmethod
+    def _blank_credential(value) -> bool:
+        return value is None or isinstance(value, str) and not value.strip()
+
+    def _merge_saved_input(self, connection: dict | None, credentials: dict, config: dict) -> tuple[dict, dict]:
+        """Resolve blank credentials privately from an organisation-scoped row."""
+        saved_credentials = self.vault.decrypt(connection["encrypted_credentials"]) if connection else {}
+        saved_config = json.loads(connection["config_json"]) if connection else {}
+        return (
+            {**saved_credentials, **{
+                key: value for key, value in credentials.items() if not self._blank_credential(value)
+            }},
+            {**saved_config, **config},
+        )
+
     def test_connection(self, organisation_id: str, provider: str, *, credentials: dict,
                         config: dict, actor: str) -> ConnectorResult:
         key = provider.strip().lower()
         try:
-            connector = connector_for(key, credentials=credentials, config=config)
+            registration = registration_for(key)
         except KeyError as error:
             raise ValueError("Unknown integration provider") from error
-        result = connector.check()
         connection = self.db.one(
-            "SELECT id FROM integration_connections WHERE organisation_id=? AND provider=?",
+            "SELECT * FROM integration_connections WHERE organisation_id=? AND provider=?",
             (organisation_id, key),
         )
+        credentials, config = self._merge_saved_input(connection, credentials, config)
+        if any(
+            field.required and self._blank_credential(
+                credentials.get(field.name) or config.get(field.name) or field.default
+            )
+            for field in registration.credential_fields
+        ):
+            return ConnectorResult(key, "check", False, False, "Enter the credentials to test this connection.")
+        result = connector_for(key, credentials=credentials, config=config).check()
         if connection:
             status = "Connected" if result.ok and result.live else "Error"
             if key == "open_banking" and result.ok:

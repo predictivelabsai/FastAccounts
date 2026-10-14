@@ -497,6 +497,13 @@ TSD manual-upload export is delivered in section 32; direct filing remains out
 of scope.
 See [payroll rules](payroll_rules.md).
 
+Self-service demo company (2026-10-14): any signed-in account can load one
+clearly labelled "Demo OÜ (sample data)" organisation from the organisation menu
+or first-run screen. It reuses the EE seed books (contacts, 18 sales invoices,
+eight bills, bank lines) and the seven sample-payroll employees with an approved
+September and a draft October run, attributed to the requesting account. Repeat
+requests reuse that account's company and never touch other organisations.
+
 ## 15. Automation demo: recurring invoices and payment reminders (2026-10-08)
 
 UK books can now turn any issued or draft invoice into a recurring schedule
@@ -781,6 +788,9 @@ values are written as numeric Excel cells for spreadsheet calculations.
 - [x] Add validated balanced EUR GL batch pushes, registry/catalogue metadata,
   text service logo and synthetic encrypted demo connection, with offline pytest
   coverage and [accounting-sync documentation](accounting-sync.md#smartaccounts).
+- [x] Expose supported pulls in the workspace for connected Merit and SmartAccounts
+  providers, including SmartAccounts workers, with reviewed staging, generic
+  accounting-record summaries, recent runs and offline browser coverage (2026-10-14).
 - [ ] Verify with a SmartAccounts test company before production acceptance.
 
 Status: **Documented contract · not live-verified**. Reviewed invoice lines need
