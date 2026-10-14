@@ -16,6 +16,83 @@ from web_app import app
 client = TestClient(app)
 
 
+def test_static_compression_content_version_and_cache_policy():
+    from hashlib import sha256
+    from web.assets import STATIC_DIR, asset_url
+
+    plain = client.get("/static/app.js", headers={"Accept-Encoding": "identity"})
+    compressed = client.get("/static/app.js", headers={"Accept-Encoding": "gzip"})
+    assert plain.status_code == compressed.status_code == 200
+    assert compressed.headers["content-encoding"] == "gzip"
+    assert "Accept-Encoding" in compressed.headers["vary"]
+    assert compressed.content == plain.content == (STATIC_DIR / "app.js").read_bytes()
+    assert plain.headers["cache-control"] == "public, max-age=300"
+    for name in ("app.js", "app.css", "fonts/fonts.css", "design.css", "public.css"):
+        url = asset_url(name)
+        assert url.endswith("?v=" + sha256((STATIC_DIR / name).read_bytes()).hexdigest()[:12])
+        response = client.get(url)
+        assert response.status_code == 200
+        assert response.headers["cache-control"] == "public, max-age=31536000, immutable"
+        cached = client.get(url, headers={"If-None-Match": response.headers["etag"]})
+        assert cached.status_code == 304
+        assert cached.headers["cache-control"] == response.headers["cache-control"]
+
+
+@pytest.mark.parametrize("path", ["/", "/privacy", "/security", "/integrations", "/login"])
+def test_public_pages_use_external_versioned_stylesheets(path):
+    response = client.get(path, headers={"Accept-Encoding": "gzip"})
+    assert response.status_code == 200
+    assert response.headers["content-encoding"] == "gzip"
+    page = BeautifulSoup(response.text, "html.parser")
+    assert sum(len(style.get_text()) for style in page.select("style")) < 1024
+    for name in ("design.css", "public.css", "fonts/fonts.css"):
+        stylesheet = page.select_one(f'link[rel="stylesheet"][href^="/static/{name}?v="]')
+        assert stylesheet
+        assert client.get(stylesheet["href"]).status_code == 200
+
+
+def test_gzip_preserves_health_and_mounted_downloads():
+    from fastapi import FastAPI
+    from starlette.applications import Starlette
+    from starlette.middleware.gzip import GZipMiddleware
+    from starlette.responses import Response, StreamingResponse
+
+    mounted = FastAPI()
+
+    @mounted.get("/download/{kind}")
+    def download(kind: str):
+        types = {"pdf": "application/pdf", "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "csv": "text/csv"}
+        return Response(b"synthetic data\n" * 200, media_type=types[kind], headers={"Content-Disposition": f'attachment; filename="test.{kind}"'})
+
+    @mounted.get("/events")
+    def events():
+        return StreamingResponse(iter([b"data: synthetic\n\n"]), media_type="text/event-stream")
+
+    @mounted.get("/json")
+    def json_response():
+        return {"synthetic": "x" * 2000}
+
+    shell = Starlette()
+    shell.add_middleware(GZipMiddleware, minimum_size=1024)
+    shell.mount("/api", mounted)
+    with TestClient(shell) as downloads:
+        for kind in ("pdf", "xlsx", "csv"):
+            response = downloads.get(f"/api/download/{kind}", headers={"Accept-Encoding": "gzip"})
+            assert response.content == b"synthetic data\n" * 200
+            assert response.headers["content-disposition"] == f'attachment; filename="test.{kind}"'
+        events_response = downloads.get("/api/events", headers={"Accept-Encoding": "gzip"})
+        assert "content-encoding" not in events_response.headers
+        assert events_response.content == b"data: synthetic\n\n"
+        assert downloads.get("/api/json").headers["content-encoding"] == "gzip"
+    health = client.get("/healthz", headers={"Accept-Encoding": "gzip"})
+    assert health.status_code == 200
+    assert "content-encoding" not in health.headers
+    mounted_json = client.get("/api/openapi.json", headers={"Accept-Encoding": "gzip"})
+    assert mounted_json.status_code == 200
+    assert mounted_json.headers["content-encoding"] == "gzip"
+    assert "paths" in mounted_json.json()
+
+
 def test_landing_has_primary_product_and_sign_in_routes():
     rendered = str(landing_page())
     assert "Bookkeeping that stays clear" in rendered
@@ -109,7 +186,7 @@ def test_public_pages_share_accessible_localized_shell(render, current, lang):
     assert len(page.select("#language-menu")) == 1
     assert len(page.select('[role="menuitem"]')) == 4
     assert page.select_one(f'a[href="/set-lang/et?next={current}"]')
-    assert page.select_one('link[href="/static/fonts/fonts.css"]')
+    assert page.select_one('link[href^="/static/fonts/fonts.css?v="]')
     assert len(page.select('link[rel="preload"][as="font"]')) == 2
     assert i18n.t("footer.tagline", lang) in page.select_one(".fs-footer").get_text()
     assert page.select_one('.fs-footer a[href="/healthz"]')
@@ -328,7 +405,7 @@ def test_workspace_shell_renders_localized_integrations_entry(lang):
     assert entry.get_text(strip=True) == i18n.t("nav.integrations", lang)
     assert entry["href"] == "#integrations"
     assert page.select_one("#workspace-app")["data-lang"] == lang
-    assert page.select_one('script[src="/static/app.js"]')
+    assert page.select_one('script[src^="/static/app.js?v="]')
     catalogue_script = page.find("script", src=False).get_text()
     assert '"Configure, test and review data for this client."' in catalogue_script
     assert "stored-token" not in catalogue_script

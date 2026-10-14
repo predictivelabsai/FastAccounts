@@ -987,11 +987,11 @@ class MeritProvider(HTTPProvider):
 
 
 class SmartAccountsProvider(HTTPProvider):
-    """Official documented contract; each pull reads one page of a frozen window."""
+    """Accounting pulls use frozen windows; workers use complete snapshots."""
 
     key = "smartaccounts"
     default_base_url = "https://sa.smartaccounts.eu"
-    PULL_OBJECT_TYPES = ("account", "contact", "sales_invoice", "purchase_invoice", "payment", "gl_entry")
+    PULL_OBJECT_TYPES = ("account", "contact", "sales_invoice", "purchase_invoice", "payment", "gl_entry", "employee")
     PUSH_OBJECT_TYPES = ("gl_batch",)
     _ENDPOINTS = {
         "account": ("settings/accounts", "accounts"),
@@ -1000,6 +1000,7 @@ class SmartAccountsProvider(HTTPProvider):
         "purchase_invoice": ("purchasesales/vendorinvoices", "vendorInvoices"),
         "payment": ("purchasesales/payments", "payments"),
         "gl_entry": ("general/entries", "entries"),
+        "employee": ("payroll/workers", "workers"),
     }
 
     def __init__(self, api_key: str, secret_key: str, *, lang: str = "et",
@@ -1153,10 +1154,79 @@ class SmartAccountsProvider(HTTPProvider):
             records.append(record)
         return records or [dict(base, import_warning="Payment has no invoice allocations; requires manual handling")]
 
+    def _employee_record(self, row: dict) -> dict:
+        today = self._now().date()
+        contracts = self._rows(row.get("contracts") or [], "contracts")
+        dated = [(contract, self._date(contract["startDate"]) if contract.get("startDate") else None,
+                  self._date(contract["endDate"]) if contract.get("endDate") else None)
+                 for contract in contracts]
+        chosen = [contract for contract, start, end in dated
+                  if start is not None and start <= today and (end is None or end >= today)]
+        starts = [start for _, start, _ in dated if start is not None]
+        if not chosen and starts:
+            latest = max(starts)
+            chosen = [contract for contract, start, _ in dated if start == latest]
+        hourly = [contract for contract in chosen if any(
+            str(contract.get(field) or "").strip().casefold() in {"hour", "hourly", "tund", "tunnis"}
+            for field in ("type", "grossType", "salaryType", "payType"))]
+        amount = sum((self._decimal(contract.get("grossSum") or 0)
+                      for contract in (hourly or chosen)), Decimal("0"))
+        workload = max((self._decimal(contract["partialWorkload"])
+                        if contract.get("partialWorkload") is not None else Decimal("1")
+                        for contract in chosen), default=Decimal("1"))
+        vendor = row.get("vendor") or {}
+        tax = row.get("taxSettings") or {}
+        pension = row.get("fundedPension") or {}
+        joined = bool(pension.get("applicableToday", pension.get("hasJoined", False)))
+        end = self._date(row["endDate"]) if row.get("endDate") else None
+        record = {
+            "external_id": self._id(row),
+            "name": " ".join(str(row.get(field) or "").strip() for field in ("forename", "surname")).strip(),
+            "pay_basis": "hourly" if hourly else "monthly",
+            "hourly_rate" if hourly else "gross_salary": four_dp(amount) if hourly else money(amount),
+            "fte": four_dp(workload), "apply_tax_free_minimum": bool(tax.get("incomeTaxFree")),
+            "funded_pension_percent": Decimal("2") if joined else Decimal("0"),
+            "active": end is None or end >= today,
+            "smartaccounts_sustain_social_tax_min": tax.get("sustainSocialTaxMin"),
+            "smartaccounts_no_unemployment_insurance": tax.get("noUnempInsurance"),
+            "smartaccounts_disability_pension": tax.get("disabilityPension"),
+            "smartaccounts_payday": row.get("payday"),
+            "smartaccounts_payout_types": [contract["payoutType"] for contract in chosen if contract.get("payoutType")],
+            "smartaccounts_vendor_id": vendor.get("id"),
+        }
+        if row.get("socialSecurityCode"):
+            record["personal_id"] = str(row["socialSecurityCode"])
+        if vendor.get("email"):
+            record["email"] = vendor["email"]
+        if starts or row.get("startDate"):
+            record["employment_start_date"] = (min(starts) if starts else self._date(row["startDate"])).isoformat()
+        if end:
+            record["employment_end_date"] = end.isoformat()
+        if joined:
+            record["smartaccounts_funded_pension_rate_assumed"] = True
+        if amount <= 0 or record["hourly_rate" if hourly else "gross_salary"] <= 0:
+            record["import_warning"] = "SmartAccounts worker has no active contract with a gross amount"
+        if not Decimal("0") < workload <= Decimal("1") or record["fte"] <= 0:
+            record["import_warning"] = "SmartAccounts worker has an invalid workload"
+        if not record["name"]:
+            record["import_warning"] = "SmartAccounts worker has no name"
+        return record
+
     def pull(self, object_type: str, *, cursor: str | None = None) -> ConnectorResult:
         if object_type not in self.PULL_OBJECT_TYPES:
             raise ValueError(f"Unsupported SmartAccounts pull object type: {object_type}")
         endpoint, key = self._ENDPOINTS[object_type]
+        if object_type == "employee":
+            records = []
+            # Workers have no change cursor. Every run must start at page one.
+            for page in range(1, 51):
+                payload = self._accounting_request("GET", endpoint + ":get",
+                                                   params={"fetchContracts": "true", "pageNumber": page})
+                records.extend(self._employee_record(row) for row in self._rows(payload, key))
+                if not isinstance(payload, dict) or payload.get("hasMoreEntries") is not True:
+                    return ConnectorResult(self.key, "pull:employee", True, True,
+                                           f"Pulled {len(records)} SmartAccounts employee records", tuple(records), None)
+            raise ProviderError("SmartAccounts workers exceeded the 50-page limit")
         params, state = {}, {}
         if object_type != "account":
             try:

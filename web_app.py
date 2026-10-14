@@ -1,4 +1,4 @@
-"""FastAccounts — open bookkeeping for UK and Estonian businesses."""
+"""FastAccounts - open bookkeeping for UK and Estonian businesses."""
 from __future__ import annotations
 
 import hmac
@@ -15,6 +15,7 @@ from fasthtml.common import RedirectResponse, fast_app, serve, to_xml
 from starlette.responses import HTMLResponse
 from starlette.responses import JSONResponse
 from starlette.responses import PlainTextResponse
+from starlette.middleware.gzip import GZipMiddleware
 
 import automation
 import integrations
@@ -22,6 +23,7 @@ import version
 from api_app import api
 from database import get_database
 from web import account_auth, google_auth, i18n
+from web.assets import CachedStaticFiles, STATIC_DIR
 from web.account_auth import accounts, client_address, csrf_ok, establish_session, form_csrf
 from web.public import (about_page, changelog_page, contact_page,
                         integrations_page, landing_page, login_page, privacy_page,
@@ -46,6 +48,9 @@ SESSION_HTTPS_ONLY = os.getenv("FASTACCOUNTS_PUBLIC_URL", "").lower().startswith
 
 app, rt = fast_app(live=False, pico=False, secret_key=SECRET, max_age=8 * 60 * 60,
                    same_site="lax", sess_https_only=SESSION_HTTPS_ONLY)
+app.add_middleware(GZipMiddleware, minimum_size=1024)
+app.mount("/static", CachedStaticFiles(directory=STATIC_DIR), name="static")
+app.router.routes.insert(0, app.router.routes.pop())
 app.mount("/api", api)
 # API documents must resolve before FastHTML's catch-all static extension route.
 app.router.routes.insert(0, app.router.routes.pop())

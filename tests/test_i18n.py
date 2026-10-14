@@ -2,12 +2,62 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
+import ast
+from pathlib import Path
+import re
 
 from starlette.testclient import TestClient
 
 from web import i18n
 from web.public import integrations_page, landing_page
 from web_app import app
+
+
+def test_workspace_literal_labels_and_table_headers_are_translated():
+    source = (Path(__file__).resolve().parents[1] / "static/app.js").read_text(encoding="utf-8")
+    literal = r'''(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')'''
+    labels = {
+        ast.literal_eval(match.group(1))
+        for match in re.finditer(r"\b(?:t|tr|button|field|select|dialog|page|link)\(\s*(" + literal + r")", source)
+    }
+    # Read the complete header array, including nested numeric header arrays.
+    for match in re.finditer(r"\btable\(\s*\[", source):
+        start, depth, quote, escaped = match.end() - 1, 0, None, False
+        for index in range(start, len(source)):
+            char = source[index]
+            if quote:
+                if escaped:
+                    escaped = False
+                elif char == "\\":
+                    escaped = True
+                elif char == quote:
+                    quote = None
+            elif char in "\"'`":
+                quote = char
+            elif char == "[":
+                depth += 1
+            elif char == "]":
+                depth -= 1
+                if depth == 0:
+                    labels.update(ast.literal_eval(item.group()) for item in re.finditer(literal, source[start:index + 1]))
+                    break
+        else:
+            raise AssertionError("Unterminated table header array")
+    intentional_tokens = {""}  # Empty selection headers and spacer labels.
+    assert labels - intentional_tokens <= i18n.catalog("et")["workspace"].keys(), sorted(
+        labels - intentional_tokens - i18n.catalog("et")["workspace"].keys()
+    )
+
+
+def test_every_integration_has_translated_catalogue_copy():
+    from integrations import CATALOGUE
+
+    for lang in ("en", "et", "lt", "lv"):
+        items = i18n.catalog(lang)["integrations"]["items"]
+        for provider in CATALOGUE:
+            assert provider.key in items
+            assert all(items[provider.key].get(field) for field in ("name", "description", "direction"))
+        assert "SmartAccounts" == items["smartaccounts"]["name"]
 
 
 def _schema(value):
@@ -68,12 +118,19 @@ def test_workspace_integration_flow_copy_is_localized_in_all_four_catalogues():
         "Configure, test and review data for this client.",
         "Ready to connect",
         "Planned integrations",
-        "Saved secrets are never shown. Enter the secret again to test or replace this configuration.",
+        "Saved secrets are never shown. Leave secret fields blank to keep and test the saved values, or enter new ones to replace them.",
         "Review employee import",
         "Apply decisions",
         "Employee import runs",
         "Import employee file",
         "Choose a CSV or TSV file, or paste its contents.",
+        "Import data", "Employees", "Chart of accounts", "Contacts",
+        "Sales invoices", "Purchase invoices", "Payments", "General ledger entries",
+        "Records are staged for review. Nothing changes until decisions are applied.",
+        "Records staged: {count}", "Review import: {type label}", "Staged records",
+        "Matched record", "The sync completed without new records.",
+        "Review staged records before applying changes.", "Import runs",
+        "Open a run to review staged records.", "Line {number}", "Remove line {number}",
     }
     for lang, (ready, review) in expectations.items():
         workspace = i18n.catalog(lang)["workspace"]

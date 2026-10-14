@@ -27,11 +27,8 @@ demo-review-002,Anu Lepp,anu.lepp@example.invalid,2100.00
 
 
 def _seed_organisation(country: str) -> dict:
-    """Enrich demo books through normal posting/reconciliation workflows."""
-    import calendar
-    from core_utils import money, new_id
+    """Create or reuse the shared demo books for one country."""
     db = get_database()
-    docs, banking = DocumentService(db), BankingService(db)
     name = "Northstar Studio Ltd" if country == "UK" else "Põhjatäht Teenused OÜ"
     organisation = db.one("SELECT * FROM organisations WHERE name=?", (name,))
     if not organisation:
@@ -40,6 +37,16 @@ def _seed_organisation(country: str) -> dict:
             entity_type="UK_COMPANY" if country == "UK" else "EE_OU", owner_email=DEMO_EMAIL,
             registration_no="09999991" if country == "UK" else "14999991",
             vat_no="GB999999973" if country == "UK" else "EE149999991")
+    return _seed_books(organisation)
+
+
+def _seed_books(organisation: dict, actor: str = DEMO_EMAIL) -> dict:
+    """Enrich demo books through normal posting/reconciliation workflows."""
+    import calendar
+    from core_utils import money, new_id
+    db = get_database()
+    docs, banking = DocumentService(db), BankingService(db)
+    country = organisation['country_code']
     oid = organisation['id']
     with db.transaction() as tx:
         for month in range(1, 13):
@@ -82,10 +89,10 @@ def _seed_organisation(country: str) -> dict:
         signed = amount if kind == 'invoice' else -amount
         content = ('date,amount,currency,counterparty,reference,id\n'
                    f"{booking_date},{signed},{organisation['base_currency']},{document['contact_name']},{number},{external_id}\n").encode()
-        banking.import_csv(oid, bank['id'], content, actor=DEMO_EMAIL)
+        banking.import_csv(oid, bank['id'], content, actor=actor)
         transaction = db.one('SELECT id FROM bank_transactions WHERE organisation_id=? AND external_id=?', (oid, external_id))
         if reconcile:
-            banking.reconcile_to_document(transaction['id'], target_type=kind, target_id=document['id'], actor=DEMO_EMAIL)
+            banking.reconcile_to_document(transaction['id'], target_type=kind, target_id=document['id'], actor=actor)
 
     for index in range(18):
         month, day = 5 + index // 3, 1 + index % 3
@@ -102,11 +109,11 @@ def _seed_organisation(country: str) -> dict:
                 code, description = 'EE9', 'Trükitud raamatud'
             invoice = docs.create_invoice(oid, contact_id=contacts['customer'][index % 5]['id'], issue_date=issued,
                 due_date='2026-09-10' if index == 12 else f'2026-{month:02d}-{day+14:02d}',
-                actor=DEMO_EMAIL, reference=reference,
+                actor=actor, reference=reference,
                 lines=[dict(description=description, quantity=1, unit_price=str(600+index*85),
                             account_id=accounts['SALES'], tax_code_id=taxes[code])])
         if invoice['status'] == 'Draft':
-            invoice = docs.issue_invoice(invoice['id'], actor=DEMO_EMAIL)
+            invoice = docs.issue_invoice(invoice['id'], actor=actor)
         partial = 9 <= index < 12
         amount = money(invoice['total']) / 2 if partial else money(invoice['total'])
         payment_date = f'2026-{max(7, month):02d}-{day+4:02d}'
@@ -126,12 +133,12 @@ def _seed_organisation(country: str) -> dict:
             elif country == 'EE' and index == 4:
                 code, description = 'EE9', 'Erialaraamatud'
             bill = docs.create_bill(oid, contact_id=contacts['supplier'][index % 5]['id'], supplier_number=number,
-                bill_date=f'2026-{month:02d}-{day:02d}', due_date=f'2026-{month:02d}-{day+14:02d}', actor=DEMO_EMAIL,
+                bill_date=f'2026-{month:02d}-{day:02d}', due_date=f'2026-{month:02d}-{day+14:02d}', actor=actor,
                 lines=[dict(description=description, quantity=1, unit_price=str(120+index*65),
                             account_id=accounts['EXPENSE'], tax_code_id=taxes[code])])
         if bill['status'] == 'Draft':
-            bill = (docs.submit_bill_for_review(bill['id'], actor=DEMO_EMAIL) if index == 7
-                    else docs.approve_bill(bill['id'], actor=DEMO_EMAIL))
+            bill = (docs.submit_bill_for_review(bill['id'], actor=actor) if index == 7
+                    else docs.approve_bill(bill['id'], actor=actor))
         if index < 7:
             amount = money(bill['total']) / 2 if index in (3, 4) else money(bill['total'])
             bank_row(bill, 'bill', money(amount), f'2026-{month:02d}-{day+4:02d}', f'PAYMENT-{index+1:03d}', reconcile=index < 5)
@@ -221,21 +228,27 @@ SAMPLE_PAYROLL_RUNS = {'2026-09': '168', '2026-10': '176'}
 
 def _seed_sample_payroll() -> dict:
     """Clearly labelled sample-payroll organisation, created through the normal services."""
-    import calendar
-    from core_utils import new_id
-    from payroll import PayrollService
     db = get_database()
     organisation = db.one("SELECT * FROM organisations WHERE name=?", (SAMPLE_PAYROLL_ORG,))
     if not organisation:
         organisation = OrganisationService(db).create(
             name=SAMPLE_PAYROLL_ORG, country_code="EE", entity_type="EE_OU", owner_email=DEMO_EMAIL,
             registration_no="14999992")
+    return _seed_payroll_books(organisation)
+
+
+def _seed_payroll_books(organisation: dict, actor: str = DEMO_EMAIL) -> dict:
+    """Synthetic employees plus an approved September and a draft October pay run."""
+    import calendar
+    from core_utils import new_id
+    from payroll import PayrollService
+    db = get_database()
     oid = organisation['id']
     service = PayrollService(db)
     existing = {e['name']: e for e in service.employees(oid)}
     for employee in SAMPLE_PAYROLL_EMPLOYEES:
         if employee['name'] not in existing:
-            service.save_employee(oid, actor=DEMO_EMAIL, **employee)
+            service.save_employee(oid, actor=actor, **employee)
     hourly = {e['id']: e for e in service.employees(oid) if e['pay_basis'] == 'hourly'}
     for period, hours in SAMPLE_PAYROLL_RUNS.items():
         year, month = map(int, period.split('-'))
@@ -244,10 +257,39 @@ def _seed_sample_payroll() -> dict:
                        (new_id(), oid, period, period+'-01', f'{period}-{calendar.monthrange(year, month)[1]}'))
         run = next((r for r in service.runs(oid) if r['period'] == period), None)
         if run is None:
-            run = service.create_run(oid, period=period, actor=DEMO_EMAIL, hours={eid: hours for eid in hourly})
+            run = service.create_run(oid, period=period, actor=actor, hours={eid: hours for eid in hourly})
         if run['status'] == 'Draft' and period != '2026-10':
-            service.approve(oid, run['id'], actor=DEMO_EMAIL)
+            service.approve(oid, run['id'], actor=actor)
     return organisation
+
+
+DEMO_COMPANY_NAME = "Demo OÜ (sample data)"
+
+
+def seed_demo_company(owner_email: str) -> dict:
+    """Create or refresh one synthetic Estonian demo company owned by this account.
+
+    The company is clearly labelled, uses only synthetic contacts and test personal
+    codes, and is reused on later calls so repeated clicks never duplicate books.
+    """
+    from core_utils import audit
+    db = get_database()
+    email = owner_email.strip().lower()
+    organisation = db.one(
+        "SELECT o.* FROM organisations o JOIN memberships m ON m.organisation_id=o.id "
+        "WHERE o.name=? AND m.email=? AND m.role='owner' ORDER BY o.created_at LIMIT 1",
+        (DEMO_COMPANY_NAME, email))
+    created = organisation is None
+    if created:
+        organisation = OrganisationService(db).create(
+            name=DEMO_COMPANY_NAME, country_code="EE", entity_type="EE_OU", owner_email=email,
+            registration_no="14999993")
+    _seed_books(organisation, actor=email)
+    _seed_payroll_books(organisation, actor=email)
+    with db.transaction() as tx:
+        audit(tx, organisation['id'], email, "organisation.demo_seeded", "organisation", organisation['id'],
+              {"created": created})
+    return OrganisationService(db).get(organisation['id'])
 
 
 def _seed_integration_connections(organisations: list[dict]) -> None:

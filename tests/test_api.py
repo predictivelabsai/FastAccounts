@@ -82,7 +82,12 @@ class FakeCheckConnector:
         raise AssertionError((object_type, records))
 
 
-def test_integration_catalogue_exposes_registry_fields(integration_api):
+def test_integration_catalogue_exposes_registry_fields(integration_api, monkeypatch):
+    def forbidden_factory(credentials, config):
+        raise AssertionError("Catalogue metadata must not construct connectors")
+
+    for key, registration in REGISTRY.items():
+        monkeypatch.setitem(REGISTRY, key, replace(registration, factory=forbidden_factory))
     client, _ = integration_api
     response = client.get("/integrations")
     assert response.status_code == 200
@@ -108,6 +113,14 @@ def test_integration_catalogue_exposes_registry_fields(integration_api):
         "subdomain", "api_key",
     ]
     assert "not vendor credentials" in catalogue["personio"]["credential_note"]
+    from connectors.providers import MeritProvider, SmartAccountsProvider
+
+    assert catalogue["merit"]["pull_object_types"] == list(MeritProvider.PULL_OBJECT_TYPES)
+    assert catalogue["smartaccounts"]["pull_object_types"] == list(SmartAccountsProvider.PULL_OBJECT_TYPES)
+    for provider in ("fasthr", "personio", "bamboohr", "file_import"):
+        assert catalogue[provider]["pull_object_types"] == ["employee"]
+    for provider in ("hmrc", "emta", "quickbooks", "xero", "open_banking", "hibob"):
+        assert catalogue[provider]["pull_object_types"] == []
 
 
 def test_fasthr_connection_list_and_test_use_registry_status_without_live_network(
@@ -190,7 +203,7 @@ def test_integration_test_success_failure_disconnect_and_redaction(
     }
     assert captured == {
         "credentials": {"access_token": ephemeral_secret, "tenant_id": "tenant-b"},
-        "config": {"sandbox": True},
+        "config": {"direction": "import", "sandbox": True},
     }
     assert ephemeral_secret not in checked.text
 
@@ -221,6 +234,50 @@ def test_integration_test_success_failure_disconnect_and_redaction(
         (configured.json()["id"],),
     )
     assert [item["action"] for item in actions].count("integration.status_changed") == 3
+
+
+def test_blank_test_and_save_reuse_saved_credentials_privately(
+    integration_api, db, ee_org, monkeypatch,
+):
+    client, base = integration_api
+    saved = {"api_key": "saved-synthetic-public-key", "secret_key": "saved-synthetic-secret-key", "lang": "et"}
+    assert client.post(base + "/integrations/smartaccounts",
+                       json={"credentials": saved, "config": {"note": "saved"}}).status_code == 200
+    captured = []
+
+    def factory(credentials, config):
+        captured.append((dict(credentials), dict(config)))
+        return FakeCheckConnector("smartaccounts", ok=True, live=True, message="Synthetic check passed")
+
+    monkeypatch.setitem(REGISTRY, "smartaccounts", replace(REGISTRY["smartaccounts"], factory=factory))
+    blank = {"api_key": "", "secret_key": "  ", "lang": "et"}
+    checked = client.post(base + "/integrations/smartaccounts/test", json={"credentials": blank, "config": {}})
+    assert checked.status_code == 200 and checked.json()["ok"] is True
+    assert captured[-1] == (saved, {"note": "saved"})
+    assert "saved-synthetic" not in checked.text
+    assert client.get(base + "/integrations").json()[0]["status"] == "Connected"
+
+    override = client.post(base + "/integrations/smartaccounts/test", json={
+        "credentials": {"api_key": "", "secret_key": "replacement-synthetic-secret", "lang": "et"}, "config": {}})
+    assert override.json()["ok"] is True
+    assert captured[-1][0] == {**saved, "secret_key": "replacement-synthetic-secret"}
+
+    # Saving with blank secrets keeps the stored values instead of erasing them.
+    assert client.post(base + "/integrations/smartaccounts",
+                       json={"credentials": blank, "config": {}}).status_code == 200
+    client.post(base + "/integrations/smartaccounts/test", json={"credentials": blank, "config": {}})
+    assert captured[-1][0] == saved
+
+    # Another organisation never borrows these credentials, and missing input changes no status.
+    calls = len(captured)
+    other = client.post(f"/organisations/{ee_org['id']}/integrations/smartaccounts/test",
+                        json={"credentials": blank, "config": {}})
+    assert other.status_code == 200
+    assert other.json() == {"provider": "smartaccounts", "operation": "check", "ok": False, "live": False,
+                            "message": "Enter the credentials to test this connection."}
+    assert len(captured) == calls
+    assert not db.one("SELECT id FROM integration_connections WHERE organisation_id=?", (ee_org["id"],))
+    assert client.get(base + "/integrations").json()[0]["status"] == "Connected"
 
 
 def test_finance_connection_check_uses_mocked_http_and_updates_status(
