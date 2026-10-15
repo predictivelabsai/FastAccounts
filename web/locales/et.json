@@ -2232,11 +2232,10 @@
     }
   },
   "copilot": {
-    "nav": {
-      "assistant": "Assistent",
-      "copilot": "AI-kaaslane"
-    },
     "workspace": {
+      "Open AI copilot": "Ava AI-kaaslane",
+      "Close AI copilot": "Sulge AI-kaaslane",
+      "Copilot administration": "AI-kaaslase haldus",
       "AI copilot": "AI-kaaslane",
       "Ask about your books, scan documents and draft staged imports. The copilot never changes records on its own.": "Küsi oma raamatupidamise kohta, skaneeri dokumente ja koosta importimise ridade eelvaateid. Kaaslane ei muuda kunagi kirjeid iseseisvalt.",
       "AI copilot is not configured on this service.": "AI-kaaslane pole selles teenuses seadistatud.",

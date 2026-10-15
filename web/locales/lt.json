@@ -2232,11 +2232,10 @@
     }
   },
   "copilot": {
-    "nav": {
-      "assistant": "Asistentas",
-      "copilot": "AI asistentas"
-    },
     "workspace": {
+      "Open AI copilot": "Atverti AI asistentą",
+      "Close AI copilot": "Užverti AI asistentą",
+      "Copilot administration": "AI asistento administravimas",
       "AI copilot": "AI asistentas",
       "Ask about your books, scan documents and draft staged imports. The copilot never changes records on its own.": "Klauskite apie savo apskaitą, skenuokite dokumentus ir rengkite importo eilučių peržiūrą. Asistentas pats niekada nekeičia įrašų.",
       "AI copilot is not configured on this service.": "AI asistentas šioje paslaugoje nesukonfigūruotas.",

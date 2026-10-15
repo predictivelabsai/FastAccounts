@@ -2232,11 +2232,10 @@
     }
   },
   "copilot": {
-    "nav": {
-      "assistant": "Assistant",
-      "copilot": "AI copilot"
-    },
     "workspace": {
+      "Open AI copilot": "Open AI copilot",
+      "Close AI copilot": "Close AI copilot",
+      "Copilot administration": "Copilot administration",
       "AI copilot": "AI copilot",
       "Ask about your books, scan documents and draft staged imports. The copilot never changes records on its own.": "Ask about your books, scan documents and draft staged imports. The copilot never changes records on its own.",
       "AI copilot is not configured on this service.": "AI copilot is not configured on this service.",

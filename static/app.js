@@ -165,7 +165,6 @@
     "fixed-assets": "asset", tax: "tax", payroll: "payroll", integrations: "link",
     imports: "import", "payment-methods": "card", "reminder-rules": "bell",
     "exchange-rates": "exchange", objects: "tag", documents: "appearance",
-    copilot: "assistant",
     periods: "calendar",
     maintenance: "wrench",
     groups: "team",
@@ -432,6 +431,7 @@
     await render();
   }
   async function render() {
+    syncCopilot();
     const ticket = ++generation,
       route = location.hash.slice(1) || "overview",
       routeParts = route.split("/").filter(Boolean),
@@ -638,6 +638,75 @@
       })
       .join("")}</svg>`;
   }
+  let copilotDrawer, copilotBody, copilotToggle, copilotOrg, copilotTicket = 0, copilotReturnFocus;
+  const currentPage = () => {
+    const key = location.hash.slice(1).split('/')[0] || 'overview';
+    return Object.hasOwn(views, key) ? key : 'overview';
+  };
+  function closeCopilot() {
+    if (!copilotDrawer || copilotDrawer.hidden) return;
+    copilotDrawer.hidden = true;
+    copilotToggle.setAttribute('aria-expanded', 'false');
+    (copilotReturnFocus?.isConnected ? copilotReturnFocus : copilotToggle).focus();
+  }
+  function syncCopilot() {
+    if (!copilotDrawer) {
+      const shell = document.createElement('div');
+      shell.innerHTML = `<button type="button" class="button primary copilot-toggle" aria-label="${tr('Open AI copilot')}" aria-controls="copilot-drawer" aria-expanded="false">${icon('assistant')}${tr('AI copilot')}</button>` +
+        `<aside id="copilot-drawer" class="copilot-drawer" role="dialog" aria-labelledby="copilot-title" hidden><header class="copilot-header"><h2 id="copilot-title">${tr('AI copilot')}</h2><button type="button" class="button" data-copilot-close aria-label="${tr('Close AI copilot')}">&times;</button></header>` +
+        `<p class="muted copilot-description">${tr('Ask about your books, scan documents and draft staged imports. The copilot never changes records on its own.')}</p><div class="copilot-body"></div></aside>`;
+      app.append(shell);
+      copilotDrawer = shell.querySelector('#copilot-drawer');
+      copilotBody = shell.querySelector('.copilot-body');
+      copilotToggle = shell.querySelector('.copilot-toggle');
+      copilotToggle.onclick = () => {
+        if (!copilotDrawer.hidden) return closeCopilot();
+        copilotReturnFocus = document.activeElement;
+        copilotDrawer.hidden = false;
+        copilotToggle.setAttribute('aria-expanded', 'true');
+        copilotDrawer.querySelector('[data-copilot-close]').focus();
+        if (!copilotBody.childElementCount) loadCopilot();
+      };
+      shell.querySelector('[data-copilot-close]').onclick = closeCopilot;
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && !document.querySelector('.dialog')) closeCopilot();
+      });
+    }
+    copilotToggle.hidden = !org;
+    if (copilotOrg !== org?.id) {
+      closeCopilot();
+      copilotOrg = org?.id;
+      copilotTicket++;
+      copilotBody.replaceChildren();
+    }
+  }
+  async function loadCopilot() {
+    const oid = org?.id, ticket = ++copilotTicket;
+    if (!oid) return;
+    const focused = copilotDrawer.contains(document.activeElement);
+    const adminOpen = copilotBody.querySelector('[data-copilot-admin]')?.open;
+    copilotBody.setAttribute('aria-busy', 'true');
+    try {
+      await renderCopilot({
+        url: (suffix) => `/organisations/${encodeURIComponent(oid)}${suffix}`,
+        mount: (html) => {
+          if (ticket !== copilotTicket || oid !== org?.id) return false;
+          copilotBody.innerHTML = html;
+          const admin = copilotBody.querySelector('[data-copilot-admin]');
+          if (admin) admin.open = !!adminOpen;
+          if (focused && !copilotDrawer.hidden) copilotDrawer.querySelector('[data-copilot-close]').focus();
+          return true;
+        },
+      });
+    } catch (error) {
+      if (ticket === copilotTicket && oid === org?.id) {
+        copilotBody.innerHTML = `<p role="alert">${esc(error.message)}</p>${button('Try again', 'retryCopilot')}`;
+        bindActions(copilotBody, {retryCopilot: loadCopilot});
+      }
+    } finally {
+      if (ticket === copilotTicket) copilotBody.removeAttribute('aria-busy');
+    }
+  }
   function copilotTranscript(messages) {
     if (!messages.length) return `<p class="muted">${tr('No copilot messages yet.')}</p>`;
     return messages.map((x) => {
@@ -646,6 +715,88 @@
         (stage ? button(tr('Stage {rows} rows for import').replace('{rows}', stage.rows ?? '?'), 'stageImport', false, `data-id="${esc(x.id)}" ${canEditMappings() ? '' : 'disabled'}`) : '') +
         `</article>`;
     }).join('');
+  }
+  async function renderCopilot(c) {
+    const admins = canEditMappings();
+    const [status, history, usage, docs] = await Promise.all([
+      api(c.url('/copilot/status')),
+      api(c.url('/copilot/messages')),
+      admins ? api(c.url('/copilot/usage')) : Promise.resolve(null),
+      api(c.url('/copilot/documents')),
+    ]);
+    const active = status.available && status.enabled && status.access?.granted !== false;
+    const quotaLine = `${num(status.quotas.user_messages)} / ${num(status.quotas.messages_per_user_day)}`;
+    const accessLine = status.access && !status.access.granted
+      ? t('AI copilot access has not been granted to this account.')
+      : null;
+    const notice = !status.available ? t('AI copilot is not configured on this service.')
+      : !status.enabled ? t('AI copilot is off for this organisation. An owner or administrator can enable it here.')
+      : accessLine || `${tr('Used today')}: ${quotaLine}`;
+    const stages = Object.fromEntries((history || []).filter((x) => x.stage_proposal_json)
+      .map((x) => [x.id, JSON.parse(x.stage_proposal_json)]));
+    const composer = form(`<label class="full-width">${tr('Message')}<textarea name="content" rows="3" maxlength="8000" required></textarea><span class="field-error" data-error="content"></span></label>` +
+        select('Attach document', 'attachment_id', [['', tr('No attachment')], ...docs.map((d) => [d.id, `${d.filename} ${date(d.created_at)}`])], ''),
+      'Send message');
+    const usageUsage = usage
+      ? `<section class="section" data-copilot-usage><h2>${tr('Copilot usage')}</h2><p class="muted">${tr('Per-user daily usage counts every message, scan and token billed to this organisation.')}</p>` +
+        table(['Day', 'User', 'Messages', 'Scans', 'Input tokens', 'Output tokens'],
+          usage.map((u) => row([
+            td(esc(u.day)),
+            td(esc(u.user_email)),
+            td(esc(num(u.messages)), 'numeric'),
+            td(esc(num(u.scans)), 'numeric'),
+            td(esc(num(u.tokens_in)), 'numeric'),
+            td(esc(num(u.tokens_out)), 'numeric'),
+          ]))) +
+        `</section>`
+      : '';
+    const grantsPanel = admins && status.grants
+      ? `<section class="section" data-copilot-access><h2>${tr('Copilot access')}</h2><p class="muted">${tr('Owners and administrators always have access. Grant members of this organisation individually; grants are audited.')}</p>` +
+        table(['Account', 'Granted by', 'Actions'],
+          (status.grants || []).map((g) => row([
+            td(esc(g.email)), td(esc(g.granted_by)),
+            td(admins ? button('Revoke', 'revokeCopilotAccess', false, `data-email="${esc(g.email)}"`) : ''),
+          ]))) +
+        form(field('Grant member email', 'grant_email', '', 'email', 'required maxlength="320"'), 'Grant access') +
+      `</section>` : '';
+    const body = `<p class="muted" data-copilot-notice aria-live="polite">${esc(notice)}</p>` +
+      (admins ? `<details data-copilot-admin><summary>${tr('Copilot administration')}</summary><section class="section" data-copilot-settings>` +
+        form(check('Enable AI copilot for this organisation', 'copilot_enabled', !!status.enabled)) + `</section>` + grantsPanel + usageUsage + `</details>` : '') +
+      `<section class="section" data-copilot-chat><h2>${tr('Conversation')}</h2><div id="copilot-transcript" aria-live="polite">${copilotTranscript(history || [])}</div>` + composer + `</section>`;
+    if (!c.mount(body)) return;
+    copilotBody.querySelectorAll('[data-action=cancel]').forEach((x) => x.remove());
+    if (!active) copilotBody.querySelectorAll('[data-copilot-chat] textarea, [data-copilot-chat] select, [data-copilot-chat] button').forEach((x) => { x.disabled = true; });
+    const enabledCheck = copilotBody.querySelector('[name=copilot_enabled]');
+    if (enabledCheck) bindForm(copilotBody.querySelector('[data-copilot-settings]'), async () => {
+      await post(c.url('/copilot/settings'), {enabled: !!enabledCheck.checked}, 'PUT');
+      toast(t('Saved successfully'));
+      await loadCopilot();
+    });
+    const accessPanel = copilotBody.querySelector('[data-copilot-access]');
+    if (accessPanel) {
+      bindForm(accessPanel, async (values) => {
+        await post(c.url('/copilot/access'), {email: values.grant_email});
+        toast(t('Saved successfully'));
+        await loadCopilot();
+      });
+      bindActions(copilotBody, {revokeCopilotAccess: (b) => confirmAction(tr('Revoke copilot access'), tr('{email} loses copilot access immediately. Revoke?').replace('{email}', b.dataset.email), async () => {
+        await post(c.url('/copilot/access/' + encodeURIComponent(b.dataset.email)), {}, 'DELETE');
+        toast(t('Saved successfully'));
+        await loadCopilot();
+      })});
+    }
+    bindForm(copilotBody.querySelector('[data-copilot-chat]'), async (data) => {
+      const payload = {page: currentPage(), content: data.content, attachment_ids: data.attachment_id ? [data.attachment_id] : []};
+      await post(c.url('/copilot/messages'), payload);
+      toast(t('Copilot replied'));
+      await loadCopilot();
+    });
+    bindActions(copilotBody, {stageImport: (b) => confirmAction(tr('Stage import rows'), tr('Review these rows in Data import before they touch your books. Stage them now?'), async () => {
+      const proposal = stages[b.dataset.id] || {};
+      await post(c.url('/copilot/stage'), {kind: proposal.kind, csv_content: proposal.csv, message_id: b.dataset.id});
+      toast(t('Import batch staged. Review it under Data import.'));
+      await loadCopilot();
+    })});
   }
   const views = {
     overview: async (c) => {
@@ -913,89 +1064,6 @@
       bindActions(content, {removeDocumentLogo: () => confirmAction('Remove logo', tr('Remove the logo from sales invoice and credit note PDFs?'), async () => {
         await post(c.url('/document-settings/logo'), {}, 'DELETE');
         toast(t('Saved successfully'));
-        await render();
-      })});
-    },
-    copilot: async (c) => {
-      const admins = canEditMappings();
-      const [status, history, usage, docs] = await Promise.all([
-        api(c.url('/copilot/status')),
-        api(c.url('/copilot/messages')),
-        admins ? api(c.url('/copilot/usage')) : Promise.resolve(null),
-        api(c.url('/copilot/documents')),
-      ]);
-      const active = status.available && status.enabled;
-      const quotaLine = `${num(status.quotas.user_messages)} / ${num(status.quotas.messages_per_user_day)}`;
-      const accessLine = status.access && !status.access.granted
-        ? t('AI copilot access has not been granted to this account.')
-        : null;
-      const notice = !status.available ? t('AI copilot is not configured on this service.')
-        : !status.enabled ? t('AI copilot is off for this organisation. An owner or administrator can enable it here.')
-        : accessLine || `${tr('Used today')}: ${quotaLine}`;
-      const stages = Object.fromEntries((history || []).filter((x) => x.stage_proposal_json)
-        .map((x) => [x.id, JSON.parse(x.stage_proposal_json)]));
-      const composer = form(`<label class="full-width">${tr('Message')}<textarea name="content" rows="3" maxlength="8000" required></textarea><span class="field-error" data-error="content"></span></label>` +
-          select('Attach document', 'attachment_id', [['', tr('No attachment')], ...docs.map((d) => [d.id, `${d.filename} ${date(d.created_at)}`])], ''),
-        'Send message');
-      const usageUsage = usage
-        ? `<section class="section" data-copilot-usage><h2>${tr('Copilot usage')}</h2><p class="muted">${tr('Per-user daily usage counts every message, scan and token billed to this organisation.')}</p>` +
-          table(['Day', 'User', 'Messages', 'Scans', 'Input tokens', 'Output tokens'],
-            usage.map((u) => row([
-              td(esc(u.day)),
-              td(esc(u.user_email)),
-              td(esc(num(u.messages)), 'numeric'),
-              td(esc(num(u.scans)), 'numeric'),
-              td(esc(num(u.tokens_in)), 'numeric'),
-              td(esc(num(u.tokens_out)), 'numeric'),
-            ]))) +
-          `</section>`
-        : '';
-      const grantsPanel = status.grants
-        ? `<section class="section" data-copilot-access><h2>${tr('Copilot access')}</h2><p class="muted">${tr('Owners and administrators always have access. Grant members of this organisation individually; grants are audited.')}</p>` +
-          table(['Account', 'Granted by', 'Actions'],
-            (status.grants || []).map((g) => row([
-              td(esc(g.email)), td(esc(g.granted_by)),
-              td(editable ? button('Revoke', 'revokeCopilotAccess', false, `data-email="${esc(g.email)}"`) : ''),
-            ]))) +
-          form(field('Grant member email', 'grant_email', '', 'email', 'required maxlength="320"'), 'Grant access') +
-        `</section>` : '';
-      const body = `<section class="section" data-copilot-settings><h2>${tr('AI copilot')}</h2>` +
-        (admins ? form(check('Enable AI copilot for this organisation', 'copilot_enabled', !!status.enabled)) : '') +
-        `<p class="muted" data-copilot-notice aria-live="polite">${esc(notice)}</p></section>` +
-        `<section class="section" data-copilot-chat><h2>${tr('Conversation')}</h2><div id="copilot-transcript">${copilotTranscript(history || [])}</div>` +
-        composer + `</section>` + grantsPanel + usageUsage;
-      if (!c.mount(page(t('AI copilot'), t('Ask about your books, scan documents and draft staged imports. The copilot never changes records on its own.'), '', body))) return;
-      content.querySelectorAll('[data-action=cancel]').forEach((x) => x.remove());
-      if (!active) content.querySelectorAll('[data-copilot-chat] textarea, [data-copilot-chat] select, [data-copilot-chat] button').forEach((x) => { x.disabled = true; });
-      const enabledCheck = content.querySelector('[name=copilot_enabled]');
-      if (enabledCheck) bindForm(content.querySelector('[data-copilot-settings]'), async () => {
-        await post(c.url('/copilot/settings'), {enabled: !!enabledCheck.checked}, 'PUT');
-        toast(t('Saved successfully'));
-        await render();
-      });
-      const accessPanel = content.querySelector('[data-copilot-access]');
-      if (accessPanel) {
-        bindForm(accessPanel, async (values) => {
-          await post(c.url('/copilot/access'), {email: values.grant_email});
-          toast(t('Saved successfully'));
-          await render();
-        });
-        bindActions(content, {revokeCopilotAccess: (b) => confirmAction(tr('Revoke copilot access'), tr('{email} loses copilot access immediately. Revoke?').replace('{email}', b.dataset.email), async () => {
-          await post(c.url('/copilot/access/' + encodeURIComponent(b.dataset.email)), {}, 'DELETE');
-          toast(t('Saved successfully'));
-          await render();
-        })});
-      }
-      bindForm(content.querySelector('[data-copilot-chat]'), async (data) => {
-        const payload = {content: data.content, attachment_ids: data.attachment_id ? [data.attachment_id] : []};
-        await post(c.url('/copilot/messages'), payload);
-        toast(t('Copilot replied'));
-        await render();
-      });
-      bindActions(content, {stageImport: (b) => confirmAction(tr('Stage import rows'), tr('Review these rows in Data import before they touch your books. Stage them now?'), async () => {
-        const proposal = stages[b.dataset.id] || {};
-        await post(c.url('/copilot/stage'), {kind: proposal.kind, csv_content: proposal.csv, message_id: b.dataset.id});
-        toast(t('Import batch staged. Review it under Data import.'));
         await render();
       })});
     },

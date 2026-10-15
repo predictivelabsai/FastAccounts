@@ -277,13 +277,16 @@ class CopilotService:
     # send ----------------------------------------------------------------
 
     def send(self, organisation_id, user_email, content, *,
-             attachment_ids=None, client=None):
+             attachment_ids=None, page=None, client=None):
         self._gate(organisation_id, user_email)
         content = self._check_text(content)
+        if page is not None and (not isinstance(page, str) or len(page) > 64
+                                 or not re.fullmatch(r"[a-z][a-z0-9_-]*", page)):
+            raise ValueError("Invalid workspace page")
         attachments = self._attachments(organisation_id, attachment_ids or [])
         evidence = [self._load_evidence(organisation_id, a) for a in attachments]
         history = list(reversed(self.messages(organisation_id, user_email)))
-        prompt = self._compose(organisation_id, content, history, evidence)
+        prompt = self._compose(organisation_id, content, history, evidence, page=page)
         self._consume_quota(organisation_id, user_email,
                             scans=sum(1 for e in evidence),
                             prompt_chars=len(prompt))
@@ -372,7 +375,7 @@ class CopilotService:
             extracted = extracted[:SCAN_MAX_TEXT_CHARS] + "\n[truncated]"
         return note + "\n" + extracted
 
-    def _compose(self, organisation_id, content, history, evidence, *, overview_chars=None):
+    def _compose(self, organisation_id, content, history, evidence, *, overview_chars=None, page=None):
         """Assemble the provider payload; never includes secrets or raw audits."""
         messages = [{"role": "system", "content": SYSTEM_PROMPT},
                     {"role": "system", "content": "Trusted server-computed context "
@@ -385,6 +388,10 @@ class CopilotService:
             + (e["text"] if e["kind"] == "text" else "[image attachment]") +
             "\n--- end of evidence ---"
             for e in evidence)
+        if page is not None:
+            content = content + "\n\nCurrent workspace page (navigation context only): " + page
+            if len(content) > MAX_MESSAGE_CHARS:
+                raise CopilotQuotaExceeded("Messages must stay within 8000 characters")
         prompt_text = content + ("\n\n" + text_evidence if text_evidence else "")
         if any(e["kind"] == "image" for e in evidence):
             parts = [{"type": "text", "text": prompt_text}]
