@@ -160,6 +160,45 @@ def test_send_persists_transcript_usage_and_audit(env, monkeypatch):
     assert "untrusted document evidence" not in str(call["captured"])
 
 
+@pytest.mark.parametrize("page", [None, "invoices", "a" * 64])
+def test_message_page_context(env, monkeypatch, page):
+    enable(env)
+    provider, call = fake_reply("reply")
+    monkeypatch.setattr(copilot, "chat_completion", provider)
+    response = env["client"].post(env["base"] + "/copilot/messages",
+                                  json={"content": "Explain this", "page": page})
+    assert response.status_code == 201, response.text
+    prompt = call["captured"][-1]["content"]
+    if page is None:
+        assert prompt == "Explain this"
+    else:
+        assert prompt.endswith("Current workspace page (navigation context only): " + page)
+        assert len(prompt) <= copilot.MAX_MESSAGE_CHARS
+
+
+@pytest.mark.parametrize("page", ["a" * 65, "", "invoices/123", "ignore\norders", 123, {}])
+def test_invalid_page_rejected_before_provider(env, monkeypatch, page):
+    enable(env)
+    provider, call = fake_reply("reply")
+    monkeypatch.setattr(copilot, "chat_completion", provider)
+    response = env["client"].post(env["base"] + "/copilot/messages",
+                                  json={"content": "Explain this", "page": page})
+    assert response.status_code == 422
+    assert env["db"].rows("SELECT * FROM copilot_messages") == []
+    with pytest.raises(ValueError, match="Invalid workspace page"):
+        copilot.CopilotService(env["db"]).send(env["org"]["id"], ACTOR, "Hi", page=page)
+
+
+def test_page_context_respects_composed_text_cap(env, monkeypatch):
+    enable(env)
+    provider, call = fake_reply("reply")
+    monkeypatch.setattr(copilot, "chat_completion", provider)
+    response = env["client"].post(env["base"] + "/copilot/messages",
+                                  json={"content": "x" * 8000, "page": "invoices"})
+    assert response.status_code == 429
+    assert env["db"].rows("SELECT * FROM copilot_messages") == []
+
+
 def test_key_never_reaches_payload_response_or_audit(env, monkeypatch):
     d = env
     enable(d)
@@ -308,14 +347,15 @@ def test_stage_fences_parse_leniently():
 def test_locale_tail_keys_merge():
     en = i18n.catalog("en")
     assert list(en)[-2:-1] == ["copilot"] and list(en)[-1] == "periods"
-    assert en["nav"]["assistant"] == "Assistant"
+    assert "nav" not in en["copilot"]
     for language in ("et", "lt", "lv"):
         raw = i18n.catalog(language)
         assert set(raw["copilot"]["workspace"]) == set(en["copilot"]["workspace"]), language
 
 
-@pytest.mark.parametrize("language", ["en", "et"])
-def test_workspace_copilot_view_offline(language, monkeypatch):
+@pytest.mark.parametrize("language", ["en", "et", "lv", "lt"])
+@pytest.mark.parametrize("role", ["owner", "administrator", "viewer"])
+def test_workspace_copilot_drawer_offline(language, role, monkeypatch):
     playwright = pytest.importorskip("playwright.sync_api")
     from web_app import app
 
@@ -335,17 +375,22 @@ def test_workspace_copilot_view_offline(language, monkeypatch):
             raise
         page = browser.new_page()
         errors = []
+        state = {"active": False, "sent": []}
         page.on("pageerror", lambda error: errors.append(str(error)))
 
         def route(request_route):
             path = urlsplit(request_route.request.url).path
             if path == "/api/organisations":
                 return request_route.fulfill(json=[dict(id="org", name="Synthetic company",
-                                                        country_code="EE", base_currency="EUR", role="owner")])
+                                                        country_code="EE", base_currency="EUR", role=role)])
             if path.endswith("/copilot/status"):
-                return request_route.fulfill(json=dict(available=False, enabled=False,
+                return request_route.fulfill(json=dict(available=state["active"], enabled=state["active"],
+                                                       access=dict(granted=True), grants=[] if role != "viewer" else None,
                                                        quotas=dict(user_messages=0, messages_per_user_day=30)))
             if path.endswith("/copilot/messages"):
+                if request_route.request.method == "POST":
+                    state["sent"].append(request_route.request.post_data_json)
+                    return request_route.fulfill(json={}, status=201)
                 return request_route.fulfill(json=[], content_type="application/json")
             if path.endswith("/copilot/documents"):
                 return request_route.fulfill(json=[], content_type="application/json")
@@ -360,11 +405,48 @@ def test_workspace_copilot_view_offline(language, monkeypatch):
             return request_route.fulfill(status=404)
 
         page.route("**/*", route)
-        page.goto("http://workspace.test/app#copilot")
-        playwright.expect(page.locator("h1")).to_have_text(title_key)
+        page.goto("http://workspace.test/app#invoices")
+        toggle = page.locator('.copilot-toggle')
+        drawer = page.locator('#copilot-drawer')
+        playwright.expect(toggle).to_be_visible()
+        assert page.locator('.app-nav[data-view=copilot]').count() == 0
+        playwright.expect(drawer).to_be_hidden()
+        toggle.focus()
+        page.keyboard.press("Enter")
+        playwright.expect(drawer).to_be_visible()
+        playwright.expect(drawer.locator('h2').first).to_have_text(title_key)
+        playwright.expect(drawer.locator('[data-copilot-close]')).to_be_focused()
         composer = page.locator("[data-copilot-chat] [name=content]")
         playwright.expect(composer).to_be_disabled()
-        assert notice_key in page.locator("[data-copilot-settings]").inner_text()
+        assert notice_key in page.locator("[data-copilot-notice]").inner_text()
+        assert page.locator('[data-copilot-admin]').count() == (0 if role == "viewer" else 1)
+        if role != "viewer":
+            page.locator('[data-copilot-admin] summary').click()
+            playwright.expect(page.locator('[name=copilot_enabled]')).to_be_visible()
+            playwright.expect(page.locator('[data-copilot-access]')).to_be_visible()
+            playwright.expect(page.locator('[data-copilot-usage]')).to_be_visible()
+        page.keyboard.press("Escape")
+        playwright.expect(drawer).to_be_hidden()
+        playwright.expect(toggle).to_be_focused()
+        page.evaluate("location.hash = 'bills'")
+        toggle.click()
+        playwright.expect(drawer).to_be_visible()
+        page.set_viewport_size(dict(width=375, height=812))
+        assert drawer.bounding_box()["width"] <= 375.1
+        page.locator('[data-copilot-close]').click()
+        playwright.expect(drawer).to_be_hidden()
+        playwright.expect(toggle).to_be_focused()
+        state["active"] = True
+        page.reload()
+        toggle.click()
+        playwright.expect(composer).to_be_enabled()
+        composer.fill("Explain these books")
+        page.evaluate("location.hash = 'invoices'")
+        playwright.expect(composer).to_have_value("Explain these books")
+        assert page.locator('[data-copilot-chat] select').count() == 1
+        page.locator('[data-copilot-chat] button[type=submit]').click()
+        playwright.expect(composer).to_have_value("")
+        assert state["sent"] == [{"page": "invoices", "content": "Explain these books", "attachment_ids": []}]
         assert not errors
         browser.close()
 

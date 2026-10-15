@@ -27,7 +27,7 @@ defence in depth is mandatory:
    the SPA shows the feature as unavailable.
 2. Per-organisation opt-in. `organisations.copilot_enabled` (migration 0029)
    defaults to 0. Only owner/administrator can turn it on or off; the SPA
-   hides copilot views for other roles when disabled, and every copilot call
+   drawer explains unavailability for other roles when disabled, and every call
    re-checks the flag server-side inside the org-locked read transaction.
 3. Roles. All copilot routes require organisation membership. Chat reads and
    message sends are owner/administrator/accountant/approver/viewer;
@@ -127,10 +127,22 @@ actions on the ledger, sharing conversations across users.
   `copilot_usage`, `organisations.copilot_enabled`. CI + tests count 29.
 - API routes in `api_app.py` (thin): POST/GET messages, POST scan,
   POST stage, GET usage, GET documents (picker), PUT org toggle (settings).
-- SPA: Copilot sidebar view (transcript, composer with one attachment picker,
-  stage buttons, quota notices, owner/administrator enable toggle and usage
-  panel in the view header; nav group assistant), locale section `copilot`
-  appended via APPEND_SECTIONS with all four languages.
+- SPA: a retractable right-side copilot drawer on every authenticated workspace
+  feature page, opened by a labelled floating button. It has no navigation entry
+  or standalone page. Escape or the close button closes it; focus moves inside
+  on opening and returns to the opener on closing. Narrow screens use full width
+  and reduced-motion preferences disable the slide animation.
+  The transcript, composer with one attachment picker, stage proposal buttons
+  and quota notices remain available. A collapsible administration section holds
+  the organisation enable toggle, access grants/revocations by email and usage
+  summary, visible only to owners/administrators. Page navigation preserves the
+  drawer and draft; switching organisation clears its state.
+  Messages accept an optional `page` navigation key (1-64 lower-case ASCII
+  letters, digits, underscores or hyphens, starting with a letter). It is added
+  as navigation context in the user prompt, within the existing 8,000-character
+  text cap. It grants no authority and introduces no machine effects. Quotas,
+  routes and the human-reviewed staging/commit boundary remain unchanged.
+  Drawer copy lives in the `copilot` locale section in all four languages.
 - `.env.sample` env documentation; deployment wiring (key) is a FastDevOps
   concern and must not be committed here.
 

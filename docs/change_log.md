@@ -4,6 +4,26 @@ Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as
 delivered.
 
+## 2026-10-15: Copilot workspace drawer
+
+- Replaced the standalone Assistant > AI copilot page with a retractable right-side
+  drawer on every authenticated workspace feature page. The floating button,
+  close button and Escape support keyboard use and focus restoration; narrow
+  screens use full width and reduced-motion preferences are respected.
+- Preserved the transcript, single attachment picker, staged-import proposals,
+  quota notices and owner/administrator controls for organisation settings,
+  access grants/revocations and usage in a collapsible administration section.
+- Added optional validated page context to messages within the existing text
+  cap. No autonomous accounting actions or quota changes were introduced.
+- Updated English, Estonian, Latvian and Lithuanian drawer copy and removed
+  the obsolete copilot navigation strings.
+- Validation: `python -m pytest tests/test_copilot.py -q` (37 passed),
+  `python -m pytest -q` (1,517 passed, 4 skipped),
+  `node --check static/app.js` and `git diff --check` passed. Offline Chromium
+  checks cover all four languages, owner/administrator/viewer roles, focus,
+  mobile width, draft preservation and current-page message context; the
+  375px drawer was also visually checked.
+
 ## 2026-10-14: Workspace audit fixes and faster page delivery
 
 - Completed workspace and integration catalogue translations, including
@@ -313,7 +333,8 @@ Full `python -m pytest -q` on Windows/Python 3.14.6: 1411 passed,
   images as base64 vision parts) is delimited as untrusted data, and any
   contacts/items import the model proposes stays a staged draft that a human
   reviews and commits through the existing Data import pipeline.
-- Added the workspace Assistant > AI copilot view: transcript with token
+- Added the original workspace Assistant > AI copilot view (replaced by the
+  global drawer on 2026-10-15): transcript with token
   counts, composer with an attachment picker, owner/administrator enable
   toggle, per-user usage panel and staged-import buttons; English, Estonian,
   Lithuanian and Latvian copy appended in a trailing `copilot` section.
@@ -342,8 +363,6 @@ follows the existing et.json precedent at line 1577).
 
 | Key | English | Estonian | Lithuanian | Latvian |
 | --- | --- | --- | --- | --- |
-| `copilot.nav.assistant` | Assistant | Assistent | Asistentas | Asistents |
-| `copilot.nav.copilot` | AI copilot | AI-kaaslane | AI asistentas | AI asistents |
 | `copilot.workspace.AI copilot` | AI copilot | AI-kaaslane | AI asistentas | AI asistents |
 | `copilot.workspace.Ask about your books, scan documents and draft staged imports. The copilot never changes records on its own.` | Ask about your books, scan documents and draft staged imports. The copilot never changes records on its own. | Küsi oma raamatupidamise kohta, skaneeri dokumente ja koosta importimise ridade eelvaateid. Kaaslane ei muuda kunagi kirjeid iseseisvalt. | Klauskite apie savo apskaitą, skenuokite dokumentus ir rengkite importo eilučių peržiūrą. Asistentas pats niekada nekeičia įrašų. | Jautiet par savām uzskaitēm, skenējiet dokumentus un sagatavojiet importēšanas rindu priekšskatījumu. Asistents pats nekad nemaina ierakstus. |
 | `copilot.workspace.AI copilot is not configured on this service.` | AI copilot is not configured on this service. | AI-kaaslane pole selles teenuses seadistatud. | AI asistentas šioje paslaugoje nesukonfigūruotas. | AI asistents šajā servisā nav konfigurēts. |

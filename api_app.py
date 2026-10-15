@@ -1051,6 +1051,7 @@ READ_ROLES = {'owner', 'administrator', 'accountant', 'approver', 'viewer'}
 
 
 class CopilotMessageIn(BaseModel):
+    page: str | None = Field(default=None, min_length=1, max_length=64, pattern=r"^[a-z][a-z0-9_-]*$")
     content: str = Field(min_length=1, max_length=8000)
     attachment_ids: list[str] = Field(default_factory=list, max_length=3)
 
@@ -1087,7 +1088,7 @@ def copilot_send(organisation_id: str, payload: CopilotMessageIn,
                  user: User = Depends(require_csrf)):
     _require(organisation_id, user, READ_ROLES)
     return CopilotService().send(organisation_id, user.email, payload.content,
-                                 attachment_ids=payload.attachment_ids)
+                                 attachment_ids=payload.attachment_ids, page=payload.page)
 
 
 @api.post('/organisations/{organisation_id}/copilot/scan', status_code=201)
