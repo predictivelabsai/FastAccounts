@@ -11,7 +11,7 @@ copilot assists; it never writes accounting data on its own authority.
 
 Provider: xAI Grok API, OpenAI-compatible
 (`https://api.x.ai/v1/chat/completions`, bearer key, models such as
-`grok-4.7`, usage token counts in the response). A dedicated API key is
+`grok-4-1-fast-reasoning`, usage token counts in the response). A dedicated API key is
 carried in `FASTACCOUNTS_GROK_API_KEY` so usage is tracked per product.
 The key lives only in the environment and never enters the repository,
 logs, audits or model prompts.
@@ -132,6 +132,14 @@ actions on the ledger, sharing conversations across users.
   or standalone page. Escape or the close button closes it; focus moves inside
   on opening and returns to the opener on closing. Narrow screens use full width
   and reduced-motion preferences disable the slide animation.
+  Ctrl+/ on Windows/Linux or ⌘/ on macOS toggles the drawer using the same
+  focus and lazy-loading paths, including while typing in the composer. It is
+  inactive without a selected organisation or while a `.dialog` modal is open.
+  The toggle exposes `aria-keyshortcuts`; toggle and close tooltips include the
+  platform shortcut. A muted, dismissible translated tip under the description
+  appears on first opening without taking focus. Showing it immediately records
+  `fastaccounts_copilot_shortcut_hint_seen` in localStorage; guarded storage
+  access falls back to showing it at most once per page load.
   The transcript, composer with one attachment picker, stage proposal buttons
   and quota notices remain available. A collapsible administration section holds
   the organisation enable toggle, access grants/revocations by email and usage
@@ -157,3 +165,29 @@ pipeline, tenancy isolation, role/CSRF matrix, audit rows with token counts,
 usage summary, migration rerun, locale tail in all four languages and an
 offline browser flow. Full `python -m pytest -q`; `node --check static/app.js`;
 estnltk QA on all Estonian additions.
+## 2026-10-21: Chat interaction and provider errors
+
+The drawer uses a column layout with a scrolling, live message list and a pinned,
+auto-growing composer. User messages use right-aligned accent bubbles; assistant
+replies use plain text with a small copilot label. Timestamps remain in titles;
+per-message token counts are hidden. Three translated suggestions send a first
+question. The paperclip opens the existing document picker; the selected document
+appears as a removable chip. Enter sends, Shift+Enter adds a newline, and empty
+or in-flight sends are disabled. Inactive copilot states disable the composer.
+
+Sending appends the question immediately, clears the composer and shows three
+typing dots. The POST response replaces the pending reply without reloading the
+drawer or showing a success toast. Failures show an inline retry button and restore
+the question and attachment. Opening and sending scroll to the newest message.
+Stage proposals remain available beneath assistant replies. A header settings
+button toggles administration outside the message flow. Mobile width, reduced
+motion, keyboard shortcuts and the first-open shortcut hint remain supported.
+
+The default model is `grok-4-1-fast-reasoning`; `FASTACCOUNTS_GROK_MODEL` still
+overrides it. Provider 401/403 responses report a rejected configured API key;
+other HTTP failures retain the generic provider error. `CopilotProviderError`
+returns HTTP 502 with a JSON `detail`. The service persists the same error as an
+assistant message with zero tokens and no stage before re-raising. Existing quota
+accounting is unchanged. Tests inject the HTTP client and never call a live provider.
+New transcript messages use microsecond timestamps so a fast failure reply stays
+after its question when the conversation is reopened.

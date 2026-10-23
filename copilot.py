@@ -90,7 +90,8 @@ def _insert_message(db, organisation_id, user_email, role, content, *,
              json.dumps(attachment_ids) if attachment_ids else None,
              json.dumps(stage) if stage else None,
              reply["tokens_in"] if reply else 0, reply["tokens_out"] if reply else 0,
-             reply["model"] if reply else "", utc_now()))
+             reply["model"] if reply else "",
+             datetime.now(timezone.utc).isoformat(timespec="microseconds")))
         return one_message(tx, message_id)
 
 
@@ -296,7 +297,11 @@ class CopilotService:
             audit(tx, organisation_id, user_email, "copilot.message", "copilot",
                   organisation_id,
                   {"attachments": len(attachments), "prompt_chars": len(prompt)})
-        reply = chat_completion(prompt, client=client)
+        try:
+            reply = chat_completion(prompt, client=client)
+        except CopilotProviderError as error:
+            _insert_message(self.db, organisation_id, user_email, "assistant", str(error))
+            raise
         stage = extract_stage(reply["content"])
         assistant = _insert_message(self.db, organisation_id, user_email, "assistant",
                                     reply["content"], reply=reply, stage=stage)

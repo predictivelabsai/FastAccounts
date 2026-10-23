@@ -3,12 +3,39 @@
 **Research baseline:** 2026-08-10  
 **Status:** engineering pilot implemented; independent UK/EE accountant UAT and provider approvals pending
 
+## 2026-10-21: Copilot chat and provider fixes
+
+- Redesigned the workspace drawer as a scrolling chat with a pinned composer,
+  suggestion chips, document attachment chips, optimistic messages, typing dots
+  and inline errors with retry. Enter sends; Shift+Enter adds a newline. A header
+  settings button reveals administration outside the message flow. Existing
+  shortcut hints, staged imports and mobile/reduced-motion support are retained.
+- Corrected the default provider model to `grok-4-1-fast-reasoning`, preserving
+  the environment override. Provider failures return HTTP 502 with a useful
+  detail and persist an assistant error reply without tokens or stage proposals;
+  quota accounting is unchanged. API-key rejection covers both 401 and 403.
+- Added offline provider and browser regressions and translated chat controls
+  into English, Estonian, Lithuanian and Latvian.
+- Validation: `python -m pytest tests/test_copilot.py -q` (43 passed),
+  `node --check static/app.js` and `git diff --check` passed. The full
+  `python -m pytest -q` run recorded 1,522 passed, 4 skipped and one stale
+  static-asset hash failure after CSS changed during that process. A fresh
+  `python -m pytest tests/test_public.py -q` run passed all 60 public/static
+  tests. Runtime tests used the machine's default Python 3.14; Python 3.12
+  syntax checks passed, but its test dependencies are not installed.
+
 ## 2026-10-15: Copilot workspace drawer
 
 - Replaced the standalone Assistant > AI copilot page with a retractable right-side
   drawer on every authenticated workspace feature page. The floating button,
   close button and Escape support keyboard use and focus restoration; narrow
   screens use full width and reduced-motion preferences are respected.
+- Added Ctrl+/ (Windows/Linux) and ⌘/ (macOS) to toggle the drawer, including
+  from the composer. The shortcut pauses for open modals or no selected
+  organisation. Localised tooltips, shortcut metadata and a muted, dismissible
+  first-open hint make it discoverable; the hint is marked seen immediately in
+  localStorage, with a once-per-page fallback when storage is unavailable.
+- The shortcut also works on keyboard layouts where '/' requires Shift.
 - Preserved the transcript, single attachment picker, staged-import proposals,
   quota notices and owner/administrator controls for organisation settings,
   access grants/revocations and usage in a collapsible administration section.
@@ -16,6 +43,12 @@
   cap. No autonomous accounting actions or quota changes were introduced.
 - Updated English, Estonian, Latvian and Lithuanian drawer copy and removed
   the obsolete copilot navigation strings.
+- Shortcut/hint validation: `python -m pytest tests/test_copilot.py -q`
+  (37 passed, one dependency deprecation warning). Offline browser coverage
+  includes both platform shortcuts, composer/input focus, modal and organisation
+  guards, translated hints in all four languages, dismissal, reload persistence
+  and blocked hint storage. JavaScript syntax and whitespace checks passed;
+  the full suite was not rerun for this addition.
 - Validation: `python -m pytest tests/test_copilot.py -q` (37 passed),
   `python -m pytest -q` (1,517 passed, 4 skipped),
   `node --check static/app.js` and `git diff --check` passed. Offline Chromium
@@ -1869,6 +1902,10 @@ follows the existing et.json precedent at line 1577).
 
 | Key | English | Estonian | Lithuanian | Latvian |
 | --- | --- | --- | --- | --- |
+| `copilot.workspace.Open AI copilot ({shortcut})` | Open AI copilot ({shortcut}) | Ava AI-kaaslane ({shortcut}) | Atverti AI asistentą ({shortcut}) | Atvērt AI asistentu ({shortcut}) |
+| `copilot.workspace.Close AI copilot ({shortcut})` | Close AI copilot ({shortcut}) | Sulge AI-kaaslane ({shortcut}) | Užverti AI asistentą ({shortcut}) | Aizvērt AI asistentu ({shortcut}) |
+| `copilot.workspace.Tip: press {shortcut} to open or close the copilot from any page.` | Tip: press {shortcut} to open or close the copilot from any page. | Vihje: vajuta {shortcut}, et avada või sulgeda kaaslane mis tahes lehel. | Patarimas: paspauskite {shortcut}, kad atvertumėte arba užvertumėte asistentą bet kuriame puslapyje. | Padoms: nospiediet {shortcut}, lai atvērtu vai aizvērtu asistentu jebkurā lapā. |
+| `copilot.workspace.Got it` | Got it | Selge | Supratau | Sapratu |
 | `copilot.workspace.AI copilot` | AI copilot | AI-kaaslane | AI asistentas | AI asistents |
 | `copilot.workspace.Ask about your books, scan documents and draft staged imports. The copilot never changes records on its own.` | Ask about your books, scan documents and draft staged imports. The copilot never changes records on its own. | Küsi oma raamatupidamise kohta, skaneeri dokumente ja koosta importimise ridade eelvaateid. Kaaslane ei muuda kunagi kirjeid iseseisvalt. | Klauskite apie savo apskaitą, skenuokite dokumentus ir rengkite importo eilučių peržiūrą. Asistentas pats niekada nekeičia įrašų. | Jautiet par savām uzskaitēm, skenējiet dokumentus un sagatavojiet importēšanas rindu priekšskatījumu. Asistents pats nekad nemaina ierakstus. |
 | `copilot.workspace.AI copilot is not configured on this service.` | AI copilot is not configured on this service. | AI-kaaslane pole selles teenuses seadistatud. | AI asistentas šioje paslaugoje nesukonfigūruotas. | AI asistents šajā servisā nav konfigurēts. |

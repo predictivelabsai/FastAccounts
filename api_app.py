@@ -24,8 +24,8 @@ from documents import DocumentService, EInvoiceAlreadyImported
 from bulk_sending import BulkSendingService, MAX_BULK_INVOICES
 from invoice_list import InvoiceListService, validate_list_dates
 from csv_exports import CsvExportService
-from copilot import (CopilotAccessDenied, CopilotDisabled, CopilotQuotaExceeded,
-                     CopilotService)
+from copilot import (CopilotAccessDenied, CopilotDisabled, CopilotProviderError,
+                     CopilotQuotaExceeded, CopilotService)
 from contact_groups import GroupService
 from list_export_repository import ListExportRepository
 from quotes import QuoteService
@@ -546,6 +546,11 @@ async def copilot_disabled(_request: Request, error: CopilotDisabled):
 @api.exception_handler(CopilotAccessDenied)
 async def copilot_access_denied(_request: Request, error: CopilotAccessDenied):
     return JSONResponse({"detail": str(error)}, status_code=403)
+
+
+@api.exception_handler(CopilotProviderError)
+async def copilot_provider_error(_request: Request, error: CopilotProviderError):
+    return JSONResponse(status_code=502, content={"detail": str(error)})
 
 
 @api.exception_handler(CopilotQuotaExceeded)

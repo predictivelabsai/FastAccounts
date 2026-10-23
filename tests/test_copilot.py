@@ -5,6 +5,7 @@ import socket
 from urllib.parse import urlsplit
 
 import pytest
+import httpx
 from fastapi.testclient import TestClient
 
 import copilot
@@ -304,6 +305,47 @@ def test_quota_burst_and_size_limits(env, monkeypatch):
     assert d["client"].post(d["base"] + "/copilot/messages", json={"content": "hi"}).status_code == 429
 
 
+def test_provider_default_model_and_override(env, monkeypatch):
+    assert copilot_provider.model() == "grok-4-1-fast-reasoning"
+    monkeypatch.setenv("FASTACCOUNTS_GROK_MODEL", "fleet-test-model")
+    assert copilot_provider.model() == "fleet-test-model"
+    monkeypatch.setenv("FASTACCOUNTS_GROK_MODEL", "  ")
+    assert copilot_provider.model() == "grok-4-1-fast-reasoning"
+
+
+@pytest.mark.parametrize("status,detail", [
+    (401, "The AI provider rejected the configured API key."),
+    (403, "The AI provider rejected the configured API key."),
+    (500, "The AI provider returned an error. Try again later."),
+    (404, "The AI provider returned an error. Try again later."),
+    (None, "The AI provider did not respond in time. Try again later."),
+])
+def test_provider_failure_api_and_transcript(env, monkeypatch, status, detail):
+    enable(env)
+
+    def fail(request):
+        assert request.url == copilot_provider.BASE_URL
+        if status is None:
+            raise httpx.ReadTimeout("synthetic timeout", request=request)
+        return httpx.Response(status, json={"error": "private provider response"})
+
+    monkeypatch.setattr(copilot_provider, "HTTP_CLIENT_FACTORY",
+                        lambda: httpx.Client(transport=httpx.MockTransport(fail)))
+    response = env["client"].post(env["base"] + "/copilot/messages",
+                                   json={"content": "Explain these books"})
+    assert response.status_code == 502, response.text
+    assert response.json() == {"detail": detail}
+    history = env["client"].get(env["base"] + "/copilot/messages").json()
+    assert [m["role"] for m in history] == ["assistant", "user"]
+    assert {(m["role"], m["content"]) for m in history} == {
+        ("user", "Explain these books"), ("assistant", detail)}
+    assistant = next(m for m in history if m["role"] == "assistant")
+    assert assistant["tokens_in"] == assistant["tokens_out"] == 0
+    assert assistant["stage_proposal_json"] is None
+    assert assistant["model"] == ""
+    assert env["db"].rows("SELECT * FROM copilot_usage") == []
+
+
 def test_provider_error_paths(env, monkeypatch):
     class Stub:
         def __init__(self, status_code=200, payload=None):
@@ -355,7 +397,7 @@ def test_locale_tail_keys_merge():
 
 @pytest.mark.parametrize("language", ["en", "et", "lv", "lt"])
 @pytest.mark.parametrize("role", ["owner", "administrator", "viewer"])
-def test_workspace_copilot_drawer_offline(language, role, monkeypatch):
+def test_workspace_copilot_drawer_offline(language, role, monkeypatch, tmp_path):
     playwright = pytest.importorskip("playwright.sync_api")
     from web_app import app
 
@@ -374,8 +416,11 @@ def test_workspace_copilot_drawer_offline(language, role, monkeypatch):
                 pytest.skip("Install Playwright Chromium to run browser regressions")
             raise
         page = browser.new_page()
+        page.add_init_script("Object.defineProperty(navigator, 'platform', {value: 'Win32'});"
+                             "Object.defineProperty(navigator, 'userAgentData', {"
+                             "value: location.search === '?mac' ? {platform: 'macOS'} : undefined});")
         errors = []
-        state = {"active": False, "sent": []}
+        state = {"active": False, "sent": [], "fail": False, "reads": 0}
         page.on("pageerror", lambda error: errors.append(str(error)))
 
         def route(request_route):
@@ -390,10 +435,16 @@ def test_workspace_copilot_drawer_offline(language, role, monkeypatch):
             if path.endswith("/copilot/messages"):
                 if request_route.request.method == "POST":
                     state["sent"].append(request_route.request.post_data_json)
-                    return request_route.fulfill(json={}, status=201)
+                    if state["fail"]:
+                        return request_route.fulfill(json={"detail": "The AI provider returned an error. Try again later."}, status=502)
+                    return request_route.fulfill(json={
+                        "user_message": dict(role="user", content=state["sent"][-1]["content"], created_at="2026-10-21"),
+                        "assistant": dict(id="answer", role="assistant", content="Synthetic reply", created_at="2026-10-21"),
+                        "stage": dict(kind="contacts", csv="name\nSynthetic\n", rows=1)}, status=201)
+                state["reads"] += 1
                 return request_route.fulfill(json=[], content_type="application/json")
             if path.endswith("/copilot/documents"):
-                return request_route.fulfill(json=[], content_type="application/json")
+                return request_route.fulfill(json=[dict(id="doc", filename="Synthetic.pdf", created_at="2026-10-21")], content_type="application/json")
             if path.endswith("/copilot/usage"):
                 return request_route.fulfill(json=[], content_type="application/json")
             if path.startswith("/api/"):
@@ -409,28 +460,45 @@ def test_workspace_copilot_drawer_offline(language, role, monkeypatch):
         toggle = page.locator('.copilot-toggle')
         drawer = page.locator('#copilot-drawer')
         playwright.expect(toggle).to_be_visible()
+        playwright.expect(toggle).to_have_attribute('aria-keyshortcuts', 'Control+/')
+        strings = i18n.catalog(language)['copilot']['workspace']
+        playwright.expect(toggle).to_have_attribute(
+            'title', strings['Open AI copilot ({shortcut})'].replace('{shortcut}', 'Ctrl+/'))
         assert page.locator('.app-nav[data-view=copilot]').count() == 0
         playwright.expect(drawer).to_be_hidden()
         toggle.focus()
-        page.keyboard.press("Enter")
+        shortcut_case = language == 'en' and role == 'owner'
+        page.keyboard.press('Control+/' if shortcut_case else 'Enter')
         playwright.expect(drawer).to_be_visible()
         playwright.expect(drawer.locator('h2').first).to_have_text(title_key)
         playwright.expect(drawer.locator('[data-copilot-close]')).to_be_focused()
+        playwright.expect(drawer.locator('[data-copilot-close]')).to_have_attribute(
+            'title', strings['Close AI copilot ({shortcut})'].replace('{shortcut}', 'Ctrl+/'))
+        hint = drawer.locator('.copilot-shortcut-hint')
+        playwright.expect(hint.locator('p')).to_have_text(
+            strings['Tip: press {shortcut} to open or close the copilot from any page.'].replace(
+                '{shortcut}', 'Ctrl+/'))
+        playwright.expect(hint.locator('kbd')).to_have_text('Ctrl+/')
+        assert page.evaluate("localStorage.getItem('fastaccounts_copilot_shortcut_hint_seen')") == 'true'
+        hint.get_by_role('button', name=strings['Got it'], exact=True).click()
+        playwright.expect(hint).to_have_count(0)
         composer = page.locator("[data-copilot-chat] [name=content]")
         playwright.expect(composer).to_be_disabled()
         assert notice_key in page.locator("[data-copilot-notice]").inner_text()
         assert page.locator('[data-copilot-admin]').count() == (0 if role == "viewer" else 1)
         if role != "viewer":
-            page.locator('[data-copilot-admin] summary').click()
+            page.locator('[data-copilot-gear]').click()
             playwright.expect(page.locator('[name=copilot_enabled]')).to_be_visible()
             playwright.expect(page.locator('[data-copilot-access]')).to_be_visible()
             playwright.expect(page.locator('[data-copilot-usage]')).to_be_visible()
-        page.keyboard.press("Escape")
+        page.keyboard.press('Control+/' if shortcut_case else 'Escape')
         playwright.expect(drawer).to_be_hidden()
         playwright.expect(toggle).to_be_focused()
         page.evaluate("location.hash = 'bills'")
         toggle.click()
         playwright.expect(drawer).to_be_visible()
+        page.set_viewport_size(dict(width=600, height=812))
+        assert abs(drawer.bounding_box()["width"] - 600) <= 0.1
         page.set_viewport_size(dict(width=375, height=812))
         assert drawer.bounding_box()["width"] <= 375.1
         page.locator('[data-copilot-close]').click()
@@ -440,13 +508,144 @@ def test_workspace_copilot_drawer_offline(language, role, monkeypatch):
         page.reload()
         toggle.click()
         playwright.expect(composer).to_be_enabled()
+        playwright.expect(hint).to_have_count(0)
         composer.fill("Explain these books")
+        if shortcut_case:
+            # Modified slash also works in an editable control and restores its opener.
+            composer.press('Control+/')
+            playwright.expect(drawer).to_be_hidden()
+            playwright.expect(toggle).to_be_focused()
+            page.keyboard.press('Control+/')
+            playwright.expect(drawer.locator('[data-copilot-close]')).to_be_focused()
+            playwright.expect(composer).to_have_value('Explain these books')
+            page.keyboard.press('Control+/')
+            playwright.expect(toggle).to_be_focused()
+            page.evaluate("""() => {
+                const input = document.createElement('input');
+                input.id = 'shortcut-opener';
+                document.body.append(input);
+                input.focus();
+            }""")
+            page.keyboard.press('Control+/')
+            playwright.expect(drawer.locator('[data-copilot-close]')).to_be_focused()
+            page.keyboard.press('Control+/')
+            playwright.expect(page.locator('#shortcut-opener')).to_be_focused()
+            page.evaluate("""() => {
+                const modal = document.createElement('div');
+                modal.className = 'dialog';
+                document.body.append(modal);
+            }""")
+            page.keyboard.press('Control+/')
+            playwright.expect(drawer).to_be_hidden()
+            page.evaluate("document.querySelector('.dialog').remove()")
+            # Estonian Ctrl+Shift+7 produces '/' with Shift held.
+            page.dispatch_event('body', 'keydown', dict(key='/', ctrlKey=True, shiftKey=True))
+            playwright.expect(drawer).to_be_visible()
+            page.dispatch_event('body', 'keydown', dict(key='/', ctrlKey=True, altKey=True))
+            playwright.expect(drawer).to_be_visible()
+            page.dispatch_event('body', 'keydown', dict(key='/', ctrlKey=True, shiftKey=True))
+            playwright.expect(drawer).to_be_hidden()
+            for key in ['/', 'Control+Alt+/', 'Meta+/']:
+                page.keyboard.press(key)
+                playwright.expect(drawer).to_be_hidden()
+            page.keyboard.press('Control+/')
         page.evaluate("location.hash = 'invoices'")
         playwright.expect(composer).to_have_value("Explain these books")
         assert page.locator('[data-copilot-chat] select').count() == 1
         page.locator('[data-copilot-chat] button[type=submit]').click()
         playwright.expect(composer).to_have_value("")
+        playwright.expect(drawer.locator('.copilot-assistant p')).to_have_text('Synthetic reply')
+        playwright.expect(drawer.locator('[data-action=stageImport]')).to_be_visible()
         assert state["sent"] == [{"page": "invoices", "content": "Explain these books", "attachment_ids": []}]
+        if shortcut_case:
+            reads = state['reads']
+            assert drawer.locator('h2').all_text_contents()[0] == title_key
+            playwright.expect(drawer.locator('.copilot-send')).to_be_disabled()
+            drawer.locator('.copilot-attach').click()
+            drawer.locator('select').select_option('doc')
+            playwright.expect(drawer.locator('[data-copilot-attachment]')).to_contain_text('Synthetic.pdf')
+            drawer.locator('[data-copilot-attachment] button').click()
+            playwright.expect(drawer.locator('[data-copilot-attachment]')).to_be_hidden()
+            drawer.locator('.copilot-attach').click()
+            drawer.locator('select').select_option('doc')
+            state['fail'] = True
+            composer.fill('Try this')
+            composer.press('Shift+Enter')
+            composer.type('with a newline')
+            assert len(state['sent']) == 1
+            composer.press('Enter')
+            playwright.expect(drawer.locator('.copilot-error')).to_be_visible()
+            playwright.expect(composer).to_have_value('Try this\nwith a newline')
+            playwright.expect(drawer.locator('[data-copilot-attachment]')).to_contain_text('Synthetic.pdf')
+            state['fail'] = False
+            drawer.locator('.copilot-error button').click()
+            playwright.expect(drawer.locator('.copilot-assistant p').last).to_have_text('Synthetic reply')
+            playwright.expect(composer).to_have_value('')
+            assert state['sent'][-1]['attachment_ids'] == ['doc']
+            assert state['reads'] == reads
+            # Hold the POST in the browser so the pending state is observable.
+            page.evaluate("""() => {
+                const original = window.fetch;
+                window.fetch = (url, options) => options?.method === 'POST' && url.endsWith('/copilot/messages')
+                    ? new Promise(resolve => { window.finishCopilot = () => resolve(original(url, options)); })
+                    : original(url, options);
+            }""")
+            composer.fill('A longer question\n' * 20)
+            assert composer.evaluate('(el) => el.clientHeight') <= 192
+            composer.press('Enter')
+            playwright.expect(drawer.locator('.copilot-typing')).to_be_visible()
+            playwright.expect(drawer.locator('.copilot-send')).to_be_disabled()
+            playwright.expect(composer).to_have_value('')
+            assert drawer.locator('.copilot-user').last.inner_text().startswith('A longer question')
+            page.emulate_media(reduced_motion='reduce')
+            assert drawer.locator('.copilot-typing span').first.evaluate('(el) => getComputedStyle(el).animationName') == 'none'
+            page.evaluate('window.finishCopilot()')
+            playwright.expect(drawer.locator('.copilot-typing')).to_have_count(0)
+            playwright.expect(composer).to_be_enabled()
+            assert drawer.locator('#copilot-transcript').evaluate('(el) => el.scrollHeight - el.scrollTop - el.clientHeight') <= 1
+            assert state['reads'] == reads
+            page.screenshot(path=str(tmp_path / 'chat-mobile.png'))
+            page.reload()
+            toggle.click()
+            playwright.expect(drawer.locator('[data-suggestion]')).to_have_count(3)
+            drawer.locator('[data-suggestion]').first.click()
+            playwright.expect(drawer.locator('.copilot-assistant p')).to_have_text('Synthetic reply')
+            assert state['sent'][-1]['content'] == 'Summarise overdue invoices'
+            assert not errors
+        if shortcut_case:
+            # Exercise the macOS platform source and blocked-storage fallback together.
+            page.add_init_script("""
+            for (const method of ['getItem', 'setItem']) {
+                const original = Storage.prototype[method];
+                Storage.prototype[method] = function(key, ...args) {
+                    if (key === 'fastaccounts_copilot_shortcut_hint_seen') {
+                        throw new Error('Storage unavailable');
+                    }
+                    return original.call(this, key, ...args);
+                };
+            }
+            """)
+            page.goto('http://workspace.test/app?mac#invoices')
+            playwright.expect(toggle).to_be_visible()
+            playwright.expect(toggle).to_have_attribute('aria-keyshortcuts', 'Meta+/')
+            playwright.expect(toggle).to_have_attribute('title', 'Open AI copilot (⌘/)')
+            toggle.focus()
+            page.keyboard.press('Control+/')
+            playwright.expect(drawer).to_be_hidden()
+            page.keyboard.press('Meta+/')
+            playwright.expect(drawer.locator('[data-copilot-close]')).to_be_focused()
+            playwright.expect(hint.locator('kbd')).to_have_text('⌘/')
+            hint.get_by_role('button', name='Got it', exact=True).click()
+            page.keyboard.press('Meta+/')
+            playwright.expect(drawer).to_be_hidden()
+            page.keyboard.press('Meta+/')
+            playwright.expect(drawer).to_be_visible()
+            playwright.expect(hint).to_have_count(0)
+            page.route('**/api/organisations', lambda route: route.fulfill(json=[]))
+            page.reload()
+            playwright.expect(toggle).to_be_hidden()
+            page.keyboard.press('Meta+/')
+            playwright.expect(drawer).to_be_hidden()
         assert not errors
         browser.close()
 

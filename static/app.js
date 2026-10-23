@@ -149,6 +149,9 @@
     tag: "M3.5 11.5V4h7.5l9 9-7.5 7.5z M8 8.5h.01",
     appearance: "M4 7h9 M17 7h3 M4 17h3 M11 17h9 M15 4.5v5 M9 14.5v5",
     assistant: "M11 3.5c.6 3.9 2.6 5.9 6.5 6.5-3.9.6-5.9 2.6-6.5 6.5-.6-3.9-2.6-5.9-6.5-6.5 3.9-.6 5.9-2.6 6.5-6.5z M18.5 15.5v5 M16 18h5",
+    send: "M12 19V5 M5 12l7-7 7 7",
+    gear: "M9 3h6l.5 3 2 .9 2.5-1.4 3 5-2.5 1.5v2L23 15.5l-3 5-2.5-1.4-2 .9-.5 3H9l-.5-3-2-.9L4 20.5l-3-5L3.5 14v-2L1 10.5l3-5L6.5 7l2-.9z M15 13a3 3 0 1 1-6 0 3 3 0 0 1 6 0",
+    paperclip: "M8 12l6-6a3 3 0 0 1 4 4l-8 8a5 5 0 0 1-7-7l8-8 M6 14l8-8",
     document: "M6 3h8l4 4v14H6z M14 3v4h4",
     plus: "M12 5v14 M5 12h14",
     close: "M6 6l12 12 M18 6 6 18",
@@ -639,6 +642,10 @@
       .join("")}</svg>`;
   }
   let copilotDrawer, copilotBody, copilotToggle, copilotOrg, copilotTicket = 0, copilotReturnFocus;
+  const copilotMac = /mac/i.test(navigator.userAgentData?.platform || navigator.platform);
+  const copilotShortcut = copilotMac ? '⌘/' : 'Ctrl+/';
+  const copilotHintKey = 'fastaccounts_copilot_shortcut_hint_seen';
+  let copilotHintSeen = false;
   const currentPage = () => {
     const key = location.hash.slice(1).split('/')[0] || 'overview';
     return Object.hasOwn(views, key) ? key : 'overview';
@@ -649,27 +656,58 @@
     copilotToggle.setAttribute('aria-expanded', 'false');
     (copilotReturnFocus?.isConnected ? copilotReturnFocus : copilotToggle).focus();
   }
+  function openCopilot() {
+    if (!org || copilotToggle.hidden || !copilotDrawer.hidden) return;
+    copilotReturnFocus = document.activeElement;
+    copilotDrawer.hidden = false;
+    copilotToggle.setAttribute('aria-expanded', 'true');
+    if (!copilotHintSeen) {
+      try { copilotHintSeen = !!localStorage.getItem(copilotHintKey); } catch {}
+      if (!copilotHintSeen) {
+        const hint = document.createElement('div');
+        hint.className = 'copilot-shortcut-hint';
+        hint.innerHTML = `<p>${tr('Tip: press {shortcut} to open or close the copilot from any page.').replace('{shortcut}', `<kbd>${copilotShortcut}</kbd>`)}</p><button type="button" class="button" data-copilot-hint-dismiss>${tr('Got it')}</button>`;
+        copilotDrawer.querySelector('.copilot-description').after(hint);
+        hint.querySelector('button').onclick = () => hint.remove();
+        copilotHintSeen = true;
+        try { localStorage.setItem(copilotHintKey, 'true'); } catch {}
+      }
+    }
+    copilotDrawer.querySelector('[data-copilot-close]').focus();
+    if (!copilotBody.childElementCount) loadCopilot();
+    else scrollCopilot();
+  }
+  function toggleCopilot() {
+    if (copilotDrawer.hidden) openCopilot();
+    else closeCopilot();
+  }
   function syncCopilot() {
     if (!copilotDrawer) {
       const shell = document.createElement('div');
       shell.innerHTML = `<button type="button" class="button primary copilot-toggle" aria-label="${tr('Open AI copilot')}" aria-controls="copilot-drawer" aria-expanded="false">${icon('assistant')}${tr('AI copilot')}</button>` +
-        `<aside id="copilot-drawer" class="copilot-drawer" role="dialog" aria-labelledby="copilot-title" hidden><header class="copilot-header"><h2 id="copilot-title">${tr('AI copilot')}</h2><button type="button" class="button" data-copilot-close aria-label="${tr('Close AI copilot')}">&times;</button></header>` +
+        `<aside id="copilot-drawer" class="copilot-drawer" role="dialog" aria-labelledby="copilot-title" hidden><header class="copilot-header"><h2 id="copilot-title">${tr('AI copilot')}</h2><button type="button" class="button" data-copilot-gear hidden aria-label="${tr('Copilot administration')}" aria-controls="copilot-admin" aria-expanded="false">${icon('gear')}</button><button type="button" class="button" data-copilot-close aria-label="${tr('Close AI copilot')}">&times;</button></header>` +
         `<p class="muted copilot-description">${tr('Ask about your books, scan documents and draft staged imports. The copilot never changes records on its own.')}</p><div class="copilot-body"></div></aside>`;
       app.append(shell);
       copilotDrawer = shell.querySelector('#copilot-drawer');
       copilotBody = shell.querySelector('.copilot-body');
       copilotToggle = shell.querySelector('.copilot-toggle');
-      copilotToggle.onclick = () => {
-        if (!copilotDrawer.hidden) return closeCopilot();
-        copilotReturnFocus = document.activeElement;
-        copilotDrawer.hidden = false;
-        copilotToggle.setAttribute('aria-expanded', 'true');
-        copilotDrawer.querySelector('[data-copilot-close]').focus();
-        if (!copilotBody.childElementCount) loadCopilot();
-      };
+      copilotToggle.setAttribute('aria-keyshortcuts', copilotMac ? 'Meta+/' : 'Control+/');
+      copilotToggle.title = t('Open AI copilot ({shortcut})').replace('{shortcut}', copilotShortcut);
+      shell.querySelector('[data-copilot-close]').title = t('Close AI copilot ({shortcut})').replace('{shortcut}', copilotShortcut);
+      copilotToggle.onclick = toggleCopilot;
       shell.querySelector('[data-copilot-close]').onclick = closeCopilot;
+      shell.querySelector('[data-copilot-gear]').onclick = () => {
+        const panel = copilotBody.querySelector('[data-copilot-admin]');
+        if (panel) panel.open = !panel.open;
+      };
       document.addEventListener('keydown', (event) => {
         if (event.key === 'Escape' && !document.querySelector('.dialog')) closeCopilot();
+        if (event.key === '/' && (copilotMac ? event.metaKey : event.ctrlKey) &&
+            !event.altKey && org && !copilotToggle.hidden &&
+            !document.querySelector('.dialog')) {
+          event.preventDefault();
+          toggleCopilot();
+        }
       });
     }
     copilotToggle.hidden = !org;
@@ -707,11 +745,16 @@
       if (ticket === copilotTicket) copilotBody.removeAttribute('aria-busy');
     }
   }
+  function scrollCopilot() {
+    const list = copilotBody.querySelector('#copilot-transcript');
+    if (list) list.scrollTop = list.scrollHeight;
+  }
   function copilotTranscript(messages) {
-    if (!messages.length) return `<p class="muted">${tr('No copilot messages yet.')}</p>`;
     return messages.map((x) => {
       const stage = x.stage_proposal_json ? JSON.parse(x.stage_proposal_json) : null;
-      return `<article class="copilot-message copilot-${esc(x.role)}"><p>${esc(x.content)}</p><p class="muted">${esc(date(x.created_at))} · ${tr('Input tokens')}: ${num(x.tokens_in)} · ${tr('Output tokens')}: ${num(x.tokens_out)}</p>` +
+      return `<article class="copilot-message copilot-${esc(x.role)}" title="${esc(x.created_at)}">` +
+        (x.role === 'assistant' ? `<span class="copilot-author">${icon('assistant')}${tr('AI copilot')}</span>` : '') +
+        `<p>${esc(x.content)}</p>` +
         (stage ? button(tr('Stage {rows} rows for import').replace('{rows}', stage.rows ?? '?'), 'stageImport', false, `data-id="${esc(x.id)}" ${canEditMappings() ? '' : 'disabled'}`) : '') +
         `</article>`;
     }).join('');
@@ -734,9 +777,14 @@
       : accessLine || `${tr('Used today')}: ${quotaLine}`;
     const stages = Object.fromEntries((history || []).filter((x) => x.stage_proposal_json)
       .map((x) => [x.id, JSON.parse(x.stage_proposal_json)]));
-    const composer = form(`<label class="full-width">${tr('Message')}<textarea name="content" rows="3" maxlength="8000" required></textarea><span class="field-error" data-error="content"></span></label>` +
-        select('Attach document', 'attachment_id', [['', tr('No attachment')], ...docs.map((d) => [d.id, `${d.filename} ${date(d.created_at)}`])], ''),
-      'Send message');
+    const suggestions = ['Summarise overdue invoices', 'What needs my attention this week?', 'Explain my VAT position'];
+    const empty = `<div class="copilot-empty"><p>${esc(active ? t('How can I help with your books?') : notice)}</p>` +
+      (active ? `<div class="copilot-suggestions">${suggestions.map((text) => `<button type="button" class="button" data-suggestion="${tr(text)}">${tr(text)}</button>`).join('')}</div>` : '') + `</div>`;
+    const composer = `<form class="copilot-composer"><div data-copilot-attachment hidden></div><div class="copilot-compose-row">` +
+      `<button type="button" class="button copilot-attach" aria-label="${tr('Attach document')}" aria-expanded="false" aria-controls="copilot-documents">${icon('paperclip')}</button>` +
+      `<textarea name="content" rows="1" maxlength="8000" aria-label="${tr('Message')}" placeholder="${tr('Ask about your books')}" required></textarea>` +
+      `<button type="submit" class="button primary copilot-send" aria-label="${tr('Send message')}" disabled>${icon('send')}</button></div>` +
+      `<div class="copilot-attachments" hidden><select id="copilot-documents" aria-label="${tr('Attach document')}"><option value="">${tr('No attachment')}</option>${docs.map((d) => `<option value="${esc(d.id)}">${esc(d.filename)}</option>`).join('')}</select></div></form>`;
     const usageUsage = usage
       ? `<section class="section" data-copilot-usage><h2>${tr('Copilot usage')}</h2><p class="muted">${tr('Per-user daily usage counts every message, scan and token billed to this organisation.')}</p>` +
         table(['Day', 'User', 'Messages', 'Scans', 'Input tokens', 'Output tokens'],
@@ -760,9 +808,9 @@
         form(field('Grant member email', 'grant_email', '', 'email', 'required maxlength="320"'), 'Grant access') +
       `</section>` : '';
     const body = `<p class="muted" data-copilot-notice aria-live="polite">${esc(notice)}</p>` +
-      (admins ? `<details data-copilot-admin><summary>${tr('Copilot administration')}</summary><section class="section" data-copilot-settings>` +
+      (admins ? `<details id="copilot-admin" data-copilot-admin><summary>${tr('Copilot administration')}</summary><section class="section" data-copilot-settings>` +
         form(check('Enable AI copilot for this organisation', 'copilot_enabled', !!status.enabled)) + `</section>` + grantsPanel + usageUsage + `</details>` : '') +
-      `<section class="section" data-copilot-chat><h2>${tr('Conversation')}</h2><div id="copilot-transcript" aria-live="polite">${copilotTranscript(history || [])}</div>` + composer + `</section>`;
+      `<section data-copilot-chat><div id="copilot-transcript" role="log" aria-live="polite" aria-relevant="additions text">${history?.length ? copilotTranscript([...history].reverse()) : empty}</div>` + composer + `</section>`;
     if (!c.mount(body)) return;
     copilotBody.querySelectorAll('[data-action=cancel]').forEach((x) => x.remove());
     if (!active) copilotBody.querySelectorAll('[data-copilot-chat] textarea, [data-copilot-chat] select, [data-copilot-chat] button').forEach((x) => { x.disabled = true; });
@@ -785,18 +833,110 @@
         await loadCopilot();
       })});
     }
-    bindForm(copilotBody.querySelector('[data-copilot-chat]'), async (data) => {
-      const payload = {page: currentPage(), content: data.content, attachment_ids: data.attachment_id ? [data.attachment_id] : []};
-      await post(c.url('/copilot/messages'), payload);
-      toast(t('Copilot replied'));
-      await loadCopilot();
-    });
-    bindActions(copilotBody, {stageImport: (b) => confirmAction(tr('Stage import rows'), tr('Review these rows in Data import before they touch your books. Stage them now?'), async () => {
-      const proposal = stages[b.dataset.id] || {};
-      await post(c.url('/copilot/stage'), {kind: proposal.kind, csv_content: proposal.csv, message_id: b.dataset.id});
-      toast(t('Import batch staged. Review it under Data import.'));
-      await loadCopilot();
-    })});
+    const panel = copilotBody.querySelector('[data-copilot-admin]');
+    const gear = copilotDrawer.querySelector('[data-copilot-gear]');
+    gear.hidden = !admins;
+    if (panel) {
+      const syncGear = () => gear.setAttribute('aria-expanded', String(panel.open));
+      panel.addEventListener('toggle', syncGear);
+      syncGear();
+    }
+    const chat = copilotBody.querySelector('[data-copilot-chat]');
+    const list = chat.querySelector('#copilot-transcript');
+    const chatForm = chat.querySelector('form');
+    const textarea = chatForm.querySelector('textarea');
+    const send = chatForm.querySelector('[type=submit]');
+    const attach = chatForm.querySelector('.copilot-attach');
+    const picker = chatForm.querySelector('select');
+    const menu = chatForm.querySelector('.copilot-attachments');
+    const chip = chatForm.querySelector('[data-copilot-attachment]');
+    let sending = false;
+    const resize = () => {
+      textarea.style.height = 'auto';
+      textarea.style.height = `${Math.min(textarea.scrollHeight, 192)}px`;
+      send.disabled = !active || sending || !textarea.value.trim();
+    };
+    textarea.oninput = resize;
+    attach.onclick = () => {
+      menu.hidden = !menu.hidden;
+      attach.setAttribute('aria-expanded', String(!menu.hidden));
+      if (!menu.hidden) picker.focus();
+    };
+    const chooseAttachment = () => {
+      chip.hidden = !picker.value;
+      chip.innerHTML = picker.value ? `<span>${esc(picker.selectedOptions[0].textContent)}</span><button type="button" class="button" aria-label="${tr('Remove attachment')}">${icon('close')}</button>` : '';
+      const remove = chip.querySelector('button');
+      if (remove) remove.onclick = () => { picker.value = ''; chooseAttachment(); textarea.focus(); };
+      menu.hidden = true;
+      attach.setAttribute('aria-expanded', 'false');
+    };
+    picker.onchange = () => { chooseAttachment(); textarea.focus(); };
+    const sendMessage = async (draft = textarea.value, attachment = picker.value) => {
+      if (!active || sending || !draft.trim()) return;
+      sending = true;
+      list.querySelector('.copilot-empty')?.remove();
+      list.insertAdjacentHTML('beforeend', copilotTranscript([{role: 'user', content: draft, created_at: new Date().toISOString()}]));
+      const userBubble = list.lastElementChild;
+      list.insertAdjacentHTML('beforeend', `<article class="copilot-message copilot-assistant"><span class="copilot-author">${icon('assistant')}${tr('AI copilot')}</span><div class="copilot-typing" aria-label="${tr('Thinking')}"><span></span><span></span><span></span></div></article>`);
+      const pending = list.lastElementChild;
+      textarea.value = '';
+      picker.value = '';
+      chooseAttachment();
+      chatForm.querySelectorAll('textarea, button, select').forEach((x) => { x.disabled = true; });
+      resize();
+      scrollCopilot();
+      try {
+        const reply = await post(c.url('/copilot/messages'), {page: currentPage(), content: draft, attachment_ids: attachment ? [attachment] : []});
+        if (!chat.isConnected) return;
+        userBubble.outerHTML = copilotTranscript([reply.user_message]);
+        if (reply.stage) {
+          stages[reply.assistant.id] = reply.stage;
+          reply.assistant.stage_proposal_json = JSON.stringify(reply.stage);
+        }
+        pending.outerHTML = copilotTranscript([reply.assistant]);
+        status.quotas.user_messages++;
+        copilotBody.querySelector('[data-copilot-notice]').textContent = `${t('Used today')}: ${num(status.quotas.user_messages)} / ${num(status.quotas.messages_per_user_day)}`;
+        bindStages();
+      } catch (error) {
+        if (!chat.isConnected) return;
+        pending.classList.add('copilot-error');
+        pending.innerHTML = `<span class="copilot-author">${icon('assistant')}${tr('AI copilot')}</span><p>${esc(error.message)}</p><button type="button" class="button">${tr('Retry')}</button>`;
+        pending.querySelector('button').onclick = () => {
+          if (sending) return;
+          pending.querySelector('button').disabled = true;
+          sendMessage(draft, attachment);
+        };
+        textarea.value = draft;
+        picker.value = attachment;
+        chooseAttachment();
+      } finally {
+        sending = false;
+        if (chat.isConnected) {
+          chatForm.querySelectorAll('textarea, button, select').forEach((x) => { x.disabled = !active; });
+          resize();
+          scrollCopilot();
+          if (!copilotDrawer.hidden) textarea.focus();
+        }
+      }
+    };
+    chatForm.onsubmit = (event) => { event.preventDefault(); sendMessage(); };
+    textarea.onkeydown = (event) => {
+      if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
+        event.preventDefault();
+        sendMessage();
+      }
+    };
+    chat.querySelectorAll('[data-suggestion]').forEach((b) => { b.onclick = () => sendMessage(b.dataset.suggestion); });
+    resize();
+    scrollCopilot();
+    function bindStages() {
+      bindActions(copilotBody, {stageImport: (b) => confirmAction(tr('Stage import rows'), tr('Review these rows in Data import before they touch your books. Stage them now?'), async () => {
+        const proposal = stages[b.dataset.id] || {};
+        await post(c.url('/copilot/stage'), {kind: proposal.kind, csv_content: proposal.csv, message_id: b.dataset.id});
+        toast(t('Import batch staged. Review it under Data import.'));
+      })});
+    }
+    bindStages();
   }
   const views = {
     overview: async (c) => {

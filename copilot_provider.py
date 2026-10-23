@@ -12,7 +12,7 @@ import os
 import httpx
 
 BASE_URL = "https://api.x.ai/v1/chat/completions"
-DEFAULT_MODEL = "grok-4.7"
+DEFAULT_MODEL = "grok-4-1-fast-reasoning"
 MAX_OUTPUT_TOKENS = 2048
 TIMEOUT_SECONDS = 60
 
@@ -50,11 +50,9 @@ def chat_completion(messages: list[dict], *, client: httpx.Client | None = None)
     finally:
         payload.clear()
         headers.clear()
-    if response.status_code == 401:
+    if response.status_code in (401, 403):
         raise CopilotProviderError("The AI provider rejected the configured API key.")
     if response.status_code != 200:
-        if response.status_code == 401 or response.status_code == 403:
-            raise CopilotProviderError("The AI provider rejected this key or request.")
         raise CopilotProviderError("The AI provider returned an error. Try again later.")
     try:
         body = response.json()
