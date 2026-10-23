@@ -21,7 +21,10 @@ delivered.
 - Validation: project-venv `pytest tests/test_copilot.py -q` passed all 60 tests,
   including offline Playwright checks. `node --check static/app.js`, Python 3.12
   syntax checks and `git diff --check` passed. The supplied venv runs Python
-  3.14.6; runtime validation on Python 3.12 remains a deployment check.
+  3.14.6; runtime validation on Python 3.12 remains a deployment check. The final
+  full `pytest -q` run was stopped at the 30-minute limit after reaching 97%,
+  with no failures reported and four skips. It did not complete; the focused
+  suite is the completed regression result.
 
 ## 2026-10-23: Organisation copilot credentials
 
