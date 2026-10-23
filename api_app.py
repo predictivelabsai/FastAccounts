@@ -10,7 +10,7 @@ from typing import Any, Literal
 from fastapi import Depends, FastAPI, File, Header, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.encoders import jsonable_encoder
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 import integrations
@@ -1071,10 +1071,6 @@ class CopilotStageIn(BaseModel):
     message_id: str | None = None
 
 
-class CopilotToggleIn(BaseModel):
-    enabled: bool
-
-
 @api.get('/organisations/{organisation_id}/copilot/status')
 def copilot_status(organisation_id: str, user: User = Depends(current_user)):
     _require(organisation_id, user, READ_ROLES)
@@ -1089,9 +1085,14 @@ def copilot_messages(organisation_id: str, limit: int = 50,
 
 
 @api.post('/organisations/{organisation_id}/copilot/messages', status_code=201)
-def copilot_send(organisation_id: str, payload: CopilotMessageIn,
+def copilot_send(organisation_id: str, payload: CopilotMessageIn, request: Request,
                  user: User = Depends(require_csrf)):
     _require(organisation_id, user, READ_ROLES)
+    if 'text/event-stream' in request.headers.get('accept', ''):
+        events = CopilotService().stream(organisation_id, user.email, payload.content,
+                                         attachment_ids=payload.attachment_ids, page=payload.page)
+        return StreamingResponse(events, media_type='text/event-stream',
+                                 headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
     return CopilotService().send(organisation_id, user.email, payload.content,
                                  attachment_ids=payload.attachment_ids, page=payload.page)
 
@@ -1124,7 +1125,8 @@ def copilot_documents(organisation_id: str, user: User = Depends(current_user)):
 
 
 class CopilotProviderSettingsIn(BaseModel):
-    api_key: str | None = Field(default=None, max_length=4096)
+    enabled: bool | None = None
+    api_key: Any = None  # Validated in the service without echoing secrets in validation errors.
     model: str | None = Field(default=None, max_length=128)
 
 
@@ -1138,15 +1140,14 @@ def copilot_provider_settings(organisation_id: str, user: User = Depends(current
 def copilot_update_provider_settings(organisation_id: str, payload: CopilotProviderSettingsIn,
                                      user: User = Depends(require_csrf)):
     _require(organisation_id, user, {'owner', 'administrator'})
-    return CopilotService().update_settings(organisation_id, **payload.model_dump(), actor=user.email)
+    service = CopilotService()
+    if payload.enabled is not None:
+        service.set_enabled(organisation_id, payload.enabled, actor=user.email)
+    if payload.api_key is not None or payload.model is not None:
+        return service.update_settings(organisation_id, api_key=payload.api_key,
+                                       model=payload.model, actor=user.email)
+    return service.status(organisation_id, user.email)
 
-
-@api.put('/organisations/{organisation_id}/copilot/settings')
-def copilot_settings(organisation_id: str, payload: CopilotToggleIn,
-                     user: User = Depends(require_csrf)):
-    _require(organisation_id, user, WRITE_ROLES & {'owner', 'administrator'})
-    CopilotService().set_enabled(organisation_id, payload.enabled, actor=user.email)
-    return CopilotService().status(organisation_id, user.email)
 
 
 class CopilotAccessIn(BaseModel):

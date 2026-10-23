@@ -749,12 +749,100 @@
     const list = copilotBody.querySelector('#copilot-transcript');
     if (list) list.scrollTop = list.scrollHeight;
   }
+  function copilotMarkdown(source) {
+    // Escape every provider character before adding our small, fixed tag allowlist.
+    const translated = String(source).split('\n').map((line) => t(line)).join('\n');
+    const clean = translated.replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, '')
+      .replace(/<!--[\s\S]*?-->/g, '').replace(/<[^>]*>/g, '');
+    function inline(text) {
+      const pattern = /(`[^`\n]+`|\*\*[^*\n]+\*\*|\*[^*\n]+\*|\[[^\]\n]+\]\([^\s)]+\))/g;
+      let result = '', offset = 0;
+      for (const match of text.matchAll(pattern)) {
+        result += esc(text.slice(offset, match.index));
+        const token = match[0];
+        if (token.startsWith('`')) result += `<code>${esc(token.slice(1, -1))}</code>`;
+        else if (token.startsWith('**')) result += `<strong>${esc(token.slice(2, -2))}</strong>`;
+        else if (token.startsWith('*')) result += `<em>${esc(token.slice(1, -1))}</em>`;
+        else {
+          const link = /^\[([^\]]+)\]\(([^)]+)\)$/.exec(token);
+          const safe = /^https?:\/\//i.test(link[2]);
+          result += safe ? `<a href="${esc(link[2])}" target="_blank" rel="noreferrer">${esc(link[1])}</a>` : esc(link[1]);
+        }
+        offset = match.index + token.length;
+      }
+      return result + esc(text.slice(offset));
+    }
+    const blocks = clean.split(/(```[^\n]*\n[\s\S]*?(?:```|$))/g);
+    return blocks.map((block) => {
+      if (block.startsWith('```')) {
+        const code = block.slice(block.indexOf('\n') + 1).replace(/```$/, '');
+        return `<pre><code>${esc(code)}</code></pre>`;
+      }
+      let html = '', paragraph = [], list = null;
+      const flush = () => { if (paragraph.length) html += `<p>${inline(paragraph.join('\n'))}</p>`; paragraph = []; };
+      const close = () => { if (list) html += `</${list}>`; list = null; };
+      for (const line of block.split('\n')) {
+        const bullet = /^\s*(?:([-*])|\d+\.)\s+(.+)$/.exec(line);
+        if (bullet) {
+          flush();
+          const tag = bullet[1] ? 'ul' : 'ol';
+          if (list !== tag) { close(); html += `<${tag}>`; list = tag; }
+          html += `<li>${inline(bullet[2])}</li>`;
+        } else {
+          close();
+          if (!line.trim()) flush();
+          else paragraph.push(line);
+        }
+      }
+      flush(); close();
+      return html;
+    }).join('');
+  }
+  async function copilotSend(url, payload, onDelta) {
+    if (typeof ReadableStream === 'undefined' || typeof TextDecoder === 'undefined') return post(url, payload);
+    let response;
+    try {
+      response = await api(url, {method: 'POST', body: JSON.stringify(payload), headers: {Accept: 'text/event-stream'}});
+    } catch (error) {
+      // Only negotiate again when the server rejected streaming before accepting a send.
+      if ([404, 405, 406, 415, 501].includes(error.status)) return post(url, payload);
+      throw error;
+    }
+    // Older servers ignore Accept and return the existing JSON result. Do not send twice.
+    if (!(response instanceof Response)) return response;
+    if (!response.body?.getReader || !response.headers.get('content-type')?.includes('text/event-stream')) {
+      throw new Error(t('The reply was interrupted. Please retry.'));
+    }
+    const reader = response.body.getReader(), decoder = new TextDecoder();
+    let buffer = '', result = null;
+    try {
+      while (true) {
+        const {value, done} = await reader.read();
+        buffer += decoder.decode(value || new Uint8Array(), {stream: !done});
+        buffer = buffer.replace(/\r\n/g, '\n');
+        let end;
+        while ((end = buffer.indexOf('\n\n')) !== -1) {
+          const frame = buffer.slice(0, end); buffer = buffer.slice(end + 2);
+          const kind = /^event: *([^\n]+)/m.exec(frame)?.[1];
+          const raw = frame.split('\n').filter((line) => line.startsWith('data:')).map((line) => line.slice(5).trimStart()).join('\n');
+          if (!raw) continue;
+          const data = JSON.parse(raw);
+          if (kind === 'delta') onDelta(data.text);
+          if (kind === 'done') result = data;
+        }
+        if (done) break;
+      }
+      if (!result) throw new Error(t('The reply was interrupted. Please retry.'));
+      return result;
+    } finally { reader.releaseLock(); }
+  }
   function copilotTranscript(messages) {
     return messages.map((x) => {
       const stage = x.stage_proposal_json ? JSON.parse(x.stage_proposal_json) : null;
       return `<article class="copilot-message copilot-${esc(x.role)}" title="${esc(x.created_at)}">` +
         (x.role === 'assistant' ? `<span class="copilot-author">${icon('assistant')}${tr('AI copilot')}</span>` : '') +
-        `<p>${esc(x.content)}</p>` +
+        (x.role === 'assistant' ? `<div class="copilot-markdown">${copilotMarkdown(x.content)}</div><button type="button" class="button copilot-copy" data-copy="${esc(x.content)}" aria-label="${tr('Copy reply')}">${tr('Copy reply')}</button>` : `<p>${esc(x.content)}</p>`) +
+        (x.retryable ? `<button type="button" class="button" data-retry="${esc(x.id)}">${tr('Retry')}</button>` : '') +
         (stage ? button(tr('Stage {rows} rows for import').replace('{rows}', stage.rows ?? '?'), 'stageImport', false, `data-id="${esc(x.id)}" ${canEditMappings() ? '' : 'disabled'}`) : '') +
         `</article>`;
     }).join('');
@@ -822,7 +910,7 @@
     if (!active) copilotBody.querySelectorAll('[data-copilot-chat] textarea, [data-copilot-chat] select, [data-copilot-chat] button').forEach((x) => { x.disabled = true; });
     const enabledCheck = copilotBody.querySelector('[name=copilot_enabled]');
     if (enabledCheck) bindForm(copilotBody.querySelector('[data-copilot-settings]'), async () => {
-      await post(c.url('/copilot/settings'), {enabled: !!enabledCheck.checked}, 'PUT');
+      await post(c.url('/copilot/settings'), {enabled: !!enabledCheck.checked});
       toast(t('Saved successfully'));
       await loadCopilot();
     });
@@ -859,6 +947,15 @@
     }
     const chat = copilotBody.querySelector('[data-copilot-chat]');
     const list = chat.querySelector('#copilot-transcript');
+    list.addEventListener('click', async (event) => {
+      const copy = event.target.closest('[data-copy]');
+      if (!copy) return;
+      try {
+        await navigator.clipboard.writeText(copy.dataset.copy);
+        copy.textContent = t('Reply copied');
+        copy.setAttribute('aria-label', t('Reply copied'));
+      } catch (_) { toast(t('Could not copy the reply. Please select and copy the text.'), 'error'); }
+    });
     const chatForm = chat.querySelector('form');
     const textarea = chatForm.querySelector('textarea');
     const send = chatForm.querySelector('[type=submit]');
@@ -901,8 +998,30 @@
       chatForm.querySelectorAll('textarea, button, select').forEach((x) => { x.disabled = true; });
       resize();
       scrollCopilot();
+      let streamedText = '';
       try {
-        const reply = await post(c.url('/copilot/messages'), {page: currentPage(), content: draft, attachment_ids: attachment ? [attachment] : []});
+        const reply = await copilotSend(c.url('/copilot/messages'), {page: currentPage(), content: draft, attachment_ids: attachment ? [attachment] : []}, (delta) => {
+          streamedText += delta;
+          if (!chat.isConnected) return;
+          let text = pending.querySelector('.copilot-markdown');
+          if (!text) {
+            pending.querySelector('.copilot-typing')?.remove();
+            text = document.createElement('div'); text.className = 'copilot-markdown'; pending.append(text);
+          }
+          text.innerHTML = copilotMarkdown(streamedText);
+          scrollCopilot();
+        });
+        if (!chat.isConnected) return;
+        if (reply.quota_consumed ?? !reply.retryable) {
+          status.quotas.user_messages++;
+          copilotBody.querySelector('[data-copilot-notice]').textContent = `${t('Used today')}: ${num(status.quotas.user_messages)} / ${num(status.quotas.messages_per_user_day)}`;
+        }
+        if (reply.retryable) {
+          streamedText = reply.assistant.content;
+          const failure = new Error(translateError(reply.error));
+          failure.partial = true;
+          throw failure;
+        }
         if (!chat.isConnected) return;
         userBubble.outerHTML = copilotTranscript([reply.user_message]);
         if (reply.stage) {
@@ -910,13 +1029,16 @@
           reply.assistant.stage_proposal_json = JSON.stringify(reply.stage);
         }
         pending.outerHTML = copilotTranscript([reply.assistant]);
-        status.quotas.user_messages++;
-        copilotBody.querySelector('[data-copilot-notice]').textContent = `${t('Used today')}: ${num(status.quotas.user_messages)} / ${num(status.quotas.messages_per_user_day)}`;
         bindStages();
       } catch (error) {
         if (!chat.isConnected) return;
         pending.classList.add('copilot-error');
         pending.innerHTML = `<span class="copilot-author">${icon('assistant')}${tr('AI copilot')}</span><p>${esc(error.message)}</p><button type="button" class="button">${tr('Retry')}</button>`;
+        if (streamedText) {
+          pending.querySelector('p').outerHTML = `<div class="copilot-markdown">${copilotMarkdown(streamedText)}</div>` +
+            (error.partial ? '' : `<p role="alert">${esc(error.message)}</p>`);
+          pending.insertAdjacentHTML('beforeend', `<button type="button" class="button copilot-copy" data-copy="${esc(streamedText)}" aria-label="${tr('Copy reply')}">${tr('Copy reply')}</button>`);
+        }
         pending.querySelector('button').onclick = () => {
           if (sending) return;
           pending.querySelector('button').disabled = true;
@@ -935,6 +1057,14 @@
         }
       }
     };
+    list.addEventListener('click', (event) => {
+      const retry = event.target.closest('[data-retry]');
+      if (!retry || sending) return;
+      const ordered = [...history].reverse();
+      const index = ordered.findIndex((message) => message.id === retry.dataset.retry);
+      const question = ordered.slice(0, index).reverse().find((message) => message.role === 'user');
+      if (question) sendMessage(question.content, JSON.parse(question.attachment_ids_json || '[]')[0] || '');
+    });
     chatForm.onsubmit = (event) => { event.preventDefault(); sendMessage(); };
     textarea.onkeydown = (event) => {
       if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {

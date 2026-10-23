@@ -2,6 +2,7 @@
 from io import BytesIO
 from pathlib import Path
 import socket
+import json
 from urllib.parse import urlsplit
 
 import pytest
@@ -72,7 +73,7 @@ def env(tmp_path, monkeypatch):
 
 
 def enable(d):
-    response = d["client"].put(d["base"] + "/copilot/settings", json={"enabled": True})
+    response = d["client"].post(d["base"] + "/copilot/settings", json={"enabled": True})
     assert response.status_code == 200, response.text
 
 
@@ -129,11 +130,11 @@ def test_org_opt_in_toggle_roles_and_audit(env):
     assert status["available"] is True and status["enabled"] is False
     assert d["client"].post(d["base"] + "/copilot/messages", json={"content": "hi"}).status_code == 409
     enable(d)
-    assert d["client"].put(d["base"] + "/copilot/settings", json={"enabled": False}).status_code == 200
+    assert d["client"].post(d["base"] + "/copilot/settings", json={"enabled": False}).status_code == 200
     events = d["db"].rows("SELECT action FROM audit_events WHERE action LIKE 'copilot.%' ORDER BY created_at")
     assert [row["action"] for row in events] == ["copilot.settings_updated", "copilot.settings_updated"]
     for user_email in ("viewer@example.test", "accountant@example.test", "approver@example.test"):
-        response = d["client"].put(d["base"] + "/copilot/settings", json={"enabled": True},
+        response = d["client"].post(d["base"] + "/copilot/settings", json={"enabled": True},
                                    headers={"X-Test-User": user_email})
         assert response.status_code == 403, (user_email, response.text)
 
@@ -586,6 +587,7 @@ def test_workspace_copilot_drawer_offline(language, role, monkeypatch, tmp_path)
             # Hold the POST in the browser so the pending state is observable.
             page.evaluate("""() => {
                 const original = window.fetch;
+                window.originalCopilotFetch = original;
                 window.fetch = (url, options) => options?.method === 'POST' && url.endsWith('/copilot/messages')
                     ? new Promise(resolve => { window.finishCopilot = () => resolve(original(url, options)); })
                     : original(url, options);
@@ -605,6 +607,81 @@ def test_workspace_copilot_drawer_offline(language, role, monkeypatch, tmp_path)
             assert drawer.locator('#copilot-transcript').evaluate('(el) => el.scrollHeight - el.scrollTop - el.clientHeight') <= 1
             assert state['reads'] == reads
             page.screenshot(path=str(tmp_path / 'chat-mobile.png'))
+            # Exercise incremental SSE, Markdown sanitisation and clipboard without a server.
+            page.evaluate("""() => {
+                Object.defineProperty(navigator, 'clipboard', {configurable: true,
+                    value: {writeText: async (text) => { window.copiedReply = text; }}});
+                window.fetch = (url, options) => options?.method === 'POST' && url.endsWith('/copilot/messages')
+                    ? Promise.resolve(new Response(new ReadableStream({start(controller) {
+                        window.pushCopilot = (kind, data) => controller.enqueue(new TextEncoder().encode(
+                            'event: ' + kind + '\\ndata: ' + JSON.stringify(data) + '\\n\\n'));
+                        window.endCopilot = () => controller.close();
+                    }}), {headers: {'Content-Type': 'text/event-stream'}}))
+                    : window.originalCopilotFetch(url, options);
+            }""")
+            composer.fill('Stream this')
+            composer.press('Enter')
+            playwright.expect(drawer.locator('.copilot-typing')).to_be_visible()
+            page.evaluate("window.pushCopilot('delta', {text: '**First** *part* `code`'})")
+            playwright.expect(drawer.locator('.copilot-markdown strong').last).to_have_text('First')
+            playwright.expect(drawer.locator('.copilot-markdown em').last).to_have_text('part')
+            playwright.expect(composer).to_be_disabled()
+            markdown = ('**First** *part* `code`\n\n- One\n- Two\n\n1. Numbered\n\n'
+                        '```python\nprint(1)\n```\n'
+                        '[Safe](https://example.test) [Bad](javascript:alert) '
+                        '<script>window.injected=true</script><img src=x onerror="window.injected=true">')
+            page.evaluate("text => window.pushCopilot('delta', {text})", markdown[len('**First** *part* `code`'):])
+            playwright.expect(drawer.locator('.copilot-markdown ul').last.locator('li')).to_have_count(2)
+            playwright.expect(drawer.locator('.copilot-markdown ol').last.locator('li')).to_have_count(1)
+            playwright.expect(drawer.locator('.copilot-markdown pre code').last).to_contain_text('print(1)')
+            assert drawer.locator('.copilot-markdown script, .copilot-markdown img').count() == 0
+            assert page.evaluate('window.injected') is None
+            safe = drawer.locator('.copilot-markdown a').last
+            playwright.expect(safe).to_have_attribute('rel', 'noreferrer')
+            playwright.expect(safe).to_have_attribute('target', '_blank')
+            page.evaluate("""text => {
+                window.pushCopilot('done', {user_message: {role: 'user', content: 'Stream this'},
+                    assistant: {id: 'stream', role: 'assistant', content: text}, stage: null});
+                window.endCopilot();
+            }""", markdown)
+            playwright.expect(composer).to_be_enabled()
+            drawer.locator('[data-copy]').last.click()
+            assert page.evaluate('window.copiedReply') == markdown
+            playwright.expect(drawer.locator('[data-copy]').last).to_have_text('Reply copied')
+            composer.fill('Interrupted stream')
+            composer.press('Enter')
+            playwright.expect(composer).to_be_disabled()
+            page.evaluate("""() => {
+                window.pushCopilot('delta', {text: 'Partial reply'});
+                window.pushCopilot('done', {retryable: true, error: 'The reply was interrupted. Please retry.',
+                    assistant: {content: 'Partial reply\\n\\nThe reply was interrupted. Please retry.'}});
+                window.endCopilot();
+            }""")
+            playwright.expect(drawer.locator('.copilot-error').last).to_contain_text('Partial reply')
+            playwright.expect(composer).to_have_value('Interrupted stream')
+            # A rejected streaming negotiation falls back once, without an optimistic duplicate.
+            page.evaluate("""() => {
+                window.fallbackRequests = [];
+                window.fetch = (url, options) => {
+                    if (options?.method === 'POST' && url.endsWith('/copilot/messages')) {
+                        window.fallbackRequests.push(options.headers.Accept || 'json');
+                        if (options.headers.Accept) return Promise.resolve(new Response('{}', {status: 406}));
+                    }
+                    return window.originalCopilotFetch(url, options);
+                };
+            }""")
+            drawer.locator('.copilot-error').last.locator('button').first.click()
+            playwright.expect(composer).to_have_value('')
+            playwright.expect(composer).to_be_enabled()
+            assert page.evaluate('window.fallbackRequests') == ['text/event-stream', 'json']
+            # A browser without a readable stream sends JSON directly.
+            page.evaluate("window.ReadableStream = undefined; window.fallbackRequests = []")
+            composer.fill('Legacy browser')
+            composer.press('Enter')
+            playwright.expect(composer).to_have_value('')
+            playwright.expect(composer).to_be_enabled()
+            assert page.evaluate('window.fallbackRequests') == ['json']
+
             page.reload()
             toggle.click()
             playwright.expect(drawer.locator('[data-suggestion]')).to_have_count(3)
@@ -715,8 +792,8 @@ def test_disabled_org_blocks_even_admins(env, monkeypatch):
     d = env
     provider, call = fake_reply("ok")
     monkeypatch.setattr(copilot, "chat_completion", provider)
-    assert d["client"].put(d["base"] + "/copilot/settings", json={"enabled": True}).status_code == 200
-    assert d["client"].put(d["base"] + "/copilot/settings", json={"enabled": False}).status_code == 200
+    assert d["client"].post(d["base"] + "/copilot/settings", json={"enabled": True}).status_code == 200
+    assert d["client"].post(d["base"] + "/copilot/settings", json={"enabled": False}).status_code == 200
     response = d["client"].post(d["base"] + "/copilot/messages", json={"content": "hi"})
     assert response.status_code == 409 and "off for this organisation" in response.text
     assert call["captured"] is None
@@ -761,3 +838,191 @@ def test_provider_settings_admin_only(env, role):
         response = getattr(env["client"], method)(env["base"] + "/copilot/settings",
             headers={"X-Test-User": role + "@example.test"}, **kwargs)
         assert response.status_code == 403
+
+
+class FakeSSE(httpx.SyncByteStream):
+    def __init__(self, events, *, fail=False):
+        self.events, self.fail = events, fail
+
+    def __iter__(self):
+        yield b': keepalive\r\n\r\n'
+        for event in self.events:
+            raw = event if isinstance(event, str) else json.dumps(event)
+            frame = ('data: ' + raw + '\r\n\r\n').encode()
+            # Deliberately split SSE fields and UTF-8 characters across HTTP chunks.
+            for start in range(0, len(frame), 7):
+                yield frame[start:start + 7]
+        if self.fail:
+            raise httpx.ReadError('synthetic private error')
+
+
+def streaming_transport(monkeypatch, events, *, fail=False, status=200):
+    seen = []
+    def respond(request):
+        seen.append(request)
+        return httpx.Response(status, stream=FakeSSE(events, fail=fail),
+                              headers={'content-type': 'text/event-stream'})
+    monkeypatch.setattr(copilot_provider, 'HTTP_CLIENT_FACTORY',
+                        lambda: httpx.Client(transport=httpx.MockTransport(respond)))
+    return seen
+
+
+def stream_events(response):
+    return [(frame.split('\n')[0][7:], json.loads(frame.split('data: ', 1)[1]))
+            for frame in response.text.strip().split('\n\n')]
+
+
+def test_stream_deltas_usage_persistence_and_tenancy(env, monkeypatch):
+    enable(env)
+    chunks = [{'model': 'grok-stream', 'choices': [{'delta': {'content': text}}]}
+              for text in ['Tere ', '**maailm**', '!']]
+    chunks += [{'choices': [], 'usage': {'prompt_tokens': 45, 'completion_tokens': 8}}, '[DONE]']
+    seen = streaming_transport(monkeypatch, chunks)
+    response = env['client'].post(env['base'] + '/copilot/messages',
+                                 headers={'Accept': 'text/event-stream'},
+                                 json={'content': 'Explain', 'page': 'invoices'})
+    assert response.status_code == 200
+    assert response.headers['content-type'].startswith('text/event-stream')
+    events = stream_events(response)
+    assert [v['text'] for k, v in events if k == 'delta'] == ['Tere ', '**maailm**', '!']
+    done = events[-1][1]
+    assert events[-1][0] == 'done' and not done['retryable']
+    assert done['assistant']['content'] == 'Tere **maailm**!'
+    assert done['assistant']['tokens_in'] == 45 and done['assistant']['tokens_out'] == 8
+    assert len(env['db'].rows("SELECT id FROM copilot_messages WHERE role='assistant'")) == 1
+    request = json.loads(seen[0].content)
+    assert request['stream'] is True and request['stream_options'] == {'include_usage': True}
+    assert request['max_tokens'] == 2048 and KEY not in str(request)
+    assert request['messages'][-1]['content'].endswith('navigation context only): invoices')
+    usage = env['client'].get(env['base'] + '/copilot/usage').json()[0]
+    assert usage['messages'] == 1 and usage['tokens_in'] == 45 and usage['tokens_out'] == 8
+    event = env['db'].one("SELECT details_json FROM audit_events WHERE object_id=?",
+                          (done['assistant']['id'],))
+    assert json.loads(event['details_json']) == dict(model='grok-stream', tokens_in=45,
+                                                   tokens_out=8, outcome='completed')
+    assert copilot.CopilotService(env['db']).messages(env['other']['id'], ACTOR) == []
+    denied = env['client'].post('/organisations/' + env['other']['id'] + '/copilot/messages',
+                               headers={'Accept': 'text/event-stream'}, json={'content': 'hi'})
+    assert denied.status_code == 403 and len(seen) == 1
+
+
+@pytest.mark.parametrize('failure', ['network', 'error_event', 'truncated', 'malformed'])
+def test_stream_partial_failure_and_retry(env, monkeypatch, failure):
+    enable(env)
+    events = [{'model': 'grok-test', 'choices': [{'delta': {'content': 'Partial answer'}}]}]
+    if failure == 'error_event':
+        events.append({'error': {'message': KEY}})
+    if failure == 'malformed':
+        events.append('{broken')
+    streaming_transport(monkeypatch, events, fail=failure == 'network')
+    response = env['client'].post(env['base'] + '/copilot/messages',
+                                 headers={'Accept': 'text/event-stream'}, json={'content': 'hi'})
+    done = stream_events(response)[-1][1]
+    assert done['retryable'] and done['assistant']['content'].startswith('Partial answer\n\n')
+    assert done['stage'] is None and done['assistant']['tokens_in'] == 0
+    assert KEY not in response.text
+    history = env['client'].get(env['base'] + '/copilot/messages').json()
+    assert history[0]['retryable']
+    assert len([m for m in history if m['role'] == 'assistant']) == 1
+    assert env['client'].get(env['base'] + '/copilot/usage').json()[0]['messages'] == 1
+    streaming_transport(monkeypatch, [{'choices': [{'delta': {'content': 'Complete'}}]}, '[DONE]'])
+    retried = env['client'].post(env['base'] + '/copilot/messages',
+                                headers={'Accept': 'text/event-stream'}, json={'content': 'hi'})
+    assert not stream_events(retried)[-1][1]['retryable']
+
+
+@pytest.mark.parametrize('status', [401, 403, 500])
+def test_stream_pre_text_failure_keeps_zero_token_retry_semantics(env, monkeypatch, status):
+    enable(env)
+    streaming_transport(monkeypatch, [], status=status)
+    response = env['client'].post(env['base'] + '/copilot/messages',
+                                 headers={'Accept': 'text/event-stream'}, json={'content': 'hi'})
+    done = stream_events(response)[-1][1]
+    assert done['retryable'] and done['assistant']['tokens_in'] == done['assistant']['tokens_out'] == 0
+    if status in (401, 403):
+        assert done['error'] == 'The AI provider rejected the configured API key.'
+    assert env['db'].rows('SELECT * FROM copilot_usage') == []
+
+
+def test_stream_preflight_and_quota_reservation(env, monkeypatch):
+    seen = streaming_transport(monkeypatch, ['[DONE]'])
+    service = copilot.CopilotService(env['db'])
+    with pytest.raises(copilot.CopilotDisabled):
+        service.stream(env['org']['id'], ACTOR, 'hi')
+    enable(env)
+    monkeypatch.setenv('FASTACCOUNTS_COPILOT_ENABLED', 'false')
+    with pytest.raises(copilot.CopilotDisabled):
+        service.stream(env['org']['id'], ACTOR, 'hi')
+    monkeypatch.setenv('FASTACCOUNTS_COPILOT_ENABLED', 'true')
+    monkeypatch.setattr(copilot, 'MESSAGES_PER_USER_DAY', 1)
+    first = service.stream(env['org']['id'], ACTOR, 'one')
+    with pytest.raises(copilot.CopilotQuotaExceeded):
+        service.stream(env['org']['id'], ACTOR, 'two')
+    assert seen == []  # Both the checks and reservation precede transport iteration.
+    list(first)
+
+
+def test_stream_close_persists_partial_once_and_completion_before_final_event(env, monkeypatch):
+    enable(env)
+    streaming_transport(monkeypatch, [{'choices': [{'delta': {'content': 'Some text'}}]}, '[DONE]'])
+    service = copilot.CopilotService(env['db'])
+    stream = service.stream(env['org']['id'], ACTOR, 'hi')
+    assert 'Some text' in next(stream)
+    stream.close()
+    history = service.messages(env['org']['id'], ACTOR)
+    assert history[0]['retryable'] and 'interrupted' in history[0]['content']
+    stream = service.stream(env['org']['id'], ACTOR, 'again')
+    next(stream)
+    assert next(stream).startswith('event: done')
+    stream.close()
+    history = service.messages(env['org']['id'], ACTOR)
+    assert not history[0]['retryable'] and history[0]['content'] == 'Some text'
+    assert len([m for m in history if m['role'] == 'assistant']) == 2
+
+
+def test_settings_writes_post_only_and_invalid_key_never_echoed(env):
+    url = env['base'] + '/copilot/settings'
+    assert env['client'].put(url, json={'enabled': True}).status_code == 405
+    secret = 'synthetic-secret-' * 300
+    response = env['client'].post(url, json={'api_key': secret})
+    assert response.status_code == 422 and secret not in response.text
+
+
+def test_copilot_settings_and_stream_require_csrf(env):
+    from fastapi import FastAPI, Request
+    from starlette.middleware.sessions import SessionMiddleware
+    from api_app import api, current_user, User
+    wrapper = FastAPI()
+    wrapper.add_middleware(SessionMiddleware, secret_key='synthetic-session-secret')
+    @wrapper.get('/token')
+    def token(request: Request):
+        request.session['csrf_token'] = 'synthetic-csrf'
+        return {}
+    wrapper.mount('/api', api)
+    previous = api.dependency_overrides.copy()
+    api.dependency_overrides[current_user] = lambda: User(email=ACTOR, name='Synthetic owner')
+    try:
+        with TestClient(wrapper) as client:
+            client.get('/token')
+            base = '/api' + env['base'] + '/copilot'
+            assert client.post(base + '/settings', json={'model': 'grok-test'}).status_code == 403
+            assert client.post(base + '/messages', json={'content': 'hi'},
+                               headers={'Accept': 'text/event-stream'}).status_code == 403
+            assert client.post(base + '/settings', json={'model': 'grok-test'},
+                               headers={'X-CSRF-Token': 'synthetic-csrf'}).status_code == 200
+    finally:
+        api.dependency_overrides.clear()
+        api.dependency_overrides.update(previous)
+
+
+def test_stream_usage_stays_on_reservation_day(env, monkeypatch):
+    enable(env)
+    streaming_transport(monkeypatch, [
+        {'choices': [{'delta': {'content': 'Reply'}}]},
+        {'usage': {'prompt_tokens': 3, 'completion_tokens': 1}}, '[DONE]'])
+    monkeypatch.setattr(copilot, '_day', lambda: '2026-10-23')
+    stream = copilot.CopilotService(env['db']).stream(env['org']['id'], ACTOR, 'hi')
+    monkeypatch.setattr(copilot, '_day', lambda: '2026-10-24')
+    list(stream)
+    usage = env['db'].rows('SELECT day,messages,tokens_in FROM copilot_usage')
+    assert usage == [{'day': '2026-10-23', 'messages': 1, 'tokens_in': 3}]

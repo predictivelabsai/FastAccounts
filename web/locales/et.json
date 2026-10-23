@@ -2280,7 +2280,11 @@
       "Clear the organisation API key": "Eemalda organisatsiooni API-võti",
       "Copilot model (optional)": "AI-kaaslase mudel (valikuline)",
       "Invalid copilot model": "Vigane AI-kaaslase mudel",
-      "Invalid copilot API key": "Vigane AI-kaaslase API-võti"
+      "Invalid copilot API key": "Vigane AI-kaaslase API-võti",
+      "Copy reply": "Kopeeri vastus",
+      "Reply copied": "Vastus kopeeritud",
+      "Could not copy the reply. Please select and copy the text.": "Vastust ei saanud kopeerida. Palun vali tekst ja kopeeri see.",
+      "The reply was interrupted. Please retry.": "Vastus katkes. Palun proovi uuesti."
     }
   },
   "periods": {

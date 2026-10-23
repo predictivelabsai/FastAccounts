@@ -4,6 +4,25 @@ Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as
 delivered.
 
+## 2026-10-23: Streamed copilot chat
+
+- Chat replies now stream progressively using SSE, with the existing JSON send
+  path retained for older browsers and rejected streaming negotiations. The
+  composer stays disabled in flight. Access and quotas are checked before
+  provider calls; quota capacity is reserved under the organisation lock.
+- Assistant replies and usage totals persist together before the final event.
+  Interrupted text is retained with a translated note and explicit Retry;
+  incomplete replies cannot produce stage proposals. Pre-text failures retain
+  the zero-token failure behaviour. Completion audits include model and usage.
+- Added escaped lightweight Markdown, safe external links and labelled copy
+  buttons to assistant replies in all four languages. User accent bubbles,
+  staging controls, keyboard behaviour and drawer administration remain.
+- All copilot settings writes now use CSRF-protected POST; PUT returns 405.
+- Validation: project-venv `pytest tests/test_copilot.py -q` passed all 60 tests,
+  including offline Playwright checks. `node --check static/app.js`, Python 3.12
+  syntax checks and `git diff --check` passed. The supplied venv runs Python
+  3.14.6; runtime validation on Python 3.12 remains a deployment check.
+
 ## 2026-10-23: Organisation copilot credentials
 
 - Owners and administrators can save or clear an encrypted organisation xAI key

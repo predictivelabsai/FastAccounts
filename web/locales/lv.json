@@ -2278,9 +2278,13 @@
       "Organisation xAI API key": "Organizācijas xAI API atslēga",
       "Leave blank to keep the saved key.": "Atstājiet tukšu, lai saglabātu esošo atslēgu.",
       "Clear the organisation API key": "Dzēst organizācijas API atslēgu",
-      "Copilot model (optional)": "AI palīga modelis (neobligāts)",
-      "Invalid copilot model": "Nederīgs AI palīga modelis",
-      "Invalid copilot API key": "Nederīga AI palīga API atslēga"
+      "Copilot model (optional)": "AI asistenta modelis (neobligāts)",
+      "Invalid copilot model": "Nederīgs AI asistenta modelis",
+      "Invalid copilot API key": "Nederīga AI asistenta API atslēga",
+      "Copy reply": "Kopēt atbildi",
+      "Reply copied": "Atbilde nokopēta",
+      "Could not copy the reply. Please select and copy the text.": "Neizdevās kopēt atbildi. Lūdzu, atlasiet un kopējiet tekstu.",
+      "The reply was interrupted. Please retry.": "Atbilde tika pārtraukta. Lūdzu, mēģiniet vēlreiz."
     }
   },
   "periods": {

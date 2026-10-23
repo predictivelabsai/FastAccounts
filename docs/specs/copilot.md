@@ -68,7 +68,8 @@ defence in depth is mandatory:
    reconciled by the model.
 9. Content safety. Attachments are validated by type and size before any
    bytes leave the system; provider responses are time-limited and length-
-   capped; provider failure yields a clear error, never a partial write.
+   capped; provider failure yields a clear error. Interrupted chat text is retained
+   as a retryable assistant reply, never as an executable stage proposal.
 
 ## Capabilities (phase 1)
 
@@ -96,7 +97,7 @@ defence in depth is mandatory:
 
 ## Non-goals (phase 1)
 
-Streaming responses, multi-conversation folders, tool/function calling that
+Multi-conversation folders, tool/function calling that
 executes actions, rasterisation of PDF pages for vision (text-only extraction),
 image generation, per-role custom quotas, per-user chat deletion, autonomous
 actions on the ledger, sharing conversations across users.
@@ -124,9 +125,9 @@ actions on the ledger, sharing conversations across users.
 - `copilot_repository.py`: org-locked writes for org toggle, messages,
   usage counters; reads for history/usage. Reuses `audit`.
 - Migration `0029_copilot` (additive, rerun-safe): `copilot_messages`,
-  `copilot_usage`, `organisations.copilot_enabled`. CI + tests count 29.
+  `copilot_usage`, `organisations.copilot_enabled`. Migration 0033 adds encrypted provider settings; CI + tests count 33.
 - API routes in `api_app.py` (thin): POST/GET messages, POST scan,
-  POST stage, GET usage, GET documents (picker), PUT org toggle (settings).
+  POST stage, GET usage, GET documents (picker), GET/POST settings (including the org toggle).
 - SPA: a retractable right-side copilot drawer on every authenticated workspace
   feature page, opened by a labelled floating button. It has no navigation entry
   or standalone page. Escape or the close button closes it; focus moves inside
@@ -202,3 +203,45 @@ and its key version, using the same portable DDL for SQLite and PostgreSQL.
 The organisation key takes precedence for chat and scans; the environment key
 remains the fallback. The global flag and organisation opt-in remain mandatory.
 Settings audits contain a configuration flag, never a key.
+
+## 2026-10-23: Streamed replies and formatted chat
+
+POST `/copilot/messages` negotiates SSE with `Accept: text/event-stream`;
+requests without that header retain the JSON path. Both use the same eager
+prompt preparation, context, access checks and caps. Quota checks, organisation
+opt-in and access rechecks, capacity reservation and the user message write run
+under one organisation write lock before any provider request. The reservation
+prevents parallel streams from bypassing daily limits. Pre-text failures release
+it, retain the existing zero-token assistant failure and remain retryable; partial
+replies count once. Prompt characters measure the composed JSON, capped at 280k.
+
+The injectable HTTP client sends `stream=true` with usage inclusion and parses
+SSE delta events, including usage-only events and split UTF-8 transport chunks.
+Only assistant text is forwarded, never reasoning or provider error bodies. The
+2048-token, 60-second and reply length caps remain. The browser receives `delta`
+events with `{text}`, followed by `done` with the existing reply object and
+`retryable`, `error` and `quota_consumed` metadata. The assistant row, usage totals
+and completion audit are written in one transaction before `done` is emitted.
+Provider errors and closed iterators retain partial text with an interruption
+note and suppress stage extraction. Retry metadata on transcript reads comes
+from scoped completion audits, without changing the stored transcript schema.
+Unknown token totals for an interrupted stream remain zero, never estimates.
+
+The drawer disables the composer during a send and renders deltas progressively.
+A rejected streaming negotiation (404/405/406/415/501) retries using JSON. Older
+servers returning JSON are consumed directly; browsers without readable streams
+use JSON immediately. Quota, authentication and provider failures never trigger
+an automatic duplicate send. Interrupted accepted streams offer explicit Retry.
+Assistant prose uses a small escaped Markdown allowlist: emphasis, inline and
+fenced code, simple lists and HTTP(S) links with `noreferrer` and a new tab.
+Headings and raw HTML are disabled. Copy buttons retain the original reply text.
+Controls, errors and interruption notes are translated in all four locales.
+
+Offline validation covers encrypted settings, stream deltas/usage, provider
+rejections, malformed/truncated/error streams, quota reservation, kill switches,
+tenancy, completion audits, iterator closure, partial retry, browser streaming,
+copy controls, sanitisation and both fallback paths. No live provider is used.
+
+Wire-format reference: [xAI streaming documentation](https://docs.x.ai/developers/model-capabilities/text/streaming)
+and [usage events](https://docs.x.ai/developers/cost-tracking). Integration tests
+use only synthetic SSE through `httpx.MockTransport`, with an offline socket guard.

@@ -2280,7 +2280,11 @@
       "Clear the organisation API key": "Clear the organisation API key",
       "Copilot model (optional)": "Copilot model (optional)",
       "Invalid copilot model": "Invalid copilot model",
-      "Invalid copilot API key": "Invalid copilot API key"
+      "Invalid copilot API key": "Invalid copilot API key",
+      "Copy reply": "Copy reply",
+      "Reply copied": "Reply copied",
+      "Could not copy the reply. Please select and copy the text.": "Could not copy the reply. Please select and copy the text.",
+      "The reply was interrupted. Please retry.": "The reply was interrupted. Please retry."
     }
   },
   "periods": {

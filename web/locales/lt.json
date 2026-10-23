@@ -2278,9 +2278,13 @@
       "Organisation xAI API key": "Organizacijos xAI API raktas",
       "Leave blank to keep the saved key.": "Palikite tuščią, kad išsaugotumėte esamą raktą.",
       "Clear the organisation API key": "Pašalinti organizacijos API raktą",
-      "Copilot model (optional)": "AI pagalbininko modelis (neprivalomas)",
-      "Invalid copilot model": "Netinkamas AI pagalbininko modelis",
-      "Invalid copilot API key": "Netinkamas AI pagalbininko API raktas"
+      "Copilot model (optional)": "AI asistento modelis (neprivalomas)",
+      "Invalid copilot model": "Netinkamas AI asistento modelis",
+      "Invalid copilot API key": "Netinkamas AI asistento API raktas",
+      "Copy reply": "Kopijuoti atsakymą",
+      "Reply copied": "Atsakymas nukopijuotas",
+      "Could not copy the reply. Please select and copy the text.": "Nepavyko nukopijuoti atsakymo. Pasirinkite ir nukopijuokite tekstą.",
+      "The reply was interrupted. Please retry.": "Atsakymas nutrūko. Bandykite dar kartą."
     }
   },
   "periods": {

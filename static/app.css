@@ -1854,3 +1854,15 @@ input[type="radio"] {
     gap: 10px;
   }
 }
+
+/* Assistant prose stays readable inside the narrow, scrolling drawer. */
+.copilot-markdown{line-height:1.65;overflow-wrap:anywhere}
+.copilot-markdown p+p,.copilot-markdown pre,.copilot-markdown ul,.copilot-markdown ol{margin:12px 0}
+.copilot-markdown ul,.copilot-markdown ol{padding-left:24px}
+.copilot-markdown li+li{margin-top:4px}
+.copilot-markdown code{font-size:.88em;background:var(--accent-soft);padding:2px 5px;border-radius:4px}
+.copilot-markdown pre{max-width:100%;overflow-x:auto;padding:12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-sm)}
+.copilot-markdown pre code{display:block;white-space:pre;background:transparent;padding:0;overflow-wrap:normal}
+.copilot-markdown a{text-decoration:underline;text-underline-offset:3px}
+.copilot-message .copilot-copy{font-size:.75rem;color:var(--text-muted);background:transparent;border-color:transparent;min-height:36px;padding:6px 8px}
+.copilot-message .copilot-copy:hover,.copilot-message .copilot-copy:focus-visible{color:var(--text);border-color:var(--line)}
