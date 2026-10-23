@@ -3,9 +3,11 @@
 This is the agreed 2026 accounting-bureau demo specification. Production
 accountant UAT is pending. Only EUR Estonian books and 2026 periods are accepted.
 Monthly calculations cover monthly salaries (full- or part-time), hourly pay and
-board-member fees, and the social tax minimum obligation. They exclude leave,
-sickness, benefits, non-resident calculations, direct TSD submission and payment
-execution. Reviewed resident-only TSD manual-upload files are documented in
+board-member fees, and the social tax minimum obligation. They exclude automatic
+leave and sickness calculations, benefits, non-resident calculations, direct TSD
+submission and payment execution. Bureau-entered payment components can represent
+additional remuneration and net deductions. Reviewed resident-only TSD manual-upload
+files are documented in
 [`tsd-export.md`](tsd-export.md).
 
 All calculations use Decimal, with ROUND_HALF_UP to cents on each tax/deduction.
@@ -26,7 +28,7 @@ Each employee's rounded amounts are then summed; aggregate taxes are not recompu
   (`apply_tax_free_minimum=true`), otherwise zero. It is an allowance, not a deduction.
   `tax_free_minimum` records the amount actually used, capped at
   gross − pension − employee unemployment (e.g. 688.80 on a EUR 700 part-time salary).
-- Withholding total: pension + employee unemployment + income tax.
+- Withholding total: pension + employee unemployment + income tax + net deductions.
 - Net pay: gross - withholding total.
 - Employer social tax: 33% of the social tax base (`social_tax_base`), which is
   the gross pay, or the 2026 monthly minimum base of EUR 886 when that is higher
@@ -54,7 +56,7 @@ rahandusministri 15.03.2013 määrus nr 17 (§ 2 lg 1, § 5).
 - The employer pays social tax on at least EUR 886 per month for 2026
   (EUR 292.38). The shortfall `social_tax_minimum_topup` = 33% × base − 33% ×
   gross is an employer cost. On approval it is posted as a separate line on the
-  existing social-tax accounts (debit 6120, credit 2240) with the memo
+  mapped social-tax expense and accrual accounts (default debit 6120, credit 2253) with the memo
   "Sotsiaalmaksu miinimumkohustuse lisamakse YYYY-MM".
 - Partial month: when employment starts or ends during the month, the minimum
   base is pro-rated by calendar days employed (886 / days in month × days,
@@ -144,22 +146,134 @@ migration 0006: `pay_basis`, `fte`, `hourly_rate`, `social_tax_minimum_exemption
 `employment_start_date`, `employment_end_date`; `gross_salary` is empty for hourly staff.
 
 A draft snapshots active employees; later employee changes do not rewrite it.
-Delete and recreate a draft to refresh it. One run per organisation/month is
+Hours and payment components can be edited on each draft item; totals are
+recomputed atomically from frozen base pay, allowance application, employment
+dates and levy settings. Delete and recreate a draft to refresh employee details. One run per organisation/month is
 allowed. Approved runs cannot be edited/deleted/reapproved through the service.
 Approval posts at calendar month-end and respects configured fiscal-period locks.
 One transaction changes status and creates the immutable balanced ledger batch;
 a posting failure rolls both back. Existing ledger reversal tools provide linked
 accounting corrections; this demo has no payroll amendment workflow.
 
-| Account | Debit / credit |
-|---|---|
-| 6110 Salary expense | Gross debit |
-| 6120 Social tax expense | Social tax debit (minimum top-up as its own line) |
-| 6130 Employer unemployment expense | Employer UI debit |
-| 2210 Employee net payable | Net credit |
-| 2220 Payroll income tax payable | Income tax credit |
-| 2230 Employee pension and unemployment payable | Pension + employee UI credit |
-| 2240 Employer payroll taxes payable | Social tax + employer UI credit (minimum top-up as its own line) |
+## Employee lifecycle and draft editing
 
-The migration adds these accounts to existing EE charts and organisation creation
-adds them to future EE books. UK charts and UK demo books are unchanged.
+Archive and unarchive use `PATCH /employees/{id}` with `active=false/true`.
+Archived staff remain in existing drafts and approved runs, and are excluded from
+new drafts. `DELETE /employees/{id}` permanently deletes only employees with no
+`pay_run_items` rows; otherwise the service returns 409 and points to archive.
+Archive, unarchive and deletion each create an audit event.
+
+`PATCH /pay-runs/{run_id}/items/{item_id}` accepts `hours` for hourly employees
+and/or a complete `components` list. Each line has `type_id`, decimal-string
+`amount`, optional name/direction snapshots and six effective boolean flags:
+`income_tax`, `social_tax`, `ui_employee`, `ui_employer`, `funded_pension`,
+`social_minimum`. Omitted flags inherit the type defaults; the editor sends the
+frozen effective flags when saving an existing line. Negative income amounts
+allow gross adjustments; deductions must be positive. Invalid or excessive net
+deductions roll back the whole save. Gross and every tax base must remain valid,
+and monthly gross must retain the snapshotted minimum wage. Approval freezes
+hours, base pay and component lines.
+
+Types belong to the organisation: `GET/POST /payroll/component-types` and
+`PUT /payroll/component-types/{id}`. Editing a type never changes saved lines.
+The three seeded types are editable bureau defaults, not a substitute for the
+accountant's decision for the recipient and payment period:
+
+| Preset | Direction | Income tax | Social tax | Employee / employer UI | II pillar | Counts towards social minimum |
+|---|---|---|---|---|---|---|
+| Kinnipidamine kohtutäiturile | Net deduction | No | No | No / No | No | No |
+| Autori tasu | Income | Yes | Yes | No / No | No | Yes |
+| Vanemapuhkused | Income | Yes | No | No / No | No | No |
+
+The author preset's social-tax default is an explicit demo assumption: the
+request did not specify that flag. The bureau must confirm it during UAT.
+Author and parental-leave rule citations and applicability also need accountant
+UAT confirmation. Every income-line flag is editable per period. Net deductions
+reduce net pay and credit their chosen deduction liability role; they do not
+change tax bases. Bailiff garnishments use a separate liability role.
+
+<!-- EMTA references for bureau UAT, checked 2026-10-23. These sources do not
+     establish universal treatment for every author or parental-leave payment.
+     https://www.emta.ee/ariklient/maksud-ja-tasumine/tulumaks-ja-sotsiaalmaks/sotsiaalmaks
+     https://www.emta.ee/ariklient/maksud-ja-tasumine/tulumaks-ja-sotsiaalmaks/maksumaarad
+     https://www.emta.ee/ariklient/maksud-ja-tasumine/tulumaks-ja-sotsiaalmaks/deklaratsiooni-tsd-esitamine -->
+
+Income amounts enter each levy base only when that levy flag is on. Pension and
+employee UI are rounded on their respective aggregate bases and deducted from
+the income-tax base before the allowance and 22% withholding. All income enters
+gross and employee net before withholding, even when no tax flags apply.
+Employer cost includes gross, social tax and employer UI, excluding net deductions.
+
+The social minimum shortfall is `max(0, pro-rated minimum - minimum-counting pay)`.
+Social tax base is social-taxable pay plus that shortfall; the top-up is total
+social tax less rounded tax on actual social-taxable pay. Existing exemptions
+remove the shortfall obligation, including for author payments. This means that
+social tax and minimum-counting flags are deliberately independent. Monthly pay
+is not automatically pro-rated. Bureau users must confirm mixed-component
+contribution deductibility and the minimum-counting treatment during UAT.
+
+PDFs append translated component detail after the employee payslips, preserving
+existing per-employee page links. The Excel book includes a translated component
+sheet. Reviewed integration push payloads retain frozen item/component detail;
+the existing Merit/SmartAccounts transport remains a balanced GL journal export.
+
+## Month-end posting and TSD reclassification
+
+Migration 0034 adds ten liability roles to EE charts without changing historical
+posted batches. The original payroll accounts remain for historical reporting.
+Expense roles retain their existing defaults. The following role mappings define
+the monthly posting shape; organisations may select their own active chart codes.
+
+| Role | Default code | Month-end debit / credit |
+|---|---|---|
+| PAYROLL_SALARY | 6110 | Gross salary expense debit |
+| PAYROLL_SALARY_PAYABLE | 2250 | Gross credit, all employee withholdings debit |
+| PAYROLL_BAILIFF | 2251 | Bailiff garnishment credit |
+| PAYROLL_DEDUCTION | 2252 | Other net deductions credit |
+| PAYROLL_SOCIAL | 6120 | Social tax expense debit, top-up separately |
+| PAYROLL_SOCIAL_ACCRUED | 2253 | Social tax credit, top-up separately |
+| PAYROLL_INCOME_WITHHELD | 2254 | Income tax credit |
+| PAYROLL_PENSION_WITHHELD | 2255 | Funded pension credit |
+| PAYROLL_UI_ACCRUED | 2256 | Employee UI and employer UI credits |
+| PAYROLL_UI | 6130 | Employer UI expense debit |
+
+`GET /payroll/posting-mappings` and `PUT /payroll/posting-mappings/{role}` expose
+these mappings and the three payable roles below. They reuse migration 0011's
+`account_mappings`, with provider `payroll:<lowercase role>` and matching local
+and external code fields. A separate provider key per role permits shared target
+accounts while preserving provider export mapping uniqueness. The UI's Payroll
+accounts dialog lets the organisation select codes such as Sunio's 7001/7500/7550,
+2210/2517/2563/2552/2554/2565 and 2320/2330/2340 after adding those chart accounts.
+
+Each approved run has declaration state `none`, `prepared` after the existing
+TSD preparation flow, or `settled` after explicit bureau reclassification.
+`POST /pay-runs/{run_id}/tsd/settle` creates one separate,
+immutable balanced batch dated the 10th of the following month:
+
+| Debit accrual role | Credit payable role | Default payable code |
+|---|---|---|
+| PAYROLL_SOCIAL_ACCRUED | PAYROLL_SOCIAL_PAYABLE | 2257 |
+| PAYROLL_INCOME_WITHHELD | PAYROLL_INCOME_PAYABLE | 2258 |
+| PAYROLL_UI_ACCRUED | PAYROLL_UI_PAYABLE | 2259 |
+| PAYROLL_PENSION_WITHHELD | PAYROLL_SOCIAL_PAYABLE | 2257 |
+
+An approved run with zero tax liabilities can be marked settled by the same
+explicit action without creating a zero-value journal; it retains a null
+`declaration_batch_id` and an audit explaining that no liability existed.
+
+The bureau may prepare TSD outside FastAccounts, so reclassification does not
+require the in-app file preparation flow or frozen personal IDs. In-app
+preparation remains available independently. The action is never automatic on
+payroll approval or payment posting. Settlement
+means this reclassification only; it does not claim a bank payment or EMTA
+submission. Run responses include `declaration_state`, `declaration_due_date`,
+`declaration_overdue` and `declaration_batch_id`. The month-end panel lists all
+approved periods; the dashboard links to the count overdue after the due date.
+The demo uses the literal following-month 10th, without weekend/holiday shifts.
+
+Accrual account IDs are frozen at approval so a later mapping change cannot
+strand the original liability. Reclassification of runs approved before 0034
+debits their original combined legacy liabilities. Both entries respect fiscal
+locks, tenant scope and atomic posting. Repeat settlement returns 409. Existing
+ledger reversals remain the correction mechanism; there is no payroll amendment
+or declaration-unsettling workflow. UK charts and books are unchanged.

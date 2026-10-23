@@ -69,7 +69,7 @@ def test_sample_run_totals_and_posting(db, ee_org):
     assert social == sum((Decimal(i['social_tax']) for i in run['items']), Decimal(0))
     topup = [r for r in lines if r['memo'] == 'Sotsiaalmaksu miinimumkohustuse lisamakse 2026-10']
     assert sorted((r['system_role'], Decimal(str(r['debit'])), Decimal(str(r['credit']))) for r in topup) == [
-        ('PAYROLL_EMPLOYER_TAX', Decimal('0'), Decimal('61.38')), ('PAYROLL_SOCIAL', Decimal('61.38'), Decimal('0'))]
+        ('PAYROLL_SOCIAL', Decimal('61.38'), Decimal('0')), ('PAYROLL_SOCIAL_ACCRUED', Decimal('0'), Decimal('61.38'))]
     ledger = LedgerService(db)
     assert sum((r['balance'] for r in ledger.trial_balance(ee_org['id'], start='2026-10-01', end='2026-10-31')), Decimal(0)) == 0
     assert ledger.profit_and_loss(ee_org['id'], start='2026-10-01', end='2026-10-31')['expenses'] == Decimal('21797.23')
@@ -221,7 +221,7 @@ def test_existing_payroll_upgrades_to_0006(tmp_path, monkeypatch):
                    "social_tax,ui_employer,employer_cost) VALUES ('i1','r1',?,'e2','Old Staff',900,0,2,900,18,14.4,0,191.86,"
                    "675.74,224.26,297,7.2,1204.2)", (org['id'],))
     monkeypatch.setattr(database, 'MIGRATIONS', original)
-    assert db.migrate() == ['0006_payroll_part_time_hourly', '0007_automation', '0008_import_staging', '0009_local_accounts', '0010_tsd_export', '0011_account_mappings', '0012_external_gl', '0013_sync_review', '0014_sync_push', '0015_payment_orders', '0016_bank_feed_schedules', '0017_prepayments', '0018_fixed_assets', '0019_master_data_import', '0020_quotes', '0021_periodisation', '0022_payment_links', '0023_analytical_objects', '0024_reminder_rules', '0025_fx_realised', '0026_fx_revaluations', '0027_mfa', '0028_document_settings', '0029_copilot', '0030_master_data_maintenance', '0031_master_data_groups', '0032_copilot_access', '0033_copilot_settings']
+    assert db.migrate() == ['0006_payroll_part_time_hourly', '0007_automation', '0008_import_staging', '0009_local_accounts', '0010_tsd_export', '0011_account_mappings', '0012_external_gl', '0013_sync_review', '0014_sync_push', '0015_payment_orders', '0016_bank_feed_schedules', '0017_prepayments', '0018_fixed_assets', '0019_master_data_import', '0020_quotes', '0021_periodisation', '0022_payment_links', '0023_analytical_objects', '0024_reminder_rules', '0025_fx_realised', '0026_fx_revaluations', '0027_mfa', '0028_document_settings', '0029_copilot', '0030_master_data_maintenance', '0031_master_data_groups', '0032_copilot_access', '0033_copilot_settings', '0034_payroll_demo_fixes']
     assert db.rows('PRAGMA foreign_key_check') == []
     service = PayrollService(db)
     employees = {e['name']: e for e in service.employees(org['id'])}

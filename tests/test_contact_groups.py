@@ -27,14 +27,14 @@ def customer(d, name):
 
 def test_migration_count_rerun_and_ci(sending):
     d = sending
-    assert d["db"].scalar("SELECT COUNT(*) FROM schema_migrations") == 33
+    assert d["db"].scalar("SELECT COUNT(*) FROM schema_migrations") == 34
     assert d["db"].rows("SELECT * FROM contact_groups") == []
     assert d["db"].rows("SELECT * FROM user_groups") == []
     for _ in range(2):
         with d["db"].transaction() as tx:
             tx.execute("DELETE FROM schema_migrations WHERE version='0031_master_data_groups'")
         assert d["db"].migrate() == ["0031_master_data_groups"]
-    assert "'0030_master_data_maintenance', '0031_master_data_groups', '0032_copilot_access', '0033_copilot_settings']" in (ROOT / ".github/workflows/ci.yml").read_text()
+    assert "'0030_master_data_maintenance', '0031_master_data_groups', '0032_copilot_access', '0033_copilot_settings', '0034_payroll_demo_fixes']" in (ROOT / ".github/workflows/ci.yml").read_text()
 
 
 def test_group_crud_membership_and_filter(sending):

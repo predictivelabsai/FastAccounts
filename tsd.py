@@ -153,7 +153,9 @@ class TSDExportService:
         employee_ui = money(item["ui_employee"])
         exemption = money(item["tax_free_minimum"])
         gross = money(item["gross"])
-        income_tax_base = money(max(Decimal("0"), gross - pension - employee_ui - exemption))
+        excluded_income = sum((money(line['amount']) for line in item.get('components', [])
+                               if line['direction'] == 'income' and not line['income_tax']), Decimal(0))
+        income_tax_base = money(max(Decimal("0"), gross - excluded_income - pension - employee_ui - exemption))
         values = {
             "declaration": "TSD",
             # Current payroll scope contains resident calculations only. Annex 2
@@ -189,6 +191,8 @@ class TSDExportService:
     def _workpaper(self, tx, organisation_id: str, run_id: str) -> dict:
         organisation = self._organisation(tx, organisation_id, require_registration=True)
         run = self._run(tx, organisation_id, run_id)
+        for item in run['items']:
+            item['components'] = tx.rows('SELECT * FROM pay_item_components WHERE organisation_id=? AND item_id=? ORDER BY position', (organisation_id, item['id']))
         records = [self._record(organisation, run, item) for item in run["items"]]
         totals = {
             field: money(sum((decimal(record[field]) for record in records), Decimal("0")))

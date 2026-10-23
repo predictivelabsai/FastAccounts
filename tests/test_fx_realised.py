@@ -416,13 +416,13 @@ def test_migration_role_seeding_and_wiring(tmp_path, monkeypatch, country, prefe
                    "VALUES ('custom',?,?, 'Synthetic existing', 'Expense','Debit',?)",
                    (org['id'], str(preferred), 'FX_GAIN_LOSS' if existing else None))
     monkeypatch.setattr(database, 'MIGRATIONS', original)
-    assert db.migrate() == ['0025_fx_realised', '0026_fx_revaluations', '0027_mfa', '0028_document_settings', '0029_copilot', '0030_master_data_maintenance', '0031_master_data_groups', '0032_copilot_access', '0033_copilot_settings']
+    assert db.migrate() == ['0025_fx_realised', '0026_fx_revaluations', '0027_mfa', '0028_document_settings', '0029_copilot', '0030_master_data_maintenance', '0031_master_data_groups', '0032_copilot_access', '0033_copilot_settings', '0034_payroll_demo_fixes']
     assert db.migrate() == []
-    assert db.scalar('SELECT COUNT(*) FROM schema_migrations') == 33
+    assert db.scalar('SELECT COUNT(*) FROM schema_migrations') == 34
     role = db.one("SELECT * FROM accounts WHERE organisation_id=? AND system_role='FX_GAIN_LOSS'", (org['id'],))
     assert role['code'] == str(preferred if existing else preferred + 1)
     sql = (root / 'migrations/sqlite/0025_fx_realised.sql').read_text(encoding='utf-8')
     with db.transaction() as tx:
         tx.execute(sql[sql.index('WITH RECURSIVE'):])
     assert db.scalar("SELECT COUNT(*) FROM accounts WHERE organisation_id=? AND system_role='FX_GAIN_LOSS'", (org['id'],)) == 1
-    assert "'0024_reminder_rules', '0025_fx_realised', '0026_fx_revaluations', '0027_mfa', '0028_document_settings', '0029_copilot', '0030_master_data_maintenance', '0031_master_data_groups', '0032_copilot_access', '0033_copilot_settings']" in (root / '.github/workflows/ci.yml').read_text(encoding='utf-8')
+    assert "'0024_reminder_rules', '0025_fx_realised', '0026_fx_revaluations', '0027_mfa', '0028_document_settings', '0029_copilot', '0030_master_data_maintenance', '0031_master_data_groups', '0032_copilot_access', '0033_copilot_settings', '0034_payroll_demo_fixes']" in (root / '.github/workflows/ci.yml').read_text(encoding='utf-8')

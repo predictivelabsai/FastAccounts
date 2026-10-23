@@ -115,6 +115,24 @@ def pay_run_workbook(organisation: dict, run: dict, items: list[dict],
             item_totals[column] += amount
     _total_row(item_sheet, 1, tuple(item_money), item_totals)
 
+    if any(item.get('components') for item in items):
+        from web import i18n
+        from payroll_components import FLAGS, FLAG_LABELS
+        language = 'et' if organisation.get('country_code') == 'EE' else 'en'
+        def label(key):
+            return i18n.catalog(language)['workspace'].get(key, key)
+        components = workbook.create_sheet(label('Payment components')[:31])
+        _header_row(components, [label(key) for key in ('Employee', 'Payment type', 'Direction', 'Amount', *FLAG_LABELS)])
+        for item in items:
+            for line in item.get('components', []):
+                row = components.max_row + 1
+                values = [item['employee_name'], label(line['name']), label('Income' if line['direction'] == 'income' else 'Deduction'),
+                          _from_decimal(line['amount']), *(label('Yes' if line[key] else 'No') for key in FLAGS)]
+                for column, value in enumerate(values, 1):
+                    _put(components, row, column, value)
+                    if isinstance(value, str):
+                        components.cell(row, column).data_type = 's'
+
     if journal_lines is not None:
         accounting = workbook.create_sheet("Accounting")
         _header_row(accounting, ("Account code", "Account name", "Memo", "Debit", "Credit"))

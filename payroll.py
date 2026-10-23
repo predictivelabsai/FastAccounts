@@ -32,6 +32,7 @@ from decimal import Decimal, InvalidOperation
 from core_utils import audit, db_number, decimal, four_dp, money, new_id, utc_now
 from database import Database, get_database
 from ledger import LedgerService, PostingLine
+from payroll_components import FLAGS, ROLES, serialise
 
 
 class PayrollConflict(ValueError):
@@ -131,7 +132,7 @@ def _fte(value) -> Decimal:
     return decimal(1 if value in (None, '') else value)
 
 
-def calculate_pay(employee: dict, *, period: str | None = None, hours=None) -> dict:
+def calculate_pay(employee: dict, *, period: str | None = None, hours=None, components=()) -> dict:
     """Calculate one employee's month. Hourly gross = hourly rate x hours entered on the run."""
     basis = pay_basis(employee)
     board = basis == 'board_fee'
@@ -139,25 +140,44 @@ def calculate_pay(employee: dict, *, period: str | None = None, hours=None) -> d
         gross = money(decimal(employee['hourly_rate']) * decimal(hours if hours is not None else employee.get('hours')))
     else:
         gross = money(employee['gross_salary'])
-    pension = money(gross * decimal(employee['funded_pension_percent']) / 100)
-    ui = money(0 if board else gross * UI_EMPLOYEE_RATE)
-    taxable = gross - pension - ui
+    bases = {key: gross for key in FLAGS}
+    if board:
+        bases['ui_employee'] = bases['ui_employer'] = Decimal(0)
+    deductions = Decimal(0)
+    for component in components:
+        amount = money(component['amount'])
+        if component['direction'] == 'deduction':
+            deductions += amount
+            continue
+        gross += amount
+        for key in FLAGS:
+            if component[key]:
+                bases[key] += amount
+    if gross <= 0 or any(value < 0 for value in bases.values()):
+        raise ValueError('Payment components must leave positive gross and non-negative tax bases')
+    pension = money(bases['funded_pension'] * decimal(employee['funded_pension_percent']) / 100)
+    ui = money(bases['ui_employee'] * UI_EMPLOYEE_RATE)
+    taxable = bases['income_tax'] - pension - ui
     # Record the basic exemption actually used: it cannot exceed the taxable amount.
     exemption = money(min(BASIC_EXEMPTION, max(Decimal('0'), taxable)) if employee['apply_tax_free_minimum'] else 0)
     income_tax = money(max(Decimal('0'), taxable - exemption) * INCOME_TAX_RATE)
     exemption_reason = 'board_member' if board else (employee.get('social_tax_minimum_exemption') or None)
-    social_base = gross
+    social_base = bases['social_tax']
+    shortfall = Decimal(0)
     if exemption_reason is None:
         minimum_base = SOCIAL_TAX_MONTHLY_BASE
         if period:
             days, days_in_month = employed_days(employee, period)
             if days < days_in_month:
                 minimum_base = money(SOCIAL_TAX_MONTHLY_BASE * days / days_in_month)
-        social_base = max(gross, minimum_base)
+        shortfall = max(Decimal(0), minimum_base - bases['social_minimum'])
+        social_base += shortfall
     social = money(social_base * SOCIAL_TAX_RATE)
-    topup = social - money(gross * SOCIAL_TAX_RATE)
-    employer_ui = money(0 if board else gross * UI_EMPLOYER_RATE)
-    withholding = pension + ui + income_tax
+    topup = social - money(bases['social_tax'] * SOCIAL_TAX_RATE)
+    employer_ui = money(bases['ui_employer'] * UI_EMPLOYER_RATE)
+    withholding = pension + ui + income_tax + deductions
+    if gross - withholding < 0:
+        raise ValueError('Payment deductions cannot exceed net pay')
     return dict(gross=gross, funded_pension=pension, ui_employee=ui,
                 tax_free_minimum=exemption, income_tax=income_tax, net=gross-withholding,
                 withholding_total=withholding, social_tax=social, ui_employer=employer_ui,
@@ -175,6 +195,11 @@ def _rate(value) -> str | None:
 def _fraction(value) -> str:
     text = db_number(four_dp(_fte(value)))
     return text.rstrip('0').rstrip('.') if '.' in text else text
+
+
+def declaration_due_date(period):
+    year, month = map(int, period.split('-'))
+    return date(year + (month == 12), 1 if month == 12 else month + 1, 10)
 
 
 class PayrollService:
@@ -306,6 +331,7 @@ class PayrollService:
                     changes['pay_basis'] = 'board_fee'
                 elif data.get('pay_basis') == 'board_fee':
                     changes['pay_basis'] = 'monthly'
+            previous_active = bool(data['active'])
             data.update(changes)
         else:
             data = dict(email=None, personal_id=None, apply_tax_free_minimum=False, board_member=False, active=True)
@@ -325,7 +351,21 @@ class PayrollService:
         if result.rowcount != 1:
             raise PayrollConflict('An employee with this name already exists')
         audit(tx, organisation_id, actor, 'payroll.employee.updated' if employee_id else 'payroll.employee.created', 'employee', record_id)
+        if employee_id and previous_active != bool(data['active']):
+            audit(tx, organisation_id, actor, 'payroll.employee.unarchived' if data['active'] else 'payroll.employee.archived', 'employee', record_id)
         return self._serialize_employee(tx.one('SELECT * FROM employees WHERE organisation_id=? AND id=?', (organisation_id, record_id)))
+
+    def delete_employee(self, organisation_id, employee_id, *, actor):
+        with self.db.transaction() as tx:
+            self._organisation(tx, organisation_id)
+            # Serialise with run creation and employee updates before checking history.
+            changed = tx.execute('UPDATE employees SET active=active WHERE organisation_id=? AND id=?', (organisation_id, employee_id))
+            if changed.rowcount != 1:
+                raise KeyError('Employee not found')
+            if tx.one('SELECT id FROM pay_run_items WHERE organisation_id=? AND employee_id=?', (organisation_id, employee_id)):
+                raise PayrollConflict('This employee has been included in a pay run. Archive the employee instead.')
+            tx.execute('DELETE FROM employees WHERE organisation_id=? AND id=?', (organisation_id, employee_id))
+            audit(tx, organisation_id, actor, 'payroll.employee.deleted', 'employee', employee_id)
 
     def _run(self, tx, organisation_id, run_id):
         run = tx.one('SELECT * FROM pay_runs WHERE organisation_id=? AND id=?', (organisation_id, run_id))
@@ -333,6 +373,8 @@ class PayrollService:
             raise KeyError('Pay run not found')
         run['items'] = tx.rows('SELECT * FROM pay_run_items WHERE organisation_id=? AND pay_run_id=? ORDER BY employee_name,id', (organisation_id, run_id))
         for item in run['items']:
+            item['components'] = [serialise(row) for row in tx.rows(
+                'SELECT * FROM pay_item_components WHERE organisation_id=? AND item_id=? ORDER BY position,id', (organisation_id, item['id']))]
             for key in (*AMOUNTS, 'gross_salary', 'funded_pension_percent'):
                 item[key] = db_number(money(item[key]))
             item['minimum_wage'] = None if item.get('minimum_wage') is None else db_number(money(item['minimum_wage']))
@@ -342,6 +384,12 @@ class PayrollService:
             item['board_member'] = bool(item['board_member'])
         for key in ('total_gross', 'total_net', 'total_employer_cost'):
             run[key] = db_number(money(run[key]))
+        run['declaration_due_date'] = declaration_due_date(run['period']).isoformat()
+        settlement = tx.one('SELECT posted_batch_id FROM pay_run_settlements WHERE organisation_id=? AND pay_run_id=?', (organisation_id, run_id))
+        prepared = tx.one("SELECT id FROM sync_runs WHERE organisation_id=? AND provider='emta' AND object_type='tsd' AND direction='export' AND cursor_before=?", (organisation_id, run_id))
+        run['declaration_state'] = 'settled' if settlement else 'prepared' if prepared else 'none'
+        run['declaration_batch_id'] = settlement['posted_batch_id'] if settlement else None
+        run['declaration_overdue'] = run['status'] == 'Approved' and run['declaration_state'] != 'settled' and declaration_due_date(run['period']) < date.today()
         return run
 
     def runs(self, organisation_id):
@@ -349,6 +397,140 @@ class PayrollService:
             self._organisation(tx, organisation_id)
             return [self._run(tx, organisation_id, row['id']) for row in tx.rows(
                 'SELECT id FROM pay_runs WHERE organisation_id=? ORDER BY period DESC,id', (organisation_id,))]
+
+    def component_types(self, organisation_id):
+        with self.db.transaction() as tx:
+            self._organisation(tx, organisation_id)
+            return [serialise(row) for row in tx.rows('SELECT * FROM pay_component_types WHERE organisation_id=? ORDER BY name,id', (organisation_id,))]
+
+    def save_component_type(self, organisation_id, *, actor, type_id=None, **changes):
+        fields = ('name', 'direction', *FLAGS, 'liability_role')
+        if set(changes) - set(fields):
+            raise ValueError('Unknown payment component field')
+        with self.db.transaction() as tx:
+            self._organisation(tx, organisation_id)
+            if type_id:
+                data = tx.one('SELECT * FROM pay_component_types WHERE organisation_id=? AND id=?', (organisation_id, type_id))
+                if not data:
+                    raise KeyError('Payment type not found')
+            else:
+                data = dict(name='', direction='income', liability_role='PAYROLL_DEDUCTION', **{key: False for key in FLAGS})
+            data.update(changes)
+            self._component_values(data)
+            type_id = type_id or new_id()
+            tx.execute('INSERT INTO pay_component_types(id,organisation_id,' + ','.join(fields) + ') VALUES (' +
+                       ','.join('?' for _ in range(len(fields)+2)) + ') ON CONFLICT(id) DO UPDATE SET ' +
+                       ','.join(f'{field}=excluded.{field}' for field in fields),
+                       (type_id, organisation_id, *(data[field] for field in fields)))
+            audit(tx, organisation_id, actor, 'payroll.component_type.saved', 'pay_component_type', type_id)
+            return serialise(tx.one('SELECT * FROM pay_component_types WHERE organisation_id=? AND id=?', (organisation_id, type_id)))
+
+    @staticmethod
+    def _component_values(data):
+        if not isinstance(data.get('name'), str) or not data['name'].strip() or len(data['name']) > 180:
+            raise ValueError('Payment name must contain 1 to 180 characters')
+        data['name'] = data['name'].strip()
+        if data.get('direction') not in ('income', 'deduction'):
+            raise ValueError('Payment direction must be income or deduction')
+        if data.get('liability_role') not in ROLES or not data['liability_role'].startswith(('PAYROLL_BAILIFF', 'PAYROLL_DEDUCTION')):
+            raise ValueError('Choose a payroll deduction liability role')
+        for key in FLAGS:
+            if type(data.get(key)) not in (bool, int) or data[key] not in (0, 1):
+                raise ValueError('Payment levy flags must be booleans')
+            data[key] = int(data[key])
+        # All flags remain editable snapshots. They affect income lines only;
+        # deduction lines are explicitly net withholdings, never tax relief.
+        return data
+
+    def update_item(self, organisation_id, run_id, item_id, *, actor, hours=None, components=None):
+        with self.db.transaction() as tx:
+            claimed = tx.execute("UPDATE pay_runs SET notes=notes WHERE organisation_id=? AND id=? AND status='Draft'", (organisation_id, run_id))
+            run = self._run(tx, organisation_id, run_id)
+            if claimed.rowcount != 1:
+                raise PayrollConflict('Only draft pay runs can be edited')
+            item = next((item for item in run['items'] if item['id'] == item_id), None)
+            if not item:
+                raise KeyError('Pay run item not found')
+            if hours is not None and item['pay_basis'] != 'hourly':
+                raise ValueError('Hours can be edited only for hourly employees')
+            worked = self._hours(dict(id=item_id, name=item['employee_name']), {item_id: hours if hours is not None else item['hours']}) if item['pay_basis'] == 'hourly' else None
+            if components is not None:
+                if len(components) > 100:
+                    raise ValueError('At most 100 payment lines are allowed per employee')
+                tx.execute('DELETE FROM pay_item_components WHERE organisation_id=? AND item_id=?', (organisation_id, item_id))
+                for position, line in enumerate(components):
+                    allowed = {'type_id', 'name', 'amount', 'direction', 'liability_role', *FLAGS}
+                    if set(line) - allowed:
+                        raise ValueError('Unknown payment component field')
+                    data = tx.one('SELECT * FROM pay_component_types WHERE organisation_id=? AND id=?', (organisation_id, line.get('type_id')))
+                    if not data:
+                        raise KeyError('Payment type not found')
+                    data.update(line)
+                    self._component_values(data)
+                    try:
+                        amount = decimal(data.get('amount'))
+                        if not amount.is_finite() or not amount or abs(amount) > Decimal('9999999999.99') or amount != money(amount) or (data['direction'] == 'deduction' and amount < 0):
+                            raise ValueError('Enter a non-zero payment amount with at most two decimals')
+                    except InvalidOperation as exc:
+                        raise ValueError('Enter a non-zero payment amount with at most two decimals') from exc
+                    fields = ('id', 'organisation_id', 'item_id', 'type_id', 'position', 'name', 'amount', 'direction', *FLAGS, 'liability_role')
+                    values = (new_id(), organisation_id, item_id, data['id'], position, data['name'], db_number(amount), data['direction'], *(data[key] for key in FLAGS), data['liability_role'])
+                    tx.execute('INSERT INTO pay_item_components(' + ','.join(fields) + ') VALUES (' + ','.join('?' for _ in fields) + ')', values)
+            lines = tx.rows('SELECT * FROM pay_item_components WHERE organisation_id=? AND item_id=? ORDER BY position', (organisation_id, item_id))
+            context = tx.one('SELECT * FROM pay_item_context WHERE organisation_id=? AND item_id=?', (organisation_id, item_id))
+            if not context:
+                raise ValueError('Pay run calculation snapshot is missing')
+            amounts = calculate_pay(item | context, period=run['period'], hours=worked, components=lines)
+            if amounts['gross'] > Decimal('9999999999.99') or any(amounts[key] > Decimal('9999999999.99') for key in AMOUNTS if key != 'employer_cost'):
+                raise ValueError('Payment totals exceed the supported amount')
+            required = money(item.get('minimum_wage') or minimum_wage(run['period'])[0] * _fte(item.get('fte')))
+            if item['pay_basis'] == 'monthly' and amounts['gross'] < required:
+                raise ValueError('Payment components must preserve the minimum wage')
+            tx.execute('UPDATE pay_run_items SET ' + ','.join(f'{key}=?' for key in AMOUNTS) + ',hours=? WHERE organisation_id=? AND id=?',
+                       (*(db_number(amounts[key]) for key in AMOUNTS), None if worked is None else db_number(worked), organisation_id, item_id))
+            refreshed = self._run(tx, organisation_id, run_id)
+            totals = [sum((money(row[key]) for row in refreshed['items']), Decimal(0)) for key in ('gross', 'net', 'employer_cost')]
+            tx.execute('UPDATE pay_runs SET total_gross=?,total_net=?,total_employer_cost=? WHERE organisation_id=? AND id=?',
+                       (*(db_number(value) for value in totals), organisation_id, run_id))
+            audit(tx, organisation_id, actor, 'payroll.item.updated', 'pay_run_item', item_id)
+            return self._run(tx, organisation_id, run_id)
+
+    def posting_mappings(self, organisation_id):
+        with self.db.transaction() as tx:
+            self._organisation(tx, organisation_id)
+            return [dict(role=role, account_code=self._posting_account(tx, organisation_id, role)['code']) for role in ROLES]
+
+    def save_posting_mapping(self, organisation_id, role, account_code, *, actor):
+        if role not in ROLES:
+            raise ValueError('Unknown payroll posting role')
+        with self.db.transaction() as tx:
+            self._organisation(tx, organisation_id)
+            account = tx.one('SELECT * FROM accounts WHERE organisation_id=? AND code=? AND active=1', (organisation_id, account_code))
+            expected = 'Expense' if role in ('PAYROLL_SALARY', 'PAYROLL_SOCIAL', 'PAYROLL_UI') else 'Liability'
+            if not account or account['account_type'] != expected:
+                raise ValueError('Choose an active account of the required payroll account type')
+            provider, now = 'payroll:' + role.lower(), utc_now()
+            # A provider key per role permits shared target codes (social tax/pension).
+            mapping = tx.one('SELECT id FROM account_mappings WHERE organisation_id=? AND provider=?', (organisation_id, provider))
+            if mapping:
+                tx.execute("UPDATE account_mappings SET local_account_code=?,external_account_code=?,status='Confirmed',updated_at=? WHERE organisation_id=? AND id=?", (account_code, account_code, now, organisation_id, mapping['id']))
+            else:
+                tx.execute("INSERT INTO account_mappings(id,organisation_id,provider,local_account_code,external_account_code,status,created_at,updated_at) VALUES (?,?,?,?,?,'Confirmed',?,?)", (new_id(), organisation_id, provider, account_code, account_code, now, now))
+            audit(tx, organisation_id, actor, 'payroll.mapping.saved', 'account', account['id'], {'role': role})
+
+    @staticmethod
+    def _posting_account(tx, organisation_id, role):
+        mapping = tx.one("SELECT local_account_code FROM account_mappings WHERE organisation_id=? AND provider=? AND status='Confirmed'", (organisation_id, 'payroll:' + role.lower()))
+        if mapping:
+            account = tx.one('SELECT * FROM accounts WHERE organisation_id=? AND code=? AND active=1', (organisation_id, mapping['local_account_code']))
+        else:
+            account = tx.one('SELECT * FROM accounts WHERE organisation_id=? AND system_role=? AND active=1', (organisation_id, role))
+        if not account:
+            raise ValueError('A payroll posting account is missing or inactive')
+        expected = 'Expense' if role in ('PAYROLL_SALARY', 'PAYROLL_SOCIAL', 'PAYROLL_UI') else 'Liability'
+        if account['account_type'] != expected:
+            raise ValueError('Choose an active account of the required payroll account type')
+        return account
 
     @staticmethod
     def _hours(employee, hours):
@@ -395,7 +577,8 @@ class PayrollService:
                         raise ValueError(f"{employee['name']}: hourly rate must be at least EUR {hourly_minimum:.2f}")
                     worked = self._hours(employee, hours)
                 amounts = calculate_pay(employee, period=period, hours=worked)
-                values = (new_id(), run_id, organisation_id, employee['id'], employee['name'], employee.get('personal_id'),
+                item_id = new_id()
+                values = (item_id, run_id, organisation_id, employee['id'], employee['name'], employee.get('personal_id'),
                           db_number(amounts['gross'] if basis == 'hourly' else money(employee['gross_salary'])),
                           int(basis == 'board_fee'), db_number(decimal(employee['funded_pension_percent'])), basis,
                           db_number(four_dp(fte)), None if basis != 'hourly' else db_number(four_dp(employee['hourly_rate'])),
@@ -403,6 +586,8 @@ class PayrollService:
                           amounts['social_tax_minimum_exemption'])
                 tx.execute('INSERT INTO pay_run_items('+','.join(columns)+') VALUES ('+','.join('?' for _ in columns)+')',
                            values+tuple(db_number(amounts[k]) for k in AMOUNTS))
+                tx.execute('INSERT INTO pay_item_context(organisation_id,item_id,apply_tax_free_minimum,employment_start_date,employment_end_date) VALUES (?,?,?,?,?)',
+                           (organisation_id, item_id, int(employee['apply_tax_free_minimum']), employee.get('employment_start_date'), employee.get('employment_end_date')))
                 for key in totals:
                     totals[key] += amounts[key]
             tx.execute('UPDATE pay_runs SET total_gross=?,total_net=?,total_employer_cost=? WHERE organisation_id=? AND id=?', tuple(db_number(totals[k]) for k in totals)+(organisation_id, run_id))
@@ -423,23 +608,29 @@ class PayrollService:
             # accounts, posted as its own line so the top-up is visible in the ledger.
             topup = totals['social_tax_minimum_topup']
             topup_memo = f"{i18n.t('workspace.Social tax minimum top-up', 'et')} {run['period']}"
+            deductions = {role: sum((money(c['amount']) for item in run['items'] for c in item['components']
+                                    if c['direction'] == 'deduction' and c['liability_role'] == role), Decimal(0))
+                          for role in ('PAYROLL_BAILIFF', 'PAYROLL_DEDUCTION')}
             postings = [('PAYROLL_SALARY', totals['gross'], True, memo),
+                        ('PAYROLL_SALARY_PAYABLE', totals['gross'], False, memo),
+                        ('PAYROLL_SALARY_PAYABLE', totals['withholding_total'], True, memo),
+                        ('PAYROLL_INCOME_WITHHELD', totals['income_tax'], False, memo),
+                        ('PAYROLL_PENSION_WITHHELD', totals['funded_pension'], False, memo),
+                        ('PAYROLL_UI_ACCRUED', totals['ui_employee'], False, memo),
+                        *((role, value, False, memo) for role, value in deductions.items()),
                         ('PAYROLL_SOCIAL', totals['social_tax']-topup, True, memo),
+                        ('PAYROLL_SOCIAL_ACCRUED', totals['social_tax']-topup, False, memo),
                         ('PAYROLL_SOCIAL', topup, True, topup_memo),
-                        ('PAYROLL_UI', totals['ui_employer'], True, memo), ('PAYROLL_NET', totals['net'], False, memo),
-                        ('PAYROLL_INCOME_TAX', totals['income_tax'], False, memo),
-                        ('PAYROLL_WITHHOLDING', totals['funded_pension']+totals['ui_employee'], False, memo),
-                        ('PAYROLL_EMPLOYER_TAX', totals['social_tax']-topup+totals['ui_employer'], False, memo),
-                        ('PAYROLL_EMPLOYER_TAX', topup, False, topup_memo)]
-            lines = []
-            for role, value, debit, line_memo in postings:
-                if not value:
-                    continue
-                account = tx.one('SELECT id FROM accounts WHERE organisation_id=? AND system_role=? AND active=1', (organisation_id, role))
-                if not account:
-                    raise ValueError(f'Chart of accounts is missing {role}')
-                lines.append(PostingLine(account['id'], debit=value if debit else Decimal(0), credit=Decimal(0) if debit else value,
-                                         memo=line_memo, source_line_type='pay_run', source_line_id=run_id))
+                        ('PAYROLL_SOCIAL_ACCRUED', topup, False, topup_memo),
+                        ('PAYROLL_UI', totals['ui_employer'], True, memo),
+                        ('PAYROLL_UI_ACCRUED', totals['ui_employer'], False, memo)]
+            accounts = {role: self._posting_account(tx, organisation_id, role) for role in ROLES}
+            for role, account in accounts.items():
+                tx.execute('INSERT INTO pay_run_posting_accounts(organisation_id,pay_run_id,role,account_id) VALUES (?,?,?,?)',
+                           (organisation_id, run_id, role, account['id']))
+            lines = [PostingLine(accounts[role]['id'], debit=value if debit else Decimal(0), credit=Decimal(0) if debit else value,
+                                 memo=line_memo, source_line_type='pay_run', source_line_id=run_id)
+                     for role, value, debit, line_memo in postings if value]
             year, month = map(int, run['period'].split('-'))
             batch = LedgerService(self.db).post(organisation_id=organisation_id, voucher_type='payroll', voucher_id=run_id,
                 voucher_code=f"PAY-{run['period']}", posting_date=f"{run['period']}-{calendar.monthrange(year,month)[1]}",
@@ -449,12 +640,70 @@ class PayrollService:
             audit(tx, organisation_id, actor, 'payroll.approved', 'pay_run', run_id, {'posted_batch_id': batch['id']})
             return self._run(tx, organisation_id, run_id)
 
+    def settle_declaration(self, organisation_id, run_id, *, actor):
+        """Explicit bureau reclassification, dated the following month's 10th.
+
+        Debit the frozen accrual accounts, even if mappings have since changed.
+        This records a liability reclassification, not a bank payment or submission.
+        """
+        with self.db.transaction() as tx:
+            run = self._run(tx, organisation_id, run_id)
+            self._organisation(tx, organisation_id)
+            if run['status'] != 'Approved':
+                raise PayrollConflict('Only approved pay runs can be settled')
+            claimed = tx.execute('INSERT INTO pay_run_settlements(organisation_id,pay_run_id) VALUES (?,?) ON CONFLICT DO NOTHING', (organisation_id, run_id))
+            if claimed.rowcount != 1:
+                raise PayrollConflict('The declaration has already been settled')
+            totals = {key: sum((money(item[key]) for item in run['items']), Decimal(0)) for key in AMOUNTS}
+            frozen = {row['role']: row['account_id'] for row in tx.rows('SELECT * FROM pay_run_posting_accounts WHERE organisation_id=? AND pay_run_id=?', (organisation_id, run_id))}
+            # Historical runs used combined liabilities. Debit their original accounts;
+            # never re-post or rewrite an existing salary batch during migration.
+            legacy = not frozen
+            original = {row['system_role']: row['account_id'] for row in tx.rows(
+                'SELECT a.system_role,g.account_id FROM gl_entries g JOIN accounts a ON a.organisation_id=g.organisation_id AND a.id=g.account_id WHERE g.organisation_id=? AND g.posting_batch_id=? AND g.credit>0', (organisation_id, run['posted_batch_id']))}
+            pairs = [('PAYROLL_SOCIAL_ACCRUED', 'PAYROLL_SOCIAL_PAYABLE', totals['social_tax']),
+                     ('PAYROLL_INCOME_WITHHELD', 'PAYROLL_INCOME_PAYABLE', totals['income_tax']),
+                     ('PAYROLL_UI_ACCRUED', 'PAYROLL_UI_PAYABLE', totals['ui_employee']+totals['ui_employer']),
+                     ('PAYROLL_PENSION_WITHHELD', 'PAYROLL_SOCIAL_PAYABLE', totals['funded_pension'])]
+            if not any(value for _, _, value in pairs):
+                # A fully exempt payment can have no tax liability to move.
+                # Record the explicit action without fabricating zero ledger lines.
+                audit(tx, organisation_id, actor, 'payroll.declaration.settled', 'pay_run', run_id,
+                      {'posted_batch_id': None, 'no_liabilities': True})
+                return self._run(tx, organisation_id, run_id)
+            lines = []
+            memo = 'TSD ' + run['period']
+            for accrued, payable, value in pairs:
+                if not value:
+                    continue
+                if legacy:
+                    sources = ([(original.get('PAYROLL_EMPLOYER_TAX'), totals['ui_employer']), (original.get('PAYROLL_WITHHOLDING'), totals['ui_employee'])]
+                               if accrued == 'PAYROLL_UI_ACCRUED' else
+                               [(original.get({'PAYROLL_SOCIAL_ACCRUED': 'PAYROLL_EMPLOYER_TAX', 'PAYROLL_INCOME_WITHHELD': 'PAYROLL_INCOME_TAX', 'PAYROLL_PENSION_WITHHELD': 'PAYROLL_WITHHOLDING'}[accrued]), value)])
+                else:
+                    sources = [(frozen.get(accrued), value)]
+                for account_id, amount in sources:
+                    if amount:
+                        if not account_id:
+                            raise ValueError('The original payroll accrual account is missing')
+                        lines.append(PostingLine(account_id, debit=amount, memo=memo, source_line_type='pay_run', source_line_id=run_id))
+                target = self._posting_account(tx, organisation_id, payable)
+                lines.append(PostingLine(target['id'], credit=value, memo=memo, source_line_type='pay_run', source_line_id=run_id))
+            batch = LedgerService(self.db).post(organisation_id=organisation_id, voucher_type='payroll_tsd', voucher_id=run_id,
+                voucher_code='TSD-' + run['period'], posting_date=declaration_due_date(run['period']).isoformat(),
+                lines=lines, actor=actor, currency='EUR', tx=tx)
+            tx.execute('UPDATE pay_run_settlements SET posted_batch_id=? WHERE organisation_id=? AND pay_run_id=?', (batch['id'], organisation_id, run_id))
+            audit(tx, organisation_id, actor, 'payroll.declaration.settled', 'pay_run', run_id, {'posted_batch_id': batch['id']})
+            return self._run(tx, organisation_id, run_id)
+
     def delete_run(self, organisation_id, run_id, *, actor):
         with self.db.transaction() as tx:
             claimed = tx.execute("UPDATE pay_runs SET notes=notes WHERE organisation_id=? AND id=? AND status='Draft'", (organisation_id, run_id))
             self._run(tx, organisation_id, run_id)
             if claimed.rowcount != 1:
                 raise PayrollConflict('Only draft pay runs can be deleted')
+            for table in ('pay_item_components', 'pay_item_context'):
+                tx.execute(f'DELETE FROM {table} WHERE organisation_id=? AND item_id IN (SELECT id FROM pay_run_items WHERE organisation_id=? AND pay_run_id=?)', (organisation_id, organisation_id, run_id))
             tx.execute('DELETE FROM pay_run_items WHERE organisation_id=? AND pay_run_id=?', (organisation_id, run_id))
             tx.execute('DELETE FROM pay_runs WHERE organisation_id=? AND id=?', (organisation_id, run_id))
             audit(tx, organisation_id, actor, 'payroll.deleted', 'pay_run', run_id)

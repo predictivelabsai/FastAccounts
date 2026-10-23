@@ -38,7 +38,9 @@ UK_ACCOUNTS = (
     ("6500", "Depreciation expense", "Expense", "Debit", "DEPRECIATION_EXPENSE"),
 )
 
-EE_ACCOUNTS = (
+from payroll_components import ACCOUNTS as PAYROLL_COMPONENT_ACCOUNTS
+
+EE_ACCOUNTS = tuple((code, name, 'Liability', 'Credit', role) for code, name, role in PAYROLL_COMPONENT_ACCOUNTS) + (
     ('6110', 'Palgakulu', 'Expense', 'Debit', 'PAYROLL_SALARY'),
     ('6120', 'Sotsiaalmaksu kulu', 'Expense', 'Debit', 'PAYROLL_SOCIAL'),
     ('6130', 'Tööandja töötuskindlustusmakse kulu', 'Expense', 'Debit', 'PAYROLL_UI'),
@@ -124,6 +126,9 @@ class OrganisationService:
                 (new_id(), organisation_id, email, "owner", now),
             )
             self._seed_accounts(tx, organisation_id, country)
+            if country == 'EE' and tx.one("SELECT version FROM schema_migrations WHERE version='0034_payroll_demo_fixes'"):
+                from payroll_components import seed_types
+                seed_types(tx, organisation_id)
             self._seed_taxes(tx, organisation_id, country)
             for document_type, prefix in (("invoice", "INV-"), ("credit_note", "CRN-"), ("quote", "QUO-")):
                 tx.execute(

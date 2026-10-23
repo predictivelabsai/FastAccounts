@@ -1017,7 +1017,7 @@ def payroll_pdf(organisation: dict, run: dict) -> bytes:
     from web import i18n
     from payroll import SOCIAL_TAX_MINIMUM_EXEMPTION_LABELS
     def catalogue(key):
-        return text(i18n.t('workspace.' + key, 'et' if ee else 'en'))
+        return text(i18n.catalog('et' if ee else 'en')['workspace'].get(key, key))
 
     output = BytesIO()
     canvas = Canvas(output, pagesize=A4)
@@ -1082,6 +1082,39 @@ def payroll_pdf(organisation: dict, run: dict) -> bytes:
                 y -= 14
             y -= 8
         canvas.drawRightString(width-42, 32, f"{index} / {len(run['items'])}")
+        canvas.showPage()
+    # Keep the first page per employee stable for existing payslip download links.
+    from payroll_components import FLAGS, FLAG_LABELS
+    for item in run['items']:
+        if not item.get('components'):
+            continue
+        y = 0
+        for component in item['components']:
+            lines = simpleSplit(catalogue(component['name']), regular, 11, width-235)
+            flags = ', '.join(catalogue(label) for key, label in zip(FLAGS, FLAG_LABELS) if component[key])
+            detail = catalogue('Income' if component['direction'] == 'income' else 'Deduction') + ': ' + (flags or catalogue('No levies'))
+            details = simpleSplit(detail, regular, 9, width-84)
+            if y < 70 + 16 * (len(lines) + len(details)):
+                if y:
+                    canvas.showPage()
+                canvas.setFont(bold, 16)
+                canvas.drawString(42, height-50, catalogue('Payment components') + ' ' + run['period'])
+                canvas.setFont(regular, 11)
+                y = height-75
+                for name_line in simpleSplit(text(item['employee_name']), regular, 11, width-84):
+                    canvas.drawString(42, y, name_line)
+                    y -= 16
+                y -= 19
+            canvas.setFont(regular, 11)
+            canvas.drawRightString(width-42, y, f"{money(component['amount']):.2f} EUR")
+            for line in lines:
+                canvas.drawString(42, y, line)
+                y -= 16
+            canvas.setFont(regular, 9)
+            for line in details:
+                canvas.drawString(42, y, line)
+                y -= 14
+            y -= 14
         canvas.showPage()
     canvas.save()
     return output.getvalue()

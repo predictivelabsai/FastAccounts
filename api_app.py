@@ -2165,6 +2165,44 @@ class PayRunIn(BaseModel):
     hours: dict[str, Decimal] | None = None
 
 
+class PayComponentIn(BaseModel):
+    model_config = {'extra': 'forbid'}
+    name: str = Field(min_length=1, max_length=180)
+    direction: Literal['income', 'deduction'] = 'income'
+    income_tax: bool = False
+    social_tax: bool = False
+    ui_employee: bool = False
+    ui_employer: bool = False
+    funded_pension: bool = False
+    social_minimum: bool = False
+    liability_role: Literal['PAYROLL_BAILIFF', 'PAYROLL_DEDUCTION'] = 'PAYROLL_DEDUCTION'
+
+
+class PayComponentLine(BaseModel):
+    model_config = {'extra': 'forbid'}
+    type_id: str
+    amount: Decimal = Field(max_digits=12, decimal_places=2)
+    name: str | None = Field(default=None, min_length=1, max_length=180)
+    direction: Literal['income', 'deduction'] | None = None
+    income_tax: bool | None = None
+    social_tax: bool | None = None
+    ui_employee: bool | None = None
+    ui_employer: bool | None = None
+    funded_pension: bool | None = None
+    social_minimum: bool | None = None
+    liability_role: Literal['PAYROLL_BAILIFF', 'PAYROLL_DEDUCTION'] | None = None
+
+
+class PayItemPatch(BaseModel):
+    model_config = {'extra': 'forbid'}
+    hours: Decimal | None = None
+    components: list[PayComponentLine] | None = Field(default=None, max_length=100)
+
+
+class PayrollMappingIn(BaseModel):
+    account_code: str = Field(min_length=1)
+
+
 @api.exception_handler(PayrollConflict)
 async def payroll_conflict(_request: Request, error: PayrollConflict):
     return JSONResponse({'detail': str(error)}, status_code=409)
@@ -2186,6 +2224,59 @@ def payroll_create_employee(organisation_id: str, payload: EmployeeIn, user: Use
 def payroll_update_employee(organisation_id: str, employee_id: str, payload: EmployeePatch, user: User = Depends(require_csrf)):
     _require(organisation_id, user, WRITE_ROLES)
     return PayrollService().save_employee(organisation_id, employee_id=employee_id, actor=user.email, **payload.model_dump(exclude_unset=True))
+
+
+@api.delete('/organisations/{organisation_id}/employees/{employee_id}', status_code=204)
+def payroll_delete_employee(organisation_id: str, employee_id: str, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    PayrollService().delete_employee(organisation_id, employee_id, actor=user.email)
+    return Response(status_code=204)
+
+
+@api.get('/organisations/{organisation_id}/payroll/component-types')
+def payroll_component_types(organisation_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    return PayrollService().component_types(organisation_id)
+
+
+@api.post('/organisations/{organisation_id}/payroll/component-types', status_code=201)
+def payroll_create_component_type(organisation_id: str, payload: PayComponentIn, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return PayrollService().save_component_type(organisation_id, actor=user.email, **payload.model_dump())
+
+
+@api.put('/organisations/{organisation_id}/payroll/component-types/{type_id}')
+def payroll_save_component_type(organisation_id: str, type_id: str, payload: PayComponentIn, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return PayrollService().save_component_type(organisation_id, type_id=type_id, actor=user.email, **payload.model_dump())
+
+
+@api.get('/organisations/{organisation_id}/payroll/posting-mappings')
+def payroll_posting_mappings(organisation_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    return PayrollService().posting_mappings(organisation_id)
+
+
+@api.put('/organisations/{organisation_id}/payroll/posting-mappings/{role}')
+def payroll_save_mapping(organisation_id: str, role: str, payload: PayrollMappingIn, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, APPROVE_ROLES)
+    PayrollService().save_posting_mapping(organisation_id, role, payload.account_code, actor=user.email)
+    return PayrollService().posting_mappings(organisation_id)
+
+
+@api.patch('/organisations/{organisation_id}/pay-runs/{run_id}/items/{item_id}')
+def payroll_update_item(organisation_id: str, run_id: str, item_id: str, payload: PayItemPatch, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    values = payload.model_dump(exclude_unset=True)
+    if any(value is None for value in values.values()):
+        raise ValueError('Draft item fields cannot be null')
+    return PayrollService().update_item(organisation_id, run_id, item_id, actor=user.email, **values)
+
+
+@api.post('/organisations/{organisation_id}/pay-runs/{run_id}/tsd/settle')
+def payroll_settle(organisation_id: str, run_id: str, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, APPROVE_ROLES)
+    return PayrollService().settle_declaration(organisation_id, run_id, actor=user.email)
 
 
 @api.get('/organisations/{organisation_id}/pay-runs')

@@ -230,6 +230,8 @@ class Database:
                     script = script.replace(
                         "accent_colour GLOB '#[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]'",
                         "accent_colour ~ '^#[0-9a-fA-F]{6}$'")
+                elif path.stem == "0034_payroll_demo_fixes":
+                    script = script.split('-- SQLITE_PAYROLL_IMMUTABILITY', 1)[0] + _postgres_payroll_component_triggers()
                 connection.execute(script)
                 connection.execute(
                     "INSERT INTO schema_migrations(version) VALUES (%s)",
@@ -243,6 +245,34 @@ class Database:
         finally:
             self._release(connection)
         return applied
+
+
+def _postgres_payroll_component_triggers():
+    script = ''
+    for table in ('pay_item_components', 'pay_item_context'):
+        script += f"""
+CREATE OR REPLACE FUNCTION guard_{table}() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP <> 'INSERT' THEN
+        IF EXISTS (SELECT 1 FROM pay_run_items i JOIN pay_runs r ON r.organisation_id=i.organisation_id AND r.id=i.pay_run_id
+                   WHERE i.organisation_id=OLD.organisation_id AND i.id=OLD.item_id AND r.status='Approved') THEN
+            RAISE EXCEPTION 'approved payroll components are immutable';
+        END IF;
+    END IF;
+    IF TG_OP <> 'DELETE' THEN
+        IF EXISTS (SELECT 1 FROM pay_run_items i JOIN pay_runs r ON r.organisation_id=i.organisation_id AND r.id=i.pay_run_id
+                   WHERE i.organisation_id=NEW.organisation_id AND i.id=NEW.item_id AND r.status='Approved') THEN
+            RAISE EXCEPTION 'approved payroll components are immutable';
+        END IF;
+    END IF;
+    IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
+    RETURN NEW;
+END; $$;
+DROP TRIGGER IF EXISTS guard_{table} ON {table};
+CREATE TRIGGER guard_{table} BEFORE INSERT OR UPDATE OR DELETE ON {table}
+FOR EACH ROW EXECUTE FUNCTION guard_{table}();
+"""
+    return script
 
 
 def _postgres_object_triggers():
