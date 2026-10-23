@@ -2272,7 +2272,15 @@
       "Stage {rows} rows for import": "Įtraukti {rows} eilutes į importo peržiūrą",
       "Stage import rows": "Importo eilučių peržiūra",
       "Review these rows in Data import before they touch your books. Stage them now?": "Peržiūrėkite šias eilutes duomenų importe, kol jos nepateko į apskaitą. Įtraukti į peržiūrą dabar?",
-      "Import batch staged. Review it under Data import.": "Importo paketas įtrauktas į peržiūrą. Peržiūrėkite jį duomenų importe."
+      "Import batch staged. Review it under Data import.": "Importo paketas įtrauktas į peržiūrą. Peržiūrėkite jį duomenų importe.",
+      "Organisation API key configured": "Organizacijos API raktas nustatytas",
+      "Using the service API key when available": "Naudojamas paslaugos API raktas, jei jis yra",
+      "Organisation xAI API key": "Organizacijos xAI API raktas",
+      "Leave blank to keep the saved key.": "Palikite tuščią, kad išsaugotumėte esamą raktą.",
+      "Clear the organisation API key": "Pašalinti organizacijos API raktą",
+      "Copilot model (optional)": "AI pagalbininko modelis (neprivalomas)",
+      "Invalid copilot model": "Netinkamas AI pagalbininko modelis",
+      "Invalid copilot API key": "Netinkamas AI pagalbininko API raktas"
     }
   },
   "periods": {

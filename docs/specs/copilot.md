@@ -13,7 +13,8 @@ Provider: xAI Grok API, OpenAI-compatible
 (`https://api.x.ai/v1/chat/completions`, bearer key, models such as
 `grok-4-1-fast-reasoning`, usage token counts in the response). A dedicated API key is
 carried in `FASTACCOUNTS_GROK_API_KEY` so usage is tracked per product.
-The key lives only in the environment and never enters the repository,
+An organisation may override the environment key using encrypted settings.
+Keys never enter the repository,
 logs, audits or model prompts.
 
 ## Threat and abuse model (primary design driver)
@@ -54,8 +55,7 @@ defence in depth is mandatory:
    `copilot.settings_updated`) with actor, model, token counts and truncated
    outcome. Owner/administrator can read a usage summary (GET
    `/copilot/usage`): per-user per-day messages/tokens so spend is visible.
-6. No secrets in prompts or client responses. Only environment-provided key
-   material exists server-side; prompts contain org data and document text.
+6. No secrets in prompts or client responses. Key material remains server-side; prompts contain org data and document text.
 7. Tenancy. Contexts are composed strictly from server-side services that
    take `organisation_id`; no cross-org joins, and attachments are validated
    with the existing org-scoped `evidence_download` integrity path.
@@ -120,7 +120,7 @@ actions on the ledger, sharing conversations across users.
   composition, provider call through an injectable factory
   `HTTP_CLIENT_FACTORY`, response persistence, stage proposal handling).
 - `copilot_provider.py`: the single place that knows the xAI wire format;
-  returns text plus usage. Key read from env; never persisted.
+  returns text plus usage. Key supplied by the service from encrypted organisation settings or env.
 - `copilot_repository.py`: org-locked writes for org toggle, messages,
   usage counters; reads for history/usage. Reuses `audit`.
 - Migration `0029_copilot` (additive, rerun-safe): `copilot_messages`,
@@ -191,3 +191,14 @@ assistant message with zero tokens and no stage before re-raising. Existing quot
 accounting is unchanged. Tests inject the HTTP client and never call a live provider.
 New transcript messages use microsecond timestamps so a fast failure reply stays
 after its question when the conversation is reopened.
+
+## 2026-10-23: Organisation provider settings
+
+Owners and administrators can POST an organisation xAI key and optional model
+from drawer administration. Omitted keys are retained; an empty key clears the
+organisation override. GET settings return only `configured` and `model`.
+Migration 0033 stores credentials encrypted with the existing CredentialVault
+and its key version, using the same portable DDL for SQLite and PostgreSQL.
+The organisation key takes precedence for chat and scans; the environment key
+remains the fallback. The global flag and organisation opt-in remain mandatory.
+Settings audits contain a configuration flag, never a key.

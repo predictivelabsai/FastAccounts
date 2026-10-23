@@ -809,7 +809,13 @@
       `</section>` : '';
     const body = `<p class="muted" data-copilot-notice aria-live="polite">${esc(notice)}</p>` +
       (admins ? `<details id="copilot-admin" data-copilot-admin><summary>${tr('Copilot administration')}</summary><section class="section" data-copilot-settings>` +
-        form(check('Enable AI copilot for this organisation', 'copilot_enabled', !!status.enabled)) + `</section>` + grantsPanel + usageUsage + `</details>` : '') +
+        form(check('Enable AI copilot for this organisation', 'copilot_enabled', !!status.enabled)) + `</section><section class="section" data-copilot-provider>` +
+        `<p class="muted">${tr(status.settings?.configured ? 'Organisation API key configured' : 'Using the service API key when available')}</p>` +
+        form(field('Organisation xAI API key', 'api_key', '', 'password', 'autocomplete="new-password" maxlength="4096"') +
+          `<p class="muted">${tr('Leave blank to keep the saved key.')}</p>` +
+          check('Clear the organisation API key', 'clear_key', false) +
+          field('Copilot model (optional)', 'model', status.settings?.model || '', 'text', 'maxlength="128"'), 'Save') +
+        `</section>` + grantsPanel + usageUsage + `</details>` : '') +
       `<section data-copilot-chat><div id="copilot-transcript" role="log" aria-live="polite" aria-relevant="additions text">${history?.length ? copilotTranscript([...history].reverse()) : empty}</div>` + composer + `</section>`;
     if (!c.mount(body)) return;
     copilotBody.querySelectorAll('[data-action=cancel]').forEach((x) => x.remove());
@@ -817,6 +823,16 @@
     const enabledCheck = copilotBody.querySelector('[name=copilot_enabled]');
     if (enabledCheck) bindForm(copilotBody.querySelector('[data-copilot-settings]'), async () => {
       await post(c.url('/copilot/settings'), {enabled: !!enabledCheck.checked}, 'PUT');
+      toast(t('Saved successfully'));
+      await loadCopilot();
+    });
+    const providerPanel = copilotBody.querySelector('[data-copilot-provider]');
+    if (providerPanel) bindForm(providerPanel, async (values) => {
+      const payload = {model: values.model || ''};
+      if (providerPanel.querySelector('[name=clear_key]').checked) payload.api_key = '';
+      else if (values.api_key?.trim()) payload.api_key = values.api_key.trim();
+      await post(c.url('/copilot/settings'), payload);
+      providerPanel.querySelector('[name=api_key]').value = '';
       toast(t('Saved successfully'));
       await loadCopilot();
     });

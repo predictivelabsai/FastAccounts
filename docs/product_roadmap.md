@@ -3,6 +3,16 @@
 **Research baseline:** 2026-08-10  
 **Status:** engineering pilot implemented; independent UK/EE accountant UAT and provider approvals pending
 
+## 2026-10-23: Organisation copilot credentials
+
+- Owners and administrators can save or clear an encrypted organisation xAI key
+  and optional model in the drawer. POST writes require CSRF; reads expose only
+  configuration status and the model. Settings audits never contain credentials.
+- Migration 0033 reuses the integration CredentialVault and records its key
+  version. Organisation credentials take precedence over the environment key
+  for chat and scans. Global and organisation switches and access grants remain.
+- Validation: offline settings tests passed; JavaScript syntax checked.
+
 ## 2026-10-21: Copilot chat and provider fixes
 
 - Redesigned the workspace drawer as a scrolling chat with a pinned composer,

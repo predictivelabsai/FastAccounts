@@ -18,6 +18,7 @@ import base64
 import csv
 import io
 import json
+import os
 import re
 from datetime import datetime, timedelta, timezone
 
@@ -27,6 +28,8 @@ from copilot_provider import (
     chat_completion,
     configured,
 )
+import copilot_repository
+from integration_service import CredentialVault
 from database import get_database
 
 MAX_MESSAGE_CHARS = 8000
@@ -124,11 +127,12 @@ class CopilotService:
 
     ADMIN_ROLES = ("owner", "administrator")
 
-    @staticmethod
-    def _gate(organisation_id, user_email):
-        if not configured():
+    def _gate(self, organisation_id, user_email):
+        if os.getenv("FASTACCOUNTS_COPILOT_ENABLED", "").lower() != "true":
             raise CopilotDisabled("AI copilot is not configured.")
-        service = CopilotService()
+        if not (configured() or self.settings(organisation_id)["configured"]):
+            raise CopilotDisabled("AI copilot is not configured.")
+        service = self
         if not service.enabled(organisation_id):
             raise CopilotDisabled("AI copilot is off for this organisation.")
         access = service.access(organisation_id, user_email)
@@ -171,7 +175,8 @@ class CopilotService:
             "FROM copilot_usage WHERE organisation_id=? AND day=?", (organisation_id, _day()))
         access = self.access(organisation_id, user_email)
         return {
-            "available": bool(configured()),
+            "available": bool(configured() or self.settings(organisation_id)["configured"]),
+            "settings": self.settings(organisation_id) if access["admin"] else None,
             "enabled": self.enabled(organisation_id),
             "access": {"role": access["role"], "admin": access["admin"],
                        "granted": access["granted"]},
@@ -214,6 +219,40 @@ class CopilotService:
             (organisation_id, int(limit)))
 
     # writes --------------------------------------------------------------
+
+    def settings(self, organisation_id):
+        row = copilot_repository.settings(self.db, organisation_id)
+        return {"configured": bool(row.get("encrypted_credentials")),
+                "model": row.get("model", "")}
+
+    def update_settings(self, organisation_id, *, api_key=None, model=None, actor):
+        if not self.access(organisation_id, actor)["admin"]:
+            raise CopilotAccessDenied("Only owners and administrators can configure the copilot.")
+        row = copilot_repository.settings(self.db, organisation_id)
+        encrypted = row.get("encrypted_credentials")
+        version = row.get("encryption_key_version")
+        if model is not None and (len(model) > 128 or (model and not re.fullmatch(r"[a-zA-Z0-9._:-]+", model))):
+            raise ValueError("Invalid copilot model")
+        if api_key is not None:
+            api_key = api_key.strip()
+            if len(api_key) > 4096 or any(ord(c) < 33 or ord(c) > 126 for c in api_key):
+                raise ValueError("Invalid copilot API key")
+            vault = CredentialVault() if api_key else None
+            encrypted = vault.encrypt({"api_key": api_key}) if vault else None
+            version = vault.version if vault else None
+        copilot_repository.save_settings(
+            self.db, organisation_id, encrypted=encrypted, version=version,
+            model=row.get("model", "") if model is None else model, actor=actor)
+        return self.settings(organisation_id)
+
+    def _provider_options(self, organisation_id):
+        row = copilot_repository.settings(self.db, organisation_id)
+        options = {}
+        if row.get("encrypted_credentials"):
+            options["api_key"] = CredentialVault().decrypt(row["encrypted_credentials"])["api_key"]
+        if row.get("model"):
+            options["model_id"] = row["model"]
+        return options
 
     def set_enabled(self, organisation_id, enabled, *, actor):
         with self.db.transaction() as tx:
@@ -298,7 +337,7 @@ class CopilotService:
                   organisation_id,
                   {"attachments": len(attachments), "prompt_chars": len(prompt)})
         try:
-            reply = chat_completion(prompt, client=client)
+            reply = chat_completion(prompt, client=client, **self._provider_options(organisation_id))
         except CopilotProviderError as error:
             _insert_message(self.db, organisation_id, user_email, "assistant", str(error))
             raise

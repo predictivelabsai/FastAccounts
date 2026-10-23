@@ -1123,6 +1123,24 @@ def copilot_documents(organisation_id: str, user: User = Depends(current_user)):
     return CopilotService().documents(organisation_id)
 
 
+class CopilotProviderSettingsIn(BaseModel):
+    api_key: str | None = Field(default=None, max_length=4096)
+    model: str | None = Field(default=None, max_length=128)
+
+
+@api.get('/organisations/{organisation_id}/copilot/settings')
+def copilot_provider_settings(organisation_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, {'owner', 'administrator'})
+    return CopilotService().settings(organisation_id)
+
+
+@api.post('/organisations/{organisation_id}/copilot/settings')
+def copilot_update_provider_settings(organisation_id: str, payload: CopilotProviderSettingsIn,
+                                     user: User = Depends(require_csrf)):
+    _require(organisation_id, user, {'owner', 'administrator'})
+    return CopilotService().update_settings(organisation_id, **payload.model_dump(), actor=user.email)
+
+
 @api.put('/organisations/{organisation_id}/copilot/settings')
 def copilot_settings(organisation_id: str, payload: CopilotToggleIn,
                      user: User = Depends(require_csrf)):

@@ -2272,7 +2272,15 @@
       "Stage {rows} rows for import": "Stage {rows} rows for import",
       "Stage import rows": "Stage import rows",
       "Review these rows in Data import before they touch your books. Stage them now?": "Review these rows in Data import before they touch your books. Stage them now?",
-      "Import batch staged. Review it under Data import.": "Import batch staged. Review it under Data import."
+      "Import batch staged. Review it under Data import.": "Import batch staged. Review it under Data import.",
+      "Organisation API key configured": "Organisation API key configured",
+      "Using the service API key when available": "Using the service API key when available",
+      "Organisation xAI API key": "Organisation xAI API key",
+      "Leave blank to keep the saved key.": "Leave blank to keep the saved key.",
+      "Clear the organisation API key": "Clear the organisation API key",
+      "Copilot model (optional)": "Copilot model (optional)",
+      "Invalid copilot model": "Invalid copilot model",
+      "Invalid copilot API key": "Invalid copilot API key"
     }
   },
   "periods": {

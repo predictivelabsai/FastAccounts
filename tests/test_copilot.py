@@ -99,7 +99,7 @@ STAGED_CSV = "code,name\nP1,Synthetic widget\nP2,Another widget"
 
 def test_migration_count_rerun_and_ci(env):
     d = env
-    assert d["db"].scalar("SELECT COUNT(*) FROM schema_migrations") == 32
+    assert d["db"].scalar("SELECT COUNT(*) FROM schema_migrations") == 33
     assert d["db"].rows("SELECT * FROM copilot_messages") == []
     assert d["db"].rows("SELECT * FROM copilot_usage") == []
     for _ in range(2):
@@ -107,7 +107,7 @@ def test_migration_count_rerun_and_ci(env):
             tx.execute("DELETE FROM schema_migrations WHERE version='0029_copilot'")
         assert d["db"].migrate() == ["0029_copilot"]
     assert d["db"].rows("SELECT * FROM copilot_messages") == []
-    assert "'0028_document_settings', '0029_copilot', '0030_master_data_maintenance', '0031_master_data_groups', '0032_copilot_access']" in (ROOT / ".github/workflows/ci.yml").read_text()
+    assert "'0028_document_settings', '0029_copilot', '0030_master_data_maintenance', '0031_master_data_groups', '0032_copilot_access', '0033_copilot_settings']" in (ROOT / ".github/workflows/ci.yml").read_text()
 
 
 def test_kill_switches_block_before_any_provider_call(env, monkeypatch):
@@ -720,3 +720,44 @@ def test_disabled_org_blocks_even_admins(env, monkeypatch):
     response = d["client"].post(d["base"] + "/copilot/messages", json={"content": "hi"})
     assert response.status_code == 409 and "off for this organisation" in response.text
     assert call["captured"] is None
+
+
+def test_organisation_provider_settings_encrypted_scoped_and_cleared(env, monkeypatch):
+    from cryptography.fernet import Fernet
+    from integration_service import CredentialVault
+    monkeypatch.setenv("FASTACCOUNTS_ENCRYPTION_KEY", Fernet.generate_key().decode())
+    monkeypatch.setenv("FASTACCOUNTS_ENCRYPTION_KEY_VERSION", "7")
+    url = env["base"] + "/copilot/settings"
+    secret = "synthetic-org-key"
+    r = env["client"].post(url, json={"api_key": secret, "model": "grok-org"})
+    assert r.status_code == 200 and r.json() == {"configured": True, "model": "grok-org"}
+    row = env["db"].one("SELECT * FROM copilot_settings")
+    assert row["encryption_key_version"] == 7 and secret not in str(row)
+    assert CredentialVault().decrypt(row["encrypted_credentials"]) == {"api_key": secret}
+    assert secret not in env["client"].get(url).text
+    assert secret not in str(env["db"].rows("SELECT * FROM audit_events"))
+    assert copilot.CopilotService(env["db"]).settings(env["other"]["id"])["configured"] is False
+    enable(env)
+    monkeypatch.delenv("FASTACCOUNTS_GROK_API_KEY")
+    seen = {}
+    def provider(messages, **kwargs):
+        seen.update(kwargs)
+        return {"content": "org reply", "model": "grok-org", "tokens_in": 2, "tokens_out": 1}
+    monkeypatch.setattr(copilot, "chat_completion", provider)
+    assert env["client"].post(env["base"] + "/copilot/messages", json={"content": "hi"}).status_code == 201
+    assert seen["api_key"] == secret and seen["model_id"] == "grok-org"
+    assert env["client"].post(url, json={"model": ""}).json()["configured"] is True
+    assert env["client"].post(url, json={"api_key": ""}).json()["configured"] is False
+    assert env["client"].post(env["base"] + "/copilot/messages", json={"content": "hi"}).status_code == 409
+    with env["db"].transaction() as tx:
+        tx.execute("DELETE FROM schema_migrations WHERE version='0033_copilot_settings'")
+    assert env["db"].migrate() == ["0033_copilot_settings"]
+
+
+@pytest.mark.parametrize("role", ["accountant", "approver", "viewer"])
+def test_provider_settings_admin_only(env, role):
+    for method in ("get", "post"):
+        kwargs = {"json": {"api_key": "synthetic"}} if method == "post" else {}
+        response = getattr(env["client"], method)(env["base"] + "/copilot/settings",
+            headers={"X-Test-User": role + "@example.test"}, **kwargs)
+        assert response.status_code == 403

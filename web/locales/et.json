@@ -2272,7 +2272,15 @@
       "Stage {rows} rows for import": "Lisa {rows} rida eelvaate importi",
       "Stage import rows": "Impordi ridade eelvaade",
       "Review these rows in Data import before they touch your books. Stage them now?": "Vaata read andmeimpordis üle enne, kui need raamatupidamisesse jõuavad. Lisa kohe eelvaatesse?",
-      "Import batch staged. Review it under Data import.": "Impordipartii lisati eelvaatesse. Vaata seda andmeimpordi all üle."
+      "Import batch staged. Review it under Data import.": "Impordipartii lisati eelvaatesse. Vaata seda andmeimpordi all üle.",
+      "Organisation API key configured": "Organisatsiooni API-võti on seadistatud",
+      "Using the service API key when available": "Võimaluse korral kasutatakse teenuse API-võtit",
+      "Organisation xAI API key": "Organisatsiooni xAI API-võti",
+      "Leave blank to keep the saved key.": "Salvestatud võtme säilitamiseks jäta väli tühjaks.",
+      "Clear the organisation API key": "Eemalda organisatsiooni API-võti",
+      "Copilot model (optional)": "AI-kaaslase mudel (valikuline)",
+      "Invalid copilot model": "Vigane AI-kaaslase mudel",
+      "Invalid copilot API key": "Vigane AI-kaaslase API-võti"
     }
   },
   "periods": {
