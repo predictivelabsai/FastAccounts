@@ -1983,3 +1983,11 @@ paired change log. Production accountant UAT remains pending, especially author
 remuneration, parental-leave defaults and mixed-component tax treatment. See
 [payroll rules](payroll_rules.md). Direct filing, payment execution, automatic
 leave calculations and general HR remain outside this change.
+
+Validation on 2026-10-24: the required payroll/migration checks passed 69 tests;
+component, TSD, push and Excel checks passed 42 tests; i18n checks passed 13 tests.
+JavaScript and Python 3.12 syntax checks passed on the supplied Python 3.14.6 venv.
+The full suite was stopped at the 40-minute limit after 838 reported outcomes.
+Its missing deletion-label translation was fixed and retested, but full-suite
+completion, Python 3.12 runtime verification and live PostgreSQL checks remain
+follow-ups. The paired change log records the validation limits.

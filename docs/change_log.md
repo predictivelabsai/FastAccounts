@@ -24,9 +24,17 @@ delivered.
 - Production bureau UAT is pending. Author social tax defaults to on; author and
   parental-leave flags remain editable assumptions. See the paired roadmap and
   payroll rules for calculation details and remaining scope.
-- Workspace browser checks pass for monthly and hourly pay, multiple components,
-  frozen flags, employee lifecycle, account mappings and declarations at a mobile
-  viewport (9 tests). Full-suite validation is in progress.
+- Validation on 2026-10-24: the required four-file payroll/migration command passed
+  all 69 tests, including monthly and hourly mobile browser flows. Component,
+  TSD, push and Excel checks passed all 42 tests; i18n checks passed all 13 tests.
+  JavaScript syntax and Python 3.12 syntax checks passed. The supplied venv runs
+  Python 3.14.6; Python 3.12 runtime and live PostgreSQL checks were not run.
+- The full `pytest -q` run was stopped by a UTC watchdog after 40 minutes,
+  with 838 outcomes reported: 837 passed and one missing `Delete` translation
+  failure. That key was added in all four locales and the complete i18n test
+  file then passed. The full run did not complete. It began before the later
+  migration-isolation and hourly minimum fixes, which the final focused checks
+  cover. A complete full-suite run remains a follow-up.
 - Isolated historical payroll migration setup from the process-wide migration
   catalogue. A concurrent legacy/current database regression verifies that an old
   schema setup cannot select old migrations for another database. The reported
