@@ -27,14 +27,16 @@ delivered.
 - Validation on 2026-10-24: the five required files passed individually: payroll
   16, part-time/hourly 30, workspace payroll 9, migrations/tenancy 14 and copilot
   60 (129 total). Payroll demo checks passed 17 tests, i18n 13 and seed integration
-  1. JavaScript syntax and Python 3.12 grammar checks passed. The supplied venv
-  runs Python 3.14.6; Python 3.12 runtime and live PostgreSQL checks were not run.
-- A marked full run completed in 25m 28s: 1,559 passed, four PostgreSQL opt-in
-  skips and one stale seed integration assertion expecting seven payroll lines.
-  The mapped journal has ten lines. The assertion now compares the export with
-  its source journal rather than pinning the old posting shape; its entire test
-  file passes, including encryption, balance, mapping and rerun checks. A final
-  full-suite rerun is in progress.
+  1. JavaScript syntax and Python 3.12 grammar checks for all 157 tracked Python
+  files passed. The supplied venv runs Python 3.14.6; Python 3.12 runtime and live
+  PostgreSQL checks were not run.
+- Final marked full-suite validation on commit `225c203`, using the project venv
+  with `pytest -q -x --maxfail=3`, completed in 25m 18s: **1,560 passed, four
+  skipped, two warnings, no failures**. The four skips require `TEST_POSTGRES_URL`.
+- Updated the seed integration regression to compare exported payroll lines with
+  their source journal rather than pinning the old seven-line posting shape.
+  The mapped journal has ten lines; encryption, balance, mapping and rerun checks
+  pass both individually and in the full suite.
 - Isolated historical payroll migration setup from the process-wide migration
   catalogue. A concurrent legacy/current database regression verifies that an old
   schema setup cannot select old migrations for another database. The reported

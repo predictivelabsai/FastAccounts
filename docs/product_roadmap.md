@@ -1986,9 +1986,9 @@ leave calculations and general HR remain outside this change.
 
 Validation on 2026-10-24: the five required files passed 129 tests individually;
 payroll demo checks passed 17, i18n 13 and seed integration 1. JavaScript syntax
-and Python 3.12 grammar checks passed on the supplied Python 3.14.6 venv. A full
-run completed with 1,559 passed, four PostgreSQL opt-in skips and one stale seed
-assertion for the old posting shape. That assertion now checks the export against
-its source journal and passes; a final full-suite rerun is in progress. The payroll
-upgrade test passed in full-suite ordering. Python 3.12 runtime verification and
-live PostgreSQL checks remain follow-ups. The paired change log records details.
+and Python 3.12 grammar checks for all 157 tracked Python files passed on the
+supplied Python 3.14.6 venv. The final marked full run on commit `225c203` completed
+in 25m 18s with **1,560 passed, four skipped, two warnings and no failures**.
+The payroll upgrade and source-journal export regressions passed in full-suite
+ordering. Python 3.12 runtime verification and the four live PostgreSQL opt-in
+checks remain follow-ups. The paired change log records details.
