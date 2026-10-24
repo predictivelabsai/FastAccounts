@@ -25,6 +25,10 @@ delivered.
 - Workspace browser checks pass for monthly and hourly pay, multiple components,
   frozen flags, employee lifecycle, account mappings and declarations at a mobile
   viewport (9 tests). Full-suite validation is in progress.
+- Isolated historical payroll migration setup from the process-wide migration
+  catalogue. A concurrent legacy/current database regression verifies that an old
+  schema setup cannot select old migrations for another database. The reported
+  full-run-only failure has not been reproduced in focused ordering checks.
 
 ## 2026-10-23: Streamed copilot chat
 

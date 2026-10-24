@@ -1972,6 +1972,8 @@ The SPA exposes per-line levy flags and deduction accounts, preserves saved
 settings when type defaults change, and saves only changed posting mappings.
 All new workspace labels are available in EN, ET, LV and LT. Monthly and hourly
 browser flows cover multiple components at a mobile viewport.
+Historical payroll migration tests now use a catalogue scoped to one migration
+call, with a concurrent legacy/current database isolation regression.
 
 Acceptance checks cover tenant isolation, snapshots, mixed levy bases, social
 minimum top-ups, balanced postings, account remapping, locks, repeated actions,

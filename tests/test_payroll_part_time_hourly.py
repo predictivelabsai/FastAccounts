@@ -199,17 +199,17 @@ def test_api_hourly_employee_and_hours(db, ee_org, monkeypatch):
     assert items['Part-time API']['social_tax'] == '292.38' and items['Part-time API']['employer_cost'] == '997.98'
 
 
-def test_existing_payroll_upgrades_to_0006(tmp_path, monkeypatch):
+def test_existing_payroll_upgrades_to_0006(tmp_path):
     import database
     from organisations import OrganisationService
     root = tmp_path/'old'
     (root/'sqlite').mkdir(parents=True)
     for path in (database.MIGRATIONS/'sqlite').glob('000[1-5]*.sql'):
         (root/'sqlite'/path.name).write_text(path.read_text(encoding='utf-8'), encoding='utf-8')
-    original = database.MIGRATIONS
-    monkeypatch.setattr(database, 'MIGRATIONS', root)
     db = database.Database(path=str(tmp_path/'upgrade.sqlite'))
-    db.migrate()
+    # A historical catalogue belongs to this migration call. Changing the
+    # process-wide catalogue can affect other database setup in the same run.
+    db.migrate(migrations=root)
     org = OrganisationService(db).create(name='Old payroll OÜ', country_code='EE', entity_type='EE_OU', owner_email=ACTOR)
     with db.transaction() as tx:
         tx.execute("INSERT INTO employees(id,organisation_id,name,gross_salary,funded_pension_percent,board_member,created_at) "
@@ -220,7 +220,6 @@ def test_existing_payroll_upgrades_to_0006(tmp_path, monkeypatch):
                    "funded_pension_percent,gross,funded_pension,ui_employee,tax_free_minimum,income_tax,net,withholding_total,"
                    "social_tax,ui_employer,employer_cost) VALUES ('i1','r1',?,'e2','Old Staff',900,0,2,900,18,14.4,0,191.86,"
                    "675.74,224.26,297,7.2,1204.2)", (org['id'],))
-    monkeypatch.setattr(database, 'MIGRATIONS', original)
     assert db.migrate() == ['0006_payroll_part_time_hourly', '0007_automation', '0008_import_staging', '0009_local_accounts', '0010_tsd_export', '0011_account_mappings', '0012_external_gl', '0013_sync_review', '0014_sync_push', '0015_payment_orders', '0016_bank_feed_schedules', '0017_prepayments', '0018_fixed_assets', '0019_master_data_import', '0020_quotes', '0021_periodisation', '0022_payment_links', '0023_analytical_objects', '0024_reminder_rules', '0025_fx_realised', '0026_fx_revaluations', '0027_mfa', '0028_document_settings', '0029_copilot', '0030_master_data_maintenance', '0031_master_data_groups', '0032_copilot_access', '0033_copilot_settings', '0034_payroll_demo_fixes']
     assert db.rows('PRAGMA foreign_key_check') == []
     service = PayrollService(db)

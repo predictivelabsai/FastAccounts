@@ -163,8 +163,10 @@ class Database:
         with self.transaction() as tx:
             return tx.scalar(query, params)
 
-    def migrate(self) -> list[str]:
-        directory = MIGRATIONS / ("sqlite" if self.dialect == "postgres" else self.dialect)
+    def migrate(self, *, migrations: Path | None = None) -> list[str]:
+        """Apply a migration catalogue, with any override scoped to this call."""
+        catalogue = MIGRATIONS if migrations is None else migrations
+        directory = catalogue / ("sqlite" if self.dialect == "postgres" else self.dialect)
         applied: list[str] = []
         if self.dialect == "sqlite":
             connection = self.connect()

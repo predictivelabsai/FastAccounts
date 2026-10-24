@@ -36,6 +36,30 @@ def test_migration_preserves_existing_data(tmp_path):
     assert db.one("SELECT name FROM organisations WHERE id=?", (org["id"],))["name"] == "Preserved"
 
 
+def test_historical_migration_catalogue_does_not_affect_other_databases(tmp_path):
+    import database
+    from concurrent.futures import ThreadPoolExecutor
+
+    historical = tmp_path / 'historical'
+    (historical / 'sqlite').mkdir(parents=True)
+    versions = []
+    for source in (database.MIGRATIONS / 'sqlite').glob('000[1-5]*.sql'):
+        (historical / 'sqlite' / source.name).write_text(source.read_text(encoding='utf-8'), encoding='utf-8')
+        versions.append(source.stem)
+    legacy = Database(path=str(tmp_path / 'legacy.sqlite'))
+    current = Database(path=str(tmp_path / 'current.sqlite'))
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        old_setup = pool.submit(legacy.migrate, migrations=historical)
+        current_setup = pool.submit(current.migrate)
+        assert old_setup.result() == sorted(versions)
+        latest = current_setup.result()
+    assert latest[-1] == '0034_payroll_demo_fixes'
+    assert legacy.scalar('SELECT COUNT(*) FROM schema_migrations') == 5
+    assert current.scalar('SELECT COUNT(*) FROM schema_migrations') == 34
+    assert legacy.migrate() == latest[5:]
+    assert legacy.migrate() == current.migrate() == []
+
+
 def test_unsafe_postgres_schema_is_rejected():
     with pytest.raises(ValueError, match="unsafe"):
         Database(url="postgresql://unused", schema='public; DROP SCHEMA public')
