@@ -84,6 +84,7 @@ class ImportService:
         self.account_mappings = AccountMappingService(self.db)
         self.APPLY_HANDLERS = {
             "employee": self._apply_employee,
+            "salary_hours": self._apply_salary_hours,
             "contact": self._apply_contact,
             "purchase_invoice": self._apply_purchase_invoice,
             "sales_invoice": self._apply_sales_invoice,
@@ -170,8 +171,6 @@ class ImportService:
         canonical_type = OBJECT_TYPES.get(requested_type)
         if canonical_type is None:
             raise ValueError(f"Unsupported reviewed import object type: {object_type}")
-        if key == "merit_palk" and requested_type == "salary_hours":
-            raise ValueError("Merit Palk salary and hours import is unsupported: no pay-run input staging destination exists")
         object_type = (
             requested_type
             if canonical_type == "employee" and key != FILE_IMPORT_PROVIDER
@@ -269,6 +268,8 @@ class ImportService:
                     review_note = warning
                 if canonical_type == "journal":
                     review_note = self._journal_review(tx, organisation_id, payload, provider)["warning"]
+                if canonical_type == "salary_hours":
+                    matched_id, review_note, match = self._salary_hours_review(tx, organisation_id, payload)
                 existing = None
                 if external_id:
                     existing = tx.one(
@@ -399,6 +400,8 @@ class ImportService:
         external_id: str | None, payload: Mapping[str, Any]
     ) -> tuple[str | None, str | None, dict | None]:
         canonical_type = OBJECT_TYPES.get(object_type, object_type)
+        if canonical_type == "salary_hours":
+            return self._salary_hours_review(tx, organisation_id, payload)
         if external_id:
             mapping = tx.one(
                 "SELECT local_id FROM external_mappings WHERE organisation_id=? AND provider=? "
@@ -598,6 +601,8 @@ class ImportService:
             (organisation_id, key, sync_run_id),
         )
         by_id = {row["id"]: row for row in rows}
+        if object_type == "salary_hours":
+            sync = dict(sync, salary_selected_ids={identity for identity, decision in decisions.items() if decision == "apply"})
         unknown = sorted(set(decisions) - set(by_id))
         if unknown:
             raise KeyError("Staged record not found")
@@ -710,6 +715,139 @@ class ImportService:
             self._upsert_external_mapping(tx, organisation_id, sync["provider"], "journal", batch["id"], row["external_id"], payload)
             return self._mark_applied(tx, organisation_id, sync, row, actor, batch["id"])
 
+    # Merit permits renaming salary types and reports no employee ID. Names must
+    # therefore match uniquely within this tenant, and types must be recognised
+    # explicitly. Preserve the original report in staging for accountant review.
+    SALARY_BASE_NAMES = {"base salary", "monthly salary", "hourly salary", "põhipalk", "kuupalk", "tunnipalk"}
+
+    def _salary_hours_review(self, tx, organisation_id, payload):
+        employee_id, warning, match = self._employee_match(tx, organisation_id, payload, match_name=True)
+        if not employee_id:
+            return None, warning or "Merit Palk salary report needs a unique local employee name", match
+        types = tx.rows("SELECT * FROM pay_component_types WHERE organisation_id=?", (organisation_id,))
+        for line in payload.get("lines", []):
+            name = str(line.get("name") or "").casefold()
+            if name not in self.SALARY_BASE_NAMES and sum(t["name"].casefold() == name for t in types) != 1:
+                return employee_id, "Merit Palk salary type is unmapped; review the source report", match
+        return employee_id, None, match
+
+    def _apply_salary_hours(self, organisation_id, sync, row, actor):
+        if sync["provider"] != "merit_palk":
+            raise ValueError("Salary and hours apply requires Merit Palk")
+        payload = json.loads(row["external_payload_json"])
+        with self.db.transaction() as tx:
+            # Organisation lock also serialises first-run creation. Payroll's
+            # draft-only conditional write serialises this with approval.
+            tx.execute("UPDATE organisations SET name=name WHERE id=?", (organisation_id,))
+            current = tx.one("SELECT * FROM import_staged_records WHERE organisation_id=? AND id=?", (organisation_id, row["id"]))
+            if not current or current["status"] not in {"Pending", "Failed", "Applied"}:
+                raise ValueError("Only pending or failed salary proposals can be applied")
+            employee_id, warning, _ = self._salary_hours_review(tx, organisation_id, payload)
+            if warning:
+                raise ValueError(warning)
+            period = payload["period"]
+            existing = tx.one("SELECT * FROM pay_runs WHERE organisation_id=? AND period=?", (organisation_id, period))
+            if existing and existing["status"] != "Draft":
+                if current["status"] == "Applied":
+                    return {"staged_id": row["id"], "outcome": "failed", "reason": "Only draft pay runs can be edited"}
+                raise PayrollConflict("Only draft pay runs can be edited")
+            if existing:
+                claimed = tx.execute("UPDATE pay_runs SET notes=notes WHERE organisation_id=? AND id=? AND status='Draft'", (organisation_id, existing["id"]))
+                if claimed.rowcount != 1:
+                    raise PayrollConflict("Only draft pay runs can be edited")
+                run = self.payroll._run(tx, organisation_id, existing["id"])
+            else:
+                # create_run requires hours for every hourly employee. Only use
+                # this reviewed sync's report, never assume missing hours are zero.
+                hours = {}
+                for staged in tx.rows("SELECT id,external_payload_json FROM import_staged_records WHERE organisation_id=? AND sync_run_id=? AND status<>'Rejected'", (organisation_id, sync["id"])):
+                    if staged["id"] not in sync["salary_selected_ids"]:
+                        continue
+                    other = json.loads(staged["external_payload_json"])
+                    identity, issue, _ = self._salary_hours_review(tx, organisation_id, other)
+                    if identity and not issue:
+                        hours[identity] = money(other["hours"])
+                run = self.payroll.create_run(organisation_id, period=period, actor=actor, hours=hours, tx=tx)
+            item = next((i for i in run["items"] if i["employee_id"] == employee_id), None)
+            if not item:
+                raise ValueError("Merit Palk employee is absent from the draft pay run")
+            mapping = tx.one("SELECT * FROM external_mappings WHERE organisation_id=? AND provider='merit_palk' AND object_type='salary_hours' AND external_id=?", (organisation_id, row["external_id"]))
+            previous = None
+            if mapping:
+                if mapping["local_id"] != item["id"]:
+                    raise ValueError("Merit Palk salary report changed; review the draft manually before importing again")
+                if mapping["last_hash"] == self._mapping_values(payload)[1]:
+                    return self._mark_applied(tx, organisation_id, sync, row, actor, item["id"], "unchanged")
+                for applied in tx.rows("SELECT external_payload_json FROM import_staged_records WHERE organisation_id=? AND provider='merit_palk' AND object_type='salary_hours' AND external_id=? AND status='Applied'", (organisation_id, row["external_id"])):
+                    candidate = json.loads(applied["external_payload_json"])
+                    if self._mapping_values(candidate)[1] == mapping["last_hash"]:
+                        previous = candidate
+                        break
+                if previous is None:
+                    raise ValueError("Merit Palk salary report changed; review the draft manually before importing again")
+            types = tx.rows("SELECT * FROM pay_component_types WHERE organisation_id=?", (organisation_id,))
+            components = [{key: c[key] for key in ("type_id", "name", "amount", "direction", "liability_role", "income_tax", "social_tax", "ui_employee", "ui_employer", "funded_pension", "social_minimum")} for c in item["components"]]
+            if previous:
+                # Replace this source's prior components on a reviewed correction,
+                # retaining unrelated manual lines. The applied payload is the
+                # source ownership evidence, never merely a matching current type.
+                expected = {}
+                old_base = Decimal(0)
+                for line in previous["lines"]:
+                    if line["name"].casefold() in self.SALARY_BASE_NAMES:
+                        old_base += money(line["amount"])
+                    else:
+                        ids = {c["type_id"] for c in components if c["name"].casefold() == line["name"].casefold()}
+                        if len(ids) != 1 and money(line["amount"]):
+                            raise ValueError("Merit Palk payment type already exists in the draft; review components before importing")
+                        for identity in ids:
+                            expected[identity] = expected.get(identity, Decimal(0)) + money(line["amount"])
+                if any(line["name"].casefold() in self.SALARY_BASE_NAMES for line in previous["lines"]):
+                    preset = {"hourly": "base_adjustment", "income_line": "contract"}.get(item["pay_basis"])
+                    if preset:
+                        old_amount = (money(old_base - money(Decimal(str(item["hourly_rate"])) * money(previous["hours"])))
+                                      if preset == "base_adjustment" else old_base)
+                        for kind in types:
+                            if kind["preset_key"] == preset and old_amount:
+                                expected[kind["id"]] = expected.get(kind["id"], Decimal(0)) + old_amount
+                for identity, amount in expected.items():
+                    if sum((money(c["amount"]) for c in components if c["type_id"] == identity), Decimal(0)) != amount:
+                        raise ValueError("Merit Palk payment type already exists in the draft; review components before importing")
+                components = [c for c in components if c["type_id"] not in expected]
+            occupied_types = {c["type_id"] for c in components}
+            def add_component(kind, amount):
+                if kind["id"] in occupied_types:
+                    raise ValueError("Merit Palk payment type already exists in the draft; review components before importing")
+                components.append({"type_id": kind["id"], "amount": db_number(amount)})
+            base = Decimal(0)
+            has_base = False
+            for line in payload["lines"]:
+                amount = money(line["amount"])
+                if line["name"].casefold() in self.SALARY_BASE_NAMES:
+                    base += amount
+                    has_base = True
+                elif amount:
+                    kind = next(t for t in types if t["name"].casefold() == line["name"].casefold())
+                    add_component(kind, amount)
+            worked = money(payload["hours"]) if item["pay_basis"] == "hourly" else None
+            gross_override = None
+            if has_base:
+                if item["pay_basis"] == "income_line":
+                    kind = next(t for t in types if t["preset_key"] == "contract")
+                    if base:
+                        add_component(kind, base)
+                elif item["pay_basis"] == "hourly":
+                    adjustment = money(base - money(Decimal(str(item["hourly_rate"])) * worked))
+                    if adjustment:
+                        kind = next(t for t in types if t["preset_key"] == "base_adjustment")
+                        add_component(kind, adjustment)
+                else:
+                    gross_override = base
+            self.payroll.update_item(organisation_id, run["id"], item["id"], actor=actor,
+                                     hours=worked, components=components, gross_salary=gross_override, tx=tx)
+            self._upsert_external_mapping(tx, organisation_id, sync["provider"], "salary_hours", item["id"], row["external_id"], payload)
+            return self._mark_applied(tx, organisation_id, sync, row, actor, item["id"], "updated" if previous else "applied")
+
     def _reject(self, organisation_id: str, row: dict, actor: str) -> dict:
         if row["status"] == "Applied":
             return {
@@ -719,6 +857,11 @@ class ImportService:
             }
         now = utc_now()
         with self.db.transaction() as tx:
+            if row["object_type"] == "salary_hours":
+                tx.execute("UPDATE organisations SET name=name WHERE id=?", (organisation_id,))
+                current = tx.one("SELECT status FROM import_staged_records WHERE organisation_id=? AND id=?", (organisation_id, row["id"]))
+                if current and current["status"] == "Applied":
+                    return {"staged_id": row["id"], "outcome": "failed", "reason": "An applied record cannot be rejected"}
             if row["object_type"] == "journal":
                 repository = JournalImportRepository(tx, organisation_id)
                 repository.lock()
@@ -775,7 +918,7 @@ class ImportService:
             if (
                 not existing
                 and "gross_salary" not in changes
-                and changes.get("pay_basis", "monthly") != "hourly"
+                and changes.get("pay_basis", "monthly") not in {"hourly", "income_line"}
             ):
                 raise ValueError("Gross salary is required")
             self._assert_name_available(tx, organisation_id, changes["name"].strip(), employee_id)
@@ -1312,6 +1455,11 @@ class ImportService:
     ) -> dict:
         conflict_id, now = new_id(), utc_now()
         with self.db.transaction() as tx:
+            if row["object_type"] == "salary_hours":
+                tx.execute("UPDATE organisations SET name=name WHERE id=?", (organisation_id,))
+                current = tx.one("SELECT status FROM import_staged_records WHERE organisation_id=? AND id=?", (organisation_id, row["id"]))
+                if current and current["status"] in {"Applied", "Rejected"}:
+                    return {"staged_id": row["id"], "outcome": "failed", "reason": reason}
             tx.execute(
                 "UPDATE import_staged_records SET status='Failed',review_note=?,updated_at=? "
                 "WHERE organisation_id=? AND id=?",

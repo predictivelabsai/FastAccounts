@@ -45,7 +45,7 @@ def palk(db, ee_org, monkeypatch):
         "getglbatch": {"DocNo": "SYNTHETIC-PAY", "BatchDate": "2026-10-24", "EntryRow": [
             {"AccountCode": accounts[0]["code"], "Debit": "2400.13", "Credit": "0", "DepartmentCode": "SYNTHETIC"},
             {"AccountCode": accounts[1]["code"], "Debit": "0", "Credit": "2400.13"}]},
-        "getsalaryreport": [{"EmployeeFullName": "Mari Testmaa", "Month6": "202610", "Hours": "160", "Sum": "2400.13"}],
+        "getsalaryreport": [{"EmployeeFullName": "Mari Testmaa", "SalaryTypeName": "Base salary", "Month6": "202610", "Hours": "160", "Sum": "2400.13"}],
         "getvacoblig": {"DaysUnused": "12.34", "DaysAcquired": "3.00"},
     }
 
@@ -110,18 +110,21 @@ def test_invalid_credentials_and_naive_clock_do_not_send_requests():
     assert not result.ok and not result.live and "timezone" in result.message
 
 
-@pytest.mark.parametrize("kind,basis,board", [(1, "monthly", False), (2, "board_fee", True), (5, None, False)])
+@pytest.mark.parametrize("kind,basis,board", [(1, "monthly", False), (2, "board_fee", True), (5, "income_line", False)])
 def test_contract_types_import_code_and_salary(palk, ee_org, kind, basis, board):
     palk[1]["getemployees"][0]["TypeId"] = kind
     sync, rows = stage(palk, ee_org["id"])
     payload = rows[0]["external_payload"]
     assert payload["external_id"] == "42" and payload["personal_id"] == "49003159999"
     assert payload["board_member"] is board and payload.get("pay_basis") == basis
-    assert Decimal(payload["gross_salary"]) == Decimal("2400.13")
+    if kind != 5:
+        assert Decimal(payload["gross_salary"]) == Decimal("2400.13")
     outcome = apply(palk, ee_org["id"], sync, rows)
     if kind == 5:
         assert payload["merit_palk_income_basis"] == "income_line"
-        assert outcome["failed"] == 1 and "income line" in outcome["outcomes"][0]["reason"]
+        assert "gross_salary" not in payload and outcome["applied"] == 1
+        saved = palk[0].db.one("SELECT * FROM employees WHERE organisation_id=?", (ee_org["id"],))
+        assert saved["pay_basis"] == "income_line" and saved["gross_salary"] is None
     else:
         assert outcome["applied"] == 1
         saved = palk[0].db.one("SELECT * FROM employees WHERE organisation_id=?", (ee_org["id"],))
@@ -168,7 +171,7 @@ def test_import_code_identity_is_shared_between_employee_and_agreement_pulls(pal
     assert db.scalar("SELECT COUNT(*) FROM employees WHERE organisation_id=?", (ee_org["id"],)) == 1
 
 
-@pytest.mark.parametrize("change", ["unconfirmed", "missing", "multiple", "services", "unknown"])
+@pytest.mark.parametrize("change", ["unconfirmed", "missing", "multiple", "unknown"])
 def test_ambiguous_pay_terms_block_apply(palk, ee_org, change):
     options = dict(OPTIONS)
     if change == "unconfirmed":
@@ -268,7 +271,7 @@ def test_gl_apply_rechecks_period_and_accounts(palk, ee_org, db, change):
     assert db.scalar("SELECT COUNT(*) FROM posting_batches") == 0
 
 
-def test_vacation_display_only_and_salary_report_unsupported(palk, ee_org, db):
+def test_vacation_display_only_and_salary_report_contract(palk, ee_org, db):
     options = dict(OPTIONS, personal_code="42", balance_date="2026-10-23")
     sync, rows = stage(palk, ee_org["id"], "vacation_balance", options)
     assert rows[0]["display_only"] and rows[0]["external_payload"]["DaysUnused"] == "12.34"
@@ -276,11 +279,12 @@ def test_vacation_display_only_and_salary_report_unsupported(palk, ee_org, db):
     assert json.loads(palk[2][-1].content) == {"ContractCode": "42", "Date": "2026-10-23"}
     with pytest.raises(ValueError, match="Display-only"):
         apply(palk, ee_org["id"], sync, rows)
-    with pytest.raises(ValueError, match="no pay-run input staging destination"):
-        stage(palk, ee_org["id"], "salary_hours")
+    _, salary_rows = stage(palk, ee_org["id"], "salary_hours")
+    assert "unique local employee" in salary_rows[0]["review_note"]
+    palk[1]["getsalaryreport"][0]["Month6"] = "202402"
     connector = connector_for("merit_palk", credentials={"api_id": "synthetic-id", "api_key": "synthetic-key-1"}, config={"month": "202402"})
     report = connector.pull("salary_hours")
-    assert report.records[0]["Hours"] == "160"
+    assert report.records[0]["hours"] == Decimal("160.00")
     assert json.loads(palk[2][-1].content) == {"StartDate": "2024-02-01", "EndDate": "2024-02-29", "Language": "EN", "SortOption": 2}
     assert db.scalar("SELECT COUNT(*) FROM posting_batches") == 0
 
@@ -312,6 +316,202 @@ def test_result_ceiling_invalid_month_and_response_validation(palk, ee_org):
             stage(palk, ee_org["id"], config={"month": month})
     with pytest.raises(ValueError, match="requires a contract"):
         stage(palk, ee_org["id"], "vacation_balance")
+
+
+def test_salary_hours_create_draft_decimal_round_trip_and_idempotency(palk, ee_org, db):
+    sync, rows = stage(palk, ee_org["id"])
+    apply(palk, ee_org["id"], sync, rows)
+    palk[1]["getsalaryreport"][0]["Sum"] = "2500.125"
+    sync, rows = stage(palk, ee_org["id"], "salary_hours")
+    assert Decimal(rows[0]["external_payload"]["gross_pay"]) == Decimal("2500.13")
+    assert apply(palk, ee_org["id"], sync, rows)["applied"] == 1
+    run = PayrollService(db).runs(ee_org["id"])[0]
+    assert run["status"] == "Draft" and Decimal(run["total_gross"]) == Decimal("2500.13")
+    assert Decimal(str(db.scalar("SELECT gross_salary FROM employees WHERE organisation_id=?", (ee_org["id"],)))) == Decimal("2400.13")
+    assert apply(palk, ee_org["id"], sync, rows)["unchanged"] == 1
+    again, records = stage(palk, ee_org["id"], "salary_hours")
+    assert apply(palk, ee_org["id"], again, records)["unchanged"] == 1
+    assert db.scalar("SELECT COUNT(*) FROM pay_runs") == 1
+    assert db.scalar("SELECT COUNT(*) FROM posting_batches") == 0
+
+
+def test_salary_hours_hourly_draft_reconciles_gross_and_preserves_rate(palk, ee_org, db):
+    payroll = PayrollService(db)
+    person = payroll.save_employee(ee_org["id"], name="Mari Testmaa", pay_basis="hourly", hourly_rate="15", actor=ACTOR)
+    run = payroll.create_run(ee_org["id"], period="2026-10", hours={person["id"]: "150"}, actor=ACTOR)
+    sync, rows = stage(palk, ee_org["id"], "salary_hours")
+    assert apply(palk, ee_org["id"], sync, rows)["applied"] == 1
+    saved = payroll.runs(ee_org["id"])[0]
+    item = saved["items"][0]
+    assert Decimal(item["hours"]) == Decimal("160")
+    assert Decimal(item["gross"]) == Decimal("2400.13") and Decimal(item["hourly_rate"]) == Decimal("15")
+    assert Decimal(item["components"][0]["amount"]) == Decimal("0.13")
+    palk[1]["getsalaryreport"][0].update(Hours="170", Sum="2600.50")
+    changed, records = stage(palk, ee_org["id"], "salary_hours")
+    assert apply(palk, ee_org["id"], changed, records)["updated"] == 1
+    item = payroll.runs(ee_org["id"])[0]["items"][0]
+    assert Decimal(item["gross"]) == Decimal("2600.50")
+    assert len(item["components"]) == 1 and Decimal(item["components"][0]["amount"]) == Decimal("50.50")
+
+
+def test_salary_hours_updates_changed_draft_and_refuses_approved_reports(palk, ee_org, db):
+    payroll = PayrollService(db)
+    payroll.save_employee(ee_org["id"], name="Mari Testmaa", gross_salary="2400", actor=ACTOR)
+    sync, rows = stage(palk, ee_org["id"], "salary_hours")
+    assert apply(palk, ee_org["id"], sync, rows)["applied"] == 1
+    palk[1]["getsalaryreport"][0]["Sum"] = "2600"
+    changed, records = stage(palk, ee_org["id"], "salary_hours")
+    assert apply(palk, ee_org["id"], changed, records)["updated"] == 1
+    run = payroll.runs(ee_org["id"])[0]
+    assert Decimal(run["total_gross"]) == Decimal("2600")
+    approved = payroll.approve(ee_org["id"], run["id"], actor=ACTOR)
+    before = db.rows("SELECT * FROM gl_entries")
+    assert apply(palk, ee_org["id"], sync, rows)["failed"] == 1
+    assert payroll.runs(ee_org["id"])[0] == approved
+    assert db.rows("SELECT * FROM gl_entries") == before
+    assert db.scalar("SELECT status FROM import_staged_records WHERE id=?", (rows[0]["id"],)) == "Applied"
+    fresh, proposals = stage(palk, ee_org["id"], "salary_hours")
+    assert apply(palk, ee_org["id"], fresh, proposals)["failed"] == 1
+    assert payroll.runs(ee_org["id"])[0] == approved
+
+
+def test_services_contract_without_salary_agreement_uses_income_components(palk, ee_org, db):
+    palk[1]["getemployees"][0]["TypeId"] = 5
+    palk[1]["getpayterms"]["EntryRow"] = []
+    sync, rows = stage(palk, ee_org["id"], config={"month": "202610"})
+    assert not rows[0]["review_note"] and apply(palk, ee_org["id"], sync, rows)["applied"] == 1
+    palk[1]["getsalaryreport"][0].update(SalaryTypeName="Töövõtulepingu tasu", Sum="100.12", Hours="0")
+    sync, rows = stage(palk, ee_org["id"], "salary_hours")
+    assert apply(palk, ee_org["id"], sync, rows)["applied"] == 1
+    payroll = PayrollService(db)
+    run = payroll.runs(ee_org["id"])[0]
+    item = run["items"][0]
+    assert item["pay_basis"] == "income_line" and Decimal(item["gross_salary"]) == 0
+    assert Decimal(item["gross"]) == Decimal("100.12")
+    assert Decimal(item["social_tax_minimum_topup"]) == 0
+    assert item["components"][0]["name"] == "Töövõtulepingu tasu"
+    assert apply(palk, ee_org["id"], sync, rows)["unchanged"] == 1
+    palk[1]["getsalaryreport"][0]["Sum"] = "200.13"
+    changed, records = stage(palk, ee_org["id"], "salary_hours")
+    assert apply(palk, ee_org["id"], changed, records)["updated"] == 1
+    item = payroll.runs(ee_org["id"])[0]["items"][0]
+    assert Decimal(item["gross"]) == Decimal("200.13") and len(item["components"]) == 1
+    manual = payroll.update_item(ee_org["id"], run["id"], item["id"], actor=ACTOR,
+        components=[{"type_id": item["components"][0]["type_id"], "amount": "300"}])
+    palk[1]["getsalaryreport"][0]["Sum"] = "400"
+    changed, records = stage(palk, ee_org["id"], "salary_hours")
+    assert apply(palk, ee_org["id"], changed, records)["failed"] == 1
+    assert payroll.runs(ee_org["id"])[0] == manual
+
+
+@pytest.mark.parametrize("change", ["unknown_type", "foreign_name", "ambiguous_name", "bad_hours", "minimum"])
+def test_salary_hours_warning_tenancy_and_atomic_failure(palk, ee_org, db, change):
+    payroll = PayrollService(db)
+    payroll.save_employee(ee_org["id"], name="Mari Testmaa", gross_salary="2400", actor=ACTOR)
+    other = OrganisationService(db).create(name="Foreign payroll", country_code="EE", entity_type="EE_OU", owner_email=ACTOR)
+    foreign = payroll.save_employee(other["id"], name="Foreign Name", gross_salary="2400", actor=ACTOR)
+    report = palk[1]["getsalaryreport"][0]
+    if change == "unknown_type":
+        report["SalaryTypeName"] = "Unknown custom taxable pay"
+    elif change == "foreign_name":
+        report["EmployeeFullName"] = "Foreign Name"
+    elif change == "ambiguous_name":
+        payroll.save_employee(ee_org["id"], name="MARI TESTMAA", gross_salary="2400", actor=ACTOR)
+    elif change == "bad_hours":
+        report["Hours"] = "745"
+        local = db.one("SELECT id FROM employees WHERE organisation_id=?", (ee_org["id"],))
+        payroll.save_employee(ee_org["id"], employee_id=local["id"], pay_basis="hourly", hourly_rate="15", actor=ACTOR)
+    else:
+        report["Sum"] = "100"
+    sync, rows = stage(palk, ee_org["id"], "salary_hours")
+    if change in {"unknown_type", "foreign_name", "ambiguous_name"}:
+        assert rows[0]["review_note"]
+    assert apply(palk, ee_org["id"], sync, rows)["failed"] == 1
+    assert db.scalar("SELECT COUNT(*) FROM pay_runs WHERE organisation_id=?", (ee_org["id"],)) == 0
+    assert db.scalar("SELECT gross_salary FROM employees WHERE id=?", (foreign["id"],)) == 2400
+
+
+def test_employee_cap_filters_use_only_documented_fields(palk, ee_org):
+    for size in (100, 101):
+        palk[1]["getemployees"] = [employee()] * size
+        with pytest.raises(ValueError, match="100 records"):
+            stage(palk, ee_org["id"], config=dict(OPTIONS, personal_code="49003159999"))
+        assert json.loads(palk[2][-1].content) == {"Month6": "202610", "PersonalCode": "49003159999"}
+    palk[1]["getemployees"] = [employee()]
+    _, rows = stage(palk, ee_org["id"], config=dict(OPTIONS, personal_code="49003159999"))
+    assert len(rows) == 1
+
+
+def test_salary_hours_refuses_component_collision_without_changing_draft(palk, ee_org, db):
+    payroll = PayrollService(db)
+    payroll.save_employee(ee_org["id"], name="Mari Testmaa", gross_salary="2400", actor=ACTOR)
+    run = payroll.create_run(ee_org["id"], period="2026-10", actor=ACTOR)
+    kind = next(t for t in payroll.component_types(ee_org["id"]) if t["preset_key"] == "author")
+    before = payroll.update_item(ee_org["id"], run["id"], run["items"][0]["id"], actor=ACTOR,
+                                 components=[{"type_id": kind["id"], "amount": "100"}])
+    palk[1]["getsalaryreport"].append(dict(palk[1]["getsalaryreport"][0], SalaryTypeName=kind["name"], Sum="100", Hours="0"))
+    sync, rows = stage(palk, ee_org["id"], "salary_hours")
+    result = apply(palk, ee_org["id"], sync, rows)
+    assert result["failed"] == 1 and "already exists" in result["outcomes"][0]["reason"]
+    assert payroll.runs(ee_org["id"])[0] == before
+
+
+def test_salary_hours_does_not_consume_unselected_or_rejected_hours(palk, ee_org, db):
+    payroll = PayrollService(db)
+    payroll.save_employee(ee_org["id"], name="Mari Testmaa", gross_salary="2400", actor=ACTOR)
+    payroll.save_employee(ee_org["id"], name="Hourly Person", pay_basis="hourly", hourly_rate="15", actor=ACTOR)
+    palk[1]["getsalaryreport"].append(dict(palk[1]["getsalaryreport"][0], EmployeeFullName="Hourly Person"))
+    sync, rows = stage(palk, ee_org["id"], "salary_hours")
+    mari = next(r for r in rows if r["external_payload"]["name"] == "Mari Testmaa")
+    hourly = next(r for r in rows if r["external_payload"]["name"] == "Hourly Person")
+    result = palk[0].apply_staged(ee_org["id"], "merit_palk", sync["id"],
+        {mari["id"]: "apply", hourly["id"]: "reject"}, actor=ACTOR)
+    assert result["failed"] == 1 and result["rejected"] == 1
+    assert db.scalar("SELECT COUNT(*) FROM pay_runs") == 0
+
+
+def test_income_line_draft_cannot_be_approved_without_income(palk, ee_org, db):
+    payroll = PayrollService(db)
+    person = payroll.save_employee(ee_org["id"], name="Contract Person", pay_basis="income_line", actor=ACTOR)
+    assert person["gross_salary"] is None
+    run = payroll.create_run(ee_org["id"], period="2026-10", actor=ACTOR)
+    with pytest.raises(ValueError, match="positive gross"):
+        payroll.approve(ee_org["id"], run["id"], actor=ACTOR)
+    assert payroll.runs(ee_org["id"])[0]["status"] == "Draft"
+    assert db.scalar("SELECT COUNT(*) FROM posting_batches") == 0
+
+
+def test_salary_hours_concurrent_apply_creates_one_draft(palk, ee_org, db):
+    from concurrent.futures import ThreadPoolExecutor
+    PayrollService(db).save_employee(ee_org["id"], name="Mari Testmaa", gross_salary="2400", actor=ACTOR)
+    sync, rows = stage(palk, ee_org["id"], "salary_hours")
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        outcomes = list(pool.map(lambda _: apply(palk, ee_org["id"], sync, rows), range(2)))
+    assert sum(result["applied"] for result in outcomes) == 1
+    assert sum(result["unchanged"] for result in outcomes) == 1
+    assert db.scalar("SELECT COUNT(*) FROM pay_runs") == 1
+    assert db.scalar("SELECT COUNT(*) FROM pay_run_items") == 1
+
+
+def test_income_line_migration_preserves_approved_payroll(tmp_path):
+    from database import Database, MIGRATIONS
+    from shutil import copyfile
+    old = tmp_path / "migrations"
+    (old / "sqlite").mkdir(parents=True)
+    for path in (MIGRATIONS / "sqlite").glob("*.sql"):
+        if path.stem < "0035":
+            copyfile(path, old / "sqlite" / path.name)
+    db = Database(path=str(tmp_path / "upgrade.sqlite"))
+    db.migrate(migrations=old)
+    org = OrganisationService(db).create(name="Migration fixture", country_code="EE", entity_type="EE_OU", owner_email=ACTOR)
+    payroll = PayrollService(db)
+    payroll.save_employee(org["id"], name="Existing Person", gross_salary="2400", fte="0.75", actor=ACTOR)
+    payroll.approve(org["id"], payroll.create_run(org["id"], period="2026-10", actor=ACTOR)["id"], actor=ACTOR)
+    tables = ("employees", "pay_runs", "pay_run_items", "pay_item_context", "gl_entries", "posting_batches")
+    before = {t: db.rows(f"SELECT * FROM {t} ORDER BY 1") for t in tables}
+    assert db.migrate() == ["0035_payroll_income_line"]
+    assert {t: db.rows(f"SELECT * FROM {t} ORDER BY 1") for t in tables} == before
+    assert db.rows("PRAGMA foreign_key_check") == [] and db.migrate() == []
 
 
 def test_vault_and_tenant_isolation(palk, ee_org, uk_org, db):
@@ -398,6 +598,18 @@ def test_api_pro_licence_errors_and_real_csrf(palk_api, palk, ee_org):
         api.dependency_overrides.clear()
 
 
+def test_services_contract_employee_is_editable_through_payroll_api(palk_api, palk, ee_org):
+    palk[1]["getemployees"][0]["TypeId"] = 5
+    sync, rows = stage(palk, ee_org["id"])
+    assert apply(palk, ee_org["id"], sync, rows)["applied"] == 1
+    base = f"/organisations/{ee_org['id']}/employees"
+    person = palk_api.get(base).json()[0]
+    assert person["gross_salary"] is None and person["pay_basis"] == "income_line"
+    response = palk_api.patch(base + "/" + person["id"], json={"name": "Mari Contract", "pay_basis": "income_line"})
+    assert response.status_code == 200, response.text
+    assert response.json()["gross_salary"] is None
+
+
 def test_browser_configure_test_choose_month_review_and_display_only(palk_api, palk, ee_org, monkeypatch):
     playwright = pytest.importorskip("playwright.sync_api")
     from web_app import app
@@ -456,5 +668,18 @@ def test_browser_configure_test_choose_month_review_and_display_only(palk_api, p
         playwright.expect(page.get_by_role("button", name="Apply decisions", exact=True)).to_be_disabled()
         page.get_by_text("View source record", exact=True).click()
         playwright.expect(page.locator('pre')).to_contain_text("DaysUnused")
+        page.get_by_role("link", name="Back to integrations", exact=True).first.click()
+        import_button.click()
+        dialog.locator('[name="object_type"]').select_option("salary_hours")
+        dialog.locator('[name="month"]').fill("2026-10")
+        dialog.locator('[type="submit"]').click()
+        playwright.expect(page.locator('#app-content')).to_contain_text("2026-10")
+        playwright.expect(page.locator('#app-content')).to_contain_text("2400.13")
+        page.locator('[data-decision="apply"]').check()
+        page.get_by_role("button", name="Apply decisions", exact=True).click()
+        playwright.expect(page.locator('.outcome-summary')).to_be_visible()
+        page.locator('.app-nav[data-view="payroll"]').click()
+        playwright.expect(page.locator('#app-content')).to_contain_text("2026-10")
+        playwright.expect(page.locator('#app-content')).to_contain_text("Draft")
         assert not errors
         browser.close()

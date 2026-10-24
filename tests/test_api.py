@@ -113,11 +113,14 @@ def test_integration_catalogue_exposes_registry_fields(integration_api, monkeypa
         "subdomain", "api_key",
     ]
     assert "not vendor credentials" in catalogue["personio"]["credential_note"]
-    from connectors.providers import MeritProvider, SmartAccountsProvider
+    from connectors.providers import MeritProvider, MeritPalkProvider, SmartAccountsProvider
 
     assert catalogue["merit"]["pull_object_types"] == list(MeritProvider.PULL_OBJECT_TYPES)
     assert catalogue["smartaccounts"]["pull_object_types"] == list(SmartAccountsProvider.PULL_OBJECT_TYPES)
-    for provider in ("fasthr", "personio", "bamboohr", "file_import"):
+    assert catalogue["merit_palk"]["pull_object_types"] == list(MeritPalkProvider.PULL_OBJECT_TYPES)
+    assert catalogue["merit_palk"]["registry_status"] == documented
+    assert catalogue["file_import"]["pull_object_types"] == ["employee", "employees", "journal"]
+    for provider in ("fasthr", "personio", "bamboohr"):
         assert catalogue[provider]["pull_object_types"] == ["employee"]
     for provider in ("hmrc", "emta", "quickbooks", "xero", "open_banking", "hibob"):
         assert catalogue[provider]["pull_object_types"] == []

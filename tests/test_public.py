@@ -318,7 +318,7 @@ def test_hr_software_catalogue_is_complete_and_renders_in_every_locale():
     assert len(hr_entries) == 22
     roadmap_entries = [
         item for item in hr_entries
-        if item.key not in {"fasthr", "file_import", "bamboohr", "personio"}
+        if item.key not in {"fasthr", "file_import", "bamboohr", "personio", "merit_palk"}
     ]
     assert all(item.status == "Roadmap · no adapter yet" for item in roadmap_entries)
     assert all(item.direction == "Import first · export by policy" for item in roadmap_entries)
@@ -327,6 +327,10 @@ def test_hr_software_catalogue_is_complete_and_renders_in_every_locale():
     assert fasthr.status == "Adapter ready"
     assert fasthr.direction == "Import · employee master data"
     assert fasthr.ownership == "FastHR remains source"
+    palk = next(item for item in hr_entries if item.key == "merit_palk")
+    assert palk.status == "Documented contract · not live-verified"
+    assert palk.direction == "Pull-only · reviewed imports"
+    assert palk.ownership == "Configured per object"
     for key in ("bamboohr", "personio"):
         documented = next(item for item in hr_entries if item.key == key)
         assert documented.status == "Documented contract · not live-verified"
@@ -429,7 +433,7 @@ def test_health_reports_every_connector_as_non_live():
     assert payload["integrations"] == len(integrations.CATALOGUE)
     assert payload["live_integrations"] == 0
     assert payload["database"]["status"] == "ok"
-    assert payload["database"]["migrations"] == 34
+    assert payload["database"]["migrations"] == 35
 
 
 def test_public_violet_tokens_and_new_locale_keys():

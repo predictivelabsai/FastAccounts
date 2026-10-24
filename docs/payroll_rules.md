@@ -2,8 +2,9 @@
 
 This is the agreed 2026 accounting-bureau demo specification. Production
 accountant UAT is pending. Only EUR Estonian books and 2026 periods are accepted.
-Monthly calculations cover monthly salaries (full- or part-time), hourly pay and
-board-member fees, and the social tax minimum obligation. They exclude automatic
+Monthly calculations cover monthly salaries (full- or part-time), hourly pay,
+board-member fees, income-line services-contract pay and the social tax minimum
+obligation. They exclude automatic
 leave and sickness calculations, benefits, non-resident calculations, direct TSD
 submission and payment execution. Bureau-entered payment components can represent
 additional remuneration and net deductions. Reviewed resident-only TSD manual-upload
@@ -15,7 +16,8 @@ Each employee's rounded amounts are then summed; aggregate taxes are not recompu
 
 - Pay basis (`pay_basis`): `monthly` (gross = `gross_salary`), `hourly`
   (gross = `hourly_rate` × hours entered on the pay run, rounded to cents) or
-  `board_fee` (board-member fee; kept in step with `board_member`).
+  `board_fee` (board-member fee; kept in step with `board_member`), or
+  `income_line` (zero base pay; reviewed income components provide the gross).
 - Work-time fraction (`fte`, 0 < FTE ≤ 1, default 1) records part-time work
   (osakoormus). It pro-rates the monthly minimum wage; it does not change pay.
 - Funded pension (II pillar): 0%, 2%, 4% or 6% of gross, default 2%. 0% is for
@@ -178,13 +180,15 @@ hours, base pay and component lines.
 
 Types belong to the organisation: `GET/POST /payroll/component-types` and
 `PUT /payroll/component-types/{id}`. Editing a type never changes saved lines.
-The three seeded types are editable bureau defaults, not a substitute for the
+The five seeded types are editable bureau defaults, not a substitute for the
 accountant's decision for the recipient and payment period:
 
 | Preset | Direction | Income tax | Social tax | Employee / employer UI | II pillar | Counts towards social minimum |
 |---|---|---|---|---|---|---|
 | Kinnipidamine kohtutäiturile | Net deduction | No | No | No / No | No | No |
 | Autori tasu | Income | Yes | Yes | No / No | No | Yes |
+| Töövõtulepingu tasu | Income | Yes | Yes | Yes / Yes | Yes | No |
+| Põhipalga korrigeerimine | Income | Yes | Yes | Yes / Yes | Yes | Yes |
 | Vanemapuhkused | Income | Yes | No | No / No | No | No |
 
 The author preset's social-tax default is an explicit demo assumption: the
@@ -218,6 +222,60 @@ PDFs append translated component detail after the employee payslips, preserving
 existing per-employee page links. The Excel book includes a translated component
 sheet. Reviewed integration push payloads retain frozen item/component detail;
 the existing Merit/SmartAccounts transport remains a balanced GL journal export.
+
+## Reviewed Merit Palk imports
+
+Sources checked 2026-10-24: Merit Palk
+[Getting Employee's List](https://api.merit.ee/merit-palk-api/palk-reference-manual/requesting-data-from-merit-palk/getting-employees-list/) and
+[Getting Salary and Hours Report data](https://api.merit.ee/merit-palk-api/palk-reference-manual/requesting-data-from-merit-palk/getting-salary-and-hours-report-data/).
+The employee endpoint identifies TypeId 5 as a contract of services
+(`Töövõtuleping`). FastAccounts maps it to `pay_basis=income_line` with zero
+monthly base pay, rather than inferring an employment salary from a tariff.
+Reviewed `Töövõtulepingu tasu` or author's-fee income components provide remuneration;
+the accountant must confirm their levy flags and recipient circumstances.
+The contract-pay preset enables income tax, social tax, both unemployment
+insurance flags and funded pension, with social-minimum counting off. These are
+editable bureau defaults, not a universal tax decision for every recipient.
+This basis carries no automatic employment-contract social minimum. Social tax
+on taxable income still follows the component flags. See EMTA
+[Sotsiaalmaks](https://www.emta.ee/ariklient/maksud-ja-tasumine/tulumaks-ja-sotsiaalmaks/sotsiaalmaks)
+and [Maksumäärad](https://www.emta.ee/ariklient/maksud-ja-tasumine/tulumaks-ja-sotsiaalmaks/maksumaarad),
+with SMS § 2 and the social-minimum rules above; accountant UAT remains pending.
+
+The salary report uses `POST /api/v1/getsalaryreport`, with `StartDate` and
+`EndDate` covering the selected month, `Language=EN` and `SortOption=2`.
+Its `EmployeeFullName`, `SalaryTypeName`, `Month6`, `Hours` and `Sum` become
+reviewed employee-period proposals. The response has no personal-code identity,
+so only a unique employee name within the organisation can match. Missing or
+ambiguous names stay blocked for review. Salary type names are customisable in
+Merit: the base-salary allowlist is `Base salary`, `Monthly salary`,
+`Hourly salary`, `Põhipalk`, `Kuupalk` and `Tunnipalk`. An exact existing
+component-type name also maps automatically. Unmapped lines remain visible with
+warnings. Existing draft components are retained; a collision with an imported
+component type blocks apply for manual review to prevent duplicate income. Hourly
+base pay differences use the visible base-adjustment component without changing
+the hourly rate. New drafts require reviewed hours for every hourly employee;
+unselected and rejected proposals do not supply hours.
+
+Apply fills or creates the period's draft through the payroll service, using
+Decimal money helpers for gross and component amounts and validated decimal
+hours for hourly staff. It preserves the unique period constraint, tenant scope
+and repeat-apply idempotency. An identical report is unchanged on repeat import;
+a changed report updates the draft using the previous applied payload to identify
+source components, while retaining unrelated manual lines. If source component
+amounts have been edited locally, apply blocks for review instead of discarding
+the edits. Approved runs cannot be changed. Source employer
+taxes, dimensions and totals remain review evidence; local payroll rules
+calculate the draft's taxes. Merit warns that unpaid salaries can affect report
+results, so live PRO reconciliation and accountant acceptance remain required.
+
+Employee-list requests support only the optional exact `PersonalCode` and
+`Month6` filters. There is no documented offset, cursor or personal-code range.
+The [Merit Palk FAQ](https://api.merit.ee/merit-palk-api/frequently-asked-questions-faq/)
+states the 100-record limit for growing lists. FastAccounts fails closed when a
+response reaches that ceiling; companies with more than 100 employees must
+repeat imports with each exact
+PersonalCode. No undocumented paging or silently truncated import is used.
 
 ## Month-end posting and TSD reclassification
 

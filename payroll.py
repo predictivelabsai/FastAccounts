@@ -43,7 +43,7 @@ AMOUNTS = ('gross', 'funded_pension', 'ui_employee', 'tax_free_minimum',
            'income_tax', 'net', 'withholding_total', 'social_tax', 'ui_employer', 'employer_cost',
            'social_tax_base', 'social_tax_minimum_topup')
 
-PAY_BASES = ('monthly', 'hourly', 'board_fee')
+PAY_BASES = ('monthly', 'hourly', 'board_fee', 'income_line')
 INCOME_TAX_RATE = Decimal('0.22')
 BASIC_EXEMPTION = Decimal('700')
 SOCIAL_TAX_RATE = Decimal('0.33')
@@ -138,6 +138,9 @@ def calculate_pay(employee: dict, *, period: str | None = None, hours=None, comp
     board = basis == 'board_fee'
     if basis == 'hourly':
         gross = money(decimal(employee['hourly_rate']) * decimal(hours if hours is not None else employee.get('hours')))
+    elif basis == 'income_line':
+        # Services-contract remuneration consists entirely of explicit income lines.
+        gross = Decimal(0)
     else:
         gross = money(employee['gross_salary'])
     bases = {key: gross for key in FLAGS}
@@ -153,7 +156,7 @@ def calculate_pay(employee: dict, *, period: str | None = None, hours=None, comp
         for key in FLAGS:
             if component[key]:
                 bases[key] += amount
-    if gross <= 0 or any(value < 0 for value in bases.values()):
+    if gross < 0 or (gross == 0 and basis != 'income_line') or any(value < 0 for value in bases.values()):
         raise ValueError('Payment components must leave positive gross and non-negative tax bases')
     pension = money(bases['funded_pension'] * decimal(employee['funded_pension_percent']) / 100)
     ui = money(bases['ui_employee'] * UI_EMPLOYEE_RATE)
@@ -161,7 +164,8 @@ def calculate_pay(employee: dict, *, period: str | None = None, hours=None, comp
     # Record the basic exemption actually used: it cannot exceed the taxable amount.
     exemption = money(min(BASIC_EXEMPTION, max(Decimal('0'), taxable)) if employee['apply_tax_free_minimum'] else 0)
     income_tax = money(max(Decimal('0'), taxable - exemption) * INCOME_TAX_RATE)
-    exemption_reason = 'board_member' if board else (employee.get('social_tax_minimum_exemption') or None)
+    exemption_reason = ('board_member' if board else 'income_line' if basis == 'income_line'
+                        else (employee.get('social_tax_minimum_exemption') or None))
     social_base = bases['social_tax']
     shortfall = Decimal(0)
     if exemption_reason is None:
@@ -230,7 +234,7 @@ class PayrollService:
             data[field] = int(data[field])
         basis = data.get('pay_basis') or ('board_fee' if data['board_member'] else 'monthly')
         if basis not in PAY_BASES:
-            raise ValueError('Pay basis must be monthly, hourly or board fee')
+            raise ValueError('Pay basis must be monthly, hourly, board fee or income line')
         if (basis == 'board_fee') != bool(data['board_member']):
             raise ValueError('Board members must use the board fee pay basis')
         data['pay_basis'] = basis
@@ -250,6 +254,8 @@ class PayrollService:
                 if rate is None or not rate.is_finite() or rate <= 0 or rate != four_dp(rate) or rate > Decimal('99999999.9999'):
                     raise ValueError('Hourly rate must be positive for hourly employees')
                 data['hourly_rate'], data['gross_salary'] = db_number(four_dp(rate)), None
+            elif basis == 'income_line':
+                data['gross_salary'], data['hourly_rate'] = None, None
             else:
                 if data.get('gross_salary') is None:
                     raise ValueError('Monthly salary or board fee must be positive')
@@ -267,7 +273,7 @@ class PayrollService:
         if reason == 'multiple_employers' and data['apply_tax_free_minimum']:
             raise ValueError('The multiple-employers exemption applies only when another employer applies the basic exemption')
         # Board-member fees never carry the minimum obligation, so no reason is stored.
-        data['social_tax_minimum_exemption'] = None if basis == 'board_fee' else reason
+        data['social_tax_minimum_exemption'] = None if basis in ('board_fee', 'income_line') else reason
         start, end = _parse_date(data.get('employment_start_date')), _parse_date(data.get('employment_end_date'))
         if start and end and end < start:
             raise ValueError('Employment dates must be YYYY-MM-DD and the end cannot precede the start')
@@ -442,63 +448,77 @@ class PayrollService:
         # deduction lines are explicitly net withholdings, never tax relief.
         return data
 
-    def update_item(self, organisation_id, run_id, item_id, *, actor, hours=None, components=None):
-        with self.db.transaction() as tx:
-            claimed = tx.execute("UPDATE pay_runs SET notes=notes WHERE organisation_id=? AND id=? AND status='Draft'", (organisation_id, run_id))
-            run = self._run(tx, organisation_id, run_id)
-            if claimed.rowcount != 1:
-                raise PayrollConflict('Only draft pay runs can be edited')
-            item = next((item for item in run['items'] if item['id'] == item_id), None)
-            if not item:
-                raise KeyError('Pay run item not found')
-            if hours is not None and item['pay_basis'] != 'hourly':
-                raise ValueError('Hours can be edited only for hourly employees')
-            worked = self._hours(dict(id=item_id, name=item['employee_name']), {item_id: hours if hours is not None else item['hours']}) if item['pay_basis'] == 'hourly' else None
-            if components is not None:
-                if len(components) > 100:
-                    raise ValueError('At most 100 payment lines are allowed per employee')
-                tx.execute('DELETE FROM pay_item_components WHERE organisation_id=? AND item_id=?', (organisation_id, item_id))
-                for position, line in enumerate(components):
-                    allowed = {'type_id', 'name', 'amount', 'direction', 'liability_role', *FLAGS}
-                    if set(line) - allowed:
-                        raise ValueError('Unknown payment component field')
-                    data = tx.one('SELECT * FROM pay_component_types WHERE organisation_id=? AND id=?', (organisation_id, line.get('type_id')))
-                    if not data:
-                        raise KeyError('Payment type not found')
-                    data.update(line)
-                    self._component_values(data)
-                    try:
-                        amount = decimal(data.get('amount'))
-                        if not amount.is_finite() or not amount or abs(amount) > Decimal('9999999999.99') or amount != money(amount) or (data['direction'] == 'deduction' and amount < 0):
-                            raise ValueError('Enter a non-zero payment amount with at most two decimals')
-                    except InvalidOperation as exc:
-                        raise ValueError('Enter a non-zero payment amount with at most two decimals') from exc
-                    fields = ('id', 'organisation_id', 'item_id', 'type_id', 'position', 'name', 'amount', 'direction', *FLAGS, 'liability_role')
-                    values = (new_id(), organisation_id, item_id, data['id'], position, data['name'], db_number(amount), data['direction'], *(data[key] for key in FLAGS), data['liability_role'])
-                    tx.execute('INSERT INTO pay_item_components(' + ','.join(fields) + ') VALUES (' + ','.join('?' for _ in fields) + ')', values)
-            lines = tx.rows('SELECT * FROM pay_item_components WHERE organisation_id=? AND item_id=? ORDER BY position', (organisation_id, item_id))
-            context = tx.one('SELECT * FROM pay_item_context WHERE organisation_id=? AND item_id=?', (organisation_id, item_id))
-            if not context:
-                raise ValueError('Pay run calculation snapshot is missing')
-            amounts = calculate_pay(item | context, period=run['period'], hours=worked, components=lines)
-            if amounts['gross'] > Decimal('9999999999.99') or any(amounts[key] > Decimal('9999999999.99') for key in AMOUNTS if key != 'employer_cost'):
-                raise ValueError('Payment totals exceed the supported amount')
-            monthly_minimum, hourly_minimum = minimum_wage(run['period'])
-            required = Decimal(0)
-            if item['pay_basis'] == 'monthly':
-                required = money(item.get('minimum_wage') or monthly_minimum * _fte(item.get('fte')))
-            elif item['pay_basis'] == 'hourly':
-                required = money(decimal(item.get('minimum_wage') or hourly_minimum) * worked)
-            if amounts['gross'] < required:
-                raise ValueError('Payment components must preserve the minimum wage')
-            tx.execute('UPDATE pay_run_items SET ' + ','.join(f'{key}=?' for key in AMOUNTS) + ',hours=? WHERE organisation_id=? AND id=?',
-                       (*(db_number(amounts[key]) for key in AMOUNTS), None if worked is None else db_number(worked), organisation_id, item_id))
-            refreshed = self._run(tx, organisation_id, run_id)
-            totals = [sum((money(row[key]) for row in refreshed['items']), Decimal(0)) for key in ('gross', 'net', 'employer_cost')]
-            tx.execute('UPDATE pay_runs SET total_gross=?,total_net=?,total_employer_cost=? WHERE organisation_id=? AND id=?',
-                       (*(db_number(value) for value in totals), organisation_id, run_id))
-            audit(tx, organisation_id, actor, 'payroll.item.updated', 'pay_run_item', item_id)
-            return self._run(tx, organisation_id, run_id)
+    def update_item(self, organisation_id, run_id, item_id, *, actor, hours=None, components=None, gross_salary=None, tx=None):
+        if tx is None:
+            with self.db.transaction() as owned_tx:
+                return self.update_item(organisation_id, run_id, item_id, actor=actor, hours=hours, components=components, gross_salary=gross_salary, tx=owned_tx)
+        claimed = tx.execute("UPDATE pay_runs SET notes=notes WHERE organisation_id=? AND id=? AND status='Draft'", (organisation_id, run_id))
+        run = self._run(tx, organisation_id, run_id)
+        if claimed.rowcount != 1:
+            raise PayrollConflict('Only draft pay runs can be edited')
+        item = next((item for item in run['items'] if item['id'] == item_id), None)
+        if not item:
+            raise KeyError('Pay run item not found')
+        if gross_salary is not None:
+            if item['pay_basis'] not in ('monthly', 'board_fee'):
+                raise ValueError('Gross salary can be edited only for monthly or board fee employees')
+            try:
+                gross = decimal(gross_salary)
+                if not gross.is_finite() or gross <= 0 or gross > Decimal('9999999999.99'):
+                    raise ValueError('Gross salary must be positive and fit NUMERIC(12,2)')
+                if money(gross) <= 0:
+                    raise ValueError('Gross salary must be at least 0.01')
+            except InvalidOperation as exc:
+                raise ValueError('Invalid gross salary') from exc
+            item['gross_salary'] = db_number(money(gross))
+        if hours is not None and item['pay_basis'] != 'hourly':
+            raise ValueError('Hours can be edited only for hourly employees')
+        worked = self._hours(dict(id=item_id, name=item['employee_name']), {item_id: hours if hours is not None else item['hours']}) if item['pay_basis'] == 'hourly' else None
+        if components is not None:
+            if len(components) > 100:
+                raise ValueError('At most 100 payment lines are allowed per employee')
+            tx.execute('DELETE FROM pay_item_components WHERE organisation_id=? AND item_id=?', (organisation_id, item_id))
+            for position, line in enumerate(components):
+                allowed = {'type_id', 'name', 'amount', 'direction', 'liability_role', *FLAGS}
+                if set(line) - allowed:
+                    raise ValueError('Unknown payment component field')
+                data = tx.one('SELECT * FROM pay_component_types WHERE organisation_id=? AND id=?', (organisation_id, line.get('type_id')))
+                if not data:
+                    raise KeyError('Payment type not found')
+                data.update(line)
+                self._component_values(data)
+                try:
+                    amount = decimal(data.get('amount'))
+                    if not amount.is_finite() or not amount or abs(amount) > Decimal('9999999999.99') or amount != money(amount) or (data['direction'] == 'deduction' and amount < 0):
+                        raise ValueError('Enter a non-zero payment amount with at most two decimals')
+                except InvalidOperation as exc:
+                    raise ValueError('Enter a non-zero payment amount with at most two decimals') from exc
+                fields = ('id', 'organisation_id', 'item_id', 'type_id', 'position', 'name', 'amount', 'direction', *FLAGS, 'liability_role')
+                values = (new_id(), organisation_id, item_id, data['id'], position, data['name'], db_number(amount), data['direction'], *(data[key] for key in FLAGS), data['liability_role'])
+                tx.execute('INSERT INTO pay_item_components(' + ','.join(fields) + ') VALUES (' + ','.join('?' for _ in fields) + ')', values)
+        lines = tx.rows('SELECT * FROM pay_item_components WHERE organisation_id=? AND item_id=? ORDER BY position', (organisation_id, item_id))
+        context = tx.one('SELECT * FROM pay_item_context WHERE organisation_id=? AND item_id=?', (organisation_id, item_id))
+        if not context:
+            raise ValueError('Pay run calculation snapshot is missing')
+        amounts = calculate_pay(item | context, period=run['period'], hours=worked, components=lines)
+        if amounts['gross'] > Decimal('9999999999.99') or any(amounts[key] > Decimal('9999999999.99') for key in AMOUNTS if key != 'employer_cost'):
+            raise ValueError('Payment totals exceed the supported amount')
+        monthly_minimum, hourly_minimum = minimum_wage(run['period'])
+        required = Decimal(0)
+        if item['pay_basis'] == 'monthly':
+            required = money(item.get('minimum_wage') or monthly_minimum * _fte(item.get('fte')))
+        elif item['pay_basis'] == 'hourly':
+            required = money(decimal(item.get('minimum_wage') or hourly_minimum) * worked)
+        if amounts['gross'] < required:
+            raise ValueError('Payment components must preserve the minimum wage')
+        tx.execute('UPDATE pay_run_items SET ' + ','.join(f'{key}=?' for key in AMOUNTS) + ',hours=?,gross_salary=? WHERE organisation_id=? AND id=?',
+                   (*(db_number(amounts[key]) for key in AMOUNTS), None if worked is None else db_number(worked), item['gross_salary'], organisation_id, item_id))
+        refreshed = self._run(tx, organisation_id, run_id)
+        totals = [sum((money(row[key]) for row in refreshed['items']), Decimal(0)) for key in ('gross', 'net', 'employer_cost')]
+        tx.execute('UPDATE pay_runs SET total_gross=?,total_net=?,total_employer_cost=? WHERE organisation_id=? AND id=?',
+                   (*(db_number(value) for value in totals), organisation_id, run_id))
+        audit(tx, organisation_id, actor, 'payroll.item.updated', 'pay_run_item', item_id)
+        return self._run(tx, organisation_id, run_id)
 
     def posting_mappings(self, organisation_id):
         with self.db.transaction() as tx:
@@ -550,54 +570,56 @@ class PayrollService:
             raise ValueError(f"{employee['name']}: hours must be a positive number with at most two decimals")
         return money(value)
 
-    def create_run(self, organisation_id, *, period, actor, hours=None):
+    def create_run(self, organisation_id, *, period, actor, hours=None, tx=None):
         if not re.fullmatch(r'2026-(0[1-9]|1[0-2])', period):
             raise ValueError('Payroll demo supports monthly periods YYYY-MM in 2026 only')
-        with self.db.transaction() as tx:
-            self._organisation(tx, organisation_id)
-            run_id = new_id()
-            result = tx.execute("INSERT INTO pay_runs(id,organisation_id,period,total_gross,total_net,total_employer_cost,created_by,created_at) VALUES (?,?,?,0,0,0,?,?) ON CONFLICT(organisation_id,period) DO NOTHING", (run_id, organisation_id, period, actor, utc_now()))
-            if result.rowcount != 1:
-                raise PayrollConflict(f'A pay run already exists for {period}')
-            employees = [e for e in tx.rows('SELECT * FROM employees WHERE organisation_id=? AND active=1 ORDER BY name,id', (organisation_id,))
-                         if employed_days(e, period)[0] > 0]
-            if not employees:
-                raise ValueError('A pay run requires at least one active employee')
-            monthly_minimum, hourly_minimum = minimum_wage(period)
-            totals = dict(gross=Decimal(0), net=Decimal(0), employer_cost=Decimal(0))
-            columns = ('id', 'pay_run_id', 'organisation_id', 'employee_id', 'employee_name', 'employee_personal_id', 'gross_salary',
-                       'board_member', 'funded_pension_percent', 'pay_basis', 'fte', 'hourly_rate', 'hours',
-                       'minimum_wage', 'social_tax_minimum_exemption', *AMOUNTS)
-            for employee in employees:
-                basis, fte, worked, required = pay_basis(employee), _fte(employee.get('fte')), None, None
-                if basis == 'monthly':
-                    # Part-time: the monthly minimum wage is pro-rated by the work-time fraction.
-                    required = money(monthly_minimum * fte)
-                    if money(employee['gross_salary']) < required:
-                        suffix = f" (EUR {monthly_minimum:.2f} × {_fraction(fte)})" if fte != 1 else ''
-                        raise ValueError(f"{employee['name']}: gross salary must be at least EUR {required:.2f}{suffix}")
-                elif basis == 'hourly':
-                    required = hourly_minimum
-                    if decimal(employee['hourly_rate']) < hourly_minimum:
-                        raise ValueError(f"{employee['name']}: hourly rate must be at least EUR {hourly_minimum:.2f}")
-                    worked = self._hours(employee, hours)
-                amounts = calculate_pay(employee, period=period, hours=worked)
-                item_id = new_id()
-                values = (item_id, run_id, organisation_id, employee['id'], employee['name'], employee.get('personal_id'),
-                          db_number(amounts['gross'] if basis == 'hourly' else money(employee['gross_salary'])),
-                          int(basis == 'board_fee'), db_number(decimal(employee['funded_pension_percent'])), basis,
-                          db_number(four_dp(fte)), None if basis != 'hourly' else db_number(four_dp(employee['hourly_rate'])),
-                          None if worked is None else db_number(worked), None if required is None else db_number(money(required)),
-                          amounts['social_tax_minimum_exemption'])
-                tx.execute('INSERT INTO pay_run_items('+','.join(columns)+') VALUES ('+','.join('?' for _ in columns)+')',
-                           values+tuple(db_number(amounts[k]) for k in AMOUNTS))
-                tx.execute('INSERT INTO pay_item_context(organisation_id,item_id,apply_tax_free_minimum,employment_start_date,employment_end_date) VALUES (?,?,?,?,?)',
-                           (organisation_id, item_id, int(employee['apply_tax_free_minimum']), employee.get('employment_start_date'), employee.get('employment_end_date')))
-                for key in totals:
-                    totals[key] += amounts[key]
-            tx.execute('UPDATE pay_runs SET total_gross=?,total_net=?,total_employer_cost=? WHERE organisation_id=? AND id=?', tuple(db_number(totals[k]) for k in totals)+(organisation_id, run_id))
-            audit(tx, organisation_id, actor, 'payroll.drafted', 'pay_run', run_id, {'period': period})
-            return self._run(tx, organisation_id, run_id)
+        if tx is None:
+            with self.db.transaction() as owned_tx:
+                return self.create_run(organisation_id, period=period, actor=actor, hours=hours, tx=owned_tx)
+        self._organisation(tx, organisation_id)
+        run_id = new_id()
+        result = tx.execute("INSERT INTO pay_runs(id,organisation_id,period,total_gross,total_net,total_employer_cost,created_by,created_at) VALUES (?,?,?,0,0,0,?,?) ON CONFLICT(organisation_id,period) DO NOTHING", (run_id, organisation_id, period, actor, utc_now()))
+        if result.rowcount != 1:
+            raise PayrollConflict(f'A pay run already exists for {period}')
+        employees = [e for e in tx.rows('SELECT * FROM employees WHERE organisation_id=? AND active=1 ORDER BY name,id', (organisation_id,))
+                     if employed_days(e, period)[0] > 0]
+        if not employees:
+            raise ValueError('A pay run requires at least one active employee')
+        monthly_minimum, hourly_minimum = minimum_wage(period)
+        totals = dict(gross=Decimal(0), net=Decimal(0), employer_cost=Decimal(0))
+        columns = ('id', 'pay_run_id', 'organisation_id', 'employee_id', 'employee_name', 'employee_personal_id', 'gross_salary',
+                   'board_member', 'funded_pension_percent', 'pay_basis', 'fte', 'hourly_rate', 'hours',
+                   'minimum_wage', 'social_tax_minimum_exemption', *AMOUNTS)
+        for employee in employees:
+            basis, fte, worked, required = pay_basis(employee), _fte(employee.get('fte')), None, None
+            if basis == 'monthly':
+                # Part-time: the monthly minimum wage is pro-rated by the work-time fraction.
+                required = money(monthly_minimum * fte)
+                if money(employee['gross_salary']) < required:
+                    suffix = f" (EUR {monthly_minimum:.2f} × {_fraction(fte)})" if fte != 1 else ''
+                    raise ValueError(f"{employee['name']}: gross salary must be at least EUR {required:.2f}{suffix}")
+            elif basis == 'hourly':
+                required = hourly_minimum
+                if decimal(employee['hourly_rate']) < hourly_minimum:
+                    raise ValueError(f"{employee['name']}: hourly rate must be at least EUR {hourly_minimum:.2f}")
+                worked = self._hours(employee, hours)
+            amounts = calculate_pay(employee, period=period, hours=worked)
+            item_id = new_id()
+            values = (item_id, run_id, organisation_id, employee['id'], employee['name'], employee.get('personal_id'),
+                      db_number(amounts['gross'] if basis in ('hourly', 'income_line') else money(employee['gross_salary'])),
+                      int(basis == 'board_fee'), db_number(decimal(employee['funded_pension_percent'])), basis,
+                      db_number(four_dp(fte)), None if basis != 'hourly' else db_number(four_dp(employee['hourly_rate'])),
+                      None if worked is None else db_number(worked), None if required is None else db_number(money(required)),
+                      amounts['social_tax_minimum_exemption'])
+            tx.execute('INSERT INTO pay_run_items('+','.join(columns)+') VALUES ('+','.join('?' for _ in columns)+')',
+                       values+tuple(db_number(amounts[k]) for k in AMOUNTS))
+            tx.execute('INSERT INTO pay_item_context(organisation_id,item_id,apply_tax_free_minimum,employment_start_date,employment_end_date) VALUES (?,?,?,?,?)',
+                       (organisation_id, item_id, int(employee['apply_tax_free_minimum']), employee.get('employment_start_date'), employee.get('employment_end_date')))
+            for key in totals:
+                totals[key] += amounts[key]
+        tx.execute('UPDATE pay_runs SET total_gross=?,total_net=?,total_employer_cost=? WHERE organisation_id=? AND id=?', tuple(db_number(totals[k]) for k in totals)+(organisation_id, run_id))
+        audit(tx, organisation_id, actor, 'payroll.drafted', 'pay_run', run_id, {'period': period})
+        return self._run(tx, organisation_id, run_id)
 
     def approve(self, organisation_id, run_id, *, actor):
         from web import i18n
@@ -607,6 +629,8 @@ class PayrollService:
             run = self._run(tx, organisation_id, run_id)
             if claimed.rowcount != 1:
                 raise PayrollConflict('Pay run is already approved')
+            if any(money(item['gross']) <= 0 for item in run['items']):
+                raise ValueError('Every employee requires positive gross pay before approval')
             totals = {k: sum((decimal(i[k]) for i in run['items']), Decimal(0)) for k in AMOUNTS}
             memo = f"Payroll {run['period']}"
             # The social tax minimum shortfall is an employer cost on the existing social-tax

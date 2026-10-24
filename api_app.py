@@ -2126,14 +2126,14 @@ def suggest_account_mappings(organisation_id: str, provider: str, user: User = D
     return AccountMappingService().suggestions(organisation_id, provider)
 
 
-PayBasis = Literal['monthly', 'hourly', 'board_fee']
+PayBasis = Literal['monthly', 'hourly', 'board_fee', 'income_line']
 
 
 class EmployeeIn(BaseModel):
     name: str = Field(min_length=1, max_length=180)
     email: str | None = None
     personal_id: str | None = None
-    # Monthly salary or board fee; leave empty for hourly employees.
+    # Monthly salary or board fee; leave empty for hourly or income-line pay.
     gross_salary: Decimal | None = Field(default=None, gt=0, max_digits=12, decimal_places=2)
     funded_pension_percent: Decimal = Decimal('2')
     apply_tax_free_minimum: bool = False

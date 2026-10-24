@@ -18,32 +18,47 @@ delivered.
   unsupported contract types remain blocked for review. ImportCode is the
   external identity, with PersonalCode fallback and tenant-scoped employee matching.
 - Board-member contracts use the existing board-fee basis. Services contracts
-  retain an `income_line` source basis and a blocking review note: there is no
-  existing reviewed destination for creating pay-run income lines. No new
-  payroll storage or employee pay basis was invented.
+  (TypeId 5) now apply as `income_line` employees with zero base pay. Their pay
+  comes from reviewed income components, without employment-contract monthly
+  gross or an automatic social tax minimum obligation.
 - GL batches use the existing balanced journal review and atomic ledger posting
   destination, with provider-scoped account mappings and idempotency. Source
   dimensions are retained in the staged payload. Changed posted batches require
   an explicit reversal and correction instead of silently replacing ledger data.
 - Vacation balances require a personal code or contract import code and balance
   date. Review displays the snapshot and unused days; apply is blocked in both
-  the UI and service. Salary/hours report pulls are implemented and fake-tested,
-  but import returns a clear unsupported error because no pay-run input or
-  report-attachment staging destination exists.
+  the UI and service.
+- Salary/hours reports now use the existing staged review pipeline and draft
+  pay-run editor. Unique employee-name matching stays within the organisation;
+  missing or ambiguous matches and unknown salary types stay in review. Mapped
+  base pay, hourly hours and existing component types are applied atomically to
+  the month's draft, creating it when absent. Approved runs are never changed.
+  Decimal rounding, the one-run-per-period constraint and repeat-apply
+  idempotency remain enforced.
 - Added English, Estonian, Latvian and Lithuanian copy. Requests reaching the
   100-employee ceiling fail closed and require filtering by personal code:
-  the manual provides no continuation contract. Production UAT, live response
-  envelopes and salary units remain to be verified with Merit Palk PRO access.
-- Validation: **330 passed** on Python 3.12.14 with SQLite, each file run
-  individually: Merit Palk 34, provider adapters 79, SmartAccounts workers 34,
-  file import 12, journal import 23, reviewed import pipeline 10, import objects 4,
-  master-data import 32, migrations and tenancy 14, workspace payroll 9,
-  copilot 60, workspace integrations 6 and i18n 13. Includes offline Playwright,
-  API role/CSRF, identity upsert, historical contract status and ledger checks.
-  JavaScript syntax, Python 3.12 grammar for eight changed/new Python files and
-  diff whitespace checks passed. A temporary Python 3.12 environment matched
-  the project venv's dependency versions; the project venv was not changed.
-  The full suite, PostgreSQL runtime and live provider verification were not run.
+  the manual provides no offset, cursor or personal-code range contract. The UI
+  explains that companies with more than 100 employees must import by exact
+  PersonalCode. Production UAT, live response envelopes, salary units and
+  unpaid-salary report effects remain to be verified with Merit Palk PRO access.
+- Validation: **183 focused tests passed**, each file run separately under five
+  minutes: Merit Palk 49, payroll 16, part-time/hourly payroll 30, workspace
+  payroll 9, workspace integrations 6, copilot 60 and i18n 13. Includes offline
+  Playwright review-to-payroll flow, draft correction, concurrent apply, approval
+  protection, component collision, tenant isolation and migration preservation.
+- Ran the full suite once with `.venv\Scripts\python.exe -m pytest -q`, capped
+  at 45 minutes. It reached 100% in approximately 28 minutes: **1,630 passed,
+  2 failed, 4 skipped**. Both failures were stale catalogue expectations already
+  present before this completion change: file-import capabilities and Merit
+  Palk's documented-adapter status. Corrected those assertions, then reran only
+  the affected files: **29 API tests and 60 public-page tests passed**. No full
+  suite rerun was performed. The Windows log-streaming wrapper hit an encoding
+  error while printing failure details after 100%; the complete progress log
+  supplies the full-run outcome counts, and targeted reruns captured the details.
+- JavaScript syntax, Python 3.12 grammar and diff whitespace checks passed.
+  Tests used the existing project venv, Python 3.14.6, without modifying it.
+  The four skips are opt-in PostgreSQL checks. Live Merit Palk PRO response
+  reconciliation, salary units and accountant UAT remain pending.
 
 ## 2026-10-24: Reviewed Excel bookkeeping journal import
 

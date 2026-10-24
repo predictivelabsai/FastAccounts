@@ -72,6 +72,7 @@
       ["monthly", "Monthly salary"],
       ["hourly", "Hourly pay"],
       ["board_fee", "Board member fee"],
+      ["income_line", "Income lines"],
     ],
     // Codes match payroll.SOCIAL_TAX_MINIMUM_EXEMPTIONS (EMTA, SMS § 2 lg 3–4).
     socialTaxExemptions = [
@@ -91,7 +92,7 @@
       ["board_member", "Board member – no minimum obligation"],
     ],
     exemptionLabel = (code) =>
-      t((socialTaxExemptions.find(([v]) => v === code) || [, code])[1]),
+      t(code === "income_line" ? "Income lines" : (socialTaxExemptions.find(([v]) => v === code) || [, code])[1]),
     partTime = (x) =>
       x.fte && Number(x.fte) < 1
         ? `<small>${tr("Part-time")} ${esc(num(x.fte))}</small>`
@@ -2520,10 +2521,10 @@
       select("Object type", "object_type", (item.pull_object_types || []).map((type) =>
         [type, palk && type === "employee" ? t("Merit Palk employees") : importTypeLabel(type)])) +
       (palk ? `<label>${tr("Accounting month")}<input type="month" name="month" required value="${new Date().toISOString().slice(0, 7)}"></label>` +
-        field("Personal code", "personal_code") + field("Contract import code (vacation balance)", "contract_code") +
+        field("Personal code", "personal_code", "", "text", `title="${tr("Employee lists are limited to 100 results. For larger companies, import each PersonalCode separately; ranges and pagination are not supported.")}"`) + field("Contract import code (vacation balance)", "contract_code") +
         `<label>${tr("Balance date")}<input type="date" name="balance_date" value="${new Date().toISOString().slice(0, 10)}"></label>` +
         `<label class="check full-width"><input type="checkbox" name="monthly_amounts">${tr("I confirm the selected salary agreement rates are monthly amounts")}</label>` +
-        `<p class="full-width">${tr("Salary and hours import is unsupported: no pay-run input staging destination exists.")}</p>` : "") +
+        `<p class="full-width">${tr("Salary and hours fill draft pay runs. Review employee names and salary types; unpaid salaries may affect the report.")}</p>` : "") +
       `<p class="full-width">${tr("Records are staged for review. Nothing changes until decisions are applied.")}</p>`,
       "Import data",
     ));
@@ -2792,6 +2793,8 @@
       details = [payload.email, payload.personal_id];
     if (objectType === "vacation_balance") {
       details = [payload.date, `${t("Unused vacation days")}: ${payload.DaysUnused}`];
+    } else if (objectType === "salary_hours") {
+      details = [payload.period, `${t("Gross")}: ${payload.gross_pay}`, `${t("Hours worked")}: ${payload.hours}`];
     } else if (objectType === "contact") {
       details = [payload.registration_no || payload.registry_code, payload.email];
     } else if (["sales_invoice", "purchase_invoice"].includes(objectType)) {
@@ -4254,9 +4257,9 @@
         input.disabled = !visible;
         input.required = visible && name !== "social_tax_minimum_exemption";
       };
-      show("gross_salary", !hourly);
+      show("gross_salary", !hourly && basis !== "income_line");
       show("hourly_rate", hourly);
-      show("social_tax_minimum_exemption", !board);
+      show("social_tax_minimum_exemption", !board && basis !== "income_line");
     };
     employeeForm.elements.pay_basis.onchange = updateBasis;
     updateBasis();

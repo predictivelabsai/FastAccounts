@@ -232,6 +232,8 @@ class Database:
                     script = script.replace(
                         "accent_colour GLOB '#[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]'",
                         "accent_colour ~ '^#[0-9a-fA-F]{6}$'")
+                elif path.stem == "0035_payroll_income_line":
+                    script = _POSTGRES_PAYROLL_0035
                 elif path.stem == "0034_payroll_demo_fixes":
                     script = script.split('-- SQLITE_PAYROLL_IMMUTABILITY', 1)[0] + _postgres_payroll_component_triggers()
                 connection.execute(script)
@@ -471,4 +473,22 @@ ALTER TABLE pay_run_items ADD COLUMN social_tax_base NUMERIC(12,2);
 ALTER TABLE pay_run_items ADD COLUMN social_tax_minimum_topup NUMERIC(12,2) NOT NULL DEFAULT 0;
 ALTER TABLE pay_run_items ADD COLUMN social_tax_minimum_exemption TEXT;
 UPDATE pay_run_items SET pay_basis=CASE WHEN board_member=1 THEN 'board_fee' ELSE 'monthly' END, social_tax_base=gross;
+"""
+
+
+# PostgreSQL extends the employee constraints without rebuilding the table.
+_POSTGRES_PAYROLL_0035 = r"""
+ALTER TABLE employees DROP CONSTRAINT employees_pay_basis_check;
+ALTER TABLE employees ADD CONSTRAINT employees_pay_basis_check CHECK(pay_basis IN ('monthly','hourly','board_fee','income_line'));
+ALTER TABLE employees DROP CONSTRAINT employees_pay_amount_check;
+ALTER TABLE employees ADD CONSTRAINT employees_pay_amount_check CHECK(
+ (pay_basis='hourly' AND hourly_rate IS NOT NULL)
+ OR (pay_basis IN ('monthly','board_fee') AND gross_salary IS NOT NULL)
+ OR (pay_basis='income_line' AND gross_salary IS NULL AND hourly_rate IS NULL));
+INSERT INTO pay_component_types(id,organisation_id,preset_key,name,direction,income_tax,social_tax,ui_employee,ui_employer,funded_pension,social_minimum,liability_role)
+SELECT id || '-component-contract',id,'contract','Töövõtulepingu tasu','income',1,1,1,1,1,0,'PAYROLL_DEDUCTION'
+FROM organisations WHERE country_code='EE' ON CONFLICT(organisation_id,preset_key) DO NOTHING;
+INSERT INTO pay_component_types(id,organisation_id,preset_key,name,direction,income_tax,social_tax,ui_employee,ui_employer,funded_pension,social_minimum,liability_role)
+SELECT id || '-component-base_adjustment',id,'base_adjustment','Põhipalga korrigeerimine','income',1,1,1,1,1,1,'PAYROLL_DEDUCTION'
+FROM organisations WHERE country_code='EE' ON CONFLICT(organisation_id,preset_key) DO NOTHING;
 """

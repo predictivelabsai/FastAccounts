@@ -687,6 +687,7 @@ class MeritPalkProvider(HTTPProvider):
     base_url = "https://palk.merit.ee/api/v1"
     PULL_OBJECT_TYPES = ("employee", "salary_agreement", "gl_entry", "salary_hours", "vacation_balance")
     PRO_ERROR = "Merit Palk requires the PRO licence and valid API credentials (HTTP 401)"
+    MAX_LIST_RESULTS = 100  # Documented in the Merit Palk FAQ, Request limits.
 
     def __init__(self, api_id: str, api_key: str, *, config=None, clock=None, **kwargs):
         super().__init__(**kwargs)
@@ -754,9 +755,11 @@ class MeritPalkProvider(HTTPProvider):
         if self.config.get("personal_code"):
             body["PersonalCode"] = str(self.config["personal_code"])
         rows = self._rows(self.post("getemployees", body))
-        # The 100-result ceiling has no documented offset or continuation token.
+        # The FAQ caps growing lists at 100. PersonalCode is an exact filter:
+        # no ranges, offset or continuation token are documented. Larger companies
+        # must pull each PersonalCode separately; never invent pagination fields.
         # Fail closed at the ceiling to avoid presenting a truncated import as complete.
-        if len(rows) >= 100:
+        if len(rows) >= self.MAX_LIST_RESULTS:
             raise ProviderError("Merit Palk employee result reached 100 records; filter by personal code")
         return rows
 
@@ -783,13 +786,15 @@ class MeritPalkProvider(HTTPProvider):
         record["active"] = ((not record.get("employment_start_date") or record["employment_start_date"] <= today)
                             and (not record.get("employment_end_date") or record["employment_end_date"] >= today))
         if kind == "5":
-            record.pop("pay_basis")
-            record["import_warning"] = "Merit Palk services contracts require a reviewed pay-run income line; employee apply is unsupported"
+            record["pay_basis"] = "income_line"
         elif kind not in {"1", "2"}:
             record["import_warning"] = "Merit Palk contract type is unsupported for employee apply"
         return record
 
     def _with_salary(self, record: dict, rows: list[dict]) -> dict:
+        if record.get("pay_basis") == "income_line":
+            # Services are paid through reviewed run components, never a monthly rate.
+            return record
         month = self._month()
         first = date(int(month[:4]), int(month[4:]), 1)
         following = (first.replace(day=28) + timedelta(days=4)).replace(day=1)
@@ -868,8 +873,28 @@ class MeritPalkProvider(HTTPProvider):
             # https://api.merit.ee/merit-palk-api/palk-reference-manual/requesting-data-from-merit-palk/getting-salary-and-hours-report-data/
             first = date(int(month[:4]), int(month[4:]), 1)
             last = (first.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
-            records = self._rows(self.post("getsalaryreport", {
+            rows = self._rows(self.post("getsalaryreport", {
                 "StartDate": first.isoformat(), "EndDate": last.isoformat(), "Language": "EN", "SortOption": 2}))
+            grouped = {}
+            for row in rows:
+                name = str(row.get("EmployeeFullName") or "").strip()
+                source_month = str(row.get("Month6") or "")
+                if not name or source_month != month:
+                    raise ProviderError("Merit Palk salary report has a missing employee or unexpected month")
+                record = grouped.setdefault(name, {
+                    "external_id": f"{month}:{name}", "name": name,
+                    "period": f"{month[:4]}-{month[4:]}", "gross_pay": Decimal(0),
+                    "hours": Decimal(0), "lines": [], "merit_palk_source": [],
+                })
+                amount = money(MeritProvider._decimal(row.get("Sum")))
+                hours = money(MeritProvider._decimal(row.get("Hours", 0)))
+                if not amount.is_finite() or not hours.is_finite() or hours < 0:
+                    raise ProviderError("Merit Palk salary report contains invalid amounts or hours")
+                record["gross_pay"] += amount
+                record["hours"] += hours
+                record["lines"].append({"name": str(row.get("SalaryTypeName") or "").strip(), "amount": amount})
+                record["merit_palk_source"].append(row)
+            records = list(grouped.values())
         else:
             # https://api.merit.ee/merit-palk-api/palk-reference-manual/requesting-data-from-merit-palk/getting-vacation-obligation-balance/
             code = str(self.config.get("contract_code") or self.config.get("personal_code") or "").strip()

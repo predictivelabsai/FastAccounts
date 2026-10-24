@@ -12,6 +12,8 @@ FLAGS = ('income_tax', 'social_tax', 'ui_employee', 'ui_employer',
 FLAG_LABELS = ('Income tax', 'Social tax', 'Employee unemployment insurance',
                'Employer unemployment insurance', 'Funded pension', 'Counts towards social tax minimum')
 PRESETS = (
+    ('base_adjustment', 'Põhipalga korrigeerimine', 'income', (1, 1, 1, 1, 1, 1), 'PAYROLL_DEDUCTION'),
+    ('contract', 'Töövõtulepingu tasu', 'income', (1, 1, 1, 1, 1, 0), 'PAYROLL_DEDUCTION'),
     ('bailiff', 'Kinnipidamine kohtutäiturile', 'deduction', (0, 0, 0, 0, 0, 0), 'PAYROLL_BAILIFF'),
     ('author', 'Autori tasu', 'income', (1, 1, 0, 0, 0, 1), 'PAYROLL_DEDUCTION'),
     ('parental', 'Vanemapuhkused', 'income', (1, 0, 0, 0, 0, 0), 'PAYROLL_DEDUCTION'),

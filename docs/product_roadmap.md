@@ -14,31 +14,45 @@
   or PersonalCode identity and tenant-scoped matching. Board contracts map to
   board fees. Monthly salary amounts require per-import confirmation because
   the documented tariff has no explicit unit. Ambiguous agreements/contracts
-  are blocked. Services contracts retain an income-line basis for review but
-  cannot apply until a reviewed pay-run income-line destination exists.
+  are blocked. Services contracts (TypeId 5) now apply with the `income_line`
+  basis, zero base pay and reviewed income components, without an automatic
+  employment-contract social tax minimum.
 - GL imports reuse journal balance/account/date review and immutable atomic
   posting, with provider-specific mappings, repeat-import idempotency and a
   correction guard for changed posted batches. Original dimensions remain in
   the staged source payload.
 - Vacation balances are display-only snapshots with no payroll or ledger writes.
-  Salary/hours pulls are implemented, but staged import is explicitly unsupported
-  until a pay-run input or report-attachment destination exists. No payroll
-  calculation, TSD submission, export or new HR scope is included.
+  Salary/hours imports now stage each employee and month for the existing draft
+  pay-run editor, applying mapped base pay, hourly hours and existing component
+  types. Unknown types and missing or ambiguous organisation-scoped name matches
+  stay in review. Apply creates or updates only a draft, preserves approval and
+  the one-run-per-period constraint, and remains idempotent. TSD submission,
+  export and new HR scope are excluded.
 - All four locales cover the flow. A result at the 100-employee ceiling requires
-  personal-code filtering rather than silently importing a truncated list.
+  exact PersonalCode filtering rather than silently importing a truncated list.
+  There is no documented offset, cursor or personal-code range support; the UI
+  explains the requirement for companies with more than 100 employees.
   Synthetic contract and browser validation is implemented. Live Merit Palk PRO
-  verification, salary unit confirmation and production accountant UAT remain
-  pending; this is not a claim of unrestricted payroll-data application.
-- Validation: **330 passed** on Python 3.12.14/SQLite, with each file run
-  individually: Merit Palk 34, provider adapters 79, SmartAccounts workers 34,
-  file import 12, journal import 23, reviewed import pipeline 10, import objects 4,
-  master-data import 32, migrations and tenancy 14, workspace payroll 9,
-  copilot 60, workspace integrations 6 and i18n 13. Offline Playwright, real
-  CSRF enforcement, roles, tenant isolation and immutable posting are covered.
-  JavaScript syntax, eight-file Python 3.12 grammar and diff whitespace checks
-  passed. The temporary test environment matched the existing dependency
-  versions. The full suite, PostgreSQL runtime and live API verification were
-  not run.
+  verification, salary units, unpaid-salary report reconciliation and production
+  accountant UAT remain pending.
+- Validation: **183 focused tests passed**, each file run separately under five
+  minutes: Merit Palk 49, payroll 16, part-time/hourly payroll 30, workspace
+  payroll 9, workspace integrations 6, copilot 60 and i18n 13. Includes offline
+  Playwright review-to-payroll flow, draft correction, concurrent apply, approval
+  protection, component collision, tenant isolation and migration preservation.
+- Ran the full suite once with `.venv\Scripts\python.exe -m pytest -q`, capped
+  at 45 minutes. It reached 100% in approximately 28 minutes: **1,630 passed,
+  2 failed, 4 skipped**. Both failures were stale catalogue expectations already
+  present before this completion change: file-import capabilities and Merit
+  Palk's documented-adapter status. Corrected those assertions, then reran only
+  the affected files: **29 API tests and 60 public-page tests passed**. No full
+  suite rerun was performed. The Windows log-streaming wrapper hit an encoding
+  error while printing failure details after 100%; the complete progress log
+  supplies the full-run outcome counts, and targeted reruns captured the details.
+- JavaScript syntax, Python 3.12 grammar and diff whitespace checks passed.
+  Tests used the existing project venv, Python 3.14.6, without modifying it.
+  The four skips are opt-in PostgreSQL checks. Live Merit Palk PRO response
+  reconciliation, salary units and accountant UAT remain pending.
 
 ## 2026-10-23: Streamed copilot chat
 
