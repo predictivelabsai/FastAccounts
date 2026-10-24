@@ -2008,7 +2008,8 @@
     "Employee not found": "Darbuotojas nerastas",
     "Employee unemployment insurance": "Darbuotojo nedarbo draudimo įmoka",
     "Employer unemployment insurance": "Darbdavio nedarbo draudimo įmoka",
-    "Funded pension": "Kaupiamoji pensija"
+    "Funded pension": "Kaupiamoji pensija",
+    "Delete": "Ištrinti"
   },
   "views": {
     "overview": "Overview",

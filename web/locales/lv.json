@@ -2008,7 +2008,8 @@
     "Employee not found": "Darbinieks nav atrasts",
     "Employee unemployment insurance": "Darbinieka bezdarba apdrošināšanas iemaksa",
     "Employer unemployment insurance": "Darba devēja bezdarba apdrošināšanas iemaksa",
-    "Funded pension": "Fondētā pensija"
+    "Funded pension": "Fondētā pensija",
+    "Delete": "Dzēst"
   },
   "views": {
     "overview": "Overview",

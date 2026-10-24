@@ -2008,7 +2008,8 @@
     "Employee not found": "Töötajat ei leitud",
     "Employee unemployment insurance": "Töötaja töötuskindlustusmakse",
     "Employer unemployment insurance": "Tööandja töötuskindlustusmakse",
-    "Funded pension": "Kogumispension"
+    "Funded pension": "Kogumispension",
+    "Delete": "Kustuta"
   },
   "views": {
     "overview": "Ülevaade",

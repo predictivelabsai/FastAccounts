@@ -2008,7 +2008,8 @@
     "Employee not found": "Employee not found",
     "Employee unemployment insurance": "Employee unemployment insurance",
     "Employer unemployment insurance": "Employer unemployment insurance",
-    "Funded pension": "Funded pension"
+    "Funded pension": "Funded pension",
+    "Delete": "Delete"
   },
   "views": {
     "overview": "Overview",
