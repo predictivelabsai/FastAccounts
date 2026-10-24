@@ -1970,6 +1970,7 @@ with preparation/settlement tracking, overdue periods and dashboard counts.
 Migration 0034 preserves historical posted batches and provider chart mappings.
 The SPA exposes per-line levy flags and deduction accounts, preserves saved
 settings when type defaults change, and saves only changed posting mappings.
+Draft adjustments retain the monthly minimum and the hourly minimum for entered hours.
 All new workspace labels are available in EN, ET, LV and LT. Monthly and hourly
 browser flows cover multiple components at a mobile viewport.
 Historical payroll migration tests now use a catalogue scoped to one migration

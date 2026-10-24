@@ -14,6 +14,8 @@ delivered.
 - Finished the SPA component editor, including per-line deduction accounts and
   preservation of saved levy flags after a type changes. Payroll account settings
   save only changed mappings. All new labels exist in EN, ET, LV and LT.
+- Draft component adjustments preserve minimum monthly pay and minimum hourly
+  pay for the entered hours; invalid adjustments roll back the entire save.
 - Added mapped gross salary payable, separate accrued tax and deduction roles,
   and explicit balanced TSD reclassification dated the following month's 10th.
   Declaration preparation/settlement and overdue counts appear in the workspace.

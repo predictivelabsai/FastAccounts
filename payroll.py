@@ -483,8 +483,13 @@ class PayrollService:
             amounts = calculate_pay(item | context, period=run['period'], hours=worked, components=lines)
             if amounts['gross'] > Decimal('9999999999.99') or any(amounts[key] > Decimal('9999999999.99') for key in AMOUNTS if key != 'employer_cost'):
                 raise ValueError('Payment totals exceed the supported amount')
-            required = money(item.get('minimum_wage') or minimum_wage(run['period'])[0] * _fte(item.get('fte')))
-            if item['pay_basis'] == 'monthly' and amounts['gross'] < required:
+            monthly_minimum, hourly_minimum = minimum_wage(run['period'])
+            required = Decimal(0)
+            if item['pay_basis'] == 'monthly':
+                required = money(item.get('minimum_wage') or monthly_minimum * _fte(item.get('fte')))
+            elif item['pay_basis'] == 'hourly':
+                required = money(decimal(item.get('minimum_wage') or hourly_minimum) * worked)
+            if amounts['gross'] < required:
                 raise ValueError('Payment components must preserve the minimum wage')
             tx.execute('UPDATE pay_run_items SET ' + ','.join(f'{key}=?' for key in AMOUNTS) + ',hours=? WHERE organisation_id=? AND id=?',
                        (*(db_number(amounts[key]) for key in AMOUNTS), None if worked is None else db_number(worked), organisation_id, item_id))

@@ -171,7 +171,9 @@ and/or a complete `components` list. Each line has `type_id`, decimal-string
 frozen effective flags when saving an existing line. Negative income amounts
 allow gross adjustments; deductions must be positive. Invalid or excessive net
 deductions roll back the whole save. Gross and every tax base must remain valid,
-and monthly gross must retain the snapshotted minimum wage. Approval freezes
+and monthly gross must retain the snapshotted minimum wage. Hourly gross must
+retain the snapshotted hourly minimum multiplied by the entered hours, including
+after negative income adjustments. Approval freezes
 hours, base pay and component lines.
 
 Types belong to the organisation: `GET/POST /payroll/component-types` and

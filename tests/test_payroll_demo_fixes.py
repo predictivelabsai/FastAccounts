@@ -346,3 +346,12 @@ def test_explicit_reclassification_does_not_require_in_app_tsd_files(db, ee_org)
     assert settled['declaration_state'] == 'settled'
     balanced(db, settled['declaration_batch_id'])
     assert db.scalar("SELECT COUNT(*) FROM sync_runs WHERE provider='emta'") == 0
+
+
+def test_hourly_gross_adjustments_preserve_minimum_pay(db, ee_org):
+    service, person, run, types = setup_run(db, ee_org, pay_basis='hourly', hourly_rate='10')
+    correction = service.save_component_type(ee_org['id'], name='Hourly gross correction', actor=ACTOR,
+        **{key: True for key in FLAGS})
+    with pytest.raises(ValueError, match='minimum wage'):
+        edit(service, ee_org, run, [dict(type_id=correction['id'], amount='-800')])
+    assert service.runs(ee_org['id'])[0] == run
