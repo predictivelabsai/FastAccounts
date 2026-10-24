@@ -189,7 +189,8 @@ def test_estonian_demo_tax_names_and_unmatched_pill(db, monkeypatch):
         browser.close()
 
 
-def test_bureau_employee_lifecycle_draft_components_and_declarations(db, ee_org, monkeypatch):
+@pytest.mark.parametrize('pay_basis', ['monthly', 'hourly'])
+def test_bureau_employee_lifecycle_draft_components_and_declarations(db, ee_org, monkeypatch, pay_basis):
     """Exercise new SPA writes against the real API without a live server."""
     from urllib.parse import urlsplit
     from datetime import date
@@ -207,10 +208,12 @@ def test_bureau_employee_lifecycle_draft_components_and_declarations(db, ee_org,
             return cls(2026, 10, 23)
     monkeypatch.setattr(payroll_module, 'date', DemoDay)
     payroll = PayrollService(db)
-    employee = payroll.save_employee(ee_org['id'], name='Synthetic bureau employee', gross_salary='2000', personal_id='49001010001', actor=actor)
+    pay = {'gross_salary': '2000'} if pay_basis == 'monthly' else {'pay_basis': 'hourly', 'hourly_rate': '10'}
+    employee = payroll.save_employee(ee_org['id'], name='Synthetic bureau employee', personal_id='49001010001', actor=actor, **pay)
     unused = payroll.save_employee(ee_org['id'], name='Synthetic unused employee', gross_salary='1000', actor=actor)
     payroll.save_employee(ee_org['id'], employee_id=unused['id'], active=False, actor=actor)
-    run = payroll.create_run(ee_org['id'], period='2026-10', actor=actor)
+    hours = {employee['id']: '200'} if pay_basis == 'hourly' else None
+    run = payroll.create_run(ee_org['id'], period='2026-10', actor=actor, hours=hours)
     root = Path(__file__).resolve().parents[1]
     errors = []
     with TestClient(app) as client, playwright.sync_playwright() as runtime:
@@ -271,11 +274,34 @@ def test_bureau_employee_lifecycle_draft_components_and_declarations(db, ee_org,
         editor.get_by_label('Amount', exact=True).fill('100')
         editor.get_by_label('Income tax', exact=True).uncheck()
         editor.get_by_label('Social tax', exact=True).check()
+        if pay_basis == 'hourly':
+            editor.get_by_label('Hours worked', exact=True).fill('210')
+        editor.get_by_role('button', name='Add payment line', exact=True).click()
+        deduction = editor.locator('.payment-line').nth(1)
+        deduction.get_by_role('combobox', name='Payment type', exact=True).select_option(label='Bailiff garnishment')
+        deduction.get_by_label('Amount', exact=True).fill('10')
+        deduction.get_by_role('combobox', name='Deduction liability', exact=True).select_option('PAYROLL_DEDUCTION')
         editor.get_by_role('button', name='Save draft pay', exact=True).click()
-        playwright.expect(page.locator('.component-summary')).to_contain_text('Parental-leave pay')
+        playwright.expect(page.locator('.component-summary').first).to_contain_text('Parental-leave pay')
+        playwright.expect(page.locator('.component-summary')).to_have_count(2)
         item = payroll.runs(ee_org['id'])[0]['items'][0]
-        assert (item['gross'], item['income_tax'], item['social_tax']) == ('2100.00', '424.16', '693.00')
+        expected = ('2100.00', '424.16', '693.00') if pay_basis == 'monthly' else ('2200.00', '445.37', '726.00')
+        assert (item['gross'], item['income_tax'], item['social_tax']) == expected
         assert not item['components'][0]['income_tax'] and item['components'][0]['social_tax']
+        assert item['components'][1]['liability_role'] == 'PAYROLL_DEDUCTION'
+        # Changing a type must not reset effective flags or liability choices
+        # when the browser reopens and saves an existing draft.
+        payroll.save_component_type(ee_org['id'], type_id=item['components'][0]['type_id'], actor=actor, income_tax=True, social_tax=False)
+        page.reload()
+        page.get_by_role('button', name='Edit draft pay', exact=True).click()
+        editor = page.get_by_role('dialog')
+        playwright.expect(editor.locator('.payment-line').first.get_by_label('Income tax', exact=True)).not_to_be_checked()
+        playwright.expect(editor.locator('.payment-line').first.get_by_label('Social tax', exact=True)).to_be_checked()
+        editor.get_by_role('button', name='Save draft pay', exact=True).click()
+        playwright.expect(page.get_by_role('dialog')).to_have_count(0)
+        refreshed = payroll.runs(ee_org['id'])[0]['items'][0]
+        assert (refreshed['gross'], refreshed['income_tax'], refreshed['social_tax'], refreshed['net']) == (item['gross'], item['income_tax'], item['social_tax'], item['net'])
+        assert refreshed['components'][1]['liability_role'] == 'PAYROLL_DEDUCTION'
         page.get_by_role('button', name='Approve & post', exact=True).click()
         page.get_by_role('button', name='Confirm', exact=True).click()
         playwright.expect(page.get_by_role('button', name='Edit draft pay', exact=True)).to_have_count(0)
@@ -287,7 +313,7 @@ def test_bureau_employee_lifecycle_draft_components_and_declarations(db, ee_org,
         page.get_by_role('button', name='Confirm', exact=True).click()
         playwright.expect(page.locator('.payroll-declarations')).to_contain_text('Settled')
         assert payroll.runs(ee_org['id'])[0]['declaration_state'] == 'settled'
-        earlier = payroll.create_run(ee_org['id'], period='2026-09', actor=actor)
+        earlier = payroll.create_run(ee_org['id'], period='2026-09', actor=actor, hours=hours)
         payroll.approve(ee_org['id'], earlier['id'], actor=actor)
         page.evaluate("location.hash = 'overview'")
         playwright.expect(page.locator('.notice.declaration-overdue')).to_have_text('Overdue payroll declarations: 1')

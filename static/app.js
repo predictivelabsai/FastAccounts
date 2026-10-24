@@ -4320,7 +4320,10 @@
       return select(payrollRoleLabels[mapping.role], mapping.role, accounts.filter((a) => a.active && a.account_type === (expense ? "Expense" : "Liability")).map((a) => [a.code, `${a.code} ${a.name}`]), mapping.account_code);
     }).join("")));
     bindForm(d, async (data) => {
-      for (const mapping of mappings) await post(c.url(`/payroll/posting-mappings/${mapping.role}`), {account_code: data[mapping.role]}, "PUT");
+      for (const mapping of mappings) {
+        if (data[mapping.role] !== mapping.account_code)
+          await post(c.url(`/payroll/posting-mappings/${mapping.role}`), {account_code: data[mapping.role]}, "PUT");
+      }
       await saved(d);
     });
   }
@@ -4338,12 +4341,14 @@
       el.innerHTML = `<legend>${tr("Payment line")}</legend><div class="form-grid">${select("Payment type", "type_id", types.map((x) => [x.id, t(x.name)]), value.type_id)}${field("Amount", "amount", value.amount || "", "number", 'required step="0.01"')}${select("Direction", "direction", [["income", t("Income")], ["deduction", t("Deduction")]], value.direction)}${field("Name", "name", value.name, "text", 'required maxlength="180"')}<div class="full-width component-flags">${componentFlagFields(value)}</div></div>${button("Remove payment line", "removePayment")}`;
       container.append(el);
       const direction = el.querySelector('[name="direction"]');
-      el.dataset.liabilityRole = value.liability_role;
+      const liability = document.createElement('div');
+      liability.innerHTML = select("Deduction liability", "liability_role", [["PAYROLL_DEDUCTION", t("Other deduction liability")], ["PAYROLL_BAILIFF", t("Bailiff withholding liability")]], value.liability_role);
+      el.querySelector('.form-grid').append(liability.firstElementChild);
       el.querySelector('[name="type_id"]').onchange = (e) => {
         const type = types.find((x) => x.id === e.target.value);
         el.querySelector('[name="name"]').value = type.name;
         direction.value = type.direction;
-        el.dataset.liabilityRole = type.liability_role;
+        el.querySelector('[name="liability_role"]').value = type.liability_role;
         componentFlags.forEach(([key]) => el.querySelector(`[name="${key}"]`).checked = type[key]);
       };
       el.querySelector('[data-action="removePayment"]').onclick = () => el.remove();
@@ -4352,8 +4357,8 @@
     d.querySelector('[data-action="addPayment"]').onclick = () => add();
     bindForm(d, async () => {
       const components = [...container.children].map((el) => {
-        const value = {liability_role: el.dataset.liabilityRole};
-        for (const key of ['type_id', 'name', 'amount', 'direction']) value[key] = el.querySelector(`[name="${key}"]`).value;
+        const value = {};
+        for (const key of ['type_id', 'name', 'amount', 'direction', 'liability_role']) value[key] = el.querySelector(`[name="${key}"]`).value;
         for (const [key] of componentFlags) value[key] = el.querySelector(`[name="${key}"]`).checked;
         return value;
       });

@@ -1968,6 +1968,10 @@ editing, component exports and configurable month-end accrual postings are in
 bureau demo scope. Explicit TSD reclassification uses the following-month 10th,
 with preparation/settlement tracking, overdue periods and dashboard counts.
 Migration 0034 preserves historical posted batches and provider chart mappings.
+The SPA exposes per-line levy flags and deduction accounts, preserves saved
+settings when type defaults change, and saves only changed posting mappings.
+All new workspace labels are available in EN, ET, LV and LT. Monthly and hourly
+browser flows cover multiple components at a mobile viewport.
 
 Acceptance checks cover tenant isolation, snapshots, mixed levy bases, social
 minimum top-ups, balanced postings, account remapping, locks, repeated actions,

@@ -11,6 +11,9 @@ delivered.
 - Added organisation payment types, editable levy defaults, component snapshots
   and hourly draft editing with atomic Decimal recalculation. PDF, Excel and
   reviewed push payloads include component detail.
+- Finished the SPA component editor, including per-line deduction accounts and
+  preservation of saved levy flags after a type changes. Payroll account settings
+  save only changed mappings. All new labels exist in EN, ET, LV and LT.
 - Added mapped gross salary payable, separate accrued tax and deduction roles,
   and explicit balanced TSD reclassification dated the following month's 10th.
   Declaration preparation/settlement and overdue counts appear in the workspace.
@@ -19,7 +22,9 @@ delivered.
 - Production bureau UAT is pending. Author social tax defaults to on; author and
   parental-leave flags remain editable assumptions. See the paired roadmap and
   payroll rules for calculation details and remaining scope.
-- Validation is in progress; final results will be recorded before completion.
+- Workspace browser checks pass for monthly and hourly pay, multiple components,
+  frozen flags, employee lifecycle, account mappings and declarations at a mobile
+  viewport (9 tests). Full-suite validation is in progress.
 
 ## 2026-10-23: Streamed copilot chat
 
