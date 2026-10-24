@@ -2353,12 +2353,14 @@
       catalog.integrations?.items?.[item.key]?.direction || item.direction || "",
     integrationUrl = (c, provider, suffix = "") =>
       c.url(`/integrations/${encodeURIComponent(provider)}${suffix}`),
-    readyProviderOrder = ["file_import", "fasthr", "quickbooks", "xero", "merit", "smartaccounts", "open_banking"];
+    readyProviderOrder = ["file_import", "fasthr", "quickbooks", "xero", "merit", "merit_palk", "smartaccounts", "open_banking"];
 
   const importTypeLabel = (objectType) => t({
     employee: "Employees", employees: "Employees", account: "Chart of accounts",
     contact: "Contacts", sales_invoice: "Sales invoices", purchase_invoice: "Purchase invoices",
     payment: "Payments", gl_entry: "General ledger entries", journal: "Bookkeeping journal",
+    salary_agreement: "Merit Palk salary agreements", salary_hours: "Merit Palk salary and hours",
+    vacation_balance: "Merit Palk vacation balances",
   }[objectType] || objectType);
 
   function integrationCard(c, item, connection) {
@@ -2366,7 +2368,7 @@
       name = integrationName(item),
       fileImport = provider === "file_import",
       status = fileImport ? "No connection needed" : connection?.status || "Not configured",
-      accountingImport = ["merit", "smartaccounts"].includes(provider),
+      accountingImport = ["merit", "smartaccounts", "merit_palk"].includes(provider),
       canImport = status === "Connected",
       actions = fileImport
         ? button("Recent runs", "integrationRuns", false, `data-provider="${esc(provider)}"`) +
@@ -2438,13 +2440,13 @@
       ]),
       byProvider = new Map(connections.map((connection) => [connection.provider, connection])),
       ready = catalogue
-        .filter((entry) => entry.registry_status === "Adapter ready" || ["merit", "smartaccounts"].includes(entry.key))
+        .filter((entry) => entry.registry_status === "Adapter ready" || ["merit", "smartaccounts", "merit_palk"].includes(entry.key))
         .sort((left, right) => {
           const leftIndex = readyProviderOrder.indexOf(left.key),
             rightIndex = readyProviderOrder.indexOf(right.key);
           return (leftIndex < 0 ? 999 : leftIndex) - (rightIndex < 0 ? 999 : rightIndex);
         }),
-      planned = catalogue.filter((entry) => entry.registry_status !== "Adapter ready" && !["merit", "smartaccounts"].includes(entry.key));
+      planned = catalogue.filter((entry) => entry.registry_status !== "Adapter ready" && !["merit", "smartaccounts", "merit_palk"].includes(entry.key));
     if (
       !c.mount(
         page(
@@ -2513,9 +2515,15 @@
   }
 
   function integrationImportDialog(c, item) {
+    const palk = item.key === "merit_palk";
     const d = dialog("Import data", form(
       select("Object type", "object_type", (item.pull_object_types || []).map((type) =>
-        [type, importTypeLabel(type)])) +
+        [type, palk && type === "employee" ? t("Merit Palk employees") : importTypeLabel(type)])) +
+      (palk ? `<label>${tr("Accounting month")}<input type="month" name="month" required value="${new Date().toISOString().slice(0, 7)}"></label>` +
+        field("Personal code", "personal_code") + field("Contract import code (vacation balance)", "contract_code") +
+        `<label>${tr("Balance date")}<input type="date" name="balance_date" value="${new Date().toISOString().slice(0, 10)}"></label>` +
+        `<label class="check full-width"><input type="checkbox" name="monthly_amounts">${tr("I confirm the selected salary agreement rates are monthly amounts")}</label>` +
+        `<p class="full-width">${tr("Salary and hours import is unsupported: no pay-run input staging destination exists.")}</p>` : "") +
       `<p class="full-width">${tr("Records are staged for review. Nothing changes until decisions are applied.")}</p>`,
       "Import data",
     ));
@@ -2526,6 +2534,9 @@
       try {
         summary = await post(integrationUrl(c, item.key, "/sync"), {
           object_type: data.object_type,
+          ...(palk ? {config: {month: data.month.replace("-", ""), personal_code: data.personal_code,
+            contract_code: data.contract_code, balance_date: data.balance_date,
+            salary_amount_basis: d.querySelector('[name="monthly_amounts"]').checked ? "monthly" : ""}} : {}),
         });
       } finally {
         d.dataset.pending = "false";
@@ -2755,7 +2766,7 @@
   }
 
   const stagedDecisionEligible = (record) =>
-    ["Pending", "Failed"].includes(record.status);
+    !record.display_only && ["Pending", "Failed"].includes(record.status);
 
   function stagedRecordRow(record, objectType) {
     const payload = record.external_payload || {};
@@ -2779,7 +2790,9 @@
         record.external_id ||
         "–",
       details = [payload.email, payload.personal_id];
-    if (objectType === "contact") {
+    if (objectType === "vacation_balance") {
+      details = [payload.date, `${t("Unused vacation days")}: ${payload.DaysUnused}`];
+    } else if (objectType === "contact") {
       details = [payload.registration_no || payload.registry_code, payload.email];
     } else if (["sales_invoice", "purchase_invoice"].includes(objectType)) {
       displayName = payload.external_number || payload.number || payload.supplier_number || record.external_id;
@@ -2806,7 +2819,7 @@
       td(
         eligible
           ? `<div class="decision-options" role="group" aria-label="${tr("Decision")}"><label class="check"><input type="checkbox" data-decision="apply" data-id="${esc(record.id)}">${tr(record.status === "Failed" ? "Retry apply" : "Approve")}</label><label class="check"><input type="checkbox" data-decision="reject" data-id="${esc(record.id)}">${tr("Reject")}</label></div>`
-          : `<span class="muted">${tr("Decision recorded")}</span>`,
+          : `<span class="muted">${tr(record.display_only ? "Display-only snapshot" : "Decision recorded")}</span>`,
       ),
     ]);
   }
@@ -2832,8 +2845,8 @@
         ),
       ),
       records = review.records || [],
-      objectType = review.summary.object_type || "employee",
-      employeeRun = ["employee", "employees"].includes(objectType),
+      objectType = provider === "merit_palk" && review.summary.object_type === "gl_entry" ? "journal" : review.summary.object_type || "employee",
+      employeeRun = ["employee", "employees", "salary_agreement"].includes(objectType),
       eligible = records.filter(stagedDecisionEligible),
       stagedBody = records.length
         ? table(

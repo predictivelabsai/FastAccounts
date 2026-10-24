@@ -12,6 +12,7 @@ from .providers import (
     BambooHRProvider,
     FastHRProvider,
     MeritProvider,
+    MeritPalkProvider,
     OpenBankingProvider,
     SmartAccountsProvider,
     PersonioProvider,
@@ -163,6 +164,15 @@ REGISTRY: dict[str, ConnectorRegistration] = {
             CredentialField("api_id", "API ID"),
             CredentialField("api_key", "API key", "secret"),
         ),
+    ),
+    "merit_palk": ConnectorRegistration(
+        connector_class=MeritPalkProvider,
+        status="Documented contract · not live-verified",
+        factory=lambda credentials, config: MeritPalkProvider(
+            api_id=credentials.get("api_id", ""), api_key=credentials.get("api_key", ""), config=config,
+        ),
+        credential_fields=(CredentialField("api_id", "API ID"), CredentialField("api_key", "API key", "secret")),
+        credential_note="Merit Palk PRO licence required. Separate credentials from Merit Aktiva. Pull-only; live verification pending.",
     ),
     "smartaccounts": ConnectorRegistration(
         connector_class=SmartAccountsProvider,

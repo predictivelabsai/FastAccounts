@@ -3,6 +3,43 @@
 **Research baseline:** 2026-08-10  
 **Status:** engineering pilot implemented; independent UK/EE accountant UAT and provider approvals pending
 
+## 2026-10-24: On-demand Merit Palk imports
+
+- Implemented the documented Estonian Merit Palk API as a separate pull-only
+  connector with encrypted credentials, connection testing and owner/administrator
+  on-demand controls in the existing integration workspace. All five endpoint
+  pages under the [reference manual](https://api.merit.ee/merit-palk-api/palk-reference-manual/)
+  were reachable; no endpoint names were guessed.
+- Employee and salary-agreement pulls use reviewed employee upserts, ImportCode
+  or PersonalCode identity and tenant-scoped matching. Board contracts map to
+  board fees. Monthly salary amounts require per-import confirmation because
+  the documented tariff has no explicit unit. Ambiguous agreements/contracts
+  are blocked. Services contracts retain an income-line basis for review but
+  cannot apply until a reviewed pay-run income-line destination exists.
+- GL imports reuse journal balance/account/date review and immutable atomic
+  posting, with provider-specific mappings, repeat-import idempotency and a
+  correction guard for changed posted batches. Original dimensions remain in
+  the staged source payload.
+- Vacation balances are display-only snapshots with no payroll or ledger writes.
+  Salary/hours pulls are implemented, but staged import is explicitly unsupported
+  until a pay-run input or report-attachment destination exists. No payroll
+  calculation, TSD submission, export or new HR scope is included.
+- All four locales cover the flow. A result at the 100-employee ceiling requires
+  personal-code filtering rather than silently importing a truncated list.
+  Synthetic contract and browser validation is implemented. Live Merit Palk PRO
+  verification, salary unit confirmation and production accountant UAT remain
+  pending; this is not a claim of unrestricted payroll-data application.
+- Validation: **330 passed** on Python 3.12.14/SQLite, with each file run
+  individually: Merit Palk 34, provider adapters 79, SmartAccounts workers 34,
+  file import 12, journal import 23, reviewed import pipeline 10, import objects 4,
+  master-data import 32, migrations and tenancy 14, workspace payroll 9,
+  copilot 60, workspace integrations 6 and i18n 13. Offline Playwright, real
+  CSRF enforcement, roles, tenant isolation and immutable posting are covered.
+  JavaScript syntax, eight-file Python 3.12 grammar and diff whitespace checks
+  passed. The temporary test environment matched the existing dependency
+  versions. The full suite, PostgreSQL runtime and live API verification were
+  not run.
+
 ## 2026-10-23: Streamed copilot chat
 
 - Chat replies now stream progressively using SSE, with the existing JSON send

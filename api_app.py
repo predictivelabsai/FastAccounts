@@ -435,6 +435,7 @@ class ConnectorResultOut(BaseModel):
 
 class IntegrationSyncIn(BaseModel):
     object_type: str = Field(min_length=1, max_length=80)
+    config: dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("object_type")
     @classmethod
@@ -2010,7 +2011,7 @@ def run_integration_sync(
 ):
     _require(organisation_id, user, {"owner", "administrator"})
     return ImportService().run_sync(
-        organisation_id, provider, payload.object_type, actor=user.email
+        organisation_id, provider, payload.object_type, actor=user.email, config=payload.config
     )
 
 

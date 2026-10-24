@@ -13,7 +13,7 @@ from typing import Any
 from psycopg.errors import UniqueViolation
 
 import connectors.registry as connector_registry
-from connectors.providers import FASTHR_NO_PAY_AMOUNT
+from connectors.providers import FASTHR_NO_PAY_AMOUNT, ProviderError
 from core_utils import (
     audit,
     canonical_json,
@@ -53,6 +53,9 @@ STAGED_STATUSES = ("Pending", "Approved", "Rejected", "Applied", "Failed")
 FILE_IMPORT_PROVIDER = "file_import"
 MAX_FILE_IMPORT_CHARS = 2_000_000
 OBJECT_TYPES = {
+    "salary_agreement": "employee",
+    "salary_hours": "salary_hours",
+    "vacation_balance": "vacation_balance",
     "journal": "journal",
     "employee": "employee",
     "employees": "employee",
@@ -136,7 +139,7 @@ class ImportService:
         return (
             key,
             dict(stored_credentials if credentials is None else credentials),
-            dict(stored_config if config is None else config),
+            dict(stored_config) | dict(config or {}),
         )
 
     def _last_cursor(self, organisation_id: str, provider: str, object_type: str) -> str | None:
@@ -167,6 +170,8 @@ class ImportService:
         canonical_type = OBJECT_TYPES.get(requested_type)
         if canonical_type is None:
             raise ValueError(f"Unsupported reviewed import object type: {object_type}")
+        if key == "merit_palk" and requested_type == "salary_hours":
+            raise ValueError("Merit Palk salary and hours import is unsupported: no pay-run input staging destination exists")
         object_type = (
             requested_type
             if canonical_type == "employee" and key != FILE_IMPORT_PROVIDER
@@ -220,7 +225,8 @@ class ImportService:
                 actor,
             )
         except Exception as error:
-            safe_error = str(error) if isinstance(error, (ValueError, KeyError)) else "Connector pull failed"
+            safe_error = (str(error) if isinstance(error, (ValueError, KeyError))
+                          or (key == "merit_palk" and isinstance(error, ProviderError)) else "Connector pull failed")
             self.integration.complete_sync(sync_id, error=safe_error)
             with self.db.transaction() as tx:
                 audit(
@@ -250,6 +256,8 @@ class ImportService:
         now = utc_now()
         staged_ids: list[str] = []
         canonical_type = OBJECT_TYPES.get(object_type, object_type)
+        if provider == "merit_palk" and object_type == "gl_entry":
+            canonical_type = object_type = "journal"
         with self.db.transaction() as tx:
             for payload in records:
                 external_id = self._external_id(payload)
@@ -260,7 +268,7 @@ class ImportService:
                 if not review_note and isinstance(warning, str) and warning:
                     review_note = warning
                 if canonical_type == "journal":
-                    review_note = self._journal_review(tx, organisation_id, payload)["warning"]
+                    review_note = self._journal_review(tx, organisation_id, payload, provider)["warning"]
                 existing = None
                 if external_id:
                     existing = tx.one(
@@ -401,6 +409,17 @@ class ImportService:
                 return mapping["local_id"], None, {
                     "strategy": "external_mapping", "external_id": external_id
                 }
+            if provider == "merit_palk" and canonical_type == "employee":
+                # Both pulls describe the same Merit Palk contract. Reuse its
+                # identity when the other pull established the mapping first.
+                other_type = "employee" if object_type == "salary_agreement" else "salary_agreement"
+                mapping = tx.one(
+                    "SELECT local_id FROM external_mappings WHERE organisation_id=? AND provider=? "
+                    "AND object_type=? AND external_id=? AND direction IN ('import','bidirectional')",
+                    (organisation_id, provider, other_type, external_id),
+                )
+                if mapping:
+                    return mapping["local_id"], None, {"strategy": "external_mapping", "external_id": external_id}
         if canonical_type == "employee":
             return self._employee_match(tx, organisation_id, payload, match_name=provider == "smartaccounts")
         if canonical_type == "contact":
@@ -473,7 +492,7 @@ class ImportService:
             "CASE WHEN s.object_type='contact' THEN c.name "
             "WHEN s.object_type='purchase_invoice' THEN bc.name||' / '||b.supplier_number "
             "WHEN s.object_type='sales_invoice' THEN ic.name||' / '||COALESCE(i.number,'Draft') "
-            "WHEN s.object_type IN ('employee','employees') THEN e.name END AS matched_local_name "
+            "WHEN s.object_type IN ('employee','employees','salary_agreement') THEN e.name END AS matched_local_name "
             "FROM import_staged_records s "
             "LEFT JOIN employees e ON e.organisation_id=s.organisation_id "
             "AND e.id=s.matched_local_employee_id "
@@ -496,7 +515,8 @@ class ImportService:
             record["external_payload"] = json.loads(record.pop("external_payload_json"))
             record["match"] = json.loads(record["match_json"]) if record.get("match_json") else None
             if record["object_type"] == "journal":
-                record["journal_review"] = self._journal_review(self.db, organisation_id, record["external_payload"])
+                record["journal_review"] = self._journal_review(self.db, organisation_id, record["external_payload"], record["provider"])
+            record["display_only"] = record["object_type"] == "vacation_balance"
         summary = self._sync_summary(organisation_id, sync_run_id) if sync_run_id else None
         return {"summary": summary, "records": records}
 
@@ -562,6 +582,10 @@ class ImportService:
         if not sync:
             raise KeyError("Sync run not found")
         object_type = OBJECT_TYPES.get(sync["object_type"], sync["object_type"])
+        if key == "merit_palk" and sync["object_type"] == "gl_entry":
+            object_type = "journal"
+        if object_type == "vacation_balance":
+            raise ValueError("Display-only vacation balance snapshot; no payroll or ledger changes are applied")
         handler = self.APPLY_HANDLERS.get(object_type)
         if handler is None:
             raise ValueError(f"Staged {sync['object_type']} records cannot be applied")
@@ -612,8 +636,8 @@ class ImportService:
             "summary": self._sync_summary(organisation_id, sync_run_id),
         }
 
-    def _journal_review(self, tx, organisation_id: str, payload: dict) -> dict:
-        repository = JournalImportRepository(tx, organisation_id)
+    def _journal_review(self, tx, organisation_id: str, payload: dict, provider: str = FILE_IMPORT_PROVIDER) -> dict:
+        repository = JournalImportRepository(tx, organisation_id, provider)
         lines = []
         debit = credit = Decimal("0")
         warning = payload.get("import_warning")
@@ -647,7 +671,7 @@ class ImportService:
     def _apply_journal(self, organisation_id, sync, row, actor, posting_date=None):
         payload = json.loads(row["external_payload_json"])
         with self.db.transaction() as tx:
-            repository = JournalImportRepository(tx, organisation_id)
+            repository = JournalImportRepository(tx, organisation_id, sync["provider"])
             repository.lock()
             current = repository.staged(row["id"])
             if current and current["status"] == "Rejected":
@@ -657,10 +681,18 @@ class ImportService:
                 raise ValueError("Only pending or failed journal proposals can be applied")
             existing = repository.posted(row["external_id"])
             if existing:
+                if sync["provider"] == "merit_palk":
+                    mapping = tx.one(
+                        "SELECT last_hash FROM external_mappings WHERE organisation_id=? AND provider=? "
+                        "AND object_type='journal' AND external_id=?",
+                        (organisation_id, sync["provider"], row["external_id"]),
+                    )
+                    if not mapping or mapping["last_hash"] != self._mapping_values(payload)[1]:
+                        raise ValueError("Merit Palk journal changed after posting; reverse the original batch before correcting it")
                 return self._mark_applied(tx, organisation_id, sync, row, actor, existing["id"], "unchanged")
             if current["status"] == "Applied":
                 raise ValueError("Only pending or failed journal proposals can be applied")
-            review = self._journal_review(tx, organisation_id, payload)
+            review = self._journal_review(tx, organisation_id, payload, sync["provider"])
             if not review["valid"]:
                 raise ValueError(review["warning"])
             day = payload.get("date") or posting_date
@@ -672,7 +704,7 @@ class ImportService:
                                  memo=line.get("description") or payload["name"])
                      for line in review["lines"] if money(line.get("debit") or "0") or money(line.get("credit") or "0")]
             batch = LedgerService(self.db).post(
-                organisation_id=organisation_id, voucher_type="file_journal", voucher_id=row["external_id"],
+                organisation_id=organisation_id, voucher_type=repository.voucher_type, voucher_id=row["external_id"],
                 voucher_code=payload["name"], posting_date=day, lines=lines, actor=actor,
                 currency=repository.currency(), tx=tx)
             self._upsert_external_mapping(tx, organisation_id, sync["provider"], "journal", batch["id"], row["external_id"], payload)

@@ -4,6 +4,47 @@ Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as
 delivered.
 
+## 2026-10-24: On-demand Merit Palk imports
+
+- Added a separate, pull-only `merit_palk` connector with encrypted API ID/key,
+  connection testing, UTC HMAC signing and safe PRO-licence, request, connection
+  and JSON errors. All five requesting-data endpoints were checked against the
+  [Merit Palk manual](https://api.merit.ee/merit-palk-api/palk-reference-manual/).
+  Provider access has only been tested with synthetic HTTP transports.
+- Owners and administrators can select an accounting month and optional personal
+  code for employee or salary-agreement imports. The manual describes `Amount`
+  as a tariff without its unit, so mapping to monthly `gross_salary` requires
+  explicit confirmation on each import. Multiple contracts/agreements and
+  unsupported contract types remain blocked for review. ImportCode is the
+  external identity, with PersonalCode fallback and tenant-scoped employee matching.
+- Board-member contracts use the existing board-fee basis. Services contracts
+  retain an `income_line` source basis and a blocking review note: there is no
+  existing reviewed destination for creating pay-run income lines. No new
+  payroll storage or employee pay basis was invented.
+- GL batches use the existing balanced journal review and atomic ledger posting
+  destination, with provider-scoped account mappings and idempotency. Source
+  dimensions are retained in the staged payload. Changed posted batches require
+  an explicit reversal and correction instead of silently replacing ledger data.
+- Vacation balances require a personal code or contract import code and balance
+  date. Review displays the snapshot and unused days; apply is blocked in both
+  the UI and service. Salary/hours report pulls are implemented and fake-tested,
+  but import returns a clear unsupported error because no pay-run input or
+  report-attachment staging destination exists.
+- Added English, Estonian, Latvian and Lithuanian copy. Requests reaching the
+  100-employee ceiling fail closed and require filtering by personal code:
+  the manual provides no continuation contract. Production UAT, live response
+  envelopes and salary units remain to be verified with Merit Palk PRO access.
+- Validation: **330 passed** on Python 3.12.14 with SQLite, each file run
+  individually: Merit Palk 34, provider adapters 79, SmartAccounts workers 34,
+  file import 12, journal import 23, reviewed import pipeline 10, import objects 4,
+  master-data import 32, migrations and tenancy 14, workspace payroll 9,
+  copilot 60, workspace integrations 6 and i18n 13. Includes offline Playwright,
+  API role/CSRF, identity upsert, historical contract status and ledger checks.
+  JavaScript syntax, Python 3.12 grammar for eight changed/new Python files and
+  diff whitespace checks passed. A temporary Python 3.12 environment matched
+  the project venv's dependency versions; the project venv was not changed.
+  The full suite, PostgreSQL runtime and live provider verification were not run.
+
 ## 2026-10-24: Reviewed Excel bookkeeping journal import
 
 - Added deterministic, offline parsing of generic titled journal blocks across
