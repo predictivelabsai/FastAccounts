@@ -1866,3 +1866,10 @@ input[type="radio"] {
 .copilot-markdown a{text-decoration:underline;text-underline-offset:3px}
 .copilot-message .copilot-copy{font-size:.75rem;color:var(--text-muted);background:transparent;border-color:transparent;min-height:36px;padding:6px 8px}
 .copilot-message .copilot-copy:hover,.copilot-message .copilot-copy:focus-visible{color:var(--text);border-color:var(--line)}
+/* Payroll period adjustments use the workspace's existing form controls. */
+.payment-line { min-width: 0; border: 1px solid var(--line); padding: 1rem; margin: 1rem 0; }
+.payment-line legend { padding: 0 .35rem; font-weight: 600; }
+.component-flags { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr)); gap: .6rem; }
+.component-summary { display: block; white-space: normal; max-width: 28rem; margin-top: .5rem; }
+.declaration-overdue { color: var(--danger, #a62d24); font-weight: 600; }
+.archived-employees { opacity: .85; }

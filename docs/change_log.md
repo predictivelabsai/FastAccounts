@@ -4,6 +4,23 @@ Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as
 delivered.
 
+## 2026-10-23: Payroll bureau demo fixes
+
+- Added audited employee archive, unarchive and deletion restricted to employees
+  without run items. Archived employees retain their existing run snapshots.
+- Added organisation payment types, editable levy defaults, component snapshots
+  and hourly draft editing with atomic Decimal recalculation. PDF, Excel and
+  reviewed push payloads include component detail.
+- Added mapped gross salary payable, separate accrued tax and deduction roles,
+  and explicit balanced TSD reclassification dated the following month's 10th.
+  Declaration preparation/settlement and overdue counts appear in the workspace.
+- Migration 0034 is additive and rerun-safe. It preserves historical postings;
+  account mappings use role-specific keys in the existing mapping table.
+- Production bureau UAT is pending. Author social tax defaults to on; author and
+  parental-leave flags remain editable assumptions. See the paired roadmap and
+  payroll rules for calculation details and remaining scope.
+- Validation is in progress; final results will be recorded before completion.
+
 ## 2026-10-23: Streamed copilot chat
 
 - Chat replies now stream progressively using SSE, with the existing JSON send

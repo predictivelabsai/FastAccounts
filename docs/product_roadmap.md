@@ -1959,3 +1959,20 @@ follows the existing et.json precedent at line 1577).
 | `copilot.workspace.Stage import rows` | Stage import rows | Impordi ridade eelvaade | Importo eilučių peržiūra | Importēšanas rindu priekšskatījums |
 | `copilot.workspace.Review these rows in Data import before they touch your books. Stage them now?` | Review these rows in Data import before they touch your books. Stage them now? | Vaata read andmeimpordis üle enne, kui need raamatupidamisesse jõuavad. Lisa kohe eelvaatesse? | Peržiūrėkite šias eilutes duomenų importe, kol jos nepateko į apskaitą. Įtraukti į peržiūrą dabar? | Pārskatiet šīs rindas datu importēšanā, pirms tās nonāk uzskaitē. Iekļaut priekšskatījumā tagad? |
 | `copilot.workspace.Import batch staged. Review it under Data import.` | Import batch staged. Review it under Data import. | Impordipartii lisati eelvaatesse. Vaata seda andmeimpordi all üle. | Importo paketas įtrauktas į peržiūrą. Peržiūrėkite jį duomenų importe. | Importēšanas pakete iekļauta priekšskatījumā. Pārskatiet to datu importēšanā. |
+
+## Payroll bureau demo fixes (2026-10-23)
+
+Employee archive/unarchive and audited deletion of unused employees, organisation
+payment types with editable levy defaults, frozen run components, hourly draft
+editing, component exports and configurable month-end accrual postings are in
+bureau demo scope. Explicit TSD reclassification uses the following-month 10th,
+with preparation/settlement tracking, overdue periods and dashboard counts.
+Migration 0034 preserves historical posted batches and provider chart mappings.
+
+Acceptance checks cover tenant isolation, snapshots, mixed levy bases, social
+minimum top-ups, balanced postings, account remapping, locks, repeated actions,
+migration reruns and browser interactions. Validation results are recorded in the
+paired change log. Production accountant UAT remains pending, especially author
+remuneration, parental-leave defaults and mixed-component tax treatment. See
+[payroll rules](payroll_rules.md). Direct filing, payment execution, automatic
+leave calculations and general HR remain outside this change.

@@ -1121,7 +1121,7 @@
             t("Overview"),
             t("A clear view of your client’s books."),
             button("New invoice", "newInvoice", true),
-            `<div class="kpis">${kpi("Receivables", money(outstanding(invoices, ["Issued", "Part Paid"])), "Open customer invoices")}${kpi("Payables", money(outstanding(bills, ["Approved", "Part Paid"])), "Approved supplier bills")}${kpi("Bank review", num(review.length), "Transactions awaiting review")}${kpi("Payroll this month", money(runs === null ? null : cost), !c.payrollSupported ? "Available for Estonian EUR books" : runs === null ? "Payroll is not available yet." : "Employer cost · draft and approved")}</div><section class="section"><div class="section-head"><h2>${tr("Client books")}</h2><span class="muted">${num(organisations.length)} ${tr("organisations")}</span></div><div class="client-strip">${clients.map(({ o, rows }) => `<button class="client-book ${o.id === c.oid ? "selected" : ""}" data-client="${esc(o.id)}"><span class="country-badge">${esc(o.country_code)}</span><strong>${esc(o.name)}</strong><small>${tr("Receivables")}</small><b>${esc(money(rows ? outstanding(rows, ["Issued", "Part Paid"]) : null, o.base_currency))}</b></button>`).join("")}</div></section><section class="card section"><div class="section-head"><h2>${tr("Revenue & cash")}</h2><span class="muted">${tr("Last six months")}</span></div>${chart(invoices, bank)}</section><div class="dashboard-lists"><section><div class="section-head"><h2>${tr("Recent invoices")}</h2><a href="#invoices">${tr("View all")}</a></div>${table(["Number", "Customer", "Date", "Status", ["Total"]], invoiceRows([...invoices].sort((a, b) => String(b.issue_date).localeCompare(a.issue_date)).slice(0, 5)), button("New invoice", "newInvoice"))}</section><section><div class="section-head"><h2>${tr("Ready for review")}</h2><a href="#banking">${tr("View all")}</a></div>${table(
+            `<div class="kpis">${kpi("Receivables", money(outstanding(invoices, ["Issued", "Part Paid"])), "Open customer invoices")}${kpi("Payables", money(outstanding(bills, ["Approved", "Part Paid"])), "Approved supplier bills")}${kpi("Bank review", num(review.length), "Transactions awaiting review")}${kpi("Payroll this month", money(runs === null ? null : cost), !c.payrollSupported ? "Available for Estonian EUR books" : runs === null ? "Payroll is not available yet." : "Employer cost · draft and approved")}</div>${runs?.some((r) => r.declaration_overdue) ? `<p class="notice declaration-overdue"><a href="#payroll">${tr("Overdue payroll declarations")}: ${num(runs.filter((r) => r.declaration_overdue).length)}</a></p>` : ""}<section class="section"><div class="section-head"><h2>${tr("Client books")}</h2><span class="muted">${num(organisations.length)} ${tr("organisations")}</span></div><div class="client-strip">${clients.map(({ o, rows }) => `<button class="client-book ${o.id === c.oid ? "selected" : ""}" data-client="${esc(o.id)}"><span class="country-badge">${esc(o.country_code)}</span><strong>${esc(o.name)}</strong><small>${tr("Receivables")}</small><b>${esc(money(rows ? outstanding(rows, ["Issued", "Part Paid"]) : null, o.base_currency))}</b></button>`).join("")}</div></section><section class="card section"><div class="section-head"><h2>${tr("Revenue & cash")}</h2><span class="muted">${tr("Last six months")}</span></div>${chart(invoices, bank)}</section><div class="dashboard-lists"><section><div class="section-head"><h2>${tr("Recent invoices")}</h2><a href="#invoices">${tr("View all")}</a></div>${table(["Number", "Customer", "Date", "Status", ["Total"]], invoiceRows([...invoices].sort((a, b) => String(b.issue_date).localeCompare(a.issue_date)).slice(0, 5)), button("New invoice", "newInvoice"))}</section><section><div class="section-head"><h2>${tr("Ready for review")}</h2><a href="#banking">${tr("View all")}</a></div>${table(
               ["Counterparty", ["Amount"]],
               review
                 .slice(0, 5)
@@ -2192,11 +2192,12 @@
           `<div class="notice" role="status">${tr("Payroll is available only for Estonian organisations with EUR books. Switch to an Estonian EUR organisation to manage payroll.")}</div>`));
         return;
       }
-      const [employees, runs, connections, tsdPreparations] = await Promise.all([
+      const [employees, runs, connections, tsdPreparations, componentTypes] = await Promise.all([
         optionalPayroll(c.url("/employees")),
         optionalPayroll(c.url("/pay-runs")),
         api(c.url("/integrations")),
         optionalPayroll(c.url("/payroll/tsd-preparations")),
+        optionalPayroll(c.url("/payroll/component-types")),
       ]);
       const accountingProviders = connections.filter((entry) => ["merit", "smartaccounts"].includes(entry.provider) && entry.status !== "Disconnected");
       await Promise.all((runs || []).map(async (run) => {
@@ -2215,8 +2216,9 @@
             t("Payroll"),
             t("People, payslips and postings for this client."),
             button("Add employee", "employee") +
+              button("Payment types", "paymentTypes") + button("Payroll accounts", "payrollAccounts") +
               button("Run payroll for month", "run", true),
-            `${unavailable ? `<div class="notice">${tr("Payroll is not available yet.")}</div>` : ""}<section class="section"><div class="section-head"><h2>${tr("Employees")}</h2><span class="muted">${num(employees?.length)} ${tr("employees")}</span>${employees === null ? '' : link('Export Excel', `/api${c.url('/reports/employees.xlsx')}`)}</div>${table(
+            `${unavailable ? `<div class="notice">${tr("Payroll is not available yet.")}</div>` : ""}<section class="section"><div class="section-head"><h2>${tr("Employees")}</h2><span class="muted">${num(employees?.filter((x) => x.active).length)} ${tr("employees")}</span>${employees === null ? '' : link('Export Excel', `/api${c.url('/reports/employees.xlsx')}`)}</div>${table(
               [
                 "Name",
                 ["Gross salary"],
@@ -2225,7 +2227,7 @@
                 "Status",
                 "Actions",
               ],
-              (employees || []).map((x) =>
+              (employees || []).filter((x) => x.active).map((x) =>
                 row([
                   td(
                     `<strong>${esc(x.name)}</strong>${x.board_member ? `<small>${pill("Board member")}</small>` : ""}${partTime(x)}${x.social_tax_minimum_exemption ? `<small>${tr("Social tax minimum exemption")}: ${esc(exemptionLabel(x.social_tax_minimum_exemption))}</small>` : ""}`,
@@ -2239,11 +2241,11 @@
                   td(num(x.funded_pension_percent) + "%", "numeric"),
                   td(tr(x.apply_tax_free_minimum ? "Yes" : "No")),
                   td(pill(x.active ? "Active" : "Inactive")),
-                  td(button("Edit", "edit", false, `data-id="${x.id}"`)),
+                  td(button("Edit", "edit", false, `data-id="${x.id}"`) + button("Archive", "archiveEmployee", false, `data-id="${esc(x.id)}"`) + button("Delete", "deleteEmployee", false, `data-id="${esc(x.id)}"`)),
                 ]),
               ),
               button("Add employee", "employee"),
-            )}</section><section class="section"><h2>${tr("Pay runs")}</h2>${
+            )}</section>${(employees || []).some((x) => !x.active) ? `<section class="section archived-employees"><h2>${tr("Archived employees")}</h2>${table(["Name", "Actions"], employees.filter((x) => !x.active).map((x) => row([td(esc(x.name)), td(button("Unarchive", "unarchiveEmployee", false, `data-id="${esc(x.id)}"`) + button("Delete", "deleteEmployee", false, `data-id="${esc(x.id)}"`))])))}</section>` : ""}${declarationPanel(runs || [])}<section class="section"><h2>${tr("Pay runs")}</h2>${
               (runs || []).length
                 ? table(
                     [
@@ -2278,6 +2280,20 @@
           await render();
         },
         employee: () => employeeDialog(),
+        paymentTypes: () => paymentTypesDialog(c, componentTypes || []),
+        payrollAccounts: () => payrollAccountsDialog(c),
+        archiveEmployee: async (b) => { await post(c.url(`/employees/${b.dataset.id}`), {active: false}, "PATCH"); await render(); },
+        unarchiveEmployee: async (b) => { await post(c.url(`/employees/${b.dataset.id}`), {active: true}, "PATCH"); await render(); },
+        deleteEmployee: (b) => confirmAction("Delete employee", tr("Delete this employee permanently? Employees with pay run history must be archived instead."), async () => {
+          await post(c.url(`/employees/${b.dataset.id}`), undefined, "DELETE"); await render();
+        }),
+        editRunItem: (b) => {
+          const run = runs.find((r) => r.id === b.dataset.run);
+          payrollItemDialog(c, run, run.items.find((i) => i.id === b.dataset.id), componentTypes || []);
+        },
+        settleDeclaration: (b) => confirmAction("Reclassify TSD liabilities", tr("Post the TSD liability reclassification dated the 10th of the following month? This does not record a bank payment or submit a declaration."), async () => {
+          await post(c.url(`/pay-runs/${b.dataset.id}/tsd/settle`)); await render();
+        }),
         edit: (b) =>
           employeeDialog(employees.find((x) => String(x.id) === b.dataset.id)),
         run: () => payrollWizard(employees || []),
@@ -2312,6 +2328,7 @@
           const preparation = await post(
             c.url(`/pay-runs/${r.id}/tsd/prepare`),
           );
+          await render();
           tsdPreparationDialog(c, r, preparation);
         },
         tsd_review: async (b) => {
@@ -4250,6 +4267,105 @@
       );
     });
   }
+  const componentFlags = [
+    ["income_tax", "Income tax"], ["social_tax", "Social tax"],
+    ["ui_employee", "Employee unemployment insurance"], ["ui_employer", "Employer unemployment insurance"],
+    ["funded_pension", "Funded pension"], ["social_minimum", "Counts towards social tax minimum"],
+  ];
+  const payrollRoleLabels = {
+    PAYROLL_SALARY: "Salary expense", PAYROLL_SOCIAL: "Social tax expense", PAYROLL_UI: "Employer unemployment expense",
+    PAYROLL_SALARY_PAYABLE: "Salary payable", PAYROLL_BAILIFF: "Bailiff withholding liability", PAYROLL_DEDUCTION: "Other deduction liability",
+    PAYROLL_SOCIAL_ACCRUED: "Social tax accrued", PAYROLL_INCOME_WITHHELD: "Income tax withheld", PAYROLL_PENSION_WITHHELD: "Funded pension withheld",
+    PAYROLL_UI_ACCRUED: "Unemployment insurance accrued", PAYROLL_SOCIAL_PAYABLE: "Social tax and pension payable",
+    PAYROLL_INCOME_PAYABLE: "Income tax payable", PAYROLL_UI_PAYABLE: "Unemployment insurance payable",
+  };
+  function declarationPanel(runs) {
+    const approved = runs.filter((r) => r.status === "Approved");
+    if (!approved.length) return "";
+    const labels = {none: "Not prepared", prepared: "Prepared", settled: "Settled"};
+    return `<section class="section payroll-declarations"><h2>${tr("Month-end declarations")}</h2>${table(["Period", "Declaration state", "Due date", "Actions"], approved.map((r) => row([
+      td(esc(r.period)), td(tr(labels[r.declaration_state] || "Not prepared")),
+      td(`${esc(r.declaration_due_date || "")}${r.declaration_overdue ? `<small class="declaration-overdue">${tr("Overdue declaration")}</small>` : ""}`),
+      td(r.declaration_state === "settled" ? "" : (r.declaration_state === "prepared" ? "" : button("Prepare TSD", "tsd_prepare", false, `data-id="${esc(r.id)}"`)) + button("Reclassify TSD liabilities", "settleDeclaration", false, `data-id="${esc(r.id)}"`)),
+    ])))}</section>`;
+  }
+  function componentFlagFields(values) {
+    return componentFlags.map(([key, label]) => check(label, key, values[key])).join("");
+  }
+  function paymentTypesDialog(c, types) {
+    const d = dialog("Payment types", `${button("Add payment type", "newType", true)}${table(["Name", "Direction", "Actions"], types.map((x) => row([
+      td(esc(t(x.name))), td(tr(x.direction === "income" ? "Income" : "Deduction")), td(button("Edit", "editType", false, `data-id="${esc(x.id)}"`)),
+    ])))}`);
+    const edit = (type) => {
+      closeDialog(d);
+      const values = type || {direction: "income", liability_role: "PAYROLL_DEDUCTION"};
+      const editor = dialog(type ? "Edit payment type" : "Add payment type", form(
+        field("Name", "name", values.name || "", "text", 'required maxlength="180"') +
+        select("Direction", "direction", [["income", t("Income")], ["deduction", t("Deduction")]], values.direction) +
+        select("Deduction liability", "liability_role", [["PAYROLL_DEDUCTION", t("Other deduction liability")], ["PAYROLL_BAILIFF", t("Bailiff withholding liability")]], values.liability_role) +
+        `<div class="full-width component-flags">${componentFlagFields(values)}</div><p class="full-width muted">${tr("Levy flags apply to income lines. Deduction lines reduce net pay.")}</p>` + `<p class="full-width muted">${tr("Defaults can be overridden on each draft payment line. Confirm tax treatment before approval.")}</p>`,
+      ));
+      bindForm(editor, async (data, f) => {
+        componentFlags.forEach(([key]) => data[key] = f.elements[key].checked);
+        await post(c.url(`/payroll/component-types${type ? `/${type.id}` : ""}`), data, type ? "PUT" : "POST");
+        await saved(editor);
+      });
+    };
+    bindActions(d, {newType: () => edit(), editType: (b) => edit(types.find((x) => x.id === b.dataset.id))});
+  }
+  async function payrollAccountsDialog(c) {
+    const [mappings, accounts] = await Promise.all([api(c.url('/payroll/posting-mappings')), api(c.url('/accounts'))]);
+    const d = dialog("Payroll accounts", form(mappings.map((mapping) => {
+      const expense = ["PAYROLL_SALARY", "PAYROLL_SOCIAL", "PAYROLL_UI"].includes(mapping.role);
+      return select(payrollRoleLabels[mapping.role], mapping.role, accounts.filter((a) => a.active && a.account_type === (expense ? "Expense" : "Liability")).map((a) => [a.code, `${a.code} ${a.name}`]), mapping.account_code);
+    }).join("")));
+    bindForm(d, async (data) => {
+      for (const mapping of mappings) await post(c.url(`/payroll/posting-mappings/${mapping.role}`), {account_code: data[mapping.role]}, "PUT");
+      await saved(d);
+    });
+  }
+  function payrollItemDialog(c, run, item, types) {
+    const d = dialog("Edit draft pay", form(
+      `<p class="full-width"><strong>${esc(item.employee_name)}</strong> · ${esc(run.period)}</p>` +
+      (item.pay_basis === "hourly" ? field("Hours worked", "hours", item.hours, "number", 'required min="0.01" max="744" step="0.01"') : `<p class="full-width">${tr("Base gross salary")}: ${esc(money(item.gross_salary, "EUR"))}</p>`) +
+      `<div class="full-width"><h3>${tr("Payment components")}</h3><p class="muted">${tr("Levy flags apply to income lines. Deduction lines reduce net pay.")}</p><p class="muted">${tr("Use an income component to adjust gross pay. Negative income amounts reduce gross pay.")}</p><div class="payment-lines"></div>${button("Add payment line", "addPayment")}</div>`, "Save draft pay",
+    ));
+    const container = d.querySelector('.payment-lines');
+    const add = (line) => {
+      if (!types.length) { toast(t("Add a payment type first."), "info"); return; }
+      const value = line || {...types[0], type_id: types[0].id};
+      const el = document.createElement('fieldset'); el.className = 'payment-line';
+      el.innerHTML = `<legend>${tr("Payment line")}</legend><div class="form-grid">${select("Payment type", "type_id", types.map((x) => [x.id, t(x.name)]), value.type_id)}${field("Amount", "amount", value.amount || "", "number", 'required step="0.01"')}${select("Direction", "direction", [["income", t("Income")], ["deduction", t("Deduction")]], value.direction)}${field("Name", "name", value.name, "text", 'required maxlength="180"')}<div class="full-width component-flags">${componentFlagFields(value)}</div></div>${button("Remove payment line", "removePayment")}`;
+      container.append(el);
+      const direction = el.querySelector('[name="direction"]');
+      el.dataset.liabilityRole = value.liability_role;
+      el.querySelector('[name="type_id"]').onchange = (e) => {
+        const type = types.find((x) => x.id === e.target.value);
+        el.querySelector('[name="name"]').value = type.name;
+        direction.value = type.direction;
+        el.dataset.liabilityRole = type.liability_role;
+        componentFlags.forEach(([key]) => el.querySelector(`[name="${key}"]`).checked = type[key]);
+      };
+      el.querySelector('[data-action="removePayment"]').onclick = () => el.remove();
+    };
+    (item.components || []).forEach(add);
+    d.querySelector('[data-action="addPayment"]').onclick = () => add();
+    bindForm(d, async () => {
+      const components = [...container.children].map((el) => {
+        const value = {liability_role: el.dataset.liabilityRole};
+        for (const key of ['type_id', 'name', 'amount', 'direction']) value[key] = el.querySelector(`[name="${key}"]`).value;
+        for (const [key] of componentFlags) value[key] = el.querySelector(`[name="${key}"]`).checked;
+        return value;
+      });
+      const data = {components};
+      if (item.pay_basis === 'hourly') data.hours = d.querySelector('[name="hours"]').value;
+      await post(c.url(`/pay-runs/${run.id}/items/${item.id}`), data, 'PATCH');
+      await saved(d);
+    });
+  }
+  function componentSummary(item) {
+    return (item.components || []).map((line) => `<small class="component-summary">${esc(t(line.name))}: ${esc(money(line.amount, 'EUR'))} · ${tr(line.direction === 'income' ? 'Income' : 'Deduction')}<br>${esc(componentFlags.filter(([key]) => line[key]).map(([, label]) => t(label)).join(', ') || t('No levies'))}</small>`).join('');
+  }
   function tsdPreparationDialog(c, run, preparation) {
     const reviewed = preparation.status === "Completed",
       base = c.url(`/pay-runs/${run.id}/tsd/${preparation.id}`),
@@ -4332,7 +4448,7 @@
       items.map((x, i) =>
         row([
           td(
-            `${esc(x.employee_name || x.name || x.employee?.name)}${hoursNote(x)}${partTime(x)}`,
+            `${esc(x.employee_name || x.name || x.employee?.name)}${hoursNote(x)}${partTime(x)}${componentSummary(x)}`,
           ),
           cash(x.gross ?? x.gross_salary, "EUR"),
           cash(x.income_tax, "EUR"),
@@ -4345,7 +4461,7 @@
           cash(x.employer_cost, "EUR"),
           td(
             draft
-              ? ""
+              ? button("Edit draft pay", "editRunItem", false, `data-run="${esc(r.id)}" data-id="${esc(x.id)}"`)
               : link(
                   "Payslip",
                   `/api${c.url(`/pay-runs/${r.id}/payslips.pdf`)}#page=${i + 1}`,

@@ -187,3 +187,111 @@ def test_estonian_demo_tax_names_and_unmatched_pill(db, monkeypatch):
         playwright.expect(page.locator('.status-pill').filter(has_text='Vastendamata').first).to_be_visible()
         assert 'Unmatched' not in page.locator('#app-content').inner_text()
         browser.close()
+
+
+def test_bureau_employee_lifecycle_draft_components_and_declarations(db, ee_org, monkeypatch):
+    """Exercise new SPA writes against the real API without a live server."""
+    from urllib.parse import urlsplit
+    from datetime import date
+    import payroll as payroll_module
+    from payroll import PayrollService
+    from web_app import app
+    playwright = pytest.importorskip('playwright.sync_api')
+    actor = 'owner@example.test'
+    monkeypatch.setenv('FASTACCOUNTS_DB', db.path)
+    monkeypatch.setenv('DB_URL', '')
+    monkeypatch.setenv('FASTACCOUNTS_DEFAULT_LANG', 'en')
+    class DemoDay(date):
+        @classmethod
+        def today(cls):
+            return cls(2026, 10, 23)
+    monkeypatch.setattr(payroll_module, 'date', DemoDay)
+    payroll = PayrollService(db)
+    employee = payroll.save_employee(ee_org['id'], name='Synthetic bureau employee', gross_salary='2000', personal_id='49001010001', actor=actor)
+    unused = payroll.save_employee(ee_org['id'], name='Synthetic unused employee', gross_salary='1000', actor=actor)
+    payroll.save_employee(ee_org['id'], employee_id=unused['id'], active=False, actor=actor)
+    run = payroll.create_run(ee_org['id'], period='2026-10', actor=actor)
+    root = Path(__file__).resolve().parents[1]
+    errors = []
+    with TestClient(app) as client, playwright.sync_playwright() as runtime:
+        html = client.get('/auth/test?email=' + actor).text
+        browser = runtime.chromium.launch()
+        page = browser.new_page(viewport={'width': 375, 'height': 844})
+        page.on('pageerror', lambda error: errors.append(str(error)))
+
+        def respond(route):
+            path = urlsplit(route.request.url).path
+            if path.startswith('/api/'):
+                response = client.request(route.request.method, path,
+                    content=route.request.post_data,
+                    headers={'X-Test-User': actor, 'Content-Type': 'application/json'})
+                return route.fulfill(status=response.status_code, body=response.content,
+                    content_type=response.headers.get('content-type', 'application/json'))
+            if path == '/app':
+                return route.fulfill(body=html, content_type='text/html')
+            if path.startswith('/static/') and (root / path.lstrip('/')).is_file():
+                return route.fulfill(path=str(root / path.lstrip('/')))
+            return route.fulfill(status=404)
+
+        page.route('**/*', respond)
+        page.goto('http://workspace.test/app#payroll')
+        page.get_by_role('button', name='Archive', exact=True).click()
+        playwright.expect(page.locator('.archived-employees').get_by_text(employee['name'], exact=True)).to_be_visible()
+        assert len(payroll.runs(ee_org['id'])[0]['items']) == 1
+        archived = page.locator('.archived-employees tr').filter(has_text=employee['name'])
+        archived.get_by_role('button', name='Delete', exact=True).click()
+        page.get_by_role('button', name='Confirm', exact=True).click()
+        playwright.expect(page.locator('#toasts')).to_contain_text('Archive the employee instead.')
+        page.get_by_role('dialog').get_by_role('button', name='Cancel', exact=True).click()
+        archived.get_by_role('button', name='Unarchive', exact=True).click()
+        playwright.expect(page.get_by_role('button', name='Archive', exact=True)).to_be_visible()
+        page.locator('.archived-employees tr').filter(has_text=unused['name']).get_by_role('button', name='Delete', exact=True).click()
+        page.get_by_role('button', name='Confirm', exact=True).click()
+        playwright.expect(page.locator('.archived-employees')).to_have_count(0)
+        assert len(payroll.employees(ee_org['id'])) == 1
+        page.get_by_role('button', name='Payment types', exact=True).click()
+        page.get_by_role('button', name='Add payment type', exact=True).click()
+        type_editor = page.get_by_role('dialog')
+        type_editor.get_by_role('textbox', name='Name', exact=True).fill('Synthetic custom income')
+        type_editor.get_by_label('Income tax', exact=True).check()
+        type_editor.get_by_role('button', name='Save', exact=True).click()
+        playwright.expect(page.get_by_role('dialog')).to_have_count(0)
+        assert any(t['name'] == 'Synthetic custom income' and t['income_tax'] for t in payroll.component_types(ee_org['id']))
+        page.get_by_role('button', name='Payroll accounts', exact=True).click()
+        account_editor = page.get_by_role('dialog')
+        account_editor.get_by_role('combobox', name='Salary payable', exact=True).select_option('2210')
+        account_editor.get_by_role('button', name='Save', exact=True).click()
+        playwright.expect(page.get_by_role('dialog')).to_have_count(0)
+        assert next(m for m in payroll.posting_mappings(ee_org['id']) if m['role'] == 'PAYROLL_SALARY_PAYABLE')['account_code'] == '2210'
+        page.get_by_role('button', name='Edit draft pay', exact=True).click()
+        editor = page.get_by_role('dialog')
+        editor.get_by_role('button', name='Add payment line', exact=True).click()
+        assert editor.locator('.payment-line').count() == 1, (errors, editor.inner_html(), page.locator('#toasts').inner_text())
+        editor.get_by_role('combobox', name='Payment type', exact=True).select_option(label='Parental-leave pay')
+        editor.get_by_label('Amount', exact=True).fill('100')
+        editor.get_by_label('Income tax', exact=True).uncheck()
+        editor.get_by_label('Social tax', exact=True).check()
+        editor.get_by_role('button', name='Save draft pay', exact=True).click()
+        playwright.expect(page.locator('.component-summary')).to_contain_text('Parental-leave pay')
+        item = payroll.runs(ee_org['id'])[0]['items'][0]
+        assert (item['gross'], item['income_tax'], item['social_tax']) == ('2100.00', '424.16', '693.00')
+        assert not item['components'][0]['income_tax'] and item['components'][0]['social_tax']
+        page.get_by_role('button', name='Approve & post', exact=True).click()
+        page.get_by_role('button', name='Confirm', exact=True).click()
+        playwright.expect(page.get_by_role('button', name='Edit draft pay', exact=True)).to_have_count(0)
+        page.locator('.payroll-declarations').get_by_role('button', name='Prepare TSD', exact=True).click()
+        playwright.expect(page.get_by_role('dialog')).to_contain_text('TSD preparation for accountant')
+        page.get_by_role('dialog').get_by_role('button', name='Close', exact=True).click()
+        playwright.expect(page.locator('.payroll-declarations')).to_contain_text('Prepared')
+        page.get_by_role('button', name='Reclassify TSD liabilities', exact=True).click()
+        page.get_by_role('button', name='Confirm', exact=True).click()
+        playwright.expect(page.locator('.payroll-declarations')).to_contain_text('Settled')
+        assert payroll.runs(ee_org['id'])[0]['declaration_state'] == 'settled'
+        earlier = payroll.create_run(ee_org['id'], period='2026-09', actor=actor)
+        payroll.approve(ee_org['id'], earlier['id'], actor=actor)
+        page.evaluate("location.hash = 'overview'")
+        playwright.expect(page.locator('.notice.declaration-overdue')).to_have_text('Overdue payroll declarations: 1')
+        assert page.locator('.notice.declaration-overdue a').get_attribute('href') == '#payroll'
+        assert not errors
+        assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+        browser.close()
