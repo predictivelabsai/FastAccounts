@@ -1805,8 +1805,8 @@
     imports: async (c) => {
       if (!c.route[0]) {
         if (c.mount(page(t("Data import"), t("Upload CSV, review each row, then import valid rows."),
-          button("Import", "masterImport", true), "")))
-          bindActions(content, { masterImport: () => masterDataImportDialog() });
+          button("Import", "masterImport", true) + (canEditMappings() ? button("Import journal workbook", "journalImport") + link("Import runs", "#integrations/runs/file_import") : ""), "")))
+          bindActions(content, { masterImport: () => masterDataImportDialog(), journalImport: () => journalImportDialog(c) });
         return;
       }
       const base = c.url(`/imports/${encodeURIComponent(c.route[0])}`);
@@ -2358,7 +2358,7 @@
   const importTypeLabel = (objectType) => t({
     employee: "Employees", employees: "Employees", account: "Chart of accounts",
     contact: "Contacts", sales_invoice: "Sales invoices", purchase_invoice: "Purchase invoices",
-    payment: "Payments", gl_entry: "General ledger entries",
+    payment: "Payments", gl_entry: "General ledger entries", journal: "Bookkeeping journal",
   }[objectType] || objectType);
 
   function integrationCard(c, item, connection) {
@@ -2759,6 +2759,20 @@
 
   function stagedRecordRow(record, objectType) {
     const payload = record.external_payload || {};
+    if (objectType === "journal") {
+      const review = record.journal_review || {}, eligible = stagedDecisionEligible(record);
+      return row([
+        td(`<strong>${esc(payload.name)}</strong><small>${esc(payload.sheet)} · ${esc(payload.date || t("Posting date required"))}</small>` +
+          `<p>${tr("Debit total")}: ${esc(review.debit_total)} · ${tr("Credit total")}: ${esc(review.credit_total)} · ${tr(review.balanced ? "Balanced" : "Unbalanced")}</p>` +
+          table(["Account", "Description", "Debit", "Credit", "Account mapping"], (review.lines || []).map((line) => row([
+            td(esc(line.account_code)), td(esc(line.description)), td(esc(line.debit ?? "")), td(esc(line.credit ?? "")),
+            td(line.account_id ? esc(line.local_account_code) : tr("Journal account is unmapped") + button("Map journal account", "mapJournalAccount", false, `data-code="${esc(line.account_code)}"`)),
+          ])))),
+        td(pill(record.status)), td(esc(record.matched_local_id || t("No local match"))),
+        td(review.warning ? tr(review.warning) : "–"),
+        td(eligible ? `<div class="decision-options"><label class="check"><input type="checkbox" data-decision="apply" data-id="${esc(record.id)}" ${review.valid ? "" : "disabled"}>${tr("Approve")}</label><label class="check"><input type="checkbox" data-decision="reject" data-id="${esc(record.id)}">${tr("Reject")}</label></div>` : tr("Decision recorded")),
+      ]);
+    }
     let displayName =
         payload.name ||
         [payload.first_name, payload.last_name].filter(Boolean).join(" ") ||
@@ -2849,6 +2863,10 @@
     const applyButton = content.querySelector(
       '[data-action="applyImportDecisions"]',
     );
+    if (objectType === "journal") {
+      applyButton.closest("section").insertAdjacentHTML("afterbegin",
+        `<div class="form-grid"><label>${tr("Posting date for undated blocks")}<input type="date" name="journal_posting_date"></label></div>`);
+    }
     content.querySelectorAll("[data-decision]").forEach((input) => {
       input.onchange = () => {
         if (input.checked)
@@ -2865,6 +2883,18 @@
       };
     });
     bindActions(content, {
+      mapJournalAccount: async (button) => {
+        const accounts = await api(c.url('/accounts'));
+        const d = dialog("Map journal account", form(
+          select("Local account", "local_account_code", accounts.filter((a) => a.active).map((a) => [a.code, `${a.code} ${a.name}`])), "Confirm mapping"));
+        bindForm(d, async (data) => {
+          await post(integrationUrl(c, provider, '/account-mappings'), {
+            local_account_code: data.local_account_code, external_account_code: button.dataset.code, status: "Confirmed",
+          });
+          closeDialog(d);
+          await integrationReview(c, item, provider, syncRunId);
+        });
+      },
       applyImportDecisions: async () => {
         const decisions = Object.fromEntries(
           [...content.querySelectorAll("[data-decision]:checked")].map(
@@ -2883,7 +2913,7 @@
               provider,
               `/sync/${encodeURIComponent(syncRunId)}/apply`,
             ),
-            { decisions },
+            { decisions, ...(objectType === "journal" ? {posting_date: content.querySelector('[name=journal_posting_date]').value || null} : {}) },
           );
           toast(t("Import decisions applied"));
           await integrationReview(c, item, provider, syncRunId, applied);
@@ -2896,7 +2926,7 @@
 
   async function integrationRuns(c, item, provider) {
     const runs = await api(integrationUrl(c, provider, "/syncs")),
-      employeeOnly = ["fasthr", "file_import", "personio", "bamboohr"].includes(provider);
+      employeeOnly = ["fasthr", "personio", "bamboohr"].includes(provider);
     if (
       !c.mount(
         page(
@@ -3914,6 +3944,23 @@
       data.due_before ||= null;
       await post(base + "/payment-orders", data);
       await saved(d);
+    });
+  }
+
+  function journalImportDialog(c) {
+    const oid = org.id, url = integrationUrl(c, "file_import", "/import");
+    const d = dialog("Import journal workbook", form(
+      `<p class="full-width">${tr("Upload titled journal blocks, then review accounts, totals and posting dates before applying.")}</p><label>${tr("Bookkeeping journal")}<input name="journal_file" type="file" accept=".xlsx" required></label>`, "Stage import"));
+    bindForm(d, async () => {
+      const file = d.querySelector('[name=journal_file]').files[0];
+      if (!file || !file.name.toLowerCase().endsWith('.xlsx') || file.size > 2000000)
+        throw new Error(t("Journal workbook must be an XLSX file under 2 MB"));
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      let binary = '';
+      for (let i = 0; i < bytes.length; i += 8192) binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
+      const result = await post(url, {object_type: "journal", xlsx_base64: btoa(binary)});
+      closeDialog(d);
+      if (org?.id === oid) location.hash = `integrations/review/file_import/${encodeURIComponent(result.id)}`;
     });
   }
 

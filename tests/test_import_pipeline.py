@@ -620,7 +620,7 @@ def test_file_import_route_imports_and_refuses_invalid_requests(import_api, db, 
     )
     assert wrong_type.status_code == 422
     assert wrong_type.json()["detail"] == (
-        "The reviewed import pipeline currently supports employees only"
+        "File import supports employees and journals only"
     )
 
     oversize = client.post(

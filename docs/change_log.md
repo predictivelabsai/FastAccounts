@@ -4,6 +4,30 @@ Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as
 delivered.
 
+## 2026-10-24: Reviewed Excel bookkeeping journal import
+
+- Added deterministic, offline parsing of generic titled journal blocks across
+  all workbook sheets through `file_import` / `journal` in the existing staged
+  review and apply pipeline. Source workbooks are never stored.
+- Added Data import XLSX attachment, totals and balance review, line-level account
+  resolution, in-review confirmed mappings and a posting date for undated blocks.
+  Labels and review warnings are translated in English, Estonian, Latvian and
+  Lithuanian.
+- Apply rechecks balance, active tenant accounts and fiscal locks, then atomically
+  posts one immutable balanced batch with mapping, staged status and audit.
+  Identical reimports are idempotent, including concurrent applies. Zero lines
+  remain in review and are omitted from the posted batch. No migration is needed.
+- Added synthetic workbook, service, API authorisation/CSRF and offline Playwright
+  coverage. Production accountant UAT remains pending; payroll calculation and
+  TSD submission are outside this import feature.
+- Validation: nine files run individually, **169 passed**: file import 12,
+  journal import 23, reviewed import pipeline 10, master-data import 32,
+  import objects 4, workspace payroll 9, copilot 60, workspace integrations 6
+  and i18n 13. JavaScript syntax, diff whitespace and Python 3.12 grammar checks
+  for all seven changed/new Python files passed. The venv runs Python 3.14.6;
+  Python 3.12 runtime and PostgreSQL validation were not run. The full suite was
+  deliberately not run. Only the existing fastcore deprecation warning appeared.
+
 ## 2026-10-23: Payroll bureau demo fixes
 
 - Added audited employee archive, unarchive and deletion restricted to employees

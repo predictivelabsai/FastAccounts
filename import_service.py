@@ -2,6 +2,9 @@
 from __future__ import annotations
 
 import json
+import base64
+import binascii
+from datetime import date
 import sqlite3
 from collections.abc import Mapping
 from decimal import Decimal, InvalidOperation
@@ -24,6 +27,8 @@ from database import Database, get_database
 from documents import DocumentService
 from integration_service import AccountMappingService, IntegrationService
 from payroll import PayrollConflict, PayrollService
+from ledger import LedgerService, PostingLine
+from journal_import_repository import JournalImportRepository
 from master_data_import import MasterDataImportService
 
 EMPLOYEE_FIELDS = {
@@ -48,6 +53,7 @@ STAGED_STATUSES = ("Pending", "Approved", "Rejected", "Applied", "Failed")
 FILE_IMPORT_PROVIDER = "file_import"
 MAX_FILE_IMPORT_CHARS = 2_000_000
 OBJECT_TYPES = {
+    "journal": "journal",
     "employee": "employee",
     "employees": "employee",
     "contact": "contact",
@@ -81,6 +87,7 @@ class ImportService:
             "payment": self._apply_payment,
             "account": self._apply_account,
             "gl_entry": self._apply_gl_entry,
+            "journal": self._apply_journal,
         }
 
     def _connection_material(
@@ -97,6 +104,14 @@ class ImportService:
             raise ValueError("Unknown integration provider") from error
         if key == FILE_IMPORT_PROVIDER:
             resolved_credentials = dict(credentials or {})
+            if "xlsx_base64" in resolved_credentials:
+                encoded = resolved_credentials.pop("xlsx_base64")
+                if not isinstance(encoded, str) or len(encoded) > 2_666_668:
+                    raise ValueError("Journal workbook must be an XLSX file under 2 MB")
+                try:
+                    resolved_credentials["workbook_content"] = base64.b64decode(encoded, validate=True)
+                except (ValueError, binascii.Error) as error:
+                    raise ValueError("Journal workbook is not a valid XLSX file") from error
             csv_content = resolved_credentials.get("csv_content", "")
             if not isinstance(csv_content, str):
                 raise ValueError("CSV content must be text")
@@ -146,8 +161,8 @@ class ImportService:
         key, resolved_credentials, resolved_config = self._connection_material(
             organisation_id, provider, credentials, config
         )
-        if key == FILE_IMPORT_PROVIDER and object_type not in {"employee", "employees"}:
-            raise ValueError("The reviewed import pipeline currently supports employees only")
+        if key == FILE_IMPORT_PROVIDER and object_type not in {"employee", "employees", "journal"}:
+            raise ValueError("File import supports employees and journals only")
         requested_type = object_type.strip().lower()
         canonical_type = OBJECT_TYPES.get(requested_type)
         if canonical_type is None:
@@ -244,6 +259,8 @@ class ImportService:
                 warning = payload.get("import_warning")
                 if not review_note and isinstance(warning, str) and warning:
                     review_note = warning
+                if canonical_type == "journal":
+                    review_note = self._journal_review(tx, organisation_id, payload)["warning"]
                 existing = None
                 if external_id:
                     existing = tx.one(
@@ -478,6 +495,8 @@ class ImportService:
         for record in records:
             record["external_payload"] = json.loads(record.pop("external_payload_json"))
             record["match"] = json.loads(record["match_json"]) if record.get("match_json") else None
+            if record["object_type"] == "journal":
+                record["journal_review"] = self._journal_review(self.db, organisation_id, record["external_payload"])
         summary = self._sync_summary(organisation_id, sync_run_id) if sync_run_id else None
         return {"summary": summary, "records": records}
 
@@ -533,6 +552,7 @@ class ImportService:
         decisions: Mapping[str, str],
         *,
         actor: str,
+        posting_date: str | None = None,
     ) -> dict:
         key = provider.strip().lower()
         sync = self.db.one(
@@ -565,7 +585,10 @@ class ImportService:
                 outcomes.append(self._reject(organisation_id, row, actor))
                 continue
             try:
-                outcomes.append(handler(organisation_id, sync, row, actor))
+                if object_type == "journal":
+                    outcomes.append(handler(organisation_id, sync, row, actor, posting_date))
+                else:
+                    outcomes.append(handler(organisation_id, sync, row, actor))
             except (
                 ValueError,
                 KeyError,
@@ -589,6 +612,72 @@ class ImportService:
             "summary": self._sync_summary(organisation_id, sync_run_id),
         }
 
+    def _journal_review(self, tx, organisation_id: str, payload: dict) -> dict:
+        repository = JournalImportRepository(tx, organisation_id)
+        lines = []
+        debit = credit = Decimal("0")
+        warning = payload.get("import_warning")
+        for source in payload.get("lines", []):
+            line = dict(source)
+            account = repository.resolve_account(str(line.get("account_code") or ""))
+            line["account_id"] = account["id"] if account else None
+            line["local_account_code"] = account["code"] if account else None
+            line["warning"] = None if account else "Journal account is unmapped"
+            if not account:
+                warning = warning or "Journal account is unmapped"
+            try:
+                dr, cr = money(line.get("debit") or "0"), money(line.get("credit") or "0")
+                if (not dr.is_finite() or not cr.is_finite() or dr < 0 or cr < 0 or (dr > 0 and cr > 0)
+                        or dr != Decimal(str(line.get("debit") or "0"))
+                        or cr != Decimal(str(line.get("credit") or "0"))):
+                    raise ValueError("Invalid journal amounts")
+                debit += dr
+                credit += cr
+            except (ValueError, InvalidOperation):
+                warning = "Journal line contains an invalid amount, date or formula"
+            lines.append(line)
+        balanced = debit == credit
+        if not balanced:
+            warning = "Journal block is unbalanced"
+        elif debit <= 0 or not lines:
+            warning = warning or "Journal block must contain a positive balanced posting"
+        return {"lines": lines, "debit_total": str(debit), "credit_total": str(credit),
+                "balanced": balanced, "warning": warning, "valid": not warning}
+
+    def _apply_journal(self, organisation_id, sync, row, actor, posting_date=None):
+        payload = json.loads(row["external_payload_json"])
+        with self.db.transaction() as tx:
+            repository = JournalImportRepository(tx, organisation_id)
+            repository.lock()
+            current = repository.staged(row["id"])
+            if current and current["status"] == "Rejected":
+                return {"staged_id": row["id"], "outcome": "failed",
+                        "reason": "Only pending or failed journal proposals can be applied"}
+            if not current or current["status"] not in {"Pending", "Failed", "Applied"}:
+                raise ValueError("Only pending or failed journal proposals can be applied")
+            existing = repository.posted(row["external_id"])
+            if existing:
+                return self._mark_applied(tx, organisation_id, sync, row, actor, existing["id"], "unchanged")
+            if current["status"] == "Applied":
+                raise ValueError("Only pending or failed journal proposals can be applied")
+            review = self._journal_review(tx, organisation_id, payload)
+            if not review["valid"]:
+                raise ValueError(review["warning"])
+            day = payload.get("date") or posting_date
+            if not day:
+                raise ValueError("Set a posting date before applying the journal")
+            day = date.fromisoformat(day).isoformat()
+            lines = [PostingLine(account_id=line["account_id"],
+                                 debit=money(line.get("debit") or "0"), credit=money(line.get("credit") or "0"),
+                                 memo=line.get("description") or payload["name"])
+                     for line in review["lines"] if money(line.get("debit") or "0") or money(line.get("credit") or "0")]
+            batch = LedgerService(self.db).post(
+                organisation_id=organisation_id, voucher_type="file_journal", voucher_id=row["external_id"],
+                voucher_code=payload["name"], posting_date=day, lines=lines, actor=actor,
+                currency=repository.currency(), tx=tx)
+            self._upsert_external_mapping(tx, organisation_id, sync["provider"], "journal", batch["id"], row["external_id"], payload)
+            return self._mark_applied(tx, organisation_id, sync, row, actor, batch["id"])
+
     def _reject(self, organisation_id: str, row: dict, actor: str) -> dict:
         if row["status"] == "Applied":
             return {
@@ -598,6 +687,13 @@ class ImportService:
             }
         now = utc_now()
         with self.db.transaction() as tx:
+            if row["object_type"] == "journal":
+                repository = JournalImportRepository(tx, organisation_id)
+                repository.lock()
+                current = repository.staged(row["id"])
+                if current and current["status"] == "Applied":
+                    return {"staged_id": row["id"], "outcome": "failed",
+                            "reason": "An applied record cannot be rejected"}
             tx.execute(
                 "UPDATE import_staged_records SET status='Rejected',review_note=NULL,updated_at=? "
                 "WHERE organisation_id=? AND id=?",

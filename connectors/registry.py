@@ -109,7 +109,7 @@ REGISTRY: dict[str, ConnectorRegistration] = {
         connector_class=FileImportConnector,
         status="Adapter ready",
         factory=lambda credentials, config: FileImportConnector(
-            credentials.get("csv_content", ""), config
+            credentials.get("workbook_content", credentials.get("csv_content", "")), config
         ),
         credential_note="Offline CSV or TSV employee import; no provider credentials required.",
     ),

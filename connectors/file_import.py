@@ -1,15 +1,14 @@
-"""Offline CSV/TSV employee import connector.
-
-Native Excel workbooks are intentionally out of scope. Export them as CSV or
-TSV first. The alias table is explicit so supported source headers stay
-reviewable and deterministic.
-"""
+"""Deterministic offline employee CSV/TSV and journal workbook imports."""
 from __future__ import annotations
 
 import csv
 import hashlib
 import io
 import json
+import re
+import unicodedata
+from datetime import date, datetime
+from zipfile import ZipFile, BadZipFile
 from collections.abc import Mapping
 from decimal import Decimal, InvalidOperation
 from typing import Any
@@ -37,11 +36,12 @@ _ALIAS_LOOKUP = {
 
 
 class FileImportConnector:
-    """Parse one uploaded employee CSV/TSV export without network access."""
+    """Parse uploaded employee text or journal workbook bytes offline."""
 
     key = "file_import"
+    PULL_OBJECT_TYPES = ("employee", "employees", "journal")
 
-    def __init__(self, csv_content: str, config: Mapping[str, Any] | None = None):
+    def __init__(self, csv_content: str | bytes, config: Mapping[str, Any] | None = None):
         self.csv_content = csv_content
         self.config = dict(config or {})
 
@@ -56,8 +56,12 @@ class FileImportConnector:
 
     def pull(self, object_type: str, *, cursor: str | None = None) -> ConnectorResult:
         del cursor
+        if object_type == "journal":
+            records = tuple(parse_journal_workbook(self.csv_content))
+            return ConnectorResult(self.key, "pull:journal", True, False,
+                                   f"Parsed {len(records)} journal blocks", records, None)
         if object_type not in {"employee", "employees"}:
-            raise ValueError("File import supports employee imports only")
+            raise ValueError("File import supports employees and journals only")
         records = tuple(self._parse())
         return ConnectorResult(
             provider=self.key,
@@ -205,3 +209,115 @@ def _stable_external_id(record: Mapping[str, Any]) -> str:
         ).encode("utf-8")
     ).hexdigest()[:16]
     return f"file-{digest}"
+
+
+def _journal_header(value: Any) -> str | None:
+    text = unicodedata.normalize("NFKD", str(value or "").casefold())
+    text = re.sub(r"[^a-z]", "", text)
+    for field, aliases in {
+        "account_code": {"konto", "kontokood", "kontonumber", "account", "accountcode", "accountnumber"},
+        "description": {"operatsioonikirjeldus", "kirjeldus", "description", "operationdescription", "memo"},
+        "debit": {"deebet", "debit", "dr"},
+        "credit": {"kreedit", "credit", "cr"},
+        "date": {"kuupaev", "kandekuupaev", "date", "postingdate", "transactiondate"},
+    }.items():
+        if text in aliases:
+            return field
+    return None
+
+
+def parse_journal_workbook(content: bytes) -> list[dict[str, Any]]:
+    """Read every titled journal block; keep invalid blocks available for review."""
+    from openpyxl import load_workbook
+
+    if not isinstance(content, bytes) or not content or len(content) > 2_000_000:
+        raise ValueError("Journal workbook must be an XLSX file under 2 MB")
+    try:
+        with ZipFile(io.BytesIO(content)) as archive:
+            if sum(info.file_size for info in archive.infolist()) > 20_000_000:
+                raise ValueError("Journal workbook is too large when expanded")
+        book = load_workbook(io.BytesIO(content), read_only=True, data_only=False)
+    except (BadZipFile, OSError, KeyError) as error:
+        raise ValueError("Journal workbook is not a valid XLSX file") from error
+    records = []
+    try:
+        for sheet in book:
+            title = None
+            block = None
+            columns = {}
+
+            def finish():
+                if block is None:
+                    return
+                dates = sorted({line["date"] for line in block["lines"] if line.get("date")})
+                if len(dates) > 1:
+                    block["import_warning"] = "Journal block contains different posting dates"
+                block["date"] = dates[0] if len(dates) == 1 else None
+                identity = json.dumps(block, sort_keys=True, ensure_ascii=False, default=str)
+                block["external_id"] = "journal-" + hashlib.sha256(identity.encode()).hexdigest()
+                records.append(block)
+
+            if sheet.max_row and sheet.max_row > 10000:
+                raise ValueError("Journal workbook exceeds the row limit")
+            if sheet.max_column and sheet.max_column > 200:
+                raise ValueError("Journal workbook is too large when expanded")
+            rows = [cells for cells in sheet.iter_rows()
+                    if any(cell.value is not None and str(cell.value).strip() for cell in cells)]
+            required = {"account_code", "description", "debit", "credit"}
+            row_headers = [{field: index for index, cell in enumerate(cells)
+                            if (field := _journal_header(cell.value))} for cells in rows]
+            for index, cells in enumerate(rows):
+                row_number = next(cell.row for cell in cells if cell.value is not None)
+                if row_number > 10000:
+                    raise ValueError("Journal workbook exceeds the row limit")
+                values = [cell.value for cell in cells]
+                headers = row_headers[index]
+                if required <= headers.keys():
+                    finish()
+                    if not title:
+                        raise ValueError("Journal header must follow a block title")
+                    block = {"name": title, "sheet": sheet.title, "header_row": row_number, "lines": []}
+                    title = None
+                    columns = headers
+                    continue
+                nonempty = [value for value in values if value is not None and str(value).strip()]
+                if index + 1 < len(rows) and required <= row_headers[index + 1].keys():
+                    finish()
+                    block = None
+                    title = " ".join(str(value).strip() for value in nonempty)
+                    continue
+                if block is None:
+                    continue
+                line = {"row_number": row_number, "account_code": "", "description": "", "debit": None, "credit": None}
+                try:
+                    for field, column in columns.items():
+                        value = values[column] if column < len(values) else None
+                        if column < len(cells) and cells[column].data_type == "f":
+                            raise ValueError("Journal formulas must be replaced with values")
+                        if field in {"debit", "credit"}:
+                            if value not in (None, ""):
+                                amount = Decimal(str(value).replace(" ", "").replace("\u00a0", "").replace(",", "."))
+                                if not amount.is_finite() or amount < 0:
+                                    raise ValueError("Journal amounts must be non-negative finite numbers")
+                                if money(amount) != amount:
+                                    raise ValueError("Journal amounts must use whole cents")
+                                line[field] = amount
+                        elif field == "date":
+                            if value not in (None, ""):
+                                if isinstance(value, (datetime, date)):
+                                    line[field] = value.date().isoformat() if isinstance(value, datetime) else value.isoformat()
+                                else:
+                                    text = str(value).strip()
+                                    line[field] = (datetime.strptime(text, "%d.%m.%Y").date().isoformat()
+                                                   if "." in text else date.fromisoformat(text).isoformat())
+                        else:
+                            line[field] = str(value).strip() if value is not None else ""
+                except (ValueError, InvalidOperation):
+                    block["import_warning"] = "Journal line contains an invalid amount, date or formula"
+                block["lines"].append(line)
+            finish()
+    finally:
+        book.close()
+    if not records:
+        raise ValueError("No titled journal blocks found in the workbook")
+    return records

@@ -447,12 +447,14 @@ class IntegrationSyncIn(BaseModel):
 
 class FileImportIn(BaseModel):
     object_type: str = Field(min_length=1, max_length=80)
-    csv_content: str = Field(min_length=1)
+    csv_content: str = ""
+    xlsx_base64: str | None = None
     config: dict[str, Any] = Field(default_factory=dict)
 
 
 class IntegrationApplyIn(BaseModel):
     decisions: dict[str, Literal["apply", "reject"]] = Field(default_factory=dict)
+    posting_date: date | None = None
 
 
 class AccountMappingIn(BaseModel):
@@ -2024,7 +2026,8 @@ def import_employee_file(
         "file_import",
         payload.object_type,
         actor=user.email,
-        credentials={"csv_content": payload.csv_content},
+        credentials=({"xlsx_base64": payload.xlsx_base64} if payload.xlsx_base64 is not None
+                     else {"csv_content": payload.csv_content}),
         config=payload.config,
     )
 
@@ -2058,6 +2061,7 @@ def apply_integration_sync(
         sync_run_id,
         payload.decisions,
         actor=user.email,
+        posting_date=payload.posting_date.isoformat() if payload.posting_date else None,
     )
 
 

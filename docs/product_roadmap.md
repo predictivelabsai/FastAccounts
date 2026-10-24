@@ -738,8 +738,9 @@ The supported header aliases are explicit:
 Blank, `active`, `aktiivne` and `tööl` status values are active; other values are
 inactive. Unmapped columns remain visible in review with a `file_` prefix. The
 browser can read a selected file or accept pasted content, but the raw CSV/TSV is
-never retained: only parsed staged records are stored. Native Excel workbooks are
-out of scope and must first be exported as CSV. No provider API key, migration or
+never retained: only parsed staged records are stored. Employee Excel workbooks
+must first be exported as CSV; titled bookkeeping journal XLSX files are supported
+by the reviewed journal workflow described below. No provider API key, migration or
 live network test is required. Section 21 covers the finance-connector health
 checks, which merged before this change.
 
@@ -1992,3 +1993,38 @@ in 25m 18s with **1,560 passed, four skipped, two warnings and no failures**.
 The payroll upgrade and source-journal export regressions passed in full-suite
 ordering. Python 3.12 runtime verification and the four live PostgreSQL opt-in
 checks remain follow-ups. The paired change log records details.
+
+
+## Reviewed Excel bookkeeping journal import (2026-10-24)
+
+- The Data import workspace accepts a synthetic-template-compatible `.xlsx`
+  bookkeeping journal (Estonian label: raamatupidamiskanded). Every titled block
+  on every sheet becomes one `file_import` / `journal` proposal in the existing
+  staged review and apply lifecycle. Titles are generic, including digits; no
+  payroll title has special meaning. Loose Estonian/English headers, blank title
+  cells, optional dates and unknown columns are supported.
+- Review shows Decimal debit/credit totals, balance, source lines and account
+  mapping warnings. Unbalanced, malformed, zero-only or mixed-date blocks cannot
+  be posted. Formula cells require values instead. Zero-value source lines remain
+  in review and are omitted from ledger posting.
+- Active organisation chart codes and confirmed migration-0011 file-import
+  mappings resolve accounts. Owners and administrators can confirm an unmapped
+  code in review. Apply revalidates every mapping and amount. Undated blocks use
+  the reviewer's chosen apply date; dated blocks retain their source date.
+- Apply creates one immutable balanced ledger batch per block, together with its
+  external mapping, staged status and audit in one transaction. Fiscal locks and
+  tenant scope apply. Concurrent identical reimports post once. Rejected proposals
+  cannot be applied; posting corrections use the existing reversal workflow.
+- Reuses existing staging, mapping and posting tables. No migration, stored
+  connection, uploaded workbook retention or live network dependency is added.
+  Uploads are limited to 2 MB compressed, 20 MB expanded, 10,000 rows and 200
+  columns per sheet. Identity includes sheet, source row and parsed block content;
+  rearranged or edited files need duplicate review, since they have new identities.
+- Production accountant UAT is pending. This imports bookkeeping entries only;
+  it does not calculate payroll or submit TSD.
+- Verified offline in nine individually run files: file import 12, journal
+  import 23, reviewed import pipeline 10, master-data import 32, import objects
+  4, workspace payroll 9, copilot 60, workspace integrations 6 and i18n 13
+  (**169 passed**). Node syntax, diff whitespace and Python 3.12 grammar checks
+  passed. Runtime tests used Python 3.14.6 and SQLite; Python 3.12 runtime and
+  PostgreSQL checks remain unrun. No unattended full-suite run was performed.
