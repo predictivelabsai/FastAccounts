@@ -1984,10 +1984,11 @@ remuneration, parental-leave defaults and mixed-component tax treatment. See
 [payroll rules](payroll_rules.md). Direct filing, payment execution, automatic
 leave calculations and general HR remain outside this change.
 
-Validation on 2026-10-24: the required payroll/migration checks passed 69 tests;
-component, TSD, push and Excel checks passed 42 tests; i18n checks passed 13 tests.
-JavaScript and Python 3.12 syntax checks passed on the supplied Python 3.14.6 venv.
-The full suite was stopped at the 40-minute limit after 838 reported outcomes.
-Its missing deletion-label translation was fixed and retested, but full-suite
-completion, Python 3.12 runtime verification and live PostgreSQL checks remain
-follow-ups. The paired change log records the validation limits.
+Validation on 2026-10-24: the five required files passed 129 tests individually;
+payroll demo checks passed 17, i18n 13 and seed integration 1. JavaScript syntax
+and Python 3.12 grammar checks passed on the supplied Python 3.14.6 venv. A full
+run completed with 1,559 passed, four PostgreSQL opt-in skips and one stale seed
+assertion for the old posting shape. That assertion now checks the export against
+its source journal and passes; a final full-suite rerun is in progress. The payroll
+upgrade test passed in full-suite ordering. Python 3.12 runtime verification and
+live PostgreSQL checks remain follow-ups. The paired change log records details.

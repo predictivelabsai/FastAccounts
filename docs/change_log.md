@@ -24,21 +24,22 @@ delivered.
 - Production bureau UAT is pending. Author social tax defaults to on; author and
   parental-leave flags remain editable assumptions. See the paired roadmap and
   payroll rules for calculation details and remaining scope.
-- Validation on 2026-10-24: the required four-file payroll/migration command passed
-  all 69 tests, including monthly and hourly mobile browser flows. Component,
-  TSD, push and Excel checks passed all 42 tests; i18n checks passed all 13 tests.
-  JavaScript syntax and Python 3.12 syntax checks passed. The supplied venv runs
-  Python 3.14.6; Python 3.12 runtime and live PostgreSQL checks were not run.
-- The full `pytest -q` run was stopped by a UTC watchdog after 40 minutes,
-  with 838 outcomes reported: 837 passed and one missing `Delete` translation
-  failure. That key was added in all four locales and the complete i18n test
-  file then passed. The full run did not complete. It began before the later
-  migration-isolation and hourly minimum fixes, which the final focused checks
-  cover. A complete full-suite run remains a follow-up.
+- Validation on 2026-10-24: the five required files passed individually: payroll
+  16, part-time/hourly 30, workspace payroll 9, migrations/tenancy 14 and copilot
+  60 (129 total). Payroll demo checks passed 17 tests, i18n 13 and seed integration
+  1. JavaScript syntax and Python 3.12 grammar checks passed. The supplied venv
+  runs Python 3.14.6; Python 3.12 runtime and live PostgreSQL checks were not run.
+- A marked full run completed in 25m 28s: 1,559 passed, four PostgreSQL opt-in
+  skips and one stale seed integration assertion expecting seven payroll lines.
+  The mapped journal has ten lines. The assertion now compares the export with
+  its source journal rather than pinning the old posting shape; its entire test
+  file passes, including encryption, balance, mapping and rerun checks. A final
+  full-suite rerun is in progress.
 - Isolated historical payroll migration setup from the process-wide migration
   catalogue. A concurrent legacy/current database regression verifies that an old
   schema setup cannot select old migrations for another database. The reported
-  full-run-only failure has not been reproduced in focused ordering checks.
+  full-run-only failure was not reproduced before the isolation change; the
+  upgrade test passes both individually and in the completed full run.
 
 ## 2026-10-23: Streamed copilot chat
 
