@@ -13,6 +13,18 @@ from web.public import integrations_page, landing_page
 from web_app import app
 
 
+def test_payroll_preset_names_descriptions_and_settings_in_all_locales():
+    from payroll_components import PRESETS, PRESET_DESCRIPTIONS
+    for language in i18n.LANGUAGES:
+        catalogue = i18n.catalog(language)
+        assert catalogue['nav']['payment_types']
+        for key, name, *_ in PRESETS:
+            for label in (name, PRESET_DESCRIPTIONS[key]):
+                assert catalogue['workspace'][label].strip()
+                assert '\u2014' not in catalogue['workspace'][label]
+    assert i18n.catalog('et')['nav']['payment_types'] == 'Makseliigid'
+
+
 def test_workspace_literal_labels_and_table_headers_are_translated():
     source = (Path(__file__).resolve().parents[1] / "static/app.js").read_text(encoding="utf-8")
     literal = r'''(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')'''

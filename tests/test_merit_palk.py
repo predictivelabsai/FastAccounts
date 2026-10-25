@@ -509,7 +509,7 @@ def test_income_line_migration_preserves_approved_payroll(tmp_path):
     payroll.approve(org["id"], payroll.create_run(org["id"], period="2026-10", actor=ACTOR)["id"], actor=ACTOR)
     tables = ("employees", "pay_runs", "pay_run_items", "pay_item_context", "gl_entries", "posting_batches")
     before = {t: db.rows(f"SELECT * FROM {t} ORDER BY 1") for t in tables}
-    assert db.migrate() == ["0035_payroll_income_line"]
+    assert db.migrate() == ["0035_payroll_income_line", "0036_payroll_component_catalogue"]
     assert {t: db.rows(f"SELECT * FROM {t} ORDER BY 1") for t in tables} == before
     assert db.rows("PRAGMA foreign_key_check") == [] and db.migrate() == []
 

@@ -5,6 +5,69 @@ import pytest
 from fastapi.testclient import TestClient
 
 
+@pytest.mark.parametrize('language', ['en', 'et', 'lv', 'lt'])
+def test_settings_payment_types_create_edit_and_payroll_reuse(monkeypatch, db, ee_org, language):
+    from urllib.parse import urlsplit
+    from web import i18n
+    from web_app import app
+    from payroll import PayrollService
+    playwright = pytest.importorskip('playwright.sync_api')
+    monkeypatch.setenv('FASTACCOUNTS_DEFAULT_LANG', language)
+    monkeypatch.setenv('FASTACCOUNTS_DB', db.path)
+    monkeypatch.setenv('DB_URL', '')
+    root = Path(__file__).resolve().parents[1]
+    actor = 'owner@example.test'
+    labels = i18n.catalog(language)['workspace']
+    errors = []
+    with TestClient(app) as client, playwright.sync_playwright() as runtime:
+        html = client.get('/auth/test?email=' + actor).text
+        browser = runtime.chromium.launch()
+        page = browser.new_page(viewport={'width': 375, 'height': 844})
+        page.on('pageerror', lambda error: errors.append(str(error)))
+
+        def respond(route):
+            path = urlsplit(route.request.url).path
+            if path.startswith('/api/'):
+                response = client.request(route.request.method, path, content=route.request.post_data,
+                    headers={'X-Test-User': actor, 'Content-Type': 'application/json'})
+                return route.fulfill(status=response.status_code, body=response.content,
+                    content_type=response.headers.get('content-type', 'application/json'))
+            if path == '/app':
+                return route.fulfill(body=html, content_type='text/html')
+            if path.startswith('/static/') and (root / path.lstrip('/')).is_file():
+                return route.fulfill(path=str(root / path.lstrip('/')))
+            return route.fulfill(status=404)
+
+        page.route('**/*', respond)
+        page.goto('http://workspace.test/app#overview')
+        # Navigation lives in the Settings group, including on a narrow viewport.
+        nav = page.locator('[data-view="payment-types"]')
+        assert nav.locator('..').locator('.nav-group').text_content() == i18n.catalog(language)['nav']['settings']
+        page.evaluate("location.hash = 'payment-types'")
+        playwright.expect(page.locator('#app-content')).to_contain_text(labels['Puhkusetasu'])
+        playwright.expect(page.locator('#app-content')).to_contain_text(labels['Reimbursement of documented employer business costs only. All levies off; excludes allowances, private costs and remuneration.'])
+        page.get_by_role('button', name=labels['Add payment type'], exact=True).click()
+        editor = page.get_by_role('dialog')
+        editor.get_by_role('textbox', name=labels['Name'], exact=True).fill('Synthetic custom category')
+        assert editor.locator('[name="income_tax"]').is_checked()
+        editor.get_by_role('button', name=labels['Save'], exact=True).click()
+        custom = page.locator('#app-content tr').filter(has_text='Synthetic custom category')
+        playwright.expect(custom).to_have_count(1)
+        custom.get_by_role('button', name=labels['Edit'], exact=True).click()
+        editor = page.get_by_role('dialog')
+        editor.get_by_role('textbox', name=labels['Name'], exact=True).fill('Synthetic edited category')
+        editor.get_by_role('button', name=labels['Save'], exact=True).click()
+        playwright.expect(page.locator('#app-content')).to_contain_text('Synthetic edited category')
+        types = PayrollService(db).component_types(ee_org['id'])
+        assert len(types) == 28
+        assert next(t for t in types if t['name'] == 'Synthetic edited category')['preset_key'] is None
+        page.evaluate("location.hash = 'payroll'")
+        page.get_by_role('button', name=labels['Payment types'], exact=True).click()
+        playwright.expect(page.get_by_role('dialog')).to_contain_text('Synthetic edited category')
+        assert not errors
+        browser.close()
+
+
 @pytest.mark.parametrize('language', ['en', 'et', 'lt', 'lv'])
 def test_payslip_accessible_names_include_employee(monkeypatch, language):
     playwright = pytest.importorskip('playwright.sync_api')
@@ -274,6 +337,10 @@ def test_bureau_employee_lifecycle_draft_components_and_declarations(db, ee_org,
         editor.get_by_label('Amount', exact=True).fill('100')
         editor.get_by_label('Income tax', exact=True).uncheck()
         editor.get_by_label('Social tax', exact=True).check()
+        # A reviewed line may override the now fully taxable parental preset.
+        for label in ('Employee unemployment insurance', 'Employer unemployment insurance',
+                      'Funded pension', 'Counts towards social tax minimum'):
+            editor.get_by_label(label, exact=True).uncheck()
         if pay_basis == 'hourly':
             editor.get_by_label('Hours worked', exact=True).fill('210')
         editor.get_by_role('button', name='Add payment line', exact=True).click()

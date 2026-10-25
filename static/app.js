@@ -155,6 +155,7 @@
     paperclip: "M8 12l6-6a3 3 0 0 1 4 4l-8 8a5 5 0 0 1-7-7l8-8 M6 14l8-8",
     document: "M6 3h8l4 4v14H6z M14 3v4h4",
     plus: "M12 5v14 M5 12h14",
+    "pay-types": "M4 4h16v16H4z M8 8h.01 M11 8h5 M8 12h.01 M11 12h5 M8 16h.01 M11 16h5",
     close: "M6 6l12 12 M18 6 6 18",
     menu: "M4 7h16 M4 12h16 M4 17h16",
     external: "M13.5 4H20v6.5 M20 4l-9 9 M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5",
@@ -169,7 +170,7 @@
     "fixed-assets": "asset", tax: "tax", payroll: "payroll", integrations: "link",
     imports: "import", "payment-methods": "card", "reminder-rules": "bell",
     "exchange-rates": "exchange", objects: "tag", documents: "appearance",
-    periods: "calendar",
+    periods: "calendar", "payment-types": "pay-types",
     maintenance: "wrench",
     groups: "team",
   };
@@ -446,7 +447,7 @@
     });
     app.classList.remove("menu-open");
     document.querySelectorAll(".app-nav").forEach((a) => {
-      const disabled = a.dataset.view === "payroll" && !payrollSupported(org);
+      const disabled = ["payroll", "payment-types"].includes(a.dataset.view) && !payrollSupported(org);
       a.setAttribute("aria-disabled", String(disabled));
       a.style.opacity = disabled ? "0.45" : "";
       a.title = disabled ? t("Payroll is currently available for Estonian books.") : "";
@@ -1312,6 +1313,17 @@
           await render();
         }),
       });
+    },
+    "payment-types": async (c) => {
+      if (!c.payrollSupported) {
+        c.mount(page(t("Payment types"), t("Payroll is available only for Estonian organisations with EUR books. Switch to an Estonian EUR organisation to manage payroll."), "", ""));
+        return;
+      }
+      const types = await api(c.url("/payroll/component-types"));
+      if (!c.mount(page(t("Payment types"), t("Manage payroll payment types and their default levy flags."),
+        button("Payroll accounts", "payrollAccounts", false, canExecutePush() ? "" : "disabled"), paymentTypesContent(types)))) return;
+      bindPaymentTypeActions(c, types, content);
+      bindActions(content, {payrollAccounts: () => payrollAccountsDialog(c)});
     },
     documents: async (c) => {
       const settings = await api(c.url('/document-settings'));
@@ -4355,15 +4367,22 @@
   function componentFlagFields(values) {
     return componentFlags.map(([key, label]) => check(label, key, values[key])).join("");
   }
+  function paymentTypesContent(types) {
+    return `${button("Add payment type", "newType", true, canExecutePush() ? "" : "disabled")}${table(["Name", "Description", "Direction", "Actions"], types.map((x) => row([
+      td(esc(t(x.name))), td(esc(t(x.description || ""))), td(tr(x.direction === "income" ? "Income" : "Deduction")), td(button("Edit", "editType", false, `data-id="${esc(x.id)}" ${canExecutePush() ? "" : "disabled"}`)),
+    ])))}`;
+  }
   function paymentTypesDialog(c, types) {
-    const d = dialog("Payment types", `${button("Add payment type", "newType", true)}${table(["Name", "Direction", "Actions"], types.map((x) => row([
-      td(esc(t(x.name))), td(tr(x.direction === "income" ? "Income" : "Deduction")), td(button("Edit", "editType", false, `data-id="${esc(x.id)}"`)),
-    ])))}`);
+    const d = dialog("Payment types", paymentTypesContent(types));
+    bindPaymentTypeActions(c, types, d, true);
+  }
+  function bindPaymentTypeActions(c, types, target, modal = false) {
     const edit = (type) => {
-      closeDialog(d);
-      const values = type || {direction: "income", liability_role: "PAYROLL_DEDUCTION"};
+      if (modal) closeDialog(target);
+      const values = type || {direction: "income", liability_role: "PAYROLL_DEDUCTION", ...Object.fromEntries(componentFlags.map(([key]) => [key, true]))};
       const editor = dialog(type ? "Edit payment type" : "Add payment type", form(
         field("Name", "name", values.name || "", "text", 'required maxlength="180"') +
+        (values.description ? `<p class="full-width muted">${tr(values.description)}</p>` : "") +
         select("Direction", "direction", [["income", t("Income")], ["deduction", t("Deduction")]], values.direction) +
         select("Deduction liability", "liability_role", [["PAYROLL_DEDUCTION", t("Other deduction liability")], ["PAYROLL_BAILIFF", t("Bailiff withholding liability")]], values.liability_role) +
         `<div class="full-width component-flags">${componentFlagFields(values)}</div><p class="full-width muted">${tr("Levy flags apply to income lines. Deduction lines reduce net pay.")}</p>` + `<p class="full-width muted">${tr("Defaults can be overridden on each draft payment line. Confirm tax treatment before approval.")}</p>`,
@@ -4374,7 +4393,7 @@
         await saved(editor);
       });
     };
-    bindActions(d, {newType: () => edit(), editType: (b) => edit(types.find((x) => x.id === b.dataset.id))});
+    bindActions(target, {newType: () => edit(), editType: (b) => edit(types.find((x) => x.id === b.dataset.id))});
   }
   async function payrollAccountsDialog(c) {
     const [mappings, accounts] = await Promise.all([api(c.url('/payroll/posting-mappings')), api(c.url('/accounts'))]);

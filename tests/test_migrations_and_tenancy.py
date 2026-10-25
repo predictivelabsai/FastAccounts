@@ -9,11 +9,67 @@ from organisations import AccessDenied, OrganisationService
 from payroll_components import ACCOUNTS as PAYROLL_COMPONENT_ACCOUNTS
 
 
+def test_component_catalogue_upgrade_preserves_defaults_and_posted_payroll(tmp_path):
+    from shutil import copyfile
+    from database import MIGRATIONS
+    from payroll import PayrollService
+    from payroll_components import FLAGS, PRESETS, seed_types
+
+    old = tmp_path / 'old' / 'sqlite'
+    old.mkdir(parents=True)
+    for path in (MIGRATIONS / 'sqlite').glob('*.sql'):
+        if path.stem < '0036':
+            copyfile(path, old / path.name)
+    db = Database(path=str(tmp_path / 'catalogue-upgrade.sqlite'))
+    db.migrate(migrations=old.parent)
+    actor = 'owner@example.test'
+    org = OrganisationService(db).create(name='Synthetic existing EE', country_code='EE', entity_type='EE_OU', owner_email=actor)
+    uk = OrganisationService(db).create(name='Synthetic existing UK', country_code='UK', entity_type='UK_COMPANY', owner_email=actor)
+    service = PayrollService(db)
+    with db.transaction() as tx:
+        # Reproduce the five rows present before 0036, independently of current org seeding.
+        tx.execute("DELETE FROM pay_component_types WHERE preset_key NOT IN ('bailiff','author','parental','contract','base_adjustment')")
+        tx.execute("UPDATE pay_component_types SET name='Bureau author',social_tax=0,ui_employee=0,ui_employer=0,funded_pension=0 WHERE preset_key='author'")
+        tx.execute("UPDATE pay_component_types SET social_tax=0,ui_employee=0,ui_employer=0,funded_pension=0,social_minimum=0 WHERE preset_key='parental'")
+    custom = service.save_component_type(org['id'], name='Puhkusetasu', actor=actor, income_tax=True)
+    service.save_employee(org['id'], name='Synthetic employee', gross_salary='2000', actor=actor)
+    run = service.create_run(org['id'], period='2026-10', actor=actor)
+    author = next(t for t in service.component_types(org['id']) if t['preset_key'] == 'author')
+    service.update_item(org['id'], run['id'], run['items'][0]['id'], actor=actor,
+                        components=[dict(type_id=author['id'], amount='100')])
+    service.approve(org['id'], run['id'], actor=actor)
+    tables = ('employees', 'pay_runs', 'pay_run_items', 'pay_item_components', 'pay_item_context',
+              'pay_run_posting_accounts', 'gl_entries', 'posting_batches', 'audit_events')
+    before = {t: db.rows(f'SELECT * FROM {t} ORDER BY 1') for t in tables}
+    existing = db.rows('SELECT * FROM pay_component_types ORDER BY id')
+    assert db.migrate() == ['0036_payroll_component_catalogue']
+    assert {t: db.rows(f'SELECT * FROM {t} ORDER BY 1') for t in tables} == before
+    after = db.rows('SELECT * FROM pay_component_types ORDER BY id')
+    assert all(row in after for row in existing)
+    assert len(after) == len(PRESETS) + 1
+    assert db.scalar('SELECT COUNT(*) FROM pay_component_types WHERE organisation_id=?', (uk['id'],)) == 0
+    assert custom['preset_key'] is None
+    for key, name, direction, flags, role in PRESETS:
+        actual = next(row for row in after if row['preset_key'] == key)
+        if key not in {'author', 'bailiff', 'parental', 'contract', 'base_adjustment'}:
+            assert (actual['name'], actual['direction'], tuple(actual[f] for f in FLAGS), actual['liability_role']) == (name, direction, flags, role)
+    with db.transaction() as tx:
+        seed_types(tx, org['id'])
+    connection = db.connect()
+    try:
+        connection.executescript((MIGRATIONS / 'sqlite' / '0036_payroll_component_catalogue.sql').read_text(encoding='utf-8'))
+    finally:
+        connection.close()
+    assert db.rows('SELECT * FROM pay_component_types ORDER BY id') == after
+    assert db.migrate() == []
+    assert db.rows('PRAGMA foreign_key_check') == []
+
+
 def test_empty_migration_is_idempotent(tmp_path):
     db = Database(path=str(tmp_path / "empty.sqlite"))
-    assert db.migrate() == ["0001_accounting_core", "0002_integrations", "0003_operations", "0004_document_immutability", "0005_payroll", "0006_payroll_part_time_hourly", "0007_automation", "0008_import_staging", "0009_local_accounts", "0010_tsd_export", "0011_account_mappings", "0012_external_gl", "0013_sync_review", "0014_sync_push", "0015_payment_orders", "0016_bank_feed_schedules", "0017_prepayments", "0018_fixed_assets", "0019_master_data_import", "0020_quotes", "0021_periodisation", "0022_payment_links", "0023_analytical_objects", "0024_reminder_rules", "0025_fx_realised", "0026_fx_revaluations", "0027_mfa", "0028_document_settings", "0029_copilot", "0030_master_data_maintenance", "0031_master_data_groups", "0032_copilot_access", "0033_copilot_settings", "0034_payroll_demo_fixes", "0035_payroll_income_line"]
+    assert db.migrate() == ["0001_accounting_core", "0002_integrations", "0003_operations", "0004_document_immutability", "0005_payroll", "0006_payroll_part_time_hourly", "0007_automation", "0008_import_staging", "0009_local_accounts", "0010_tsd_export", "0011_account_mappings", "0012_external_gl", "0013_sync_review", "0014_sync_push", "0015_payment_orders", "0016_bank_feed_schedules", "0017_prepayments", "0018_fixed_assets", "0019_master_data_import", "0020_quotes", "0021_periodisation", "0022_payment_links", "0023_analytical_objects", "0024_reminder_rules", "0025_fx_realised", "0026_fx_revaluations", "0027_mfa", "0028_document_settings", "0029_copilot", "0030_master_data_maintenance", "0031_master_data_groups", "0032_copilot_access", "0033_copilot_settings", "0034_payroll_demo_fixes", "0035_payroll_income_line", "0036_payroll_component_catalogue"]
     assert db.migrate() == []
-    assert db.scalar("SELECT COUNT(*) FROM schema_migrations") == 35
+    assert db.scalar("SELECT COUNT(*) FROM schema_migrations") == 36
     assert db.scalar(
         "SELECT COUNT(*) FROM sqlite_master WHERE type='table' "
         "AND name IN ('account_mappings','external_gl_entries')"
@@ -53,9 +109,9 @@ def test_historical_migration_catalogue_does_not_affect_other_databases(tmp_path
         current_setup = pool.submit(current.migrate)
         assert old_setup.result() == sorted(versions)
         latest = current_setup.result()
-    assert latest[-1] == '0035_payroll_income_line'
+    assert latest[-1] == '0036_payroll_component_catalogue'
     assert legacy.scalar('SELECT COUNT(*) FROM schema_migrations') == 5
-    assert current.scalar('SELECT COUNT(*) FROM schema_migrations') == 35
+    assert current.scalar('SELECT COUNT(*) FROM schema_migrations') == 36
     assert legacy.migrate() == latest[5:]
     assert legacy.migrate() == current.migrate() == []
 
@@ -215,7 +271,7 @@ def test_fixed_asset_upgrade_preserves_custom_charts_and_postings(tmp_path, monk
         lines=[PostingLine(accounts["BANK"], debit=Decimal("10")), PostingLine(accounts["CAPITAL"], credit=Decimal("10"))], actor="owner@example.test")
     before = {table: db.rows(f"SELECT * FROM {table} ORDER BY id") for table in ["organisations", "accounts", "gl_entries", "posting_batches", "audit_events"]}
     monkeypatch.setattr(database, "MIGRATIONS", original)
-    assert db.migrate() == ["0018_fixed_assets", "0019_master_data_import", "0020_quotes", "0021_periodisation", "0022_payment_links", "0023_analytical_objects", "0024_reminder_rules", "0025_fx_realised", "0026_fx_revaluations", "0027_mfa", "0028_document_settings", "0029_copilot", "0030_master_data_maintenance", "0031_master_data_groups", "0032_copilot_access", "0033_copilot_settings", "0034_payroll_demo_fixes", "0035_payroll_income_line"]
+    assert db.migrate() == ["0018_fixed_assets", "0019_master_data_import", "0020_quotes", "0021_periodisation", "0022_payment_links", "0023_analytical_objects", "0024_reminder_rules", "0025_fx_realised", "0026_fx_revaluations", "0027_mfa", "0028_document_settings", "0029_copilot", "0030_master_data_maintenance", "0031_master_data_groups", "0032_copilot_access", "0033_copilot_settings", "0034_payroll_demo_fixes", "0035_payroll_income_line", "0036_payroll_component_catalogue"]
     assert db.migrate() == []
     after_accounts = db.rows("SELECT * FROM accounts ORDER BY id")
     assert all(row in after_accounts for row in before["accounts"])

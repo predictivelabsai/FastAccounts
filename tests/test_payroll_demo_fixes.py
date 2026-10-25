@@ -12,6 +12,58 @@ from payroll_components import FLAGS
 ACTOR = 'owner@example.test'
 
 
+def test_full_catalogue_defaults_and_descriptions(db, ee_org, uk_org):
+    from payroll_components import PRESETS, PRESET_DESCRIPTIONS, seed_types
+    service = PayrollService(db)
+    types = {t['preset_key']: t for t in service.component_types(ee_org['id'])}
+    assert len(types) == len(PRESETS) == 27
+    assert set(types) == set(PRESET_DESCRIPTIONS)
+    for key, name, direction, flags, role in PRESETS:
+        actual = types[key]
+        assert actual['name'] == name and actual['description'] == PRESET_DESCRIPTIONS[key]
+        assert actual['direction'] == direction and actual['liability_role'] == role
+        assert tuple(actual[f] for f in FLAGS) == flags
+        if direction == 'deduction':
+            assert flags == (0, 0, 0, 0, 0, 0)
+            assert role == ('PAYROLL_BAILIFF' if key == 'bailiff' else 'PAYROLL_DEDUCTION')
+    assert tuple(types['employer_sick_pay'][f] for f in FLAGS) == (1, 0, 0, 0, 0, 0)
+    assert not any(types['expense_reimbursement'][f] for f in FLAGS)
+    assert all(types[key][f] for key in ('severance', 'author', 'parental') for f in FLAGS)
+    with db.transaction() as tx:
+        seed_types(tx, ee_org['id'])
+    assert len(service.component_types(ee_org['id'])) == 27
+    assert db.scalar('SELECT COUNT(*) FROM pay_component_types WHERE organisation_id=?', (uk_org['id'],)) == 0
+
+
+@pytest.mark.parametrize('key', ['salary_advance', 'advance_recovery', 'alimony', 'union_fee', 'agreed_deduction'])
+def test_new_net_deductions_post_to_other_liability(db, ee_org, key):
+    service, person, run, types = setup_run(db, ee_org)
+    before = run['items'][0]
+    run = edit(service, ee_org, run, [dict(type_id=types[key]['id'], amount='25')])
+    item = run['items'][0]
+    assert money(item['net']) == money(before['net']) - Decimal('25')
+    for field in ('gross', 'income_tax', 'social_tax', 'funded_pension', 'ui_employee', 'ui_employer', 'employer_cost'):
+        assert item[field] == before[field]
+    approved = service.approve(ee_org['id'], run['id'], actor=ACTOR)
+    lines = balanced(db, approved['posted_batch_id'])
+    account = db.scalar("SELECT id FROM accounts WHERE organisation_id=? AND system_role='PAYROLL_DEDUCTION'", (ee_org['id'],))
+    assert sum(money(line['credit']) for line in lines if line['account_id'] == account) == Decimal('25')
+
+
+def test_sick_pay_and_documented_reimbursement_use_separate_tax_bases(db, ee_org):
+    service, person, run, types = setup_run(db, ee_org)
+    before = run['items'][0]
+    run = edit(service, ee_org, run, [dict(type_id=types[key]['id'], amount='100')
+                                    for key in ('employer_sick_pay', 'expense_reimbursement')])
+    item = run['items'][0]
+    assert money(item['gross']) == money(before['gross']) + Decimal('200')
+    assert money(item['income_tax']) == money(before['income_tax']) + Decimal('22')
+    assert money(item['net']) == money(before['net']) + Decimal('178')
+    for field in ('social_tax', 'funded_pension', 'ui_employee', 'ui_employer'):
+        assert item[field] == before[field]
+    balanced(db, service.approve(ee_org['id'], run['id'], actor=ACTOR)['posted_batch_id'])
+
+
 def setup_run(db, org, **employee):
     service = PayrollService(db)
     person = service.save_employee(org['id'], actor=ACTOR, **(dict(name='Synthetic payroll', gross_salary='2000', personal_id='49001010001') | employee))
@@ -51,8 +103,9 @@ def test_archive_unarchive_delete_history_and_audit(db, ee_org):
 
 def test_components_rounding_snapshots_exports_and_approval(db, ee_org):
     service, person, run, types = setup_run(db, ee_org, apply_tax_free_minimum=True)
-    run = edit(service, ee_org, run, [dict(type_id=types['author']['id'], amount='100'),
-                                    dict(type_id=types['parental']['id'], amount='50'),
+    # Explicit reviewed legacy flags still freeze independently of conservative presets.
+    run = edit(service, ee_org, run, [dict(type_id=types['author']['id'], amount='100', **dict(zip(FLAGS, (1, 1, 0, 0, 0, 1)))),
+                                    dict(type_id=types['parental']['id'], amount='50', **dict(zip(FLAGS, (1, 0, 0, 0, 0, 0)))),
                                     dict(type_id=types['bailiff']['id'], amount='30')])
     item = run['items'][0]
     assert (item['gross'], item['funded_pension'], item['ui_employee'], item['income_tax'], item['net'], item['social_tax'], item['ui_employer']) == (
@@ -231,7 +284,7 @@ def test_components_in_reviewed_push_and_tsd_taxable_base(db, ee_org):
     from push_service import PushService
     from tsd import TSDExportService
     service, person, run, types = setup_run(db, ee_org)
-    run = edit(service, ee_org, run, [dict(type_id=types['parental']['id'], amount='100', income_tax=False),
+    run = edit(service, ee_org, run, [dict(type_id=types['parental']['id'], amount='100', **{f: False for f in FLAGS}),
                                     dict(type_id=types['bailiff']['id'], amount='10')])
     run = service.approve(ee_org['id'], run['id'], actor=ACTOR)
     for row in db.rows('SELECT DISTINCT a.code FROM gl_entries g JOIN accounts a ON a.id=g.account_id AND a.organisation_id=g.organisation_id WHERE g.posting_batch_id=?', (run['posted_batch_id'],)):
@@ -310,7 +363,7 @@ def test_zero_liability_declaration_does_not_fabricate_zero_postings(db, ee_org)
     correction = service.save_component_type(ee_org['id'], name='Replace gross', actor=ACTOR,
         **{key: True for key in FLAGS})
     run = edit(service, ee_org, run, [dict(type_id=correction['id'], amount='-1000'),
-        dict(type_id=types['parental']['id'], amount='2000', income_tax=False)])
+        dict(type_id=types['parental']['id'], amount='2000', **{f: False for f in FLAGS})])
     run = service.approve(ee_org['id'], run['id'], actor=ACTOR)
     assert run['total_gross'] == run['total_net'] == run['total_employer_cost'] == '2000.00'
     TSDExportService(db).prepare(ee_org['id'], run['id'], actor=ACTOR)

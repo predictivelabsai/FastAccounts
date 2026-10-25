@@ -4,6 +4,43 @@ Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as
 delivered.
 
+## 2026-10-25: Expanded Estonian payroll payment categories
+
+- Expanded the Estonian payroll catalogue from five to 27 stable presets, with
+  names and treatment descriptions in English, Estonian, Latvian and Lithuanian.
+  Includes leave pay, unused leave compensation, qualifying employer sick pay,
+  ordinary pay supplements, termination compensation, documented cost
+  reimbursement, salary advances, alimony, union fees and other net deductions.
+- Added additive migration 0036 using 0034's organisation/preset uniqueness and
+  `ON CONFLICT DO NOTHING`. Existing bureau edits, custom categories, saved
+  components and posted ledger data are preserved. New EE organisations receive
+  the same catalogue through the existing organisation seeding function. UK
+  organisations receive no presets.
+- Added Payment types / Makseliigid under Settings, reusing the payroll editor's
+  management components and existing organisation-scoped routes. Users can add
+  and edit custom categories and reach payroll account mappings. New custom
+  income types start fully taxable. All four locales have mobile browser coverage.
+- Uncertain new defaults, including author and employer parental-leave payments,
+  are fully taxable. Qualifying employer sick pay is income-tax-only within
+  statutory limits; reimbursement is restricted to documented employer costs.
+  Net deductions use PAYROLL_DEDUCTION except bailiff garnishments. Accountant
+  UAT remains pending for author/parental payment basis, contract recipients,
+  severance exceptions, standby/study/average pay and social-minimum treatment.
+  Sick-pay limits and reimbursement evidence require bureau confirmation. See
+  [payroll rules](payroll_rules.md) for the full catalogue and EMTA references.
+- Validation: **221 focused tests passed**, each file run separately: payroll
+  16, part-time/hourly payroll 30, workspace payroll 13, migrations/tenancy 15,
+  Merit Palk 49, copilot 60, i18n 14 and payroll component regressions 24. Four
+  icon tests also passed. Node syntax, diff whitespace, the CI credential-pattern
+  guard and Python 3.12 grammar checks for all 160 tracked Python files passed.
+- The final full suite ran once with `.venv\Scripts\python.exe -m pytest -q`:
+  **1,645 passed, four skipped, two warnings and zero failures** in **53m 25s**
+  (3,205.21 seconds). The skips are the four PostgreSQL opt-in tests. Warnings
+  concern fastcore's deprecated coroutine detection and an existing pytest
+  parametrisation iterator in the MFA tests. No live provider calls or production
+  accounting data are used. Python 3.12 runtime and live PostgreSQL checks remain
+  unrun; the available Windows venv uses Python 3.14.6 and SQLite.
+
 ## 2026-10-24: On-demand Merit Palk imports
 
 - Added a separate, pull-only `merit_palk` connector with encrypted API ID/key,

@@ -180,29 +180,106 @@ hours, base pay and component lines.
 
 Types belong to the organisation: `GET/POST /payroll/component-types` and
 `PUT /payroll/component-types/{id}`. Editing a type never changes saved lines.
-The five seeded types are editable bureau defaults, not a substitute for the
-accountant's decision for the recipient and payment period:
+The 27 seeded types are editable bureau defaults, not a substitute for the
+accountant's decision for the recipient and payment period. Stable `preset_key`
+values identify them independently of editable organisation names. The settings
+navigation includes **Payment types / Makseliigid** (`#payment-types`), with the
+same add/edit surface as the payroll editor and a link to payroll account
+mappings. Owners, administrators and accountants can add named custom categories
+and set their direction, liability role and six levy defaults. Custom categories
+have no preset key. New income types in this editor start with all levy flags on.
+Names and preset-basis descriptions are translated into English, Estonian,
+Latvian and Lithuanian. Descriptions describe the preset basis, rather than
+claiming to validate later bureau edits to its flags.
 
-| Preset | Direction | Income tax | Social tax | Employee / employer UI | II pillar | Counts towards social minimum |
-|---|---|---|---|---|---|---|
-| Kinnipidamine kohtutäiturile | Net deduction | No | No | No / No | No | No |
-| Autori tasu | Income | Yes | Yes | No / No | No | Yes |
-| Töövõtulepingu tasu | Income | Yes | Yes | Yes / Yes | Yes | No |
-| Põhipalga korrigeerimine | Income | Yes | Yes | Yes / Yes | Yes | Yes |
-| Vanemapuhkused | Income | Yes | No | No / No | No | No |
+| Preset key | Estonian name | Direction | Income tax | Social tax | Employee / employer UI | II pillar | Counts towards social minimum |
+|---|---|---|---|---|---|---|---|
+| `base_adjustment` | Põhipalga korrigeerimine | Income | Yes | Yes | Yes / Yes | Yes | Yes |
+| `contract` | Töövõtulepingu tasu | Income | Yes | Yes | Yes / Yes | Yes | No |
+| `bailiff` | Kinnipidamine kohtutäiturile | Net deduction | No | No | No / No | No | No |
+| `author` | Autori tasu | Income | Yes | Yes | Yes / Yes | Yes | Yes |
+| `parental` | Vanemapuhkused | Income | Yes | Yes | Yes / Yes | Yes | Yes |
+| `annual_leave` | Puhkusetasu | Income | Yes | Yes | Yes / Yes | Yes | Yes |
+| `unused_leave` | Kasutamata puhkuse hüvitis | Income | Yes | Yes | Yes / Yes | Yes | Yes |
+| `employer_sick_pay` | Tööandja haigushüvitis piirmäära ulatuses | Income | Yes | No | No / No | No | No |
+| `overtime` | Ületunnitöö tasu | Income | Yes | Yes | Yes / Yes | Yes | Yes |
+| `extra_work` | Lisatöö tasu | Income | Yes | Yes | Yes / Yes | Yes | Yes |
+| `bonus` | Preemia ja boonus | Income | Yes | Yes | Yes / Yes | Yes | Yes |
+| `thirteenth_salary` | 13. palk | Income | Yes | Yes | Yes / Yes | Yes | Yes |
+| `public_holiday` | Riigipühal töötamise tasu | Income | Yes | Yes | Yes / Yes | Yes | Yes |
+| `night_work` | Öötöö tasu | Income | Yes | Yes | Yes / Yes | Yes | Yes |
+| `rest_day` | Puhkepäeval töötamise tasu | Income | Yes | Yes | Yes / Yes | Yes | Yes |
+| `standby` | Valveaja tasu | Income | Yes | Yes | Yes / Yes | Yes | Yes |
+| `substitution` | Asendustasu | Income | Yes | Yes | Yes / Yes | Yes | Yes |
+| `commission` | Müügitasu | Income | Yes | Yes | Yes / Yes | Yes | Yes |
+| `study_leave` | Õppepuhkuse tasu | Income | Yes | Yes | Yes / Yes | Yes | Yes |
+| `average_pay` | Keskmise töötasu säilitamine | Income | Yes | Yes | Yes / Yes | Yes | Yes |
+| `severance` | Töölepingu lõpetamise hüvitis | Income | Yes | Yes | Yes / Yes | Yes | Yes |
+| `expense_reimbursement` | Dokumenteeritud kulude hüvitis | Income | No | No | No / No | No | No |
+| `salary_advance` | Väljamakstud palga ettemaks | Net deduction | No | No | No / No | No | No |
+| `advance_recovery` | Varasema ettemaksu tasaarvestus | Net deduction | No | No | No / No | No | No |
+| `alimony` | Elatise kinnipidamine | Net deduction | No | No | No / No | No | No |
+| `union_fee` | Ametiühingu liikmemaksu kinnipidamine | Net deduction | No | No | No / No | No | No |
+| `agreed_deduction` | Muu kokkulepitud kinnipidamine | Net deduction | No | No | No / No | No | No |
 
-The author preset's social-tax default is an explicit demo assumption: the
-request did not specify that flag. The bureau must confirm it during UAT.
-Author and parental-leave rule citations and applicability also need accountant
-UAT confirmation. Every income-line flag is editable per period. Net deductions
-reduce net pay and credit their chosen deduction liability role; they do not
-change tax bases. Bailiff garnishments use a separate liability role.
+Treatment references checked 2026-10-25:
 
-<!-- EMTA references for bureau UAT, checked 2026-10-23. These sources do not
-     establish universal treatment for every author or parental-leave payment.
-     https://www.emta.ee/ariklient/maksud-ja-tasumine/tulumaks-ja-sotsiaalmaks/sotsiaalmaks
-     https://www.emta.ee/ariklient/maksud-ja-tasumine/tulumaks-ja-sotsiaalmaks/maksumaarad
-     https://www.emta.ee/ariklient/maksud-ja-tasumine/tulumaks-ja-sotsiaalmaks/deklaratsiooni-tsd-esitamine -->
+- EMTA [Palgatulu](https://www.emta.ee/eraklient/maksud-ja-tasumine/maksustatavad-tulud/palgatulu):
+  ordinary employment remuneration and TLS section 84 unused leave compensation
+  carry the ordinary employment levies. All ordinary pay supplements in the table
+  follow this basis. The catalogue supplies amounts and defaults, with no
+  automatic entitlement, average-pay, leave-day or overtime calculation.
+- EMTA [Sotsiaalmaks](https://www.emta.ee/ariklient/maksud-ja-tasumine/tulumaks-ja-sotsiaalmaks/sotsiaalmaks),
+  employer sick-pay section: the sick-pay preset is restricted to qualifying
+  employer payments for days 1 to 8 within the statutory average-pay limit and
+  backed by a valid certificate. Only income tax is enabled. Days 4 to 8 are the
+  ordinary mandatory employer-paid days; days 1 to 3 may be voluntary. The bureau
+  must check days, certificate and limit, and enter excess as fully taxable pay.
+  This preset does not cover Tervisekassa payments or arbitrary sick-leave top-ups.
+- EMTA [documented cost reimbursement, questions 24 and 25](https://www.emta.ee/ariklient/maksud-ja-tasumine/tulumaks-ja-sotsiaalmaks/erisoodustused/toolahetuse-kusimused-ja-vastused),
+  TuMS section 12(3): documented costs incurred for the employer's business are
+  reimbursed with all levies off. This narrow preset excludes per diem allowances,
+  private costs, fringe benefits and disguised remuneration. The bureau checks
+  supporting documents and avoids duplicating a reimbursement already in books.
+- EMTA [Töötuskindlustusmakse](https://www.emta.ee/ariklient/maksud-ja-tasumine/tulumaks-ja-sotsiaalmaks/tootuskindlustusmakse):
+  statutory termination compensation may be exempt from unemployment insurance;
+  general agreed compensation is not universally exempt. The generic severance
+  preset, including notice compensation, deliberately defaults to all levies on.
+  The bureau must distinguish statutory TLS sections 100/109 payments from agreed
+  supplements and confirm both UI flags and social-minimum counting at UAT.
+
+Newly seeded author and employer parental-leave categories now default to fully
+taxable income because their payment basis and recipient treatment are uncertain.
+Accountant UAT must confirm every applicable levy, the contract and social-minimum
+counting. The parental category is employer-side only, not a state benefit or an
+assertion of a universal employer entitlement. No maternity or state-paid parental
+benefit category is added. Existing organisation defaults, including the earlier
+author social-tax demo assumption and parental exemptions, are preserved by the
+migration and require bureau review at UAT. Contract-pay recipient flags and
+minimum counting also retain their documented UAT requirement.
+
+Standby pay, study-leave pay, retained average wages and general severance use
+conservative fully taxable income defaults. The bureau confirms their contractual
+or legal basis and social-minimum treatment at UAT. Qualifying sick pay and
+reimbursement require the evidence and limits above. No exemption is inferred
+from an uncertain payment name. Every income-line flag remains editable per period.
+
+All net deductions leave tax bases unchanged and use `PAYROLL_DEDUCTION`, except
+bailiff garnishments, which use `PAYROLL_BAILIFF`. Direct alimony is separate from
+bailiff enforcement. The bureau confirms lawful authority and deduction limits.
+`salary_advance` recognises an advance already paid for the current period;
+`advance_recovery` recovers an earlier advance. Both reduce outstanding net pay,
+without executing payment or reducing gross. Never apply both to the same advance.
+They use the requested deduction liability role; clearing an already recorded
+advance remains the accountant's responsibility.
+
+Migration 0036 inserts missing catalogue entries into existing EE organisations
+with `ON CONFLICT(organisation_id,preset_key) DO NOTHING`, reusing the unique
+constraint introduced in 0034. Existing names, levy edits, custom types and frozen
+payroll or ledger rows remain unchanged. New EE organisations receive the same
+catalogue through `payroll_components.seed_types`. SQL migration values are a
+versioned snapshot, checked against that catalogue in upgrade tests. UK
+organisations receive no payroll types. No historical migration is rewritten.
 
 Income amounts enter each levy base only when that levy flag is on. Pension and
 employee UI are rounded on their respective aggregate bases and deducted from
