@@ -44,6 +44,10 @@ def calculate_component_amount(method, *, amount=0, rate=0, quantity=1, coeffici
         result = d(average_hourly_pay) * d(quantity)
     elif method == 'average_working_day_pay':
         result = d(average_working_day_pay) * d(quantity)
+    elif method == 'monthly_salary_day_based':
+        result = d(amount) * d(quantity)
+    elif method in ('monthly_salary', 'contract_sum'):
+        result = d(amount)
     elif method == 'gross_up_from_net':
         # Search cents in ascending order. This gives the smallest gross whose
         # rounded net reaches the requested amount, including tax plateaus.
@@ -149,8 +153,8 @@ TSD_PRESET_CODES = {
 
 PRESET_METHODS = {
     'overtime': ('percentage_of_hourly_rate', 150, 6),
-    'night_work': ('percentage_of_hourly_rate', 0, 7),
-    'public_holiday': ('percentage_of_hourly_rate', 0, 7),
+    'night_work': ('percentage_of_hourly_rate', 25, 7),
+    'public_holiday': ('percentage_of_hourly_rate', 100, 7),
     'bonus': ('percentage_of_base', 0, 5),
     'severance': ('average_monthly_pay', 0, 8),
     'notice_pay': ('average_working_day_pay', 0, 8),
@@ -160,6 +164,7 @@ PRESET_METHODS = {
     'care_leave_pay': ('average_working_day_pay', 0, 9),
     'child_leave_pay': ('average_working_day_pay', 0, 9),
 }
+PRESET_DEFAULTS = {'car_compensation': ('0.30', None, '335')}
 
 # Translation keys describe the preset basis, independently of editable organisation names.
 PRESET_DESCRIPTIONS = {
@@ -190,6 +195,12 @@ PRESET_DESCRIPTIONS = {
     'alimony': 'Direct alimony withholding from net pay. Use the bailiff category for bailiff orders.',
     'union_fee': 'Agreed union membership fee withheld from net pay. No payroll tax relief.',
     'agreed_deduction': 'Other lawfully agreed withholding from net pay. No change to tax bases.',
+    'car_compensation': 'Business use of a private car. Default exemption reference is EUR 0.30/km up to EUR 335/month; verify records, eligibility and current legal limits before approval.',
+    'birth_allowance': 'Birth allowance using TSD type 14. Confirm recipient and legal eligibility.',
+    'work_accident_benefit': 'Work-accident benefit using TSD type 32. Confirm the legal basis and applicable levies.',
+    'notice_pay': 'Notice-period compensation using the average working-day pay method and TSD type 33.',
+    'care_leave_pay': 'Care-leave payment. Confirm the payer and legal basis.',
+    'child_leave_pay': 'Child-leave payment. Confirm the payer and legal basis.',
 }
 ACCOUNTS = (
     ('2250', 'Palgavõlg', 'PAYROLL_SALARY_PAYABLE'),
@@ -221,7 +232,7 @@ def seed_types(tx, organisation_id):
         method_ready = (bool(tx.one("SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='pay_component_types' AND column_name='calculation_method'"))
                         if tx.dialect == 'postgres' else 'calculation_method' in {row['name'] for row in tx.rows('PRAGMA table_info(pay_component_types)')})
         if method_ready:
-            fields += ',calculation_method,default_percentage,palk_row'
+            fields += ',calculation_method,default_rate,default_percentage,default_coefficient,palk_row'
         values = (organisation_id + '-component-' + key, organisation_id, key, name, direction, *flags, role)
         if metadata_ready:
             values += (int(key not in {'bailiff', 'parental', 'annual_leave', 'unused_leave', 'employer_sick_pay',
@@ -230,7 +241,8 @@ def seed_types(tx, organisation_id):
         if has_tsd:
             values += (TSD_PRESET_CODES[key],)
         if method_ready:
-            values += (method, pct or None, palk_row)
+            rate, coefficient = PRESET_DEFAULTS.get(key, (None, None, None))[0], PRESET_DEFAULTS.get(key, (None, None, None))[2]
+            values += (method, rate, pct or None, coefficient, palk_row)
         tx.execute('INSERT INTO pay_component_types(id,organisation_id,preset_key,name,direction,' + fields +
                    ') VALUES (' + ','.join('?' for _ in values) +
                    ') ON CONFLICT(organisation_id,preset_key) DO NOTHING',

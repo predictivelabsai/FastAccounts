@@ -4780,12 +4780,18 @@
       `<div class="full-width"><h3>${tr("Payment components")}</h3><p class="muted">${tr("Levy flags apply to income lines. Deduction lines reduce net pay.")}</p><p class="muted">${tr("Use an income component to adjust gross pay. Negative income amounts reduce gross pay.")}</p><div class="payment-lines"></div>${button("Add payment line", "addPayment")}</div>`, "Save draft pay",
     ));
     const container = d.querySelector('.payment-lines');
+    const methodLabels = {fixed_sum:'Sum',sum_x_qty_x_coef:'Sum x quantity x coefficient',percentage_of_base:'Percentage of base salary',percentage_of_hourly_rate:'Percentage of hourly rate',piece_rate:'Piece rate',hourly:'Hourly',average_monthly_pay:'Average monthly pay',average_hourly_pay:'Average hourly pay',average_working_day_pay:'Average working-day pay',gross_up_from_net:'Gross-up from net',monthly_salary:'Monthly salary',monthly_salary_day_based:'Monthly salary, day-based',contract_sum:'Contract sum',contract_sum_x_quantity:'Contract sum x quantity',percentage:'Percentage'};
+    const methodInputs = {sum_x_qty_x_coef:['rate','quantity','coefficient'],percentage_of_base:['percentage'],percentage:['percentage'],percentage_of_hourly_rate:['percentage','quantity'],piece_rate:['rate','quantity'],hourly:['rate','quantity'],average_monthly_pay:['quantity'],average_hourly_pay:['quantity'],average_working_day_pay:['quantity'],gross_up_from_net:['net_target'],contract_sum:['amount'],contract_sum_x_quantity:['rate','quantity'],monthly_salary:['amount'],monthly_salary_day_based:['amount','quantity']};
+    const preview = (method, v, base) => { const n=(k)=>Number(v[k]||0); let x=n('amount'); if(method==='sum_x_qty_x_coef')x=n('rate')*n('quantity')*n('coefficient'); else if(['percentage_of_base','percentage'].includes(method))x=base*n('percentage')/100; else if(method==='percentage_of_hourly_rate')x=(Number(item.hourly_rate||0)||base/176)*n('percentage')/100*n('quantity'); else if(['piece_rate','hourly','contract_sum_x_quantity'].includes(method))x=n('rate')*n('quantity'); else if(method==='average_monthly_pay')x=Number(v.average_monthly_pay||0)*n('quantity'); else if(method==='average_hourly_pay')x=Number(v.average_hourly_pay||0)*n('quantity'); else if(method==='average_working_day_pay')x=Number(v.average_working_day_pay||0)*n('quantity'); return Number.isFinite(x)?x.toFixed(2):'0.00'; };
     const add = (line) => {
       if (!types.length) { toast(t("Add a payment type first."), "info"); return; }
       const value = line || {...types[0], type_id: types[0].id};
       const el = document.createElement('fieldset'); el.className = 'payment-line';
       const availableTypes = types.filter((x) => x.active || x.id === value.type_id);
-      el.innerHTML = `<legend>${tr("Payment line")}</legend><div class="form-grid">${select("Payment type", "type_id", availableTypes.map((x) => [x.id, t(x.name)]), value.type_id)}${field("Amount", "amount", value.amount || "", "number", 'required step="0.01"')}${select("Direction", "direction", [["income", t("Income")], ["deduction", t("Deduction")]], value.direction)}${field("Name", "name", value.name, "text", 'required maxlength="180"')}<div class="full-width component-flags">${componentFlagFields(value)}</div></div>${button("Remove payment line", "removePayment")}`;
+      const selected = types.find((x) => x.id === value.type_id) || types[0], method = value.calculation_method || selected.calculation_method || 'fixed_sum';
+      const input = (key) => field(key === 'net_target' ? 'Net target' : key[0].toUpperCase()+key.slice(1), key, value[key] ?? selected[`default_${key}`] ?? (key==='quantity' || key==='coefficient' ? 1 : ''), 'number', 'step="0.0001"');
+      const dynamic = (methodInputs[method] || []).map(input).join('');
+      el.innerHTML = `<legend>${tr("Payment line")}</legend><div class="form-grid">${select("Payment type", "type_id", availableTypes.map((x) => [x.id, t(x.name)]), value.type_id)}<p class="full-width muted">${tr(methodLabels[method] || 'Sum')}. ${tr('The server recalculates and validates this amount when saved.')}</p>${method==='fixed_sum' ? field("Amount", "amount", value.amount || "", "number", 'required step="0.01"') : `<output class="full-width" data-computed-amount>${esc(value.amount || '0.00')}</output>`}${dynamic}${select("Direction", "direction", [["income", t("Income")], ["deduction", t("Deduction")]], value.direction)}${field("Name", "name", value.name, "text", 'required maxlength="180"')}<div class="full-width component-flags">${componentFlagFields(value)}</div></div>${button("Remove payment line", "removePayment")}`;
       container.append(el);
       const direction = el.querySelector('[name="direction"]');
       const liability = document.createElement('div');
@@ -4793,11 +4799,13 @@
       el.querySelector('.form-grid').append(liability.firstElementChild);
       el.querySelector('[name="type_id"]').onchange = (e) => {
         const type = types.find((x) => x.id === e.target.value);
+        value.calculation_method = type.calculation_method || 'fixed_sum';
         el.querySelector('[name="name"]').value = type.name;
         direction.value = type.direction;
         el.querySelector('[name="liability_role"]').value = type.liability_role;
         componentFlags.forEach(([key]) => el.querySelector(`[name="${key}"]`).checked = type[key]);
       };
+      el.addEventListener('input', () => { const output=el.querySelector('[data-computed-amount]'); if(output) { const values=Object.fromEntries([...el.querySelectorAll('input')].map((x)=>[x.name,x.value])); output.value=preview(method, values, Number(item.gross_salary||0)); } });
       el.querySelector('[data-action="removePayment"]').onclick = () => el.remove();
     };
     (item.components || []).forEach(add);
@@ -4805,7 +4813,7 @@
     bindForm(d, async () => {
       const components = [...container.children].map((el) => {
         const value = {};
-        for (const key of ['type_id', 'name', 'amount', 'direction', 'liability_role']) value[key] = el.querySelector(`[name="${key}"]`).value;
+        for (const key of ['type_id', 'name', 'amount', 'direction', 'liability_role','quantity','rate','coefficient','percentage','net_target']) { const input=el.querySelector(`[name="${key}"]`); if(input) value[key] = input.value; }
         for (const [key] of componentFlags) value[key] = el.querySelector(`[name="${key}"]`).checked;
         return value;
       });

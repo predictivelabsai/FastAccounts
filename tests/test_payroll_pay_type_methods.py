@@ -16,6 +16,10 @@ from payroll_components import calculate_component_amount
     ('average_hourly_pay', {'average_hourly_pay': '15', 'quantity': '4'}, '60.00'),
     ('average_working_day_pay', {'average_working_day_pay': '90', 'quantity': '3'}, '270.00'),
     ('contract_sum_x_quantity', {'rate': '25', 'quantity': '3'}, '75.00'),
+    ('contract_sum', {'amount': '85'}, '85.00'),
+    ('monthly_salary', {'amount': '1200'}, '1200.00'),
+    ('monthly_salary_day_based', {'amount': '100', 'quantity': '0.5'}, '50.00'),
+    ('percentage', {'base_pay': '200', 'percentage': '5'}, '10.00'),
 ])
 def test_component_calculation_methods(method, inputs, expected):
     assert calculate_component_amount(method, **inputs) == Decimal(expected)
@@ -36,3 +40,15 @@ def test_gross_up_from_net_reaches_target_cent(pension, exemption):
 
 def test_existing_fixed_sum_default_is_bit_exact():
     assert calculate_component_amount('fixed_sum', amount='123.456') == Decimal('123.46')
+
+
+def test_seeded_methods_and_tsd_codes(db, ee_org):
+    from payroll import PayrollService
+    types = {row['preset_key']: row for row in PayrollService(db).component_types(ee_org['id'])}
+    assert types['overtime']['calculation_method'] == 'percentage_of_hourly_rate'
+    assert types['overtime']['default_percentage'] == '150'
+    assert types['birth_allowance']['tsd_payment_type'] == 14
+    assert types['work_accident_benefit']['tsd_payment_type'] == 32
+    assert types['notice_pay']['tsd_payment_type'] == 33
+    assert types['car_compensation']['default_rate'] == '0.3'
+    assert types['car_compensation']['default_coefficient'] == '335'

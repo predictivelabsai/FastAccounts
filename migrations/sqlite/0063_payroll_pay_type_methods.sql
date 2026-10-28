@@ -31,6 +31,7 @@ UPDATE pay_component_types SET calculation_method='percentage_of_hourly_rate',de
 UPDATE pay_component_types SET calculation_method='percentage_of_base',palk_row=5 WHERE preset_key='bonus';
 UPDATE pay_component_types SET calculation_method='average_monthly_pay',palk_row=8 WHERE preset_key='severance';
 UPDATE pay_component_types SET calculation_method='average_working_day_pay',palk_row=8 WHERE preset_key='notice_pay';
+UPDATE pay_component_types SET default_rate=0.30,default_coefficient=335 WHERE preset_key='car_compensation';
 UPDATE pay_component_types SET palk_row=CASE preset_key
  WHEN 'overtime' THEN 6 WHEN 'night_work' THEN 7 WHEN 'public_holiday' THEN 7
  WHEN 'bonus' THEN 5 WHEN 'thirteenth_salary' THEN 8 WHEN 'annual_leave' THEN 9

@@ -181,7 +181,7 @@ hours, base pay and component lines.
 
 Types belong to the organisation: `GET/POST /payroll/component-types` and
 `PUT /payroll/component-types/{id}`. Editing a type never changes saved lines.
-The 27 seeded types are editable bureau defaults, not a substitute for the
+The 33 seeded types are editable bureau defaults, not a substitute for the
 accountant's decision for the recipient and payment period. Stable `preset_key`
 values identify them independently of editable organisation names. The settings
 navigation includes **Payment types / Makseliigid** (`#payment-types`), with the
@@ -605,3 +605,46 @@ employer contribution. Contract components retain their separately reviewed tax
 flags, and board-fee base remuneration keeps its automatic exclusions.
 
 Payment components also carry an editable EMTA VALJAMLIIK code. Preset defaults, matrix source and items needing accountant confirmation are listed in [tsd-export.md](tsd-export.md). These codes do not replace review of the recipient's legal relationship.
+
+## Payment-type calculation methods (Build 6)
+
+Every existing component type and saved component line migrates to `fixed_sum`.
+That preserves the prior entered amount exactly. Editing a type affects later
+lines only; draft and approved lines retain their calculation method, entered
+quantity/rate/coefficient/percentage, calculated amount, TSD payment code and
+PALK row. `fixed_sum` remains the default for newly created custom types.
+
+A gross-up searches integer cents from the lowest gross upward and uses the
+first gross whose net reaches the requested net after pension, employee
+unemployment and income tax. Each deduction and tax is rounded `ROUND_HALF_UP`
+to cents, as in the payroll engine. The gross-up is deterministic. It currently
+uses the 2026 rates and the exemption value supplied by the caller; accountant
+review is required for unusual exemption sharing and future tax-year rules.
+
+| Preset | Method/default | TSD type | PALK row | Review note |
+|---|---|---:|---:|---|
+| Overtime | Percentage of hourly rate, 150% | 10 | 6 | Ordinary employment levies |
+| Night work | Percentage of hourly rate, 25% | 10 | 7 | Verify agreement and hours |
+| Public-holiday work | Percentage of hourly rate, 100% | 10 | 7 | Verify agreement and hours |
+| Bonus | Percentage of base salary, percentage entered per line | 10 | 5 | Regular bonus classification |
+| Thirteenth salary | Fixed sum | 10 | 8 | Irregular bonus classification |
+| Annual leave and unused leave | Fixed sum unless entered from absence calculation | 10 | 9 | Existing absence calculation remains authoritative |
+| Severance | Average monthly pay | 33 | 8 | Confirm compensation type |
+| Notice pay | Average working-day pay | 33 | 8 | Confirm legal basis |
+| Car compensation | Fixed sum; EUR 0.30/km and EUR 335/month defaults | 10 | 15 | Mileage records, eligible recipient and monthly cap must be reviewed |
+| Birth allowance | Fixed sum | 14 | 16 | Tax-free preset; confirm eligibility |
+| Work-accident benefit | Fixed sum | 32 | 17 | Confirm legal basis and levies |
+| Care leave pay | Average working-day pay | 10 | 9 | Confirm payer and entitlement |
+| Child leave pay | Average working-day pay | 10 | 9 | Confirm payer and entitlement |
+
+The private-car reference limit is EUR 0.30 per kilometre, capped at EUR 335 per
+employer per calendar month when the required records are kept. This preset
+stores those values as editable defaults only and does not calculate the
+exempt/taxable split. The accountant must confirm current applicability and
+handle any excess as taxable fringe benefit. See the [Income Tax Act](https://www.riigiteataja.ee/en/akt/515052024003) and [EMTA car compensation guidance](https://www.emta.ee/en/node/168/main_chapter/11656/pdf).
+
+Component types also select a Statistics Estonia PALK row: 5 base pay including
+regular bonuses, 6 overtime, 7 shift/night/public-holiday work, 8 irregular
+bonuses, 9 non-worked time, 10 non-monetary benefits, and 15-18 benefits. This
+classification is stored for a later PALK report and is not currently exported.
+
