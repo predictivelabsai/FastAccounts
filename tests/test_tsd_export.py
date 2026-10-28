@@ -71,6 +71,7 @@ def test_xbrl_gl_has_one_complete_transaction_per_payment_and_reconciles(db, ee_
         assert detail.findtext("tsd:annex", namespaces=ns) == "1"
     personal_ids = {detail.findtext("tsd:recipient_personal_id", namespaces=ns) for detail in details}
     assert personal_ids == {"49001010018", "38002020029"}
+    assert {detail.findtext("tsd:tsd_payment_type", namespaces=ns) for detail in details} == {"10", "21"}
     totals = {
         field: sum(
             (Decimal(detail.findtext(f"tsd:{field}", namespaces=ns)) for detail in details),
@@ -94,6 +95,7 @@ def test_transitional_csv_has_declared_fields_and_reconciles(db, ee_org):
     assert {row["payment_classification"] for row in rows} == {
         "EMPLOYMENT_SALARY", "BOARD_MEMBER_FEE"
     }
+    assert {row["tsd_payment_type"] for row in rows} == {"10", "21"}
     assert sum((Decimal(row["gross_amount"]) for row in rows), Decimal("0")) == Decimal(run["total_gross"])
     assert sum((Decimal(row["net_amount"]) for row in rows), Decimal("0")) == Decimal(run["total_net"])
     assert sum((Decimal(row["employer_cost"]) for row in rows), Decimal("0")) == Decimal(run["total_employer_cost"])

@@ -32,3 +32,4 @@ jobs:
             exit 1
           fi
       - run: docker build -t fastaccounts-ci .
+

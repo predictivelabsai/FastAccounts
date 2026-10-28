@@ -4,10 +4,11 @@ Date: 2026-10-28. Branch: `feat/payroll-tsd-apa`, based on `200c715`.
 
 ## Implemented in this checkpoint
 
-Migration 0052 adds tenant-scoped payment-type codes to component types and
-frozen component rows, with defaults for existing catalogue presets. The payment
-type editor accepts the code and displays its Estonian label. `payroll_tsd_types.py`
-contains a small resident-person matrix extract and pure lookup function.
+Migrations 0052 and 0053 add tenant-scoped payment-type codes to component
+types, frozen component rows and base-pay run items, with preset defaults and
+backfills. Prepared records expose the base-pay code, and the editor accepts a
+component code with an Estonian label. `payroll_tsd_types.py` contains a small
+resident-person matrix extract and pure lookup function.
 
 ## Verification run
 
