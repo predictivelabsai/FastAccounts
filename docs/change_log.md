@@ -18,7 +18,11 @@ delivered.
 - Focused test results are recorded in `payroll_tsd_validation.md`.
 - Started scope 4b step 5 with a pure offline APA validator for frozen payout
   data. Its implemented rule subset and offline data gaps are recorded in
-  `payroll_tsd_validation.md`; this step remains in progress.
+  `payroll_tsd_validation.md`.
+- Added payout-level findings, blocked XML/ZIP controls, feedback upload,
+  cancellation downloads and export history to the accountant preparation
+  view in en/et/lv/lt. The offline rule subset and unavailable-data conditions
+  are documented; schema validation and live e-MTA acceptance remain pending.
 
 ## 2026-10-28: Payroll leave liability and payslip balances
 

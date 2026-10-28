@@ -16,8 +16,10 @@ class APAHistoryService:
         self.db = db
 
     def exports(self, organisation_id: str) -> list[dict]:
-        return self.db.rows("SELECT id,organisation_id,payout_id,transaction_id,version,file_sha256,created_at,created_by,status "
-                            "FROM tsd_apa_exports WHERE organisation_id=? ORDER BY created_at DESC,id DESC",
+        return self.db.rows("SELECT e.id,e.organisation_id,e.payout_id,e.transaction_id,e.version,e.file_sha256,e.created_at,e.created_by,e.status,"
+                            "COALESCE((SELECT payout_date FROM payroll_payout_batches p WHERE p.organisation_id=e.organisation_id AND p.id=e.payout_id),"
+                            "(SELECT payout_date FROM payroll_absence_payout_batches p WHERE p.organisation_id=e.organisation_id AND p.id=e.payout_id)) AS payout_date "
+                            "FROM tsd_apa_exports e WHERE e.organisation_id=? ORDER BY e.created_at DESC,e.id DESC",
                             (organisation_id,))
 
     def record_export(self, organisation_id: str, payout_id: str, transaction_id: str,

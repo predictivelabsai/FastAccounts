@@ -1087,9 +1087,11 @@ submission. Production accountant UAT and e-MTA upload verification remain
 pending.
 
 Scope 4b adds one XML file per paid payout, month ZIP downloads, cancellation
-and feedback history, and an offline validator for an initial subset of APA
-business rules. The remaining rule mapping and declaration-panel controls are
-in progress; see `payroll_tsd_validation.md`.
+and feedback history, and declaration-panel payout findings, export controls
+and history. The implemented offline APA rules and conditions that cannot be
+checked from the frozen payout data are documented in `payroll_tsd_validation.md`.
+Scope 4b is implemented; full XBRL GL schema validation and live e-MTA
+acceptance remain external validation tasks. Direct submission remains disabled.
 
 ## 33. Payment orders and document evidence (PR1, 2026-10-11)
 

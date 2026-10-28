@@ -1895,4 +1895,10 @@ input[type="radio"] {
 .component-flags { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr)); gap: .6rem; }
 .component-summary { display: block; white-space: normal; max-width: 28rem; margin-top: .5rem; }
 .declaration-overdue { color: var(--danger, #a62d24); font-weight: 600; }
+.apa-findings { margin: 0; padding-left: 1.2rem; }
+.apa-finding { margin: .25rem 0; }
+.apa-must { color: #20242a; font-weight: 650; }
+.apa-punane { color: var(--danger, #a62d24); }
+.apa-sinine { color: #245d91; }
+.apa-kollane { color: #856000; }
 .archived-employees { opacity: .85; }

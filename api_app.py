@@ -2767,7 +2767,22 @@ def payroll_tsd_preparations(organisation_id: str, user: User = Depends(current_
 def payroll_tsd_apa_history(organisation_id: str, user: User = Depends(current_user)):
     _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
     from tsd_apa_history import APAHistoryService
-    return APAHistoryService(get_database()).exports(organisation_id)
+    history = APAHistoryService(get_database())
+    rows = history.exports(organisation_id)
+    for row in rows:
+        row['feedback_results'] = history.feedback_results(organisation_id, row['id'])
+    return rows
+
+
+@api.get('/organisations/{organisation_id}/pay-runs/{run_id}/tsd/{preparation_id}/apa-payouts')
+def payroll_tsd_apa_payouts(organisation_id: str, run_id: str, preparation_id: str,
+                            user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    service = TSDExportService()
+    preparation = service.get(organisation_id, preparation_id)
+    if preparation['pay_run_id'] != run_id:
+        raise KeyError('TSD preparation not found')
+    return service.apa_payouts_for_review(organisation_id, preparation_id)
 
 
 @api.post('/organisations/{organisation_id}/payroll/tsd-apa/history/{export_id}/cancellation.xml')

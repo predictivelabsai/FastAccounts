@@ -73,6 +73,12 @@ def test_apa_routes_require_role_and_tenant_and_zip_one_file_per_payout(db, ee_o
     from test_tsd_export import _approved_run
 
     run = _approved_run(db, ee_org)
+    with db.transaction() as tx:
+        frozen_items = tx.rows("SELECT id FROM pay_run_items WHERE organisation_id=? AND pay_run_id=? ORDER BY id",
+                               (ee_org["id"], run["id"]))
+        for item, personal_id in zip(frozen_items, ("49001010012", "38002020021")):
+            tx.execute("UPDATE pay_run_items SET employee_personal_id=? WHERE organisation_id=? AND id=?",
+                       (personal_id, ee_org["id"], item["id"]))
     accounts = db.rows("SELECT id FROM accounts WHERE organisation_id=? AND account_type='Asset' AND active=1 ORDER BY code LIMIT 1", (ee_org["id"],))
     with db.transaction() as tx:
         tx.execute("INSERT INTO bank_accounts(id,organisation_id,ledger_account_id,name,currency,iban_masked,iban,bic) VALUES ('apa-bank',?,?,?,'EUR','********5685','EE382200221020145685','HABAEE2X')",
@@ -90,6 +96,9 @@ def test_apa_routes_require_role_and_tenant_and_zip_one_file_per_payout(db, ee_o
     monkeypatch.setenv("DB_URL", "")
     client = TestClient(api)
     base = f"/organisations/{ee_org['id']}/pay-runs/{run['id']}/tsd/{prep['id']}"
+    review_rows = client.get(base + "/apa-payouts", headers={"X-Test-User": "owner@example.test"})
+    assert review_rows.status_code == 200
+    assert {item["id"] for item in review_rows.json()} == {payout["id"], second_payout["id"]}
     assert client.get(base + f"/payouts/{payout['id']}/apa.xml", headers={"X-Test-User": "outsider@example.test"}).status_code == 403
     xml = client.get(base + f"/payouts/{payout['id']}/apa.xml", headers={"X-Test-User": "owner@example.test"})
     repeated_xml = client.get(base + f"/payouts/{payout['id']}/apa.xml", headers={"X-Test-User": "owner@example.test"})
@@ -107,6 +116,13 @@ def test_apa_routes_require_role_and_tenant_and_zip_one_file_per_payout(db, ee_o
     with ZipFile(io.BytesIO(zipped.content)) as archive:
         assert len(archive.namelist()) == 2
         assert ET.fromstring(archive.read(archive.namelist()[0])).tag.endswith("}xbrl")
+    with db.transaction() as tx:
+        tx.execute("UPDATE pay_run_items SET employee_personal_id='invalid' WHERE organisation_id=? AND pay_run_id=?",
+                   (ee_org["id"], run["id"]))
+    blocked = client.get(base + f"/payouts/{second_payout['id']}/apa.xml",
+                         headers={"X-Test-User": "owner@example.test"})
+    assert blocked.status_code == 409
+    assert blocked.json()["detail"][0]["rule_code"] == "KR_XBRL_VALJAMAKSED_10"
     other = OrganisationService(db).create(name="Other EE", country_code="EE", entity_type="EE_OU", owner_email="other@example.test")
     tenant_url = f"/organisations/{other['id']}/payroll/tsd-apa/2026-10.zip"
     assert client.get(tenant_url, headers={"X-Test-User": "owner@example.test"}).status_code == 403
@@ -122,7 +138,7 @@ def test_apa_export_contains_one_paid_absence_payout(db, ee_org):
     actor = "owner@example.test"
     payroll = PayrollService(db)
     employee = payroll.save_employee(ee_org["id"], actor=actor, name="Absence recipient",
-                                     personal_id="49001010018", gross_salary="2000")
+                                     personal_id="49001010012", gross_salary="2000")
     PaydaySettingsService(db).save(ee_org["id"], start_date="2026-01-01", rule_start_date="2026-01-01",
                                    rule="next_month_day", day=10, actor=actor)
     run = payroll.create_run(ee_org["id"], period="2026-10", actor=actor)

@@ -255,3 +255,20 @@ The local venv has neither `lxml` nor `xmlschema`, so uploads receive a
 structural XML parse rather than XSD validation. The XSD remains vendored at
 `tests/fixtures/emta/APA_TSD_20260330_feedbackReport.xsd`; no dependency was
 installed. All four recorded feedback examples are covered by offline tests.
+
+## APA offline validation and declaration controls (4b steps 5–6)
+
+The declaration preparation view evaluates frozen payout rows against the
+offline rule subset listed in [`payroll_tsd_validation.md`](payroll_tsd_validation.md).
+MUST and PUNANE findings disable an individual XML download and the payment
+month ZIP; the API returns HTTP 409 with rule codes and messages if a blocked
+download is requested directly. SININE and KOLLANE findings remain non-blocking.
+The interface displays Estonian messages in Estonian and English in English,
+Latvian and Lithuanian.
+
+The preparation view shows paid payouts by month, their findings, export
+history and imported feedback results. It provides cancellation downloads and
+feedback report upload through the existing tenant, role and CSRF protected
+routes. It does not submit a declaration to e-MTA. Rules that depend on EMTA
+state outside the frozen payout snapshot remain out of scope; the validation
+log lists those codes and reasons.

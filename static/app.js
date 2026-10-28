@@ -246,7 +246,9 @@
     if (!r.ok) {
       const d = await r.json().catch(() => ({}));
       const e = new Error(
-        Array.isArray(d.detail)
+        Array.isArray(d.detail) && d.detail[0]?.rule_code
+          ? d.detail.map((finding) => `${finding.rule_code}: ${lang === "et" ? finding.message_et : finding.message_en}`).join("; ")
+          : Array.isArray(d.detail)
           ? d.detail
               .map((x) => `${x.loc?.slice(1).join(".")}: ${x.msg}`)
               .join("; ")
@@ -2358,14 +2360,14 @@
             c.url(`/pay-runs/${r.id}/tsd/prepare`),
           );
           await render();
-          tsdPreparationDialog(c, r, preparation);
+          await tsdPreparationDialog(c, r, preparation);
         },
         tsd_review: async (b) => {
           const r = runs.find((x) => String(x.id) === b.dataset.id);
           const preparation = await api(
             c.url(`/pay-runs/${r.id}/tsd/${b.dataset.preparationId}`),
           );
-          tsdPreparationDialog(c, r, preparation);
+          await tsdPreparationDialog(c, r, preparation);
         },
       });
     },
@@ -4786,8 +4788,12 @@
   function componentSummary(item) {
     return (item.components || []).map((line) => `<small class="component-summary">${esc(t(line.name))}: ${esc(money(line.amount, 'EUR'))} · ${tr(line.direction === 'income' ? 'Income' : 'Deduction')}<br>${esc(componentFlags.filter(([key]) => line[key]).map(([, label]) => t(label)).join(', ') || t('No levies'))}</small>`).join('');
   }
-  function tsdPreparationDialog(c, run, preparation) {
+  async function tsdPreparationDialog(c, run, preparation) {
     const payableTotal = preparation.summary_totals.total_payable;
+    const apaPayouts = preparation.status === "Completed"
+      ? await api(c.url(`/pay-runs/${run.id}/tsd/${preparation.id}/apa-payouts`)).catch(() => []) : [];
+    const apaHistory = preparation.status === "Completed"
+      ? await api(c.url("/payroll/tsd-apa/history")).catch(() => []) : [];
     const reviewed = preparation.status === "Completed",
       base = c.url(`/pay-runs/${run.id}/tsd/${preparation.id}`),
       d = dialog(
@@ -4804,7 +4810,14 @@
               cash(record.net_amount, "EUR"),
             ]),
           ),
-        )}<div class="dialog-actions">${
+        )}${reviewed ? `<section class="section"><h3>${tr("Business rules")}</h3>${apaPayouts.length ? table(["Payment month", "Payout", "Findings", "Export XML"], apaPayouts.map((payout) => {
+          const blocking = payout.findings.filter((finding) => finding.blocking), reason = blocking.map((finding) => `${finding.rule_code}: ${lang === "et" ? finding.message_et : finding.message_en}`).join("; ");
+          const findings = payout.findings.length ? `<ul class="apa-findings">${payout.findings.map((finding) => `<li class="apa-finding apa-${esc(finding.category.toLowerCase())}"><small>${tr(finding.blocking ? "Validation errors" : "Warnings")}</small> <strong>${esc(finding.rule_code)}</strong> ${esc(lang === "et" ? finding.message_et : finding.message_en)}</li>`).join("")}</ul>` : `<ul class="apa-findings"><li>${tr("No findings")}</li></ul>`;
+          return row([td(esc(payout.payment_month)), td(esc(payout.payout_date)), td(findings), td(blocking.length ? `<button disabled title="${esc(reason)}">${tr("Export XML")}</button><small>${esc(reason)}</small>` : link("Export XML", `/api${base}/payouts/${encodeURIComponent(payout.id)}/apa.xml`))]);
+        })) : empty("No paid payouts", "")}${[...new Set(apaPayouts.map((payout) => payout.payment_month))].map((month) => {
+          const blocked = apaPayouts.some((payout) => payout.payment_month === month && payout.findings.some((finding) => finding.blocking));
+          return blocked ? `<button disabled title="${tr("Blocked by validation findings")}">${tr("ZIP for month")} ${esc(month)}</button>` : link(`${tr("ZIP for month")} ${month}`, `/api${c.url(`/payroll/tsd-apa/${month}.zip`)}`);
+        }).join(" ")}</section><section class="section"><h3>${tr("Export history")}</h3>${table(["Payment month", "Transaction", "Version", "Status", "Feedback results", "Actions"], apaHistory.map((item) => row([td(esc((item.payout_date || "").slice(0, 7))), td(esc(item.transaction_id)), td(item.version), td(tr(item.status === "Accepted" ? "Accepted" : item.status === "Rejected" ? "Rejected" : item.status === "PartiallyRejected" ? "Partially rejected" : item.status)), td((item.feedback_results || []).map((result) => `${esc(result.rule_code || result.file_result || "")}: ${esc(result.message_text || "")}`).filter(Boolean).join("; ") || tr("No feedback results")), td(item.status === "Cancelled" ? "" : button("Export cancellation", "apa_cancel", false, `data-id="${esc(item.id)}"`))])))}</section><form data-apa-feedback><h3>${tr("Upload feedback report")}</h3><label>${tr("Transaction ID")}<input name="transaction_id" required></label><label>${tr("Feedback XML")}<input name="file" type="file" accept=".xml,application/xml,text/xml" required></label><button type="submit">${tr("Upload feedback report")}</button></form>` : ""}<div class="dialog-actions">${
           reviewed
             ? link("TSD XBRL GL XML", `/api${base}/export.xbrl.xml`) +
               link("TSD CSV (through 2027)", `/api${base}/export.csv`) +
@@ -4814,6 +4827,14 @@
         }</div>`,
       );
     bindActions(d, {
+      apa_cancel: async (buttonEl) => {
+        try {
+          const response = await api(c.url(`/payroll/tsd-apa/history/${encodeURIComponent(buttonEl.dataset.id)}/cancellation.xml`), {method: "POST"});
+          const objectUrl = URL.createObjectURL(await response.blob()), anchor = document.createElement("a");
+          anchor.href = objectUrl; anchor.download = `tsd-cancel-${buttonEl.dataset.id}.xml`; anchor.click(); URL.revokeObjectURL(objectUrl);
+          toast(t("Cancellation file downloaded"));
+        } catch (error) { toast(error.message, "error"); }
+      },
       tsd_confirm_review: () =>
         confirmAction(
           "Mark TSD reviewed",
@@ -4827,6 +4848,14 @@
             await render();
           },
         ),
+    });
+    d.querySelector("[data-apa-feedback]")?.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const form = event.currentTarget, payload = new FormData();
+      payload.append("transaction_id", form.elements.transaction_id.value);
+      payload.append("file", form.elements.file.files[0]);
+      try { const result = await api(c.url("/payroll/tsd-apa/feedback"), {method: "POST", body: payload}); toast(`${tr("Feedback status")}: ${tr(result.status)}`); }
+      catch (error) { toast(error.message, "error"); }
     });
     const recordsHost = d.querySelector('[data-tsd-records]'), monthInput = d.querySelector('[data-tsd-month]');
     const drawRecords = (mode = 'list') => {

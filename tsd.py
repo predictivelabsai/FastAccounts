@@ -514,8 +514,6 @@ class TSDExportService:
                             scaled[field] = money(money(row[field]) * ratio)
                         records.append(scaled)
                 if records:
-                    from tsd_apa_rules import require_exportable
-                    require_exportable(payout, records)
                     result.append((payout, generate_apa_xml(organisation, payout, records), records))
             absence_batches = tx.rows("SELECT * FROM payroll_absence_payout_batches WHERE organisation_id=? "
                                       "AND status='Paid' AND substr(payout_date,1,7)=substr((SELECT settlement_date FROM pay_runs "
@@ -524,12 +522,20 @@ class TSDExportService:
             for payout in absence_batches:
                 records = [dict(row) for row in workpaper["records"] if row["pay_run_id"] == payout["id"]]
                 if records:
-                    from tsd_apa_rules import require_exportable
-                    require_exportable(payout, records)
+                    for record in records:
+                        record["payment_date"] = payout["payout_date"]
+                        record["payment_month"] = payout["payout_date"][:7]
                     result.append((payout, generate_apa_xml(organisation, payout, records), records))
         if not result:
             raise ValueError("No paid payout transactions are available for APA export")
         return result
+
+    def apa_payouts_for_review(self, organisation_id: str, preparation_id: str) -> list[dict]:
+        from tsd_apa_rules import validate_payout
+        return [{"id": payout["id"], "payout_date": payout["payout_date"],
+                 "payment_month": payout["payout_date"][:7],
+                 "findings": validate_payout(payout, records)}
+                for payout, _payload, records in self._apa_payouts(organisation_id, preparation_id)]
 
     def _audit_apa_exports(self, organisation_id: str, exports: list[tuple[dict, bytes]], *, actor: str) -> None:
         with self.db.transaction() as tx:
@@ -540,9 +546,11 @@ class TSDExportService:
     def export_apa_payout(self, organisation_id: str, preparation_id: str, payout_id: str, *, actor: str) -> bytes:
         exports = self._apa_payouts(organisation_id, preparation_id)
         from tsd_apa_history import APAHistoryService
+        from tsd_apa_rules import require_exportable
         history = APAHistoryService(self.db)
         for payout, payload, records in exports:
             if payout["id"] == payout_id:
+                require_exportable(payout, records)
                 self._audit_apa_exports(organisation_id, [(payout, payload)], actor=actor)
                 return history.export_version(organisation_id, payout, records, actor=actor)[1]
         raise KeyError("Paid payout not found in this reviewed TSD preparation")
@@ -577,6 +585,11 @@ class TSDExportService:
                     exports_by_id[payout["id"]] = (payout, payload, records)
         if not exports_by_id:
             raise ValueError("No paid payout transactions are available for APA export in this month")
+        from tsd_apa_rules import APAValidationError, validate_payout
+        findings = [finding for payout, _payload, records in exports_by_id.values()
+                    for finding in validate_payout(payout, records) if finding["blocking"]]
+        if findings:
+            raise APAValidationError(findings)
         output = BytesIO()
         with ZipFile(output, "w", ZIP_DEFLATED) as archive:
             from tsd_apa_history import APAHistoryService

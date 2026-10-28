@@ -62,6 +62,26 @@ def test_tsd_workpaper_labels_exist_in_all_locales():
     assert estonian['Group by recipient'] == 'Koonda saaja järgi'
 
 
+def test_apa_declaration_labels_exist_in_all_locales():
+    labels = ('Business rules', 'Validation errors', 'Warnings', 'Export XML',
+              'ZIP for month', 'Export cancellation', 'Upload feedback report',
+              'Export history', 'Accepted', 'Rejected', 'Partially rejected')
+    for language in ('en', 'et', 'lv', 'lt'):
+        workspace = i18n.catalog(language)['workspace']
+        assert all(workspace.get(label, '').strip() for label in labels)
+    estonian = i18n.catalog('et')['workspace']
+    assert estonian['Business rules'] == 'Ärireeglid'
+    assert estonian['Validation errors'] == 'Veateated'
+    assert estonian['Warnings'] == 'Hoiatused'
+    assert estonian['Export XML'] == 'Ekspordi XML'
+    assert estonian['Export cancellation'] == 'Tühistamise fail'
+    assert estonian['Upload feedback report'] == 'Laadi tagasisideraport'
+    assert estonian['Export history'] == 'Ekspordiajalugu'
+    assert estonian['Accepted'] == 'Vastu võetud'
+    assert estonian['Rejected'] == 'Tagasi lükatud'
+    assert estonian['Partially rejected'] == 'Osaliselt tagasi lükatud'
+
+
 def test_workspace_literal_labels_and_table_headers_are_translated():
     source = (Path(__file__).resolve().parents[1] / "static/app.js").read_text(encoding="utf-8")
     literal = r'''(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')'''
