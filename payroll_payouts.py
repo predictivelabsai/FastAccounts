@@ -308,22 +308,27 @@ class PayoutService:
         if not lines:
             raise ValueError('Withholding payout has no payment lines')
         total = sum((money(line['amount']) for line in lines), Decimal('0.00'))
-        by_role = {}
-        for row in tx.rows('SELECT component_type,amount FROM payroll_withholding_run_lines WHERE organisation_id=? AND pay_run_id=?',
+        by_recipient = {}
+        for row in tx.rows('SELECT recipient_id,component_type,amount FROM payroll_withholding_run_lines WHERE organisation_id=? AND pay_run_id=?',
                            (organisation_id, batch['pay_run_id'])):
             role = 'PAYROLL_BAILIFF' if row['component_type'] in ('alimony', 'bailiff') else 'PAYROLL_DEDUCTION'
-            by_role[role] = money(by_role.get(role, Decimal('0.00')) + decimal(row['amount']))
-        # A payout can be partial, so allocate each role in proportion to its remaining liability.
-        liability_total = sum(by_role.values(), Decimal('0.00'))
-        remaining = total
+            recipient_roles = by_recipient.setdefault(row['recipient_id'], {})
+            recipient_roles[role] = money(recipient_roles.get(role, Decimal('0.00')) + decimal(row['amount']))
+        allocated = {}
+        for payout_line in lines:
+            recipient_roles = by_recipient.get(payout_line['recipient_id'], {})
+            role_items = [(role, amount) for role, amount in recipient_roles.items() if amount]
+            role_total = sum((amount for _, amount in role_items), Decimal('0.00'))
+            remaining = money(payout_line['amount'])
+            for index, (role, amount) in enumerate(role_items):
+                debit = remaining if index == len(role_items) - 1 else min(remaining, money(payout_line['amount'] * amount / role_total))
+                allocated[role] = money(allocated.get(role, Decimal('0.00')) + debit)
+                remaining = money(remaining - debit)
         posting_lines = []
-        roles = [role for role in ('PAYROLL_BAILIFF', 'PAYROLL_DEDUCTION') if by_role.get(role)]
-        for index, role in enumerate(roles):
-            liability = by_role.get(role, Decimal('0.00'))
-            if not liability:
+        for role in ('PAYROLL_BAILIFF', 'PAYROLL_DEDUCTION'):
+            debit = allocated.get(role, Decimal('0.00'))
+            if not debit:
                 continue
-            debit = remaining if index == len(roles) - 1 else min(remaining, money(total * liability / liability_total))
-            debit = min(debit, remaining)
             account_id = frozen.get(role)
             if not account_id:
                 from payroll import PayrollService
@@ -333,7 +338,6 @@ class PayoutService:
                 raise ValueError(f'The {role} account is missing')
             posting_lines.append(PostingLine(account_id, debit=debit, memo='Payroll withholding payout ' + batch['payout_date'],
                 source_line_type='payroll_payout', source_line_id=batch['id']))
-            remaining = money(remaining - debit)
         posting_lines.append(PostingLine(bank['ledger_account_id'], credit=total, memo='Payroll withholding payout ' + batch['payout_date'],
             source_line_type='payroll_payout', source_line_id=batch['id']))
         posting = LedgerService(self.db).post(organisation_id=organisation_id, voucher_type='payroll_withholding_payout',

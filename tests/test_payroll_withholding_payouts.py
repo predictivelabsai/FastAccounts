@@ -70,6 +70,31 @@ def test_withholding_payout_posts_liability_and_reverses_on_cancel(db, ee_org):
     assert cancelled['reversal_batch_id']
 
 
+def test_partial_recipient_payout_debits_its_own_liability_role(db, ee_org):
+    payroll = PayrollService(db)
+    service = PayrollWithholdingService(db)
+    bailiff = service.save_recipient(ee_org['id'], actor=ACTOR, name='Bailiff recipient',
+        registry_code='bailiff-001', iban=IBAN)
+    deduction = service.save_recipient(ee_org['id'], actor=ACTOR, name='Union recipient',
+        registry_code='union-001', iban=IBAN)
+    for recipient, kind, name in [(bailiff, 'bailiff', 'Bailiff employee'),
+                                  (deduction, 'union_fee', 'Union employee')]:
+        employee = payroll.save_employee(ee_org['id'], actor=ACTOR, name=name, gross_salary='2000')
+        service.save_agreement(ee_org['id'], actor=ACTOR, employee_id=employee['id'], recipient_id=recipient['id'],
+            component_type=kind, method='fixed_sum', start_date='2026-01-01', monthly_amount='30')
+    run = payroll.create_run(ee_org['id'], period='2026-10', actor=ACTOR)
+    payroll.approve(ee_org['id'], run['id'], actor=ACTOR)
+    bank_id = bank_account(db, ee_org['id'])
+    service_payout = PayoutService(db)
+    batch = service_payout.create(ee_org['id'], run['id'], actor=ACTOR, payout_type='withholding',
+        amounts={bailiff['id']: '10'})
+    paid = service_payout.mark_paid(ee_org['id'], batch['id'], bank_id, actor=ACTOR)
+    rows = db.rows('SELECT a.system_role,g.debit FROM gl_entries g JOIN accounts a ON a.organisation_id=g.organisation_id AND a.id=g.account_id WHERE g.organisation_id=? AND g.posting_batch_id=?',
+                   (ee_org['id'], paid['posted_batch_id']))
+    debits = {row['system_role']: Decimal(str(row['debit'])) for row in rows if Decimal(str(row['debit']))}
+    assert debits == {'PAYROLL_BAILIFF': Decimal('10.00')}
+
+
 def test_withholding_pain001_uses_recipient_iban_and_references(db, ee_org):
     run, _ = approved_run(db, ee_org)
     bank_id = bank_account(db, ee_org['id'])
