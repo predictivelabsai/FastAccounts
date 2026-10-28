@@ -2223,7 +2223,8 @@
     "Delete absence": "Dzēst prombūtni",
     "Delete this absence?": "Dzēst šo prombūtni?",
     "Absence pay settings": "Prombūtnes apmaksas iestatījumi",
-    "Continue salary during permitted absence": "Saglabāt algu atļautas prombūtnes laikā"
+    "Continue salary during permitted absence": "Saglabāt algu atļautas prombūtnes laikā",
+    "Worked days / norm days": "Nostrādātās dienas / norma dienas"
   },
   "views": {
     "overview": "Overview",

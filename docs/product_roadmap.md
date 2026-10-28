@@ -12,8 +12,10 @@
   and working-day counts, annual-leave holiday exclusions, overlap refusal,
   collective leave, audit events, role/CSRF protected APIs and the translated
   payroll workspace dialog. Unit tests and four-language browser flow pass.
-  Salary proration, average pay, leave pay, historical import and liability work
-  remains in progress.
+  Unit 3 adds frozen worked/norm day counts, monthly salary and minimum-wage
+  proration by interrupted working days, with hourly payroll unchanged and the
+  ratio shown on the run and payslip. Average pay, leave pay, historical import
+  and liability work remains in progress.
 
 ## 2026-10-28: Payroll calendar and payouts
 

@@ -2223,7 +2223,8 @@
     "Delete absence": "Ištrinti neatvykimą",
     "Delete this absence?": "Ištrinti šį neatvykimą?",
     "Absence pay settings": "Neatvykimo apmokėjimo nustatymai",
-    "Continue salary during permitted absence": "Mokėti atlyginimą leidžiamo neatvykimo metu"
+    "Continue salary during permitted absence": "Mokėti atlyginimą leidžiamo neatvykimo metu",
+    "Worked days / norm days": "Dirbtos dienos / norminės dienos"
   },
   "views": {
     "overview": "Overview",

@@ -21,6 +21,11 @@ delivered.
   absence snapshots are reserved for the payroll calculation unit.
 - Validation is recorded in `payroll_absences_validation.md`; accountant UAT and
   PostgreSQL execution remain outstanding.
+- Added migration 0044 for frozen run-level worked, norm and interrupted absence
+  days. Monthly salary and its minimum threshold prorate by worked/norm days;
+  hourly pay remains based on entered hours. The run breakdown and payslip show
+  worked/norm days. See the validation record for test commands and the
+  employee-specific work-schedule assumption.
 
 ## 2026-10-28: Payroll calendar and payouts
 

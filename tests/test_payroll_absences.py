@@ -78,3 +78,67 @@ def test_absence_type_salary_setting_is_audited(db, ee_org):
     updated = service.set_type_paid(ee_org['id'], 'permitted_absence', True, actor=ACTOR)
     assert updated['paid_salary'] is True
     assert db.scalar("SELECT COUNT(*) FROM audit_events WHERE organisation_id=? AND action='payroll.absence_type.updated'", (ee_org['id'],)) == 1
+
+
+def test_monthly_salary_is_prorated_by_frozen_absence_workdays(db, ee_org):
+    from decimal import Decimal
+    from payroll import PayrollService
+    service = PayrollService(db)
+    employee = service.save_employee(ee_org['id'], actor=ACTOR, name='Prorated employee',
+                                     gross_salary='2200', apply_tax_free_minimum=False)
+    absence = PayrollAbsenceService(db).save(ee_org['id'], employee['id'], actor=ACTOR,
+                                             absence_type='sick_leave', start_date='2026-10-05',
+                                             end_date='2026-10-05')
+    item = service.create_run(ee_org['id'], period='2026-10', actor=ACTOR)['items'][0]
+    assert item['worked_days'] == 21 and item['norm_days'] == 22
+    assert item['absence_working_days'] == absence['working_days'] == 1
+    assert item['gross_salary'] == item['gross'] == '2100.00'
+    assert Decimal(item['minimum_wage']) == Decimal('903.00')
+    assert db.scalar('SELECT COUNT(*) FROM payroll_absence_run_items WHERE organisation_id=? AND absence_id=?',
+                     (ee_org['id'], absence['id'])) == 1
+
+
+def test_hourly_pay_is_not_reduced_for_absences_and_approved_freeze_protects_record(db, ee_org):
+    from payroll import PayrollConflict, PayrollService
+    service = PayrollService(db)
+    employee = service.save_employee(ee_org['id'], actor=ACTOR, name='Hourly absence employee',
+                                     pay_basis='hourly', hourly_rate='8.00', apply_tax_free_minimum=False)
+    absence_service = PayrollAbsenceService(db)
+    absence = absence_service.save(ee_org['id'], employee['id'], actor=ACTOR, absence_type='sick_leave',
+                                   start_date='2026-10-05', end_date='2026-10-05')
+    run = service.create_run(ee_org['id'], period='2026-10', actor=ACTOR, hours={employee['id']: '176'})
+    item = run['items'][0]
+    assert item['gross'] == '1408.00' and item['hours'] == '176.00'
+    assert item['worked_days'] is None and item['norm_days'] is None
+    service.approve(ee_org['id'], run['id'], actor=ACTOR)
+    with pytest.raises(AbsenceConflict, match='approved'):
+        absence_service.delete(ee_org['id'], absence['id'], actor=ACTOR)
+    with pytest.raises(PayrollConflict):
+        service.delete_run(ee_org['id'], run['id'], actor=ACTOR)
+
+
+def test_part_time_monthly_minimum_and_absence_proration_use_fte(db, ee_org):
+    from decimal import Decimal
+    from payroll import PayrollService
+    service = PayrollService(db)
+    employee = service.save_employee(ee_org['id'], actor=ACTOR, name='Part-time absence employee',
+                                     gross_salary='1500', fte='0.5', apply_tax_free_minimum=False)
+    PayrollAbsenceService(db).save(ee_org['id'], employee['id'], actor=ACTOR, absence_type='annual_leave',
+                                   start_date='2026-10-05', end_date='2026-10-05')
+    item = service.create_run(ee_org['id'], period='2026-10', actor=ACTOR)['items'][0]
+    assert item['gross'] == '1431.82' and item['minimum_wage'] == '451.50'
+    assert item['fte'] == '0.5' and Decimal(item['worked_days']) == Decimal('21')
+
+
+def test_paid_permitted_absence_does_not_reduce_monthly_salary(db, ee_org):
+    from payroll import PayrollService
+    service = PayrollService(db)
+    employee = service.save_employee(ee_org['id'], actor=ACTOR, name='Paid permitted absence',
+                                     gross_salary='2200', apply_tax_free_minimum=False)
+    absences = PayrollAbsenceService(db)
+    absences.save(ee_org['id'], employee['id'], actor=ACTOR, absence_type='permitted_absence',
+                  start_date='2026-10-05', end_date='2026-10-05')
+    absences.set_type_paid(ee_org['id'], 'permitted_absence', True, actor=ACTOR)
+    item = service.create_run(ee_org['id'], period='2026-10', actor=ACTOR)['items'][0]
+    assert item['gross'] == '2200.00' and item['worked_days'] == item['norm_days'] == 22
+    assert item['absence_working_days'] == 0

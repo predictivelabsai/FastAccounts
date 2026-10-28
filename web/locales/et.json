@@ -2223,7 +2223,8 @@
     "Delete absence": "Kustuta puudumine",
     "Delete this absence?": "Kas kustutada see puudumine?",
     "Absence pay settings": "Puudumise tasustamise seaded",
-    "Continue salary during permitted absence": "Säilita puudumise ajal töötasu"
+    "Continue salary during permitted absence": "Säilita puudumise ajal töötasu",
+    "Worked days / norm days": "Töötatud päevad / normpäevad"
   },
   "views": {
     "overview": "Ülevaade",

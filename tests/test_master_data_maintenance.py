@@ -38,7 +38,7 @@ def test_migration_count_rerun_and_ci(sending):
             tx.execute("DELETE FROM schema_migrations WHERE version='0030_master_data_maintenance'")
         assert d["db"].migrate() == ["0030_master_data_maintenance"]
     assert d["db"].rows("SELECT name FROM pragma_table_info('contacts') WHERE name='active'")
-    assert "'0029_copilot', '0030_master_data_maintenance', '0031_master_data_groups', '0032_copilot_access', '0033_copilot_settings', '0034_payroll_demo_fixes', '0035_payroll_income_line', '0036_payroll_component_catalogue', '0037_employee_tax_settings', '0038_payroll_payday_rules', '0039_payroll_payouts', '0040_payroll_settlement_dates', '0041_payroll_sepa_details', '0042_payroll_component_metadata', '0043_payroll_absences']" in (ROOT / ".github/workflows/ci.yml").read_text()
+    assert "'0029_copilot', '0030_master_data_maintenance', '0031_master_data_groups', '0032_copilot_access', '0033_copilot_settings', '0034_payroll_demo_fixes', '0035_payroll_income_line', '0036_payroll_component_catalogue', '0037_employee_tax_settings', '0038_payroll_payday_rules', '0039_payroll_payouts', '0040_payroll_settlement_dates', '0041_payroll_sepa_details', '0042_payroll_component_metadata', '0043_payroll_absences', '0044_payroll_absence_day_freeze']" in (ROOT / ".github/workflows/ci.yml").read_text()
 
 
 def test_analysis_finds_all_four_categories(sending):

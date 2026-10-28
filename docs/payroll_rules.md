@@ -517,6 +517,16 @@ absence records. The `permitted_absence` type has an organisation setting for
 whether salary continues; it defaults to unpaid. Collective annual leave creates
 one separately auditable absence per selected employee.
 
+For monthly employees, the run freezes standard calendar norm days, interrupted
+absence working days and resulting worked days. The frozen base salary and
+monthly minimum threshold are each multiplied by `worked_days / norm_days`.
+The agreed monthly salary already reflects the employee's FTE; the calendar day
+ratio therefore applies equally at every FTE. This demo has no employee-specific
+weekday schedule, so norm days use the Estonian Monday-to-Friday calendar at the
+configured FTE pay. Hourly employees retain the entered hours and hourly amount
+unchanged by absences. Run items and payslips display worked days against norm
+days.
+
 ### Payroll absence calculation parameters
 
 The absence and average-pay service uses the dated statutory rules and the

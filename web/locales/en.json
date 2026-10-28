@@ -2223,7 +2223,8 @@
     "Delete absence": "Delete absence",
     "Delete this absence?": "Delete this absence?",
     "Absence pay settings": "Absence pay settings",
-    "Continue salary during permitted absence": "Continue salary during permitted absence"
+    "Continue salary during permitted absence": "Continue salary during permitted absence",
+    "Worked days / norm days": "Worked days / norm days"
   },
   "views": {
     "overview": "Overview",

@@ -38,6 +38,7 @@ from payroll_tax_settings import EmployeeTaxSettingsService, resolve as resolve_
 from payroll_tax_repository import monthly_exemption_used
 from payroll_payday import payday_for_period
 from employee_details import validate_details, birth_date_from_personal_code
+from payroll_absences import PayrollAbsenceService
 
 
 class PayrollConflict(ValueError):
@@ -132,7 +133,8 @@ def _fte(value) -> Decimal:
 
 
 def calculate_pay(employee: dict, *, period: str | None = None, hours=None, components=(),
-                  settlement_on: date | None = None, exemption_remaining: Decimal | None = None) -> dict:
+                  settlement_on: date | None = None, exemption_remaining: Decimal | None = None,
+                  allow_zero_monthly=False) -> dict:
     """Calculate one employee's month. Hourly gross = hourly rate x hours entered on the run."""
     rules = rules_for(settlement_on or settlement_date(period or '2026-01'))
     basis = pay_basis(employee)
@@ -157,7 +159,7 @@ def calculate_pay(employee: dict, *, period: str | None = None, hours=None, comp
         for key in FLAGS:
             if component[key]:
                 bases[key] += amount
-    if gross < 0 or (gross == 0 and basis != 'income_line') or any(value < 0 for value in bases.values()):
+    if gross < 0 or (gross == 0 and basis != 'income_line' and not allow_zero_monthly) or any(value < 0 for value in bases.values()):
         raise ValueError('Payment components must leave positive gross and non-negative tax bases')
     pension = money(bases['funded_pension'] * decimal(employee['funded_pension_percent']) / 100)
     ui = money(bases['ui_employee'] * rules.ui_employee_rate) if employee.get('unemployment_applies', True) is not False and employee.get('unemployment_applies') != 0 else money(0)
@@ -557,7 +559,8 @@ class PayrollService:
             context.get('tax_free_mode') or ('maximum' if context.get('apply_tax_free_minimum') else 'none'),
             context.get('tax_free_amount'), rules_for(pay_date).basic_exemption, used_exemption)
         amounts = calculate_pay(item | context, period=run['period'], hours=worked, components=lines,
-                                settlement_on=pay_date, exemption_remaining=exemption_cap)
+                                settlement_on=pay_date, exemption_remaining=exemption_cap,
+                                allow_zero_monthly=item['pay_basis'] == 'monthly' and item.get('worked_days') == 0)
         if amounts['gross'] > Decimal('9999999999.99') or any(amounts[key] > Decimal('9999999999.99') for key in AMOUNTS if key != 'employer_cost'):
             raise ValueError('Payment totals exceed the supported amount')
         monthly_minimum, hourly_minimum = minimum_wage(run['period'])
@@ -648,28 +651,41 @@ class PayrollService:
         totals = dict(gross=Decimal(0), net=Decimal(0), employer_cost=Decimal(0))
         columns = ('id', 'pay_run_id', 'organisation_id', 'employee_id', 'employee_name', 'employee_personal_id', 'gross_salary',
                    'board_member', 'funded_pension_percent', 'pay_basis', 'fte', 'hourly_rate', 'hours',
-                   'minimum_wage', 'social_tax_minimum_exemption', *AMOUNTS)
+                   'minimum_wage', 'social_tax_minimum_exemption', *AMOUNTS,
+                   'worked_days', 'norm_days', 'absence_working_days')
         for employee in employees:
             election = resolve_tax_settings(tx, organisation_id, employee, pay_date)
             employee = employee | election
             basis, fte, worked, required = pay_basis(employee), _fte(employee.get('fte')), None, None
             if basis == 'monthly':
                 # Part-time: the monthly minimum wage is pro-rated by the work-time fraction.
-                required = money(monthly_minimum * fte)
-                if money(employee['gross_salary']) < required:
+                agreement_minimum = money(monthly_minimum * fte)
+                if money(employee['gross_salary']) < agreement_minimum:
                     suffix = f" (EUR {monthly_minimum:.2f} × {_fraction(fte)})" if fte != 1 else ''
-                    raise ValueError(f"{employee['name']}: gross salary must be at least EUR {required:.2f}{suffix}")
+                    raise ValueError(f"{employee['name']}: gross salary must be at least EUR {agreement_minimum:.2f}{suffix}")
             elif basis == 'hourly':
                 required = hourly_minimum
                 if decimal(employee['hourly_rate']) < hourly_minimum:
                     raise ValueError(f"{employee['name']}: hourly rate must be at least EUR {hourly_minimum:.2f}")
                 worked = self._hours(employee, hours)
+            absence_snapshot = PayrollAbsenceService(self.db).freeze_for_run(
+                tx, organisation_id, employee['id'], run_id, period)
+            worked_days = norm_days_snapshot = None
+            if basis == 'monthly':
+                norm_days_snapshot = absence_snapshot['norm_days']
+                worked_days = absence_snapshot['worked_days']
+                employee = employee | {'gross_salary': db_number(money(
+                    decimal(employee['gross_salary']) * Decimal(worked_days) / Decimal(norm_days_snapshot)
+                    if norm_days_snapshot else Decimal(0)))}
+                required = money(agreement_minimum * Decimal(worked_days) / Decimal(norm_days_snapshot)
+                                 if norm_days_snapshot else Decimal(0))
             used_exemption = monthly_exemption_used(tx, organisation_id, employee['id'], pay_date.strftime('%Y-%m'))
             exemption_cap = remaining_monthly_exemption(
                 election['tax_free_mode'], election.get('tax_free_amount'),
                 rules_for(pay_date).basic_exemption, used_exemption)
             amounts = calculate_pay(employee, period=period, hours=worked, settlement_on=pay_date,
-                                    exemption_remaining=exemption_cap)
+                                    exemption_remaining=exemption_cap,
+                                    allow_zero_monthly=basis == 'monthly' and worked_days == 0)
             item_id = new_id()
             values = (item_id, run_id, organisation_id, employee['id'], employee['name'], employee.get('personal_id'),
                       db_number(amounts['gross'] if basis in ('hourly', 'income_line') else money(employee['gross_salary'])),
@@ -678,7 +694,8 @@ class PayrollService:
                       None if worked is None else db_number(worked), None if required is None else db_number(money(required)),
                       amounts['social_tax_minimum_exemption'])
             tx.execute('INSERT INTO pay_run_items('+','.join(columns)+') VALUES ('+','.join('?' for _ in columns)+')',
-                       values+tuple(db_number(amounts[k]) for k in AMOUNTS))
+                       values+tuple(db_number(amounts[k]) for k in AMOUNTS)+
+                       (worked_days, norm_days_snapshot, absence_snapshot['absence_working_days']))
             context_fields = ('tax_free_mode', 'tax_free_amount', 'unemployment_applies',
                               'tax_free_setting_id', 'pension_setting_id', 'unemployment_setting_id')
             tx.execute('INSERT INTO pay_item_context(organisation_id,item_id,apply_tax_free_minimum,employment_start_date,employment_end_date,' + ','.join(context_fields) + ') VALUES (?,?,?,?,?,?,?,?,?,?,?)',
@@ -703,7 +720,8 @@ class PayrollService:
             run = self._run(tx, organisation_id, run_id)
             if claimed.rowcount != 1:
                 raise PayrollConflict('Pay run is already approved')
-            if any(money(item['gross']) <= 0 for item in run['items']):
+            if any(money(item['gross']) <= 0 and not (item['pay_basis'] == 'monthly' and item.get('worked_days') == 0)
+                   for item in run['items']):
                 raise ValueError('Every employee requires positive gross pay before approval')
             totals = {k: sum((decimal(i[k]) for i in run['items']), Decimal(0)) for k in AMOUNTS}
             memo = f"Payroll {run['period']}"
@@ -805,6 +823,7 @@ class PayrollService:
             self._run(tx, organisation_id, run_id)
             if claimed.rowcount != 1:
                 raise PayrollConflict('Only draft pay runs can be deleted')
+            tx.execute('DELETE FROM payroll_absence_run_items WHERE organisation_id=? AND pay_run_id=?', (organisation_id, run_id))
             for table in ('pay_item_components', 'pay_item_context'):
                 tx.execute(f'DELETE FROM {table} WHERE organisation_id=? AND item_id IN (SELECT id FROM pay_run_items WHERE organisation_id=? AND pay_run_id=?)', (organisation_id, organisation_id, run_id))
             tx.execute('DELETE FROM pay_run_items WHERE organisation_id=? AND pay_run_id=?', (organisation_id, run_id))

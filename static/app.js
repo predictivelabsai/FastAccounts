@@ -100,7 +100,9 @@
     hoursNote = (x) =>
       x.pay_basis === "hourly" && x.hours != null
         ? `<small>${esc(money(x.hourly_rate, "EUR"))} × ${esc(num(x.hours))} ${tr("Hours").toLowerCase()}</small>`
-        : "";
+        : x.pay_basis === "monthly" && x.worked_days != null
+          ? `<small>${tr("Worked days / norm days")}: ${num(x.worked_days)} / ${num(x.norm_days)}</small>`
+          : "";
   const payrollSupported = (organisation) =>
     organisation?.country_code === "EE" && organisation?.base_currency === "EUR";
   const today = () => {

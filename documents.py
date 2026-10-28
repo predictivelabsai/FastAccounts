@@ -1064,6 +1064,8 @@ def payroll_pdf(organisation: dict, run: dict) -> bytes:
                    label('Juhatuse liige', 'Board member') if item['board_member'] else label('Töötaja', 'Employee')]
         if item.get('pay_basis') == 'hourly' and item.get('hours') is not None:
             details.append(f"{catalogue('Hourly rate')}: {item['hourly_rate']} EUR × {item['hours']} {catalogue('Hours').lower()}")
+        if item.get('pay_basis') == 'monthly' and item.get('worked_days') is not None:
+            details.append(f"{catalogue('Worked days / norm days')}: {item['worked_days']} / {item['norm_days']}")
         if item.get('fte') not in (None, '1'):
             details.append(f"{catalogue('Work-time fraction (FTE)')}: {item['fte']}")
         reason = item.get('social_tax_minimum_exemption')

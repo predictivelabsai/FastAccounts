@@ -56,3 +56,34 @@ node --check static\app.js
 
 The application uses portable SQLite/PostgreSQL DDL; no PostgreSQL server was
 available for an execution check. No live network calls were made.
+
+## Unit 3: Day-based monthly salary
+
+Migration 0044 adds frozen `worked_days`, `norm_days` and
+`absence_working_days` to run items and snapshots the salary-interruption
+decision on each run/absence relation. Monthly salary base pay and its run-level
+minimum wage threshold use the same worked/norm ratio. Every absence type
+interrupts salary except `permitted_absence` when its organisation setting says
+salary continues. Hourly gross remains rate multiplied by entered hours. The
+run breakdown and PDF payslip show the monthly worked/norm ratio.
+
+Targeted command and result:
+
+```powershell
+.tmp\venv312\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache312 --basetemp=.tmp\test-absence-unit3-final tests\test_payroll_absences.py tests\test_payroll_part_time_hourly.py
+# 39 passed
+.tmp\venv312\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache312 --basetemp=.tmp\test-payroll-day-pdf tests\test_payroll.py::test_workflow_snapshot_balance_pdf_and_delete tests\test_payroll_absences.py::test_monthly_salary_is_prorated_by_frozen_absence_workdays tests\test_payroll_absences.py::test_hourly_pay_is_not_reduced_for_absences_and_approved_freeze_protects_record
+# 3 passed
+.tmp\venv312\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache312 --basetemp=.tmp\test-parttime-absence tests\test_payroll_absences.py::test_monthly_salary_is_prorated_by_frozen_absence_workdays tests\test_payroll_absences.py::test_part_time_monthly_minimum_and_absence_proration_use_fte tests\test_payroll_absences.py::test_hourly_pay_is_not_reduced_for_absences_and_approved_freeze_protects_record
+# 3 passed
+.tmp\venv312\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache312 --basetemp=.tmp\test-paid-permitted tests\test_payroll_absences.py::test_paid_permitted_absence_does_not_reduce_monthly_salary
+# 1 passed
+.tmp\venv312\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache312 --basetemp=.tmp\test-meta-unit3 tests\test_migrations_and_tenancy.py::test_empty_migration_is_idempotent tests\test_migrations_and_tenancy.py::test_component_catalogue_upgrade_preserves_defaults_and_posted_payroll
+# 2 passed
+```
+
+The fixture covers the 21/22 October example (EUR 2,200 becomes EUR 2,100),
+minimum-wage ratio, hourly pay unchanged, and approved-run absence protection.
+Employee-specific weekly schedules are not represented by this demo; an
+accountant must confirm that the standard calendar/FTE assumption is suitable
+for the bureau's part-time cases.

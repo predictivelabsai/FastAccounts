@@ -2,7 +2,7 @@
 from datetime import date, timedelta
 
 from core_utils import audit, new_id, utc_now
-from payroll_calendar import is_working_day, public_holidays
+from payroll_calendar import is_working_day, public_holidays, working_days as norm_working_days
 
 ABSENCE_TYPES = (
     'annual_leave', 'extended_leave', 'child_leave', 'paternity_leave',
@@ -43,7 +43,7 @@ class PayrollAbsenceService:
             return rows
 
     def set_type_paid(self, organisation_id, kind, paid, *, actor):
-        if kind not in ABSENCE_TYPES or not isinstance(paid, bool):
+        if kind != 'permitted_absence' or not isinstance(paid, bool):
             raise ValueError('Choose a valid absence type and paid setting')
         with self.db.transaction() as tx:
             if not tx.one('SELECT id FROM organisations WHERE id=?', (organisation_id,)):
@@ -52,6 +52,32 @@ class PayrollAbsenceService:
                        (organisation_id, kind, int(paid)))
             audit(tx, organisation_id, actor, 'payroll.absence_type.updated', 'payroll_absence_type', kind, {'paid_salary': paid})
             return {'absence_type': kind, 'paid_salary': paid}
+
+    def freeze_for_run(self, tx, organisation_id, employee_id, run_id, period):
+        """Snapshot absences intersecting the run month and return day totals."""
+        year, month = (int(part) for part in period.split('-'))
+        first, last = date(year, month, 1), date(year + (month == 12), month % 12 + 1, 1) - timedelta(days=1)
+        rows = tx.rows('SELECT a.* FROM payroll_absences a WHERE a.organisation_id=? AND a.employee_id=? AND a.start_date<=? AND a.end_date>=? ORDER BY a.start_date,a.id',
+                       (organisation_id, employee_id, last.isoformat(), first.isoformat()))
+        settings = {row['absence_type']: bool(row['paid_salary']) for row in tx.rows(
+            'SELECT absence_type,paid_salary FROM payroll_absence_type_settings WHERE organisation_id=?', (organisation_id,))}
+        interrupted = 0
+        snapshots = []
+        for absence in rows:
+            start = max(first, date.fromisoformat(absence['start_date']))
+            end = min(last, date.fromisoformat(absence['end_date']))
+            counts = self._counts(absence['absence_type'], start.isoformat(), end.isoformat())
+            interrupts = absence['absence_type'] != 'permitted_absence' or not settings.get('permitted_absence', False)
+            if interrupts:
+                interrupted += counts['working_days']
+            snapshot_id = new_id()
+            tx.execute('INSERT INTO payroll_absence_run_items(id,organisation_id,pay_run_id,employee_id,absence_id,calendar_days,leave_days,working_days,interrupts_salary) VALUES (?,?,?,?,?,?,?,?,?)',
+                       (snapshot_id, organisation_id, run_id, employee_id, absence['id'], counts['calendar_days'], counts['leave_days'], counts['working_days'], int(interrupts)))
+            snapshots.append(absence | counts | {'interrupts_salary': interrupts})
+        norm = norm_working_days(year, month)
+        absent = min(interrupted, norm)
+        return {'norm_days': norm, 'absence_working_days': absent,
+                'worked_days': norm - absent, 'absences': snapshots}
 
     def list(self, organisation_id, *, month=None, kind=None):
         query = ('SELECT a.*,e.name AS employee_name FROM payroll_absences a '
