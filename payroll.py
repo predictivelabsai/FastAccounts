@@ -835,6 +835,13 @@ class PayrollService:
         with self.db.transaction() as tx:
             run = self._run(tx, organisation_id, run_id)
             org = self._organisation(tx, organisation_id)
+            for item in run['items']:
+                item['absences'] = tx.rows(
+                    'SELECT a.absence_type,a.start_date,a.end_date,x.calendar_days,x.leave_days,x.working_days '
+                    'FROM payroll_absence_run_items x JOIN payroll_absences a '
+                    'ON a.organisation_id=x.organisation_id AND a.id=x.absence_id '
+                    'WHERE x.organisation_id=? AND x.pay_run_id=? AND x.employee_id=? ORDER BY a.start_date,a.id',
+                    (organisation_id, run_id, item['employee_id']))
         return payroll_pdf(org, run)
 
     def workbook_xlsx(self, organisation_id, run_id):

@@ -25,6 +25,9 @@
   outstanding. Unit 7 now has pure calendar-day accrual, FIFO/expiry and
   employer-cost valuation functions with focused tests. Leave-lot persistence,
   organisation expiry settings, reports and reserve posting remain outstanding.
+  Unit 8 adds run-snapshot absences to payslips and dashboard counts for annual
+  leave and sick leave today, with labels in all four locales. Remaining leave
+  balances and optional payslip balances remain outstanding.
 
 ## 2026-10-28: Payroll calendar and payouts
 

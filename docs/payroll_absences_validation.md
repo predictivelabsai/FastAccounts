@@ -182,3 +182,17 @@ have not yet been implemented, so this unit is incomplete.
 .tmp\venv312\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache312 --basetemp=.tmp\test-payroll-unit6b tests\test_migrations_and_tenancy.py::test_empty_migration_is_idempotent tests\test_migrations_and_tenancy.py::test_historical_migration_catalogue_does_not_affect_other_databases
 # 2 passed
 ```
+## Unit 8: Payslip and dashboard
+
+Payslips show absences frozen into the run, including date range and leave-day
+count. The dashboard shows employees with annual or extended leave today and
+employees on sick leave today. Labels are translated in en/et/lv/lt. Remaining
+leave balance display is not implemented because entitlement and leave-lot
+application are not yet connected.
+
+```powershell
+node --check static\app.js
+.tmp\venv312\Scripts\python.exe -c "import json,pathlib; [json.loads(p.read_text(encoding='utf-8')) for p in pathlib.Path('web/locales').glob('*.json')]"
+.tmp\venv312\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache312 --basetemp=.tmp\test-payroll-unit8 tests\test_payroll.py::test_workflow_snapshot_balance_pdf_and_delete tests\test_workspace_payroll.py::test_payroll_absences_register_can_create_localised_leave
+# 5 passed; JavaScript syntax and locale JSON checks passed
+```

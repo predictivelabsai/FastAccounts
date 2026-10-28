@@ -1090,11 +1090,12 @@
   }
   const views = {
     overview: async (c) => {
-      const [invoices, bills, bank, runs, clients] = await Promise.all([
+      const [invoices, bills, bank, runs, absences, clients] = await Promise.all([
         api(c.url("/invoices")),
         api(c.url("/bills")),
         api(c.url("/bank-transactions")),
         c.payrollSupported ? optionalPayroll(c.url("/pay-runs")) : null,
+        c.payrollSupported ? optionalPayroll(c.url(`/payroll/absences?month=${today().slice(0, 7)}`)) : null,
         Promise.all(
           organisations.map(async (o) => {
             try {
@@ -1107,6 +1108,7 @@
         ),
       ]);
       const review = bank.filter((x) => x.status !== "Reconciled"),
+        absentToday = (absences || []).filter((x) => x.start_date <= today() && x.end_date >= today()),
         monthly = runs?.filter((x) =>
           (x.period || "").startsWith(today().slice(0, 7)),
         ),
@@ -1125,7 +1127,7 @@
             t("Overview"),
             t("A clear view of your client’s books."),
             button("New invoice", "newInvoice", true),
-            `<div class="kpis">${kpi("Receivables", money(outstanding(invoices, ["Issued", "Part Paid"])), "Open customer invoices")}${kpi("Payables", money(outstanding(bills, ["Approved", "Part Paid"])), "Approved supplier bills")}${kpi("Bank review", num(review.length), "Transactions awaiting review")}${kpi("Payroll this month", money(runs === null ? null : cost), !c.payrollSupported ? "Available for Estonian EUR books" : runs === null ? "Payroll is not available yet." : "Employer cost · draft and approved")}</div>${runs?.some((r) => r.declaration_overdue) ? `<p class="notice declaration-overdue"><a href="#payroll">${tr("Overdue payroll declarations")}: ${num(runs.filter((r) => r.declaration_overdue).length)}</a></p>` : ""}<section class="section"><div class="section-head"><h2>${tr("Client books")}</h2><span class="muted">${num(organisations.length)} ${tr("organisations")}</span></div><div class="client-strip">${clients.map(({ o, rows }) => `<button class="client-book ${o.id === c.oid ? "selected" : ""}" data-client="${esc(o.id)}"><span class="country-badge">${esc(o.country_code)}</span><strong>${esc(o.name)}</strong><small>${tr("Receivables")}</small><b>${esc(money(rows ? outstanding(rows, ["Issued", "Part Paid"]) : null, o.base_currency))}</b></button>`).join("")}</div></section><section class="card section"><div class="section-head"><h2>${tr("Revenue & cash")}</h2><span class="muted">${tr("Last six months")}</span></div>${chart(invoices, bank)}</section><div class="dashboard-lists"><section><div class="section-head"><h2>${tr("Recent invoices")}</h2><a href="#invoices">${tr("View all")}</a></div>${table(["Number", "Customer", "Date", "Status", ["Total"]], invoiceRows([...invoices].sort((a, b) => String(b.issue_date).localeCompare(a.issue_date)).slice(0, 5)), button("New invoice", "newInvoice"))}</section><section><div class="section-head"><h2>${tr("Ready for review")}</h2><a href="#banking">${tr("View all")}</a></div>${table(
+            `<div class="kpis">${kpi("Receivables", money(outstanding(invoices, ["Issued", "Part Paid"])), "Open customer invoices")}${kpi("Payables", money(outstanding(bills, ["Approved", "Part Paid"])), "Approved supplier bills")}${kpi("Bank review", num(review.length), "Transactions awaiting review")}${kpi("Payroll this month", money(runs === null ? null : cost), !c.payrollSupported ? "Available for Estonian EUR books" : runs === null ? "Payroll is not available yet." : "Employer cost · draft and approved")}${c.payrollSupported ? kpi("Employees on leave today", num(absentToday.filter((x) => x.absence_type === "annual_leave" || x.absence_type === "extended_leave").length), "Current annual leave") + kpi("Sick leave today", num(absentToday.filter((x) => x.absence_type === "sick_leave").length), "Current sick leave") : ""}</div>${runs?.some((r) => r.declaration_overdue) ? `<p class="notice declaration-overdue"><a href="#payroll">${tr("Overdue payroll declarations")}: ${num(runs.filter((r) => r.declaration_overdue).length)}</a></p>` : ""}<section class="section"><div class="section-head"><h2>${tr("Client books")}</h2><span class="muted">${num(organisations.length)} ${tr("organisations")}</span></div><div class="client-strip">${clients.map(({ o, rows }) => `<button class="client-book ${o.id === c.oid ? "selected" : ""}" data-client="${esc(o.id)}"><span class="country-badge">${esc(o.country_code)}</span><strong>${esc(o.name)}</strong><small>${tr("Receivables")}</small><b>${esc(money(rows ? outstanding(rows, ["Issued", "Part Paid"]) : null, o.base_currency))}</b></button>`).join("")}</div></section><section class="card section"><div class="section-head"><h2>${tr("Revenue & cash")}</h2><span class="muted">${tr("Last six months")}</span></div>${chart(invoices, bank)}</section><div class="dashboard-lists"><section><div class="section-head"><h2>${tr("Recent invoices")}</h2><a href="#invoices">${tr("View all")}</a></div>${table(["Number", "Customer", "Date", "Status", ["Total"]], invoiceRows([...invoices].sort((a, b) => String(b.issue_date).localeCompare(a.issue_date)).slice(0, 5)), button("New invoice", "newInvoice"))}</section><section><div class="section-head"><h2>${tr("Ready for review")}</h2><a href="#banking">${tr("View all")}</a></div>${table(
               ["Counterparty", ["Amount"]],
               review
                 .slice(0, 5)

@@ -46,6 +46,10 @@ delivered.
   accrual, configurable expiry dates, FIFO consumption and liability valuation
   including 2026 social tax and employer unemployment. Four tests pass. Persistent
   leave lots, org settings, reports and immutable reserve journals remain open.
+- Payslips now list absence dates and leave-day counts from approved run
+  snapshots; the overview adds employees currently on annual leave and sick
+  leave KPIs. Dashboard labels are translated in en/et/lv/lt. Remaining leave
+  balances are not yet calculated in the payslip.
 
 ## 2026-10-28: Payroll calendar and payouts
 

@@ -1066,6 +1066,27 @@ def payroll_pdf(organisation: dict, run: dict) -> bytes:
             details.append(f"{catalogue('Hourly rate')}: {item['hourly_rate']} EUR × {item['hours']} {catalogue('Hours').lower()}")
         if item.get('pay_basis') == 'monthly' and item.get('worked_days') is not None:
             details.append(f"{catalogue('Worked days / norm days')}: {item['worked_days']} / {item['norm_days']}")
+        if item.get('absences'):
+            details.append(label('Puudumised perioodis', 'Absences in period') + ':')
+            absence_names = {
+                'annual_leave': ('Põhipuhkus', 'Annual leave'),
+                'extended_leave': ('Pikendatud puhkus', 'Extended leave'),
+                'child_leave': ('Lapsepuhkus', 'Child leave'),
+                'paternity_leave': ('Isapuhkus', 'Paternity leave'),
+                'maternity_leave': ('Emapuhkus', 'Maternity leave'),
+                'parental_leave': ('Vanemapuhkus', 'Parental leave'),
+                'study_leave': ('Õppepuhkus', 'Study leave'),
+                'care_leave': ('Hoolduspuhkus', 'Care leave'),
+                'sick_leave': ('Töövõimetus', 'Sick leave'),
+                'permitted_absence': ('Puudumine tööandja loal', 'Permitted absence'),
+                'truancy': ('Tööluus', 'Unauthorised absence'),
+                'unpaid_leave': ('Palgata puhkus', 'Unpaid leave'),
+                'alternative_service': ('Aja- ja asendusteenistus', 'Alternative service'),
+                'other': ('Muu töökatkestus', 'Other absence'),
+            }
+            for absence in item['absences']:
+                et_name, en_name = absence_names.get(absence['absence_type'], ('Muu töökatkestus', 'Other absence'))
+                details.append(f"{label(et_name, en_name)}: {absence['start_date']}–{absence['end_date']} ({absence['leave_days']} {catalogue('Leave days').lower()})")
         if item.get('fte') not in (None, '1'):
             details.append(f"{catalogue('Work-time fraction (FTE)')}: {item['fte']}")
         reason = item.get('social_tax_minimum_exemption')
