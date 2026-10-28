@@ -614,15 +614,16 @@ class PayrollService:
         item = next((item for item in run['items'] if item['id'] == item_id), None)
         if not item:
             raise KeyError('Pay run item not found')
+        is_adjustable = run.get('kind', 'regular') in {'correction', 'supplementary'}
         component_overrides = {}
         if gross_salary is not None:
             if item['pay_basis'] not in ('monthly', 'board_fee'):
                 raise ValueError('Gross salary can be edited only for monthly or board fee employees')
             try:
                 gross = decimal(gross_salary)
-                if not gross.is_finite() or gross <= 0 or gross > Decimal('9999999999.99'):
+                if not gross.is_finite() or gross < 0 or (gross == 0 and not is_adjustable) or gross > Decimal('9999999999.99'):
                     raise ValueError('Gross salary must be positive and fit NUMERIC(12,2)')
-                if money(gross) <= 0:
+                if money(gross) <= 0 and not is_adjustable:
                     raise ValueError('Gross salary must be at least 0.01')
             except InvalidOperation as exc:
                 raise ValueError('Invalid gross salary') from exc
@@ -727,7 +728,8 @@ class PayrollService:
             context.get('tax_free_amount'), rules_for(pay_date).basic_exemption, used_exemption)
         amounts = calculate_pay(item | context, period=run['period'], hours=worked, components=lines,
                                 settlement_on=pay_date, exemption_remaining=exemption_cap,
-                                allow_zero_monthly=item['pay_basis'] == 'monthly' and item.get('worked_days') == 0)
+                                allow_zero_monthly=(item['pay_basis'] == 'monthly' and
+                                    (item.get('worked_days') == 0 or is_adjustable and money(item['gross_salary']) == 0)))
         if amounts['gross'] > Decimal('9999999999.99') or any(amounts[key] > Decimal('9999999999.99') for key in AMOUNTS if key != 'employer_cost'):
             raise ValueError('Payment totals exceed the supported amount')
         monthly_minimum, hourly_minimum = minimum_wage(run['period'])
@@ -736,7 +738,7 @@ class PayrollService:
             required = money(item.get('minimum_wage') or monthly_minimum * _fte(item.get('fte')))
         elif item['pay_basis'] == 'hourly':
             required = money(decimal(item.get('minimum_wage') or hourly_minimum) * worked)
-        if amounts['gross'] < required:
+        if amounts['gross'] < required and not is_adjustable:
             raise ValueError('Payment components must preserve the minimum wage')
         tx.execute('UPDATE pay_run_items SET ' + ','.join(f'{key}=?' for key in AMOUNTS) + ',hours=?,gross_salary=? WHERE organisation_id=? AND id=?',
                    (*(db_number(amounts[key]) for key in AMOUNTS), None if worked is None else db_number(worked), item['gross_salary'], organisation_id, item_id))
@@ -888,6 +890,10 @@ class PayrollService:
     def create_correction(self, organisation_id, original_run_id, *, actor):
         """Create an editable copy of an approved regular payroll run."""
         with self.db.transaction() as tx:
+            locked = tx.execute("UPDATE pay_runs SET notes=notes WHERE organisation_id=? AND id=? AND status='Approved'",
+                                (organisation_id, original_run_id))
+            if locked.rowcount != 1:
+                raise KeyError('Pay run not found')
             original = tx.one('SELECT * FROM pay_runs WHERE organisation_id=? AND id=?',
                               (organisation_id, original_run_id))
             if not original:
@@ -923,6 +929,42 @@ class PayrollService:
                   {'original_run_id': original_run_id})
             return self._run(tx, organisation_id, run_id)
 
+    def create_supplementary(self, organisation_id, original_run_id, employee_ids, *, actor):
+        """Create a blank supplementary run for selected employees in an approved period."""
+        with self.db.transaction() as tx:
+            original = tx.one('SELECT * FROM pay_runs WHERE organisation_id=? AND id=?',
+                              (organisation_id, original_run_id))
+            if not original:
+                raise KeyError('Pay run not found')
+            if original['status'] != 'Approved' or original.get('kind', 'regular') != 'regular':
+                raise PayrollConflict('Supplementary runs require an approved regular pay run')
+            source_items = {row['employee_id']: row for row in tx.rows(
+                'SELECT * FROM pay_run_items WHERE organisation_id=? AND pay_run_id=?',
+                (organisation_id, original_run_id))}
+            selected = list(dict.fromkeys(employee_ids))
+            if not selected or set(selected) - source_items.keys():
+                raise ValueError('Choose employees included in the approved pay run')
+            run_id = new_id()
+            tx.execute("INSERT INTO pay_runs(id,organisation_id,period,total_gross,total_net,total_employer_cost,created_by,created_at,settlement_date,show_leave_balance,kind,original_run_id) "
+                       "VALUES (?,?,?,0,0,0,?,?,?,?, 'supplementary',?)",
+                       (run_id, organisation_id, original['period'], actor, utc_now(),
+                        original.get('settlement_date'), original.get('show_leave_balance', 0), original_run_id))
+            for employee_id in selected:
+                source = source_items[employee_id]
+                item_id = new_id()
+                values = dict(source)
+                values.update(id=item_id, pay_run_id=run_id, gross_salary=0)
+                values.update({key: 0 for key in AMOUNTS})
+                self._insert_copied_row(tx, 'pay_run_items', values)
+                for context in tx.rows('SELECT * FROM pay_item_context WHERE organisation_id=? AND item_id=?',
+                                       (organisation_id, source['id'])):
+                    copied = dict(context)
+                    copied['item_id'] = item_id
+                    self._insert_copied_row(tx, 'pay_item_context', copied)
+            audit(tx, organisation_id, actor, 'payroll.supplementary.drafted', 'pay_run', run_id,
+                  {'original_run_id': original_run_id, 'employee_ids': selected})
+            return self._run(tx, organisation_id, run_id)
+
     @staticmethod
     def _insert_copied_row(tx, table, values):
         columns = tuple(values)
@@ -943,19 +985,69 @@ class PayrollService:
             run = self._run(tx, organisation_id, run_id)
             if claimed.rowcount != 1:
                 raise PayrollConflict('Pay run is already approved')
-            if any(money(item['gross']) <= 0 and not (item['pay_basis'] == 'monthly' and item.get('worked_days') == 0)
+            correction = run.get('kind', 'regular') == 'correction'
+            if correction:
+                original_id = run.get('original_run_id')
+                original = tx.one("SELECT * FROM pay_runs WHERE organisation_id=? AND id=? AND status='Approved' AND kind='regular'",
+                                  (organisation_id, original_id))
+                if not original:
+                    raise PayrollConflict('The approved original pay run is unavailable')
+                prior = tx.one("SELECT id FROM pay_runs WHERE organisation_id=? AND original_run_id=? AND kind='correction' AND status='Approved' AND id<>? ORDER BY approved_at DESC,id DESC LIMIT 1",
+                               (organisation_id, original_id, run_id))
+                baseline_run = self._run(tx, organisation_id, prior['id'] if prior else original_id)
+                baseline = {item['employee_id']: item for item in baseline_run['items']}
+                if set(baseline) != {item['employee_id'] for item in run['items']}:
+                    raise PayrollConflict('Correction employees must match the original pay run')
+                deltas = {key: sum((decimal(item[key]) - decimal(baseline[item['employee_id']][key])
+                                    for item in run['items']), Decimal(0)) for key in AMOUNTS}
+                if any(money(item['gross']) < 0 for item in run['items']):
+                    raise ValueError('Correction gross pay cannot be negative')
+            if not correction and any(money(item['gross']) <= 0 and not (item['pay_basis'] == 'monthly' and item.get('worked_days') == 0)
                    for item in run['items']):
                 raise ValueError('Every employee requires positive gross pay before approval')
-            from payroll_tsd_breakdown import freeze_tsd_breakdown
+            from payroll_tsd_breakdown import calculate_tsd_breakdown, freeze_tsd_breakdown
+            from payroll_tsd_breakdown import LINE_FIELDS
+            from payroll_tsd_types import payment_type
             for item in run['items']:
                 context = tx.one('SELECT * FROM pay_item_context WHERE organisation_id=? AND item_id=?',
                                  (organisation_id, item['id']))
                 if not context:
                     raise ValueError('Pay run calculation snapshot is missing')
-                freeze_tsd_breakdown(tx, organisation_id, 'pay_run_item', item['id'],
-                                     item=item, components=item['components'], context=context)
-            totals = {k: sum((decimal(i[k]) for i in run['items']), Decimal(0)) for k in AMOUNTS}
-            memo = f"Payroll {run['period']}"
+                if correction:
+                    current_lines = calculate_tsd_breakdown(item=item, components=item['components'], context=context)
+                    prior_rows = tx.rows(
+                        "SELECT l.* FROM pay_item_tsd_lines l JOIN pay_run_items i "
+                        "ON i.organisation_id=l.organisation_id AND i.id=l.source_id "
+                        "JOIN pay_runs p ON p.organisation_id=i.organisation_id AND p.id=i.pay_run_id "
+                        "WHERE p.organisation_id=? AND i.employee_id=? AND "
+                        "(p.id=? OR (p.original_run_id=? AND p.kind='correction' AND p.status='Approved'))",
+                        (organisation_id, item['employee_id'], original_id, original_id))
+                    previous = {}
+                    for row in prior_rows:
+                        record = previous.setdefault(row['payment_type'], {
+                            'payment_type': row['payment_type'], 'payment_type_name': row['payment_type_name']})
+                        for field in LINE_FIELDS[1:]:
+                            record[field] = record.get(field, Decimal(0)) + decimal(row[field])
+                    current_by_type = {row['payment_type']: row for row in current_lines}
+                    delta_lines = []
+                    for code in sorted(set(previous) | set(current_by_type)):
+                        current_line = current_by_type.get(code, {'payment_type': code, 'amount': Decimal(0),
+                            **{field: Decimal(0) for field in LINE_FIELDS[2:]}})
+                        previous_line = previous.get(code, {'payment_type': code, 'amount': Decimal(0),
+                            **{field: Decimal(0) for field in LINE_FIELDS[2:]}})
+                        delta = {'payment_type': code,
+                                 'payment_type_name': payment_type(code).name}
+                        for field in LINE_FIELDS[1:]:
+                            delta[field] = decimal(current_line.get(field, 0)) - decimal(previous_line.get(field, 0))
+                        delta_lines.append(delta)
+                    freeze_tsd_breakdown(tx, organisation_id, 'pay_run_item', item['id'],
+                        item=item, components=item['components'], context=context, records=delta_lines)
+                else:
+                    freeze_tsd_breakdown(tx, organisation_id, 'pay_run_item', item['id'],
+                                         item=item, components=item['components'], context=context)
+            snapshot_totals = {k: sum((decimal(i[k]) for i in run['items']), Decimal(0)) for k in AMOUNTS}
+            totals = deltas if correction else snapshot_totals
+            memo = f"Payroll correction {run['period']}" if correction else f"Payroll {run['period']}"
             # The social tax minimum shortfall is an employer cost on the existing social-tax
             # accounts, posted as its own line so the top-up is visible in the ledger.
             topup = totals['social_tax_minimum_topup']
@@ -963,6 +1055,12 @@ class PayrollService:
             deductions = {role: sum((money(c['amount']) for item in run['items'] for c in item['components']
                                     if c['direction'] == 'deduction' and c['liability_role'] == role), Decimal(0))
                           for role in ('PAYROLL_BAILIFF', 'PAYROLL_DEDUCTION')}
+            if correction:
+                deductions = {role: sum((money(c['amount']) for item in run['items'] for c in item['components']
+                    if c['direction'] == 'deduction' and c['liability_role'] == role), Decimal(0)) -
+                    sum((money(c['amount']) for item in baseline_run['items'] for c in item['components']
+                    if c['direction'] == 'deduction' and c['liability_role'] == role), Decimal(0))
+                    for role in ('PAYROLL_BAILIFF', 'PAYROLL_DEDUCTION')}
             postings = [('PAYROLL_SALARY', totals['gross'], True, memo),
                         ('PAYROLL_SALARY_PAYABLE', totals['gross'], False, memo),
                         ('PAYROLL_SALARY_PAYABLE', totals['withholding_total'], True, memo),
@@ -980,15 +1078,22 @@ class PayrollService:
             for role, account in accounts.items():
                 tx.execute('INSERT INTO pay_run_posting_accounts(organisation_id,pay_run_id,role,account_id) VALUES (?,?,?,?)',
                            (organisation_id, run_id, role, account['id']))
+            source_id = original_id if correction else run_id
             lines = [PostingLine(accounts[role]['id'], debit=value if debit else Decimal(0), credit=Decimal(0) if debit else value,
-                                 memo=line_memo, source_line_type='pay_run', source_line_id=run_id)
+                                 memo=line_memo, source_line_type='pay_run', source_line_id=source_id)
                      for role, value, debit, line_memo in postings if value]
+            if correction:
+                lines = [PostingLine(line.account_id,
+                    debit=abs(line.debit or line.credit) if (line.debit > 0 or line.credit < 0) else Decimal(0),
+                    credit=abs(line.credit or line.debit) if (line.credit > 0 or line.debit < 0) else Decimal(0),
+                    memo=line.memo, source_line_type=line.source_line_type, source_line_id=line.source_line_id)
+                    for line in lines]
             year, month = map(int, run['period'].split('-'))
             batch = LedgerService(self.db).post(organisation_id=organisation_id, voucher_type='payroll', voucher_id=run_id,
-                voucher_code=f"PAY-{run['period']}", posting_date=f"{run['period']}-{calendar.monthrange(year,month)[1]}",
+                voucher_code=f"PAY-{run['period']}{'-COR' if correction else ''}", posting_date=f"{run['period']}-{calendar.monthrange(year,month)[1]}",
                 lines=lines, actor=actor, currency='EUR', tx=tx)
             tx.execute('UPDATE pay_runs SET posted_batch_id=?,total_gross=?,total_net=?,total_employer_cost=? WHERE organisation_id=? AND id=?',
-                       (batch['id'], db_number(totals['gross']), db_number(totals['net']), db_number(totals['employer_cost']), organisation_id, run_id))
+                       (batch['id'], db_number(snapshot_totals['gross']), db_number(snapshot_totals['net']), db_number(snapshot_totals['employer_cost']), organisation_id, run_id))
             audit(tx, organisation_id, actor, 'payroll.approved', 'pay_run', run_id, {'posted_batch_id': batch['id']})
             return self._run(tx, organisation_id, run_id)
 

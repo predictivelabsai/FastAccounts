@@ -2204,6 +2204,11 @@ class PayRunIn(BaseModel):
     show_leave_balance: bool = False
 
 
+class PaySupplementaryIn(BaseModel):
+    model_config = {'extra': 'forbid'}
+    employee_ids: list[str] = Field(min_length=1, max_length=500)
+
+
 class EmployeeTaxSettingIn(BaseModel):
     model_config = {'extra': 'forbid'}
     kind: Literal['tax_free', 'pension', 'unemployment']
@@ -2248,6 +2253,7 @@ class PayComponentLine(BaseModel):
 class PayItemPatch(BaseModel):
     model_config = {'extra': 'forbid'}
     hours: Decimal | None = None
+    gross_salary: Decimal | None = Field(default=None, ge=0, max_digits=12, decimal_places=2)
     components: list[PayComponentLine] | None = Field(default=None, max_length=100)
 
 
@@ -2725,6 +2731,20 @@ def payroll_create_run(organisation_id: str, payload: PayRunIn, user: User = Dep
     _require(organisation_id, user, WRITE_ROLES)
     return PayrollService().create_run(organisation_id, period=payload.period, actor=user.email, hours=payload.hours,
                                       show_leave_balance=payload.show_leave_balance)
+
+
+@api.post('/organisations/{organisation_id}/pay-runs/{run_id}/corrections', status_code=201)
+def payroll_create_correction(organisation_id: str, run_id: str, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return PayrollService().create_correction(organisation_id, run_id, actor=user.email)
+
+
+@api.post('/organisations/{organisation_id}/pay-runs/{run_id}/supplementary', status_code=201)
+def payroll_create_supplementary(organisation_id: str, run_id: str, payload: PaySupplementaryIn,
+                                 user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return PayrollService().create_supplementary(
+        organisation_id, run_id, payload.employee_ids, actor=user.email)
 
 
 @api.post('/organisations/{organisation_id}/pay-runs/{run_id}/approve')

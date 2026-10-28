@@ -136,11 +136,11 @@ def calculate_tsd_breakdown(*, item, components, context):
 
 
 def freeze_tsd_breakdown(tx, organisation_id, source_kind, source_id, *, item, components, context,
-                         payout_batch_id=None):
+                         payout_batch_id=None, records=None):
     """Persist a breakdown inside the caller's approval transaction."""
     if not tsd_lines_table_ready(tx):
         return []
-    records = calculate_tsd_breakdown(item=item, components=components, context=context)
+    records = records if records is not None else calculate_tsd_breakdown(item=item, components=components, context=context)
     for record in records:
         payment = payment_type(record["payment_type"])
         tx.execute(
