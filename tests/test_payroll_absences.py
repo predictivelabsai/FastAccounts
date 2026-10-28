@@ -18,6 +18,25 @@ def test_absence_counts_include_calendar_days_but_annual_leave_excludes_public_h
     assert [row['id'] for row in service.list(ee_org['id'], month='2026-12', kind='annual_leave')] == [annual['id']]
 
 
+def test_absence_pay_is_persisted_and_only_pending_records_recalculate(db, ee_org, legacy_payroll):
+    legacy_payroll(db, ee_org['id'], name='Absence pay employee', gross='2000')
+    service = PayrollAbsenceService(db)
+    absence = service.save(ee_org['id'], 'legacy-employee', actor=ACTOR, absence_type='annual_leave',
+                           start_date='2026-10-19', end_date='2026-10-21')
+    saved = service.set_pay_method(ee_org['id'], absence['id'], 'best_of', actor=ACTOR)
+    assert saved['method'] == 'best_of' and saved['status'] == 'pending'
+    assert saved['gross'] == '272.73'
+    assert saved['breakdown']['method'] == 'best_of'
+    fixed = service.set_pay_method(ee_org['id'], absence['id'], 'fixed_sum', actor=ACTOR, fixed_amount='275')
+    assert fixed['gross'] == '275.00' and fixed['fixed_amount'] == '275.00'
+    assert service.list(ee_org['id'])[0]['absence_pay']['breakdown']['amount'] == '275.00'
+    with db.transaction() as tx:
+        tx.execute("UPDATE payroll_absence_pay SET status='in_payout' WHERE organisation_id=? AND absence_id=?",
+                   (ee_org['id'], absence['id']))
+    with pytest.raises(AbsenceConflict, match='frozen'):
+        service.set_pay_method(ee_org['id'], absence['id'], 'average', actor=ACTOR)
+
+
 def test_absence_overlap_is_refused_and_updates_remain_tenant_scoped(db, ee_org, legacy_payroll):
     legacy_payroll(db, ee_org['id'], name='Overlap employee', gross='2000')
     service = PayrollAbsenceService(db)
@@ -142,3 +161,4 @@ def test_paid_permitted_absence_does_not_reduce_monthly_salary(db, ee_org):
     item = service.create_run(ee_org['id'], period='2026-10', actor=ACTOR)['items'][0]
     assert item['gross'] == '2200.00' and item['worked_days'] == item['norm_days'] == 22
     assert item['absence_working_days'] == 0
+

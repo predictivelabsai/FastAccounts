@@ -2280,6 +2280,12 @@ class PayrollAbsenceIn(BaseModel):
     comment: str = Field(default='', max_length=2000)
 
 
+class AbsencePayMethodIn(BaseModel):
+    model_config = {'extra': 'forbid'}
+    method: Literal['average','unchanged_salary','best_of','fixed_sum']
+    fixed_amount: Decimal | None = Field(default=None, ge=0)
+
+
 class CollectiveAnnualLeaveIn(BaseModel):
     model_config = {'extra': 'forbid'}
     employee_ids: list[str] = Field(min_length=1, max_length=500)
@@ -2433,6 +2439,15 @@ def payroll_delete_absence(organisation_id: str, absence_id: str, user: User = D
     _require(organisation_id, user, WRITE_ROLES)
     PayrollAbsenceService(get_database()).delete(organisation_id, absence_id, actor=user.email)
     return Response(status_code=204)
+
+
+@api.post('/organisations/{organisation_id}/payroll/absences/{absence_id}/pay', status_code=201)
+def payroll_calculate_absence_pay(organisation_id: str, absence_id: str,
+                                 payload: AbsencePayMethodIn, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return PayrollAbsenceService(get_database()).set_pay_method(
+        organisation_id, absence_id, payload.method, actor=user.email,
+        fixed_amount=payload.fixed_amount)
 
 
 @api.post('/organisations/{organisation_id}/payroll/absences/collective', status_code=201)

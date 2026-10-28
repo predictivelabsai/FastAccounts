@@ -3,6 +3,10 @@ from datetime import date, timedelta
 
 from core_utils import audit, new_id, utc_now
 from payroll_calendar import is_working_day, public_holidays, working_days as norm_working_days
+from payroll_absence_pay import VACATION_PAY_METHODS, vacation_pay, vacation_payout_date
+from payroll_average import calculate_average_pay
+from payroll_calendar import working_days as norm_month_working_days
+import json
 
 ABSENCE_TYPES = (
     'annual_leave', 'extended_leave', 'child_leave', 'paternity_leave',
@@ -103,7 +107,87 @@ class PayrollAbsenceService:
         for row in rows:
             row.update(self._counts(row['absence_type'], row['start_date'], row['end_date']))
             row['frozen'] = self.db.scalar('SELECT 1 FROM payroll_absence_run_items x JOIN pay_runs r ON r.organisation_id=x.organisation_id AND r.id=x.pay_run_id WHERE x.organisation_id=? AND x.absence_id=? AND r.status=\'Approved\' LIMIT 1', (organisation_id, row['id'])) is not None
+            row['absence_pay'] = self.db.one('SELECT * FROM payroll_absence_pay WHERE organisation_id=? AND absence_id=?',
+                                             (organisation_id, row['id']))
+            if row['absence_pay']:
+                row['absence_pay']['breakdown'] = json.loads(row['absence_pay'].pop('breakdown_json'))
         return rows
+
+    def set_pay_method(self, organisation_id, absence_id, method, *, actor, fixed_amount=None):
+        """Create or refresh the pending vacation-pay snapshot for an absence."""
+        from core_utils import db_number, decimal, money
+        from datetime import date
+        if method not in VACATION_PAY_METHODS:
+            raise ValueError('Choose a valid vacation pay method')
+        if method == 'fixed_sum' and fixed_amount is None:
+            raise ValueError('A fixed amount is required for the fixed-sum method')
+        if method != 'fixed_sum' and fixed_amount is not None:
+            raise ValueError('A fixed amount is only valid for the fixed-sum method')
+        with self.db.transaction() as tx:
+            absence = tx.one('SELECT a.*,e.name AS employee_name,e.pay_basis,e.gross_salary,e.hourly_rate '
+                             'FROM payroll_absences a JOIN employees e '
+                             'ON e.organisation_id=a.organisation_id AND e.id=a.employee_id '
+                             'WHERE a.organisation_id=? AND a.id=?', (organisation_id, absence_id))
+            if not absence:
+                raise KeyError('Absence not found')
+            if absence['absence_type'] not in ANNUAL_TYPES:
+                raise ValueError('Vacation pay applies to annual and extended leave')
+            existing = tx.one('SELECT * FROM payroll_absence_pay WHERE organisation_id=? AND absence_id=?',
+                              (organisation_id, absence_id))
+            if existing and existing['status'] != 'pending':
+                raise AbsenceConflict('Absence pay is frozen once added to a payout')
+            leave_start, leave_end = date.fromisoformat(absence['start_date']), date.fromisoformat(absence['end_date'])
+            run_rows = tx.rows("SELECT i.*,r.period,r.status FROM pay_run_items i JOIN pay_runs r "
+                               "ON r.organisation_id=i.organisation_id AND r.id=i.pay_run_id "
+                               "WHERE i.organisation_id=? AND i.employee_id=? AND r.status='Approved'",
+                               (organisation_id, absence['employee_id']))
+            for item in run_rows:
+                item['components'] = tx.rows('SELECT direction,amount,is_wage FROM pay_item_components '
+                                             'WHERE organisation_id=? AND item_id=?',
+                                             (organisation_id, item['id']))
+            history = tx.rows("SELECT earning_month AS period,wage_total FROM payroll_historical_earnings "
+                              "WHERE organisation_id=? AND employee_id=? AND status='Approved'",
+                              (organisation_id, absence['employee_id']))
+            absence_history = tx.rows('SELECT absence_type,start_date,end_date FROM payroll_absences '
+                                      'WHERE organisation_id=? AND employee_id=? AND id<>?',
+                                      (organisation_id, absence['employee_id'], absence_id))
+            for prior in absence_history:
+                prior['wage_paid'] = (prior['absence_type'] == 'permitted_absence' and bool(tx.scalar(
+                    'SELECT paid_salary FROM payroll_absence_type_settings WHERE organisation_id=? AND absence_type=?',
+                    (organisation_id, 'permitted_absence'))) or prior['absence_type'] not in
+                    ('permitted_absence', 'unpaid_leave', 'truancy'))
+            avg = calculate_average_pay(absence, leave_start, approved_items=run_rows,
+                                        historical_earnings=history, absences=absence_history)
+            leave_days = self._counts(absence['absence_type'], absence['start_date'], absence['end_date'])['leave_days']
+            work_days = sum(is_working_day(leave_start + timedelta(days=n))
+                            for n in range((leave_end - leave_start).days + 1))
+            period = leave_start.strftime('%Y-%m')
+            norm = norm_month_working_days(leave_start.year, leave_start.month)
+            breakdown = vacation_pay(method, average_daily_pay=avg.average_daily_pay,
+                                     leave_days=leave_days, monthly_salary=absence.get('gross_salary'),
+                                     leave_working_days=work_days, norm_working_days=norm,
+                                     fixed_sum=fixed_amount)
+            breakdown['average'] = avg.as_dict()
+            payout_date = vacation_payout_date(leave_start).isoformat()
+            record_id = existing['id'] if existing else new_id()
+            now = utc_now()
+            tx.execute('INSERT INTO payroll_absence_pay(id,organisation_id,absence_id,employee_id,method,fixed_amount,gross,breakdown_json,status,payout_batch_id,payment_date,payment_month,created_at,updated_at) '
+                       'VALUES (?,?,?,?,?,?,?,? ,\'pending\',NULL,?,?,?,?) ON CONFLICT(organisation_id,absence_id) '
+                       'DO UPDATE SET method=excluded.method,fixed_amount=excluded.fixed_amount,gross=excluded.gross,'
+                       'breakdown_json=excluded.breakdown_json,payment_date=excluded.payment_date,'
+                       'payment_month=excluded.payment_month,updated_at=excluded.updated_at '
+                       'WHERE payroll_absence_pay.status=\'pending\'',
+                       (record_id, organisation_id, absence_id, absence['employee_id'], method,
+                        None if fixed_amount is None else db_number(money(fixed_amount)), breakdown['amount'],
+                        json.dumps(breakdown, sort_keys=True), payout_date, period, now, now))
+            audit(tx, organisation_id, actor, 'payroll.absence_pay.calculated', 'payroll_absence_pay', record_id,
+                  {'absence_id': absence_id, 'method': method, 'gross': breakdown['amount']})
+            result = tx.one('SELECT * FROM payroll_absence_pay WHERE organisation_id=? AND id=?',
+                            (organisation_id, record_id))
+            result['gross'] = db_number(money(result['gross']))
+            result['fixed_amount'] = (None if result['fixed_amount'] is None
+                                      else db_number(money(result['fixed_amount'])))
+            return result | {'breakdown': breakdown}
 
     @classmethod
     def _counts(cls, kind, start_date, end_date):
