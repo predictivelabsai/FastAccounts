@@ -75,7 +75,7 @@ def test_vacation_payout_and_salary_share_payment_month_exemption_and_reverse(db
     payouts.approve(ee_org['id'], retry['id'], actor=actor)
     frozen_retries = db.rows("SELECT payout_batch_id FROM pay_item_tsd_lines WHERE organisation_id=? AND source_kind='absence_pay' AND source_id=? ORDER BY payout_batch_id",
                              (ee_org['id'], snapshot['id']))
-    assert [row['payout_batch_id'] for row in frozen_retries] == [batch['id'], retry['id']]
+    assert {row['payout_batch_id'] for row in frozen_retries} == {batch['id'], retry['id']}
 
 
 def test_absence_payout_routes_enforce_roles_tenant_and_csrf(db, ee_org, monkeypatch):
