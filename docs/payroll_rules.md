@@ -508,6 +508,15 @@ rules to be applied by the average-pay service. Sources: [Employment Contracts
 Act](https://www.riigiteataja.ee/akt/123122024006) and [Average Pay
 Regulation](https://www.riigiteataja.ee/akt/13191217).
 
+The absence register stores inclusive start and end dates, a document reference
+and a comment for each organisation-scoped employee record. Calendar days count
+both endpoints. Annual and extended leave days exclude public holidays, while
+working days use the Estonian payroll calendar. Other absence types currently
+report inclusive calendar days as leave days. An employee cannot have overlapping
+absence records. The `permitted_absence` type has an organisation setting for
+whether salary continues; it defaults to unpaid. Collective annual leave creates
+one separately auditable absence per selected employee.
+
 ### Payroll absence calculation parameters
 
 The absence and average-pay service uses the dated statutory rules and the

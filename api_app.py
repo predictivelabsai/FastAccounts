@@ -52,6 +52,7 @@ from payroll import PayrollConflict, PayrollService
 from payroll_tax_settings import EmployeeTaxSettingsService, TaxSettingConflict, TaxSettingValidationError
 from payroll_payday import PaydaySettingsService
 from payroll_payouts import PayoutConflict, PayoutService
+from payroll_absences import AbsenceConflict, PayrollAbsenceService, ABSENCE_TYPES
 from employee_details import EmployeeDetailsError
 from tax import TaxService
 from tsd import TSDExportService
@@ -2269,6 +2270,30 @@ class PayoutPaidIn(BaseModel):
     bank_account_id: str
 
 
+class PayrollAbsenceIn(BaseModel):
+    model_config = {'extra': 'forbid'}
+    employee_id: str
+    absence_type: Literal['annual_leave','extended_leave','child_leave','paternity_leave','maternity_leave','parental_leave','study_leave','care_leave','sick_leave','permitted_absence','truancy','unpaid_leave','alternative_service','other']
+    start_date: str
+    end_date: str
+    document_reference: str = Field(default='', max_length=180)
+    comment: str = Field(default='', max_length=2000)
+
+
+class CollectiveAnnualLeaveIn(BaseModel):
+    model_config = {'extra': 'forbid'}
+    employee_ids: list[str] = Field(min_length=1, max_length=500)
+    start_date: str
+    end_date: str
+    document_reference: str = Field(default='', max_length=180)
+    comment: str = Field(default='', max_length=2000)
+
+
+class AbsenceTypeSettingIn(BaseModel):
+    model_config = {'extra': 'forbid'}
+    paid_salary: bool
+
+
 @api.exception_handler(PayrollConflict)
 async def payroll_conflict(_request: Request, error: PayrollConflict):
     return JSONResponse({'detail': str(error)}, status_code=409)
@@ -2276,6 +2301,11 @@ async def payroll_conflict(_request: Request, error: PayrollConflict):
 
 @api.exception_handler(PayoutConflict)
 async def payout_conflict(_request: Request, error: PayoutConflict):
+    return JSONResponse({'detail': str(error)}, status_code=409)
+
+
+@api.exception_handler(AbsenceConflict)
+async def payroll_absence_conflict(_request: Request, error: AbsenceConflict):
     return JSONResponse({'detail': str(error)}, status_code=409)
 
 
@@ -2356,6 +2386,63 @@ def save_payroll_payday_settings(organisation_id: str, payload: PaydaySettingsIn
 def payroll_payouts(organisation_id: str, run_id: str | None = None, user: User = Depends(current_user)):
     _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
     return PayoutService(get_database()).list(organisation_id, run_id=run_id)
+
+
+@api.get('/organisations/{organisation_id}/payroll/absence-types')
+def payroll_absence_types(organisation_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    return PayrollAbsenceService(get_database()).types(organisation_id)
+
+
+@api.put('/organisations/{organisation_id}/payroll/absence-types/{absence_type}')
+def payroll_save_absence_type(organisation_id: str, absence_type: str, payload: AbsenceTypeSettingIn,
+                              user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return PayrollAbsenceService(get_database()).set_type_paid(
+        organisation_id, absence_type, payload.paid_salary, actor=user.email)
+
+
+@api.get('/organisations/{organisation_id}/payroll/absences')
+def payroll_absences(organisation_id: str, month: str | None = None, absence_type: str | None = None,
+                     user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    return PayrollAbsenceService(get_database()).list(organisation_id, month=month, kind=absence_type)
+
+
+@api.post('/organisations/{organisation_id}/payroll/absences', status_code=201)
+def payroll_create_absence(organisation_id: str, payload: PayrollAbsenceIn, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    values = payload.model_dump()
+    employee_id = values.pop('employee_id')
+    return PayrollAbsenceService(get_database()).save(
+        organisation_id, employee_id, actor=user.email, **values)
+
+
+@api.put('/organisations/{organisation_id}/payroll/absences/{absence_id}')
+def payroll_update_absence(organisation_id: str, absence_id: str, payload: PayrollAbsenceIn,
+                           user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    values = payload.model_dump()
+    employee_id = values.pop('employee_id')
+    return PayrollAbsenceService(get_database()).save(
+        organisation_id, employee_id, actor=user.email, absence_id=absence_id, **values)
+
+
+@api.delete('/organisations/{organisation_id}/payroll/absences/{absence_id}', status_code=204)
+def payroll_delete_absence(organisation_id: str, absence_id: str, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    PayrollAbsenceService(get_database()).delete(organisation_id, absence_id, actor=user.email)
+    return Response(status_code=204)
+
+
+@api.post('/organisations/{organisation_id}/payroll/absences/collective', status_code=201)
+def payroll_collective_absence(organisation_id: str, payload: CollectiveAnnualLeaveIn,
+                               user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    values = payload.model_dump()
+    employee_ids = values.pop('employee_ids')
+    return PayrollAbsenceService(get_database()).collective_annual_leave(
+        organisation_id, employee_ids, actor=user.email, **values)
 
 
 @api.get('/organisations/{organisation_id}/payroll/payouts/summary')

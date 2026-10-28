@@ -13,6 +13,14 @@ delivered.
 - Documented the preset defaults and the governing Estonian leave and average-pay
   sources in `payroll_rules.md`. Absence calculations and related workflows
   remain in progress.
+- Added migration 0043 and the organisation-scoped absence register with
+  inclusive calendar-day counts, holiday-excluded annual leave days, payroll
+  calendar working days, overlap checks, audited collective annual leave, and
+  payroll-role/CSRF protected APIs. The workspace offers list filters, add/edit/
+  delete actions and a collective-leave dialog in all four locales. Approved-run
+  absence snapshots are reserved for the payroll calculation unit.
+- Validation is recorded in `payroll_absences_validation.md`; accountant UAT and
+  PostgreSQL execution remain outstanding.
 
 ## 2026-10-28: Payroll calendar and payouts
 

@@ -2233,6 +2233,7 @@
             t("Payroll"),
             t("People, payslips and postings for this client."),
             button("Add employee", "employee") + button("Payout summary", "payoutSummary") +
+              button("Absences", "absences") +
               button("Payment types", "paymentTypes") + button("Payroll accounts", "payrollAccounts") + button("Payday settings", "paydaySettings") +
               button("Run payroll for month", "run", true),
             `${unavailable ? `<div class="notice">${tr("Payroll is not available yet.")}</div>` : ""}<section class="section"><div class="section-head"><h2>${tr("Employees")}</h2><span class="muted">${num(employees?.filter((x) => x.active).length)} ${tr("employees")}</span>${employees === null ? '' : link('Export Excel', `/api${c.url('/reports/employees.xlsx')}`)}</div>${table(
@@ -2298,6 +2299,7 @@
         },
         employee: () => employeeDialog(),
         paymentTypes: () => paymentTypesDialog(c, componentTypes || []),
+        absences: () => payrollAbsencesDialog(c, employees || []),
         payrollAccounts: () => payrollAccountsDialog(c),
         paydaySettings: () => paydaySettingsDialog(c),
         managePayouts: (b) => payrollPayoutsDialog(c, runs.find((run) => run.id === b.dataset.id), bankAccounts || []),
@@ -4461,6 +4463,76 @@
   function paymentTypesDialog(c, types) {
     const d = dialog("Payment types", paymentTypesContent(types));
     bindPaymentTypeActions(c, types, d, true);
+  }
+  const absenceKinds = [
+    ["annual_leave", "Annual leave"], ["extended_leave", "Extended leave"],
+    ["child_leave", "Child leave"], ["paternity_leave", "Paternity leave"],
+    ["maternity_leave", "Maternity leave"], ["parental_leave", "Parental leave"],
+    ["study_leave", "Study leave"], ["care_leave", "Care leave"],
+    ["sick_leave", "Sick leave"], ["permitted_absence", "Permitted absence"],
+    ["truancy", "Unauthorised absence"], ["unpaid_leave", "Unpaid leave"],
+    ["alternative_service", "Alternative service"], ["other", "Other absence"],
+  ];
+  async function payrollAbsencesDialog(c, employees) {
+    const base = c.url("/payroll/absences");
+    const monthNow = new Date().toISOString().slice(0, 7);
+    const renderList = async (month = monthNow, kind = "") => {
+      document.querySelectorAll(".dialog").forEach(closeDialog);
+      const query = new URLSearchParams();
+      if (month) query.set("month", month);
+      if (kind) query.set("absence_type", kind);
+      const [rows, typeSettings] = await Promise.all([api(base + (query.size ? `?${query}` : "")), api(c.url("/payroll/absence-types"))]);
+      const d = dialog("Absences", `<div class="section-head">${field("Month", "month", month, "month")} ${select("Absence type", "absence_type", [["", "All types"], ...absenceKinds.map(([v, label]) => [v, tr(label)])], kind)}</div>${button("Add absence", "addAbsence", true)} ${button("Collective annual leave", "collectiveLeave")} ${button("Absence pay settings", "absenceSettings")}${rows.length ? table(["Employee", "Type", "Start date", "End date", "Calendar days", "Leave days", "Working days", "Actions"], rows.map((absence) => row([td(esc(absence.employee_name)), td(tr(absenceKinds.find(([key]) => key === absence.absence_type)?.[1] || "Other absence")), td(esc(absence.start_date)), td(esc(absence.end_date)), td(num(absence.calendar_days)), td(num(absence.leave_days)), td(num(absence.working_days)), td(absence.frozen ? tr("Used in approved payroll") : button("Edit", "editAbsence", false, `data-id="${esc(absence.id)}"`) + button("Delete", "deleteAbsence", false, `data-id="${esc(absence.id)}"`))]))) : empty("No absences", "")}`);
+      d.querySelector('[name="month"]').onchange = () => { const nextMonth = d.querySelector('[name="month"]').value; const nextKind = d.querySelector('[name="absence_type"]').value; closeDialog(d); renderList(nextMonth, nextKind); };
+      d.querySelector('[name="absence_type"]').onchange = () => { const nextMonth = d.querySelector('[name="month"]').value; const nextKind = d.querySelector('[name="absence_type"]').value; closeDialog(d); renderList(nextMonth, nextKind); };
+      bindActions(d, {
+        addAbsence: () => absenceEditDialog(c, employees, null, () => renderList(month, kind)),
+        collectiveLeave: () => collectiveLeaveDialog(c, employees, () => renderList(month, kind)),
+        absenceSettings: () => absenceSettingsDialog(c, typeSettings, () => renderList(month, kind)),
+        editAbsence: (buttonEl) => absenceEditDialog(c, employees, rows.find((row) => row.id === buttonEl.dataset.id), () => renderList(month, kind)),
+        deleteAbsence: (buttonEl) => confirmAction("Delete absence", tr("Delete this absence?"), async () => {
+          await post(`${base}/${buttonEl.dataset.id}`, undefined, "DELETE");
+          closeDialog(d); await renderList(month, kind);
+        }),
+      });
+    };
+    await renderList();
+  }
+  function absenceEditDialog(c, employees, existing, refresh) {
+    const employeeOptions = employees.filter((e) => e.active || e.id === existing?.employee_id).map((e) => [e.id, e.name]);
+    const d = dialog(existing ? "Edit absence" : "Add absence", form(
+      select("Employee", "employee_id", employeeOptions, existing?.employee_id || "") +
+      select("Absence type", "absence_type", absenceKinds.map(([v, label]) => [v, tr(label)]), existing?.absence_type || "annual_leave") +
+      field("Start date", "start_date", existing?.start_date || "", "date", "required") +
+      field("End date", "end_date", existing?.end_date || "", "date", "required") +
+      field("Document reference", "document_reference", existing?.document_reference || "") +
+      `<label class="full-width">${tr("Comment")}<textarea name="comment" maxlength="2000">${esc(existing?.comment || "")}</textarea></label>`
+    ));
+    bindForm(d, async (data) => {
+      await post(c.url(`/payroll/absences${existing ? `/${existing.id}` : ""}`), data, existing ? "PUT" : "POST");
+      closeDialog(d); await refresh();
+    });
+  }
+  function collectiveLeaveDialog(c, employees, refresh) {
+    const d = dialog("Collective annual leave", form(
+      `<label class="full-width">${tr("Employees")}<select name="employee_ids" multiple size="7" required>${employees.filter((e) => e.active).map((e) => `<option value="${esc(e.id)}">${esc(e.name)}</option>`).join("")}</select></label>` +
+      field("Start date", "start_date", "", "date", "required") + field("End date", "end_date", "", "date", "required") +
+      field("Document reference", "document_reference") + `<label class="full-width">${tr("Comment")}<textarea name="comment" maxlength="2000"></textarea></label>`
+    ));
+    bindForm(d, async (_data, f) => {
+      const data = Object.fromEntries(new FormData(f));
+      data.employee_ids = [...f.elements.employee_ids.selectedOptions].map((option) => option.value);
+      await post(c.url("/payroll/absences/collective"), data);
+      closeDialog(d); await refresh();
+    });
+  }
+  function absenceSettingsDialog(c, typeSettings, refresh) {
+    const permitted = typeSettings.find((setting) => setting.absence_type === "permitted_absence");
+    const d = dialog("Absence pay settings", form(check("Continue salary during permitted absence", "paid_salary", permitted?.paid_salary)));
+    bindForm(d, async (_data, f) => {
+      await post(c.url("/payroll/absence-types/permitted_absence"), {paid_salary: f.elements.paid_salary.checked}, "PUT");
+      closeDialog(d); await refresh();
+    });
   }
   function bindPaymentTypeActions(c, types, target, modal = false) {
     const edit = (type) => {

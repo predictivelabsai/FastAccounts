@@ -68,6 +68,55 @@ def test_settings_payment_types_create_edit_and_payroll_reuse(monkeypatch, db, e
         browser.close()
 
 
+@pytest.mark.parametrize('language', ['en', 'et', 'lv', 'lt'])
+def test_payroll_absences_register_can_create_localised_leave(monkeypatch, db, ee_org, language, legacy_payroll):
+    from urllib.parse import urlsplit
+    from web import i18n
+    from web_app import app
+    playwright = pytest.importorskip('playwright.sync_api')
+    actor = 'owner@example.test'
+    legacy_payroll(db, ee_org['id'], name='Absence UI employee', gross='2000')
+    monkeypatch.setenv('FASTACCOUNTS_DEFAULT_LANG', language)
+    monkeypatch.setenv('FASTACCOUNTS_DB', db.path)
+    monkeypatch.setenv('DB_URL', '')
+    labels = i18n.catalog(language)['workspace']
+    root = Path(__file__).resolve().parents[1]
+    errors = []
+    with TestClient(app) as client, playwright.sync_playwright() as runtime:
+        html = client.get('/auth/test?email=' + actor).text
+        browser = runtime.chromium.launch()
+        page = browser.new_page(viewport={'width': 900, 'height': 900})
+        page.on('pageerror', lambda error: errors.append(str(error)))
+
+        def respond(route):
+            path = urlsplit(route.request.url).path
+            if path.startswith('/api/'):
+                response = client.request(route.request.method, path, content=route.request.post_data,
+                    headers={'X-Test-User': actor, 'Content-Type': 'application/json'})
+                return route.fulfill(status=response.status_code, body=response.content,
+                    content_type=response.headers.get('content-type', 'application/json'))
+            if path == '/app':
+                return route.fulfill(body=html, content_type='text/html')
+            if path.startswith('/static/') and (root / path.lstrip('/')).is_file():
+                return route.fulfill(path=str(root / path.lstrip('/')))
+            return route.fulfill(status=404)
+
+        page.route('**/*', respond)
+        page.goto('http://workspace.test/app#payroll')
+        page.get_by_role('button', name=labels['Absences'], exact=True).click()
+        page.get_by_role('button', name=labels['Add absence'], exact=True).click()
+        editor = page.get_by_role('dialog')
+        editor.get_by_label(labels['Employee']).select_option('legacy-employee')
+        editor.locator('select[name="absence_type"]').last.select_option('annual_leave')
+        editor.get_by_label(labels['Start date']).fill('2026-10-19')
+        editor.get_by_label(labels['End date']).fill('2026-10-21')
+        editor.get_by_role('button', name=labels['Save'], exact=True).click()
+        playwright.expect(page.get_by_role('dialog')).to_contain_text(labels['Annual leave'])
+        playwright.expect(page.get_by_role('dialog')).to_contain_text('Absence UI employee')
+        assert not errors
+        browser.close()
+
+
 @pytest.mark.parametrize('language', ['en', 'et', 'lt', 'lv'])
 def test_payslip_accessible_names_include_employee(monkeypatch, language):
     playwright = pytest.importorskip('playwright.sync_api')

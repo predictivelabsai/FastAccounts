@@ -7,8 +7,13 @@
 
 - Implemented migration 0042 for wage-eligibility and active payment-type
   metadata, including a frozen wage flag on component history. Preset defaults
-  are documented in `payroll_rules.md`; absence register, calculations,
-  entitlement, import and liability work remains in progress.
+  are documented in `payroll_rules.md`.
+- Implemented migration 0043 and the tenant-scoped absence register, calendar-day
+  and working-day counts, annual-leave holiday exclusions, overlap refusal,
+  collective leave, audit events, role/CSRF protected APIs and the translated
+  payroll workspace dialog. Unit tests and four-language browser flow pass.
+  Salary proration, average pay, leave pay, historical import and liability work
+  remains in progress.
 
 ## 2026-10-28: Payroll calendar and payouts
 
