@@ -280,7 +280,7 @@ class PayrollService:
             entitlements = tx.rows('SELECT effective_from,days_per_year FROM payroll_leave_entitlements '
                                    'WHERE organisation_id=? AND employee_id=? AND effective_from<=? ORDER BY effective_from',
                                    (organisation_id, employee['id'], end_date.isoformat()))
-            applicable = next((r for r in reversed(entitlements) if r['effective_from'][:4] == str(year)), None)
+            applicable = entitlements[-1] if entitlements else None
             entitlement = Decimal(str(applicable['days_per_year'])) if applicable else Decimal(0)
             taken = Decimal(0)
             for absence in absence_rows:
@@ -289,7 +289,7 @@ class PayrollService:
                     taken += Decimal(str(PayrollAbsenceService._counts(absence['absence_type'],
                         absence['start_date'], min(absence['end_date'], end_date.isoformat()))['leave_days']))
             opening_row = tx.one('SELECT unused_days FROM payroll_leave_openings '
-                                 'WHERE organisation_id=? AND employee_id=? AND cutover_date<=? '
+                                 'WHERE organisation_id=? AND employee_id=? AND cutover_date<=? AND reviewed_at IS NOT NULL '
                                  'ORDER BY cutover_date DESC LIMIT 1',
                                  (organisation_id, employee['id'], end_date.isoformat()))
             opening = opening_row['unused_days'] if opening_row else 0
@@ -638,13 +638,15 @@ class PayrollService:
                 data.setdefault('is_wage', True)
                 data.setdefault('active', True)
                 data.update(line)
-                if data.get('preset_key') in ('unused_leave', 'employer_sick_pay'):
+                if data.get('preset_key') == 'unused_leave':
                     component_overrides[data['preset_key']] = decimal(data['amount'])
                 self._component_values(data)
                 try:
                     amount = decimal(data.get('amount'))
                     if not amount.is_finite() or not amount or abs(amount) > Decimal('9999999999.99') or amount != money(amount) or (data['direction'] == 'deduction' and amount < 0):
                         raise ValueError('Enter a non-zero payment amount with at most two decimals')
+                    if data.get('preset_key') == 'unused_leave' and amount <= 0:
+                        raise ValueError('Unused-leave compensation must remain positive')
                 except InvalidOperation as exc:
                     raise ValueError('Enter a non-zero payment amount with at most two decimals') from exc
                 if tx.dialect == 'postgres':
