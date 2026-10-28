@@ -255,6 +255,31 @@ END; $$;
 CREATE TRIGGER guard_payroll_payout_tsd_update BEFORE UPDATE OR DELETE ON payroll_payout_tsd_lines
 FOR EACH ROW EXECUTE FUNCTION guard_payroll_payout_tsd_lines();
 """
+                elif path.stem == "0062_payroll_run_lineage_parent_guard":
+                    script = """CREATE OR REPLACE FUNCTION guard_pay_run_original_parent() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP = 'DELETE' AND EXISTS (
+        SELECT 1 FROM pay_runs child
+        WHERE child.organisation_id=OLD.organisation_id AND child.original_run_id=OLD.id
+    ) THEN
+        RAISE EXCEPTION 'payroll original run has related runs';
+    END IF;
+    IF TG_OP = 'UPDATE' AND (NEW.id<>OLD.id OR NEW.organisation_id<>OLD.organisation_id) AND EXISTS (
+        SELECT 1 FROM pay_runs child
+        WHERE child.organisation_id=OLD.organisation_id AND child.original_run_id=OLD.id
+    ) THEN
+        RAISE EXCEPTION 'payroll original run has related runs';
+    END IF;
+    IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
+    RETURN NEW;
+END; $$;
+CREATE TRIGGER pay_runs_original_parent_update
+BEFORE UPDATE OF id,organisation_id ON pay_runs
+FOR EACH ROW EXECUTE FUNCTION guard_pay_run_original_parent();
+CREATE TRIGGER pay_runs_original_parent_delete
+BEFORE DELETE ON pay_runs
+FOR EACH ROW EXECUTE FUNCTION guard_pay_run_original_parent();
+"""
                 elif path.stem == "0060_payroll_run_lineage_tenancy":
                     script = """CREATE OR REPLACE FUNCTION guard_pay_run_original_tenant() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
