@@ -5,11 +5,10 @@ import re
 
 from core_utils import audit, db_number, money, new_id, utc_now
 from payment_orders import PaymentOrderService
+from payroll_rules import garnishable_amount, rules_for
 
 COMPONENT_TYPES = {'alimony', 'bailiff', 'union_fee', 'agreed_deduction', 'third_pillar'}
 METHODS = {'fixed_sum', 'percent_of_gross', 'sum_x_qty', 'third_pillar_net'}
-THIRD_PILLAR_ANNUAL_RATE = Decimal('0.15')
-THIRD_PILLAR_ANNUAL_CAP = Decimal('6000.00')
 
 
 def normalise_iban(value):
@@ -35,8 +34,6 @@ def calculate_withholding(agreement, *, gross, net, withheld_to_date=0,
         amount = money(agreement.get('monthly_amount') or 0)
     else:
         raise ValueError('Unknown withholding method')
-    if agreement.get('component_type') == 'third_pillar':
-        amount = min(amount, money(gross * THIRD_PILLAR_ANNUAL_RATE))
     cap = agreement.get('total_cap')
     if cap is not None:
         amount = min(amount, max(Decimal('0.00'), money(Decimal(str(cap)) - money(withheld_to_date))))
@@ -139,3 +136,60 @@ class PayrollWithholdingService:
             'JOIN payroll_withholding_recipients r ON r.organisation_id=l.organisation_id AND r.id=l.recipient_id '
             'WHERE l.organisation_id=? AND p.period>=? AND p.period<=? GROUP BY e.name,r.name,l.component_type ORDER BY e.name,r.name,l.component_type',
             (organisation_id,start,end))
+
+    @staticmethod
+    def generate_for_item(tx, organisation_id, run, item, *, gross, net, minimum_wage):
+        """Freeze active agreement deductions for a draft item and return total."""
+        period_start = run['period'] + '-01'
+        period_end = run['period'] + '-31'
+        agreements = tx.rows('SELECT a.*,r.name recipient_name FROM payroll_withholding_agreements a '
+            'JOIN payroll_withholding_recipients r ON r.organisation_id=a.organisation_id AND r.id=a.recipient_id '
+            'WHERE a.organisation_id=? AND a.employee_id=? AND a.active=1 AND a.start_date<=? '
+            'AND (a.end_date IS NULL OR a.end_date>=?) AND r.active=1 '
+            "ORDER BY CASE WHEN a.component_type='alimony' THEN 0 ELSE 1 END,a.id",
+            (organisation_id, item['employee_id'], period_end, period_start))
+        rules = rules_for(date.fromisoformat(run.get('settlement_date') or period_end))
+        manual_lines = tx.rows('SELECT agreement_id,component_type,amount FROM payroll_withholding_run_lines '
+            'WHERE organisation_id=? AND pay_run_id=? AND pay_run_item_id=? AND generated=0',
+            (organisation_id, run['id'], item['id']))
+        manual_total = sum((money(line['amount']) for line in manual_lines), Decimal('0.00'))
+        ordinary_limit = garnishable_amount(net, minimum_wage, rules=rules)
+        child_limit = garnishable_amount(net, minimum_wage, child_maintenance=True, rules=rules)
+        has_child_claim = any(row['component_type'] == 'alimony' for row in agreements)
+        manual_garnishable = sum((money(line['amount']) for line in manual_lines
+            if line['component_type'] in ('alimony', 'bailiff')), Decimal('0.00'))
+        garnishable_left = max(Decimal('0.00'), money((child_limit if has_child_claim else ordinary_limit)
+                                                       - manual_garnishable))
+        remaining_net = max(Decimal('0.00'), money(net - manual_total))
+        ordinary_left = max(Decimal('0.00'), money(ordinary_limit - manual_garnishable))
+        child_left = max(Decimal('0.00'), money(child_limit - manual_garnishable))
+        total = manual_total
+        manual_agreement_ids = {line['agreement_id'] for line in manual_lines}
+        for agreement in agreements:
+            if agreement['id'] in manual_agreement_ids:
+                continue
+            child = agreement['component_type'] == 'alimony'
+            available = min(child_left if child else ordinary_left, garnishable_left)
+            desired = calculate_withholding(agreement, gross=gross, net=net,
+                withheld_to_date=agreement['withheld_to_date'], available_net=remaining_net,
+                garnishable=available if agreement['component_type'] in ('alimony', 'bailiff') else None)
+            reduced = desired < calculate_withholding(agreement, gross=gross, net=net,
+                withheld_to_date=agreement['withheld_to_date'], available_net=net)
+            if desired or reduced:
+                description = agreement['payment_description'] or agreement['recipient_name']
+                if agreement['component_type'] == 'third_pillar':
+                    description += ' | tax-free treatment (TSD type 25 / exemption 640) pending accountant confirmation'
+                tx.execute('INSERT INTO payroll_withholding_run_lines '
+                    '(id,organisation_id,pay_run_id,pay_run_item_id,agreement_id,recipient_id,employee_id,component_type,amount,generated,description) '
+                    'VALUES (?,?,?,?,?,?,?,?,?,1,?)', (new_id(), organisation_id, run['id'], item['id'],
+                     agreement['id'], agreement['recipient_id'], item['employee_id'], agreement['component_type'],
+                     db_number(desired), description + (' | reduced to legal/net limit' if reduced else '')))
+            remaining_net = money(remaining_net - desired)
+            total = money(total + desired)
+            if agreement['component_type'] == 'alimony':
+                child_left = money(child_left - desired)
+            elif agreement['component_type'] == 'bailiff':
+                ordinary_left = money(ordinary_left - desired)
+            if agreement['component_type'] in ('alimony', 'bailiff'):
+                garnishable_left = money(garnishable_left - desired)
+        return total

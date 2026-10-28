@@ -17,13 +17,13 @@ def test_withholding_methods_are_decimal_and_limited_by_net(method, payload, exp
     assert calculate_withholding(agreement, gross='2000', net='10') == Decimal('10.00')
 
 
-def test_withholding_cap_garnishable_limit_and_third_pillar_limit():
+def test_withholding_cap_garnishable_limit_and_third_pillar_net_only():
     agreement = {'method': 'fixed_sum', 'component_type': 'bailiff',
                  'monthly_amount': '500', 'total_cap': '300'}
     assert calculate_withholding(agreement, gross='2000', net='900', withheld_to_date='260',
                                  garnishable='20') == Decimal('20.00')
     pillar = {'method': 'third_pillar_net', 'component_type': 'third_pillar', 'monthly_amount': '500'}
-    assert calculate_withholding(pillar, gross='1000', net='900') == Decimal('150.00')
+    assert calculate_withholding(pillar, gross='1000', net='900') == Decimal('500.00')
 
 
 def test_iban_normalisation_and_validation():

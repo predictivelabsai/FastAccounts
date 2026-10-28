@@ -1,6 +1,10 @@
 """Verified, immutable payroll rules selected by settlement date.
 
 Only 2026 is configured. Sources and scope are recorded in docs/payroll_rules.md.
+Garnishment estimates use ordinary protection up to the minimum wage and a
+one-half minimum-wage protected portion for qualifying child-maintenance claims
+(Code of Enforcement Procedure §132(1¹)). The order's conditions, dependants,
+partial months and multiple orders require accountant confirmation.
 """
 from dataclasses import dataclass
 from datetime import date
@@ -26,6 +30,7 @@ class PayrollRules:
     minimum_wages: tuple[tuple[date, Decimal, Decimal], ...]
     private_car_rate_per_km: Decimal
     private_car_monthly_limit: Decimal
+    garnishment_child_protected_fraction: Decimal
 
     def minimum_wage(self, applies_on: date) -> tuple[Decimal, Decimal]:
         if applies_on.year != self.year:
@@ -49,8 +54,21 @@ _RULES = {2026: PayrollRules(
     Decimal('0.33'), Decimal('886'),
     ((date(2026, 1, 1), Decimal('886'), Decimal('5.31')),
      (date(2026, 4, 1), Decimal('946'), Decimal('5.67'))),
-    Decimal('0.30'), Decimal('335')),
+    Decimal('0.30'), Decimal('335'), Decimal('0.50')),
 }
+
+
+def garnishable_amount(net, minimum_wage: Decimal, *, child_maintenance=False,
+                       rules: PayrollRules) -> Decimal:
+    """Estimate attachable net under §132; order-specific exceptions need review."""
+    from core_utils import money
+    net, minimum_wage = money(net), money(minimum_wage)
+    if child_maintenance:
+        # §132(1¹) lowers the protected portion to one half in qualifying cases.
+        # The enforcement order must confirm eligibility.
+        protected = money(minimum_wage * rules.garnishment_child_protected_fraction)
+        return max(Decimal('0.00'), money(net - protected))
+    return max(Decimal('0.00'), money(net - minimum_wage))
 
 _SICK_BENEFIT_RULES = {
     2026: SickBenefitRules(2026, 2, 5, Decimal('0.70'), 6, 1),

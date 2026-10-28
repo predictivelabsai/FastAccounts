@@ -37,30 +37,45 @@ recipient and agreement services.
 
 ## Remaining work before the feature is complete
 
-- Connect agreements to draft-run generation, preserve manual deductions, and
-  freeze generated lines and warnings in the run. Apply the year-parameterised
-  protected-wage calculation only after an accountant confirms how order-specific
-  exceptions and partial months should be represented.
-- Implement the annual third-pillar allowance and EMTA TSD payment type 25 with
-  exemption type 640. EMTA's TSD handbook describes an employer contribution as
-  a separate type 25 payment and tracks exemption type 640 cumulatively; this is
-  not the same as ordinary employee income tax exemption 610. See the
-  [EMTA TSD handbook](https://emta.ee/node/330/handbook/20/pdf). The limits are
-  15% of qualifying annual taxable payments and EUR 6,000, pending accountant
-  confirmation of the qualifying base and excess treatment.
-- Add a withholding payout lifecycle after salary payment, recipient
-  aggregation, pain.001 integration, balanced liability-to-bank posting and
-  approval-time cap updates.
-- Add an XLSX report, payroll workspace tab and preview/payout actions; add the
-  requested en/et/lv/lt labels.
-- Add API tests for role checks and CSRF, report and payout tests, generated vs
-  manual line preservation, and run the remaining requested files individually:
-  `test_payroll.py`, `test_payroll_payouts.py`, `test_tsd_export.py`,
-  `test_workspace_payroll.py`, `test_i18n.py` and final migration/tenancy rerun.
-- Add a year-versioned garnishment rule and accountant-confirmed warnings.
-  Relevant law is Code of Enforcement Procedure §132, including the protected
-  minimum-wage amount and distinct periodic child-maintenance exceptions:
-  [Riigi Teataja, English translation](https://www.riigiteataja.ee/en/akt/523012025002).
+- Add recipient payouts and SEPA pain.001 integration, including liability-to-bank
+  posting and recipient aggregation.
+- Add reports, payroll workspace preview and payout actions, plus en/et/lv/lt
+  labels.
+- Confirm garnishment handling for order-specific exceptions, dependants,
+  partial months and multiple orders with an accountant. The 2026 estimate uses
+  the minimum monthly wage as the ordinary protected amount and uses half that
+  amount as the protected portion for qualifying child-maintenance cases under
+  Code of Enforcement Procedure §132(1¹). Both estimates are marked for
+  accountant confirmation. [Riigi Teataja, English translation](https://www.riigiteataja.ee/en/akt/523012025002).
+- Confirm third-pillar tax treatment with an accountant before implementing TSD
+  type 25 or exemption 640. The current feature records this only as a net
+  withholding and does not change TSD lines.
+- Add API role-check and CSRF coverage, report and payout tests, and rerun the
+  migration/tenancy suite after schema changes.
+
+## Integration checkpoint (2026-10-29)
+
+- Draft payroll runs create active agreement withholding lines using the
+  agreement method, remaining cap and available net. Recalculation regenerates
+  agreement lines while retaining manually entered payroll components and
+  withholding lines.
+- Bailiff and child-maintenance lines use year-configured §132 garnishable
+  estimates, are reduced when required and expose an item warning. Order-specific
+  legal exceptions remain pending accountant confirmation.
+- Third-pillar entries remain net withholdings and show the pending TSD type 25 /
+  exemption 640 note. TSD calculation lines are unchanged.
+- Approval updates agreement withheld-to-date and closes capped agreements in
+  the approval transaction. Withholdings post to the existing liability roles.
+- Added offline integration tests for methods, limits, warnings, recalculation,
+  approval and tenant isolation. Individually run: `test_payroll_withholding_integration.py`
+  (6 passed), `test_payroll_withholdings.py` (7 passed), `test_payroll.py`
+  (16 passed, 1 existing deprecation warning), `test_payroll_demo_fixes.py`
+  (24 passed) and `test_payroll_absence_pay.py` (10 passed, 1 existing
+  deprecation warning).
+- No migration was needed: the run-line schema already carries the generated
+  flag, agreement link, amount and description used by this integration.
+
+Remaining scope is recipient payouts + SEPA, reports and UI/locales.
 
 No full test run, live network operation or PostgreSQL migration run was done.
 The full suite running in the separate worktree was not inspected or changed.

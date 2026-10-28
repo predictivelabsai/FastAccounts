@@ -39,6 +39,7 @@ from payroll_tax_repository import monthly_exemption_used
 from payroll_payday import payday_for_period
 from employee_details import validate_details, birth_date_from_personal_code
 from payroll_absences import PayrollAbsenceService
+from payroll_withholdings import PayrollWithholdingService
 from payroll_absence_pay import employer_sick_benefit, unused_leave_compensation
 from payroll_average import calculate_average_pay
 import json
@@ -532,6 +533,13 @@ class PayrollService:
             item['hourly_rate'] = _rate(item.get('hourly_rate'))
             item['fte'] = _fraction(item.get('fte'))
             item['board_member'] = bool(item['board_member'])
+            item['withholdings'] = [dict(row) for row in tx.rows(
+                'SELECT * FROM payroll_withholding_run_lines WHERE organisation_id=? AND pay_run_item_id=? ORDER BY id',
+                (organisation_id, item['id']))]
+            for line in item['withholdings']:
+                line['amount'] = db_number(money(line['amount']))
+            item['withholding_warnings'] = [line['description'] for line in item['withholdings']
+                if 'reduced to legal/net limit' in line['description']]
         for key in ('total_gross', 'total_net', 'total_employer_cost'):
             run[key] = db_number(money(run[key]))
         due_date = declaration_due_date(run['period'], run['payment_date'])
@@ -831,6 +839,14 @@ class PayrollService:
             required = money(decimal(item.get('minimum_wage') or hourly_minimum) * worked)
         if amounts['gross'] < required and not is_adjustable:
             raise ValueError('Payment components must preserve the minimum wage')
+        tx.execute('DELETE FROM payroll_withholding_run_lines WHERE organisation_id=? AND pay_run_id=? AND pay_run_item_id=? AND generated=1',
+                   (organisation_id, run_id, item_id))
+        withholding_minimum, _ = minimum_wage(run['period'])
+        withholding = PayrollWithholdingService.generate_for_item(
+            tx, organisation_id, run, item, gross=amounts['gross'], net=amounts['net'],
+            minimum_wage=withholding_minimum)
+        amounts['net'] = money(amounts['net'] - withholding)
+        amounts['withholding_total'] = money(amounts['withholding_total'] + withholding)
         tx.execute('UPDATE pay_run_items SET ' + ','.join(f'{key}=?' for key in AMOUNTS) + ',hours=?,gross_salary=? WHERE organisation_id=? AND id=?',
                    (*(db_number(amounts[key]) for key in AMOUNTS), None if worked is None else db_number(worked), item['gross_salary'], organisation_id, item_id))
         refreshed = self._run(tx, organisation_id, run_id)
@@ -974,6 +990,15 @@ class PayrollService:
                               'tax_free_setting_id', 'pension_setting_id', 'unemployment_setting_id')
             tx.execute('INSERT INTO pay_item_context(organisation_id,item_id,apply_tax_free_minimum,employment_start_date,employment_end_date,' + ','.join(context_fields) + ') VALUES (?,?,?,?,?,?,?,?,?,?,?)',
                        (organisation_id, item_id, int(employee['apply_tax_free_minimum']), employee.get('employment_start_date'), employee.get('employment_end_date')) + tuple(election[k] for k in context_fields))
+            withholding = PayrollWithholdingService.generate_for_item(
+                tx, organisation_id, {'id': run_id, 'period': period, 'settlement_date': pay_date.isoformat()},
+                {'id': item_id, 'employee_id': employee['id']}, gross=amounts['gross'],
+                net=amounts['net'], minimum_wage=monthly_minimum)
+            if withholding:
+                amounts['net'] = money(amounts['net'] - withholding)
+                amounts['withholding_total'] = money(amounts['withholding_total'] + withholding)
+                tx.execute('UPDATE pay_run_items SET net=?,withholding_total=? WHERE organisation_id=? AND id=?',
+                           (db_number(amounts['net']), db_number(amounts['withholding_total']), organisation_id, item_id))
             for key in totals:
                 totals[key] += amounts[key]
         tx.execute('UPDATE pay_runs SET total_gross=?,total_net=?,total_employer_cost=? WHERE organisation_id=? AND id=?', tuple(db_number(totals[k]) for k in totals)+(organisation_id, run_id))
@@ -1083,6 +1108,14 @@ class PayrollService:
             run = self._run(tx, organisation_id, run_id)
             if claimed.rowcount != 1:
                 raise PayrollConflict('Pay run is already approved')
+            for line in tx.rows('SELECT agreement_id,amount FROM payroll_withholding_run_lines WHERE organisation_id=? AND pay_run_id=? AND generated=1',
+                                (organisation_id, run_id)):
+                tx.execute('UPDATE payroll_withholding_agreements SET withheld_to_date=withheld_to_date+?,updated_at=? '
+                           'WHERE organisation_id=? AND id=?',
+                           (line['amount'], utc_now(), organisation_id, line['agreement_id']))
+                tx.execute('UPDATE payroll_withholding_agreements SET active=0,updated_at=? WHERE organisation_id=? AND id=? '
+                           'AND total_cap IS NOT NULL AND withheld_to_date>=total_cap',
+                           (utc_now(), organisation_id, line['agreement_id']))
             correction = run.get('kind', 'regular') == 'correction'
             if correction:
                 original_id = run.get('original_run_id')
@@ -1177,6 +1210,13 @@ class PayrollService:
             deductions = {role: sum((money(c['amount']) for item in run['items'] for c in item['components']
                                     if c['direction'] == 'deduction' and c['liability_role'] == role), Decimal(0))
                           for role in ('PAYROLL_BAILIFF', 'PAYROLL_DEDUCTION')}
+            withholding_roles = {
+                'PAYROLL_BAILIFF': {'alimony', 'bailiff'},
+                'PAYROLL_DEDUCTION': {'union_fee', 'agreed_deduction', 'third_pillar'},
+            }
+            for role, component_types in withholding_roles.items():
+                deductions[role] += sum((money(line['amount']) for item in run['items']
+                    for line in item.get('withholdings', []) if line['component_type'] in component_types), Decimal(0))
             if correction:
                 deductions = {role: sum((money(c['amount']) for item in run['items'] for c in item['components']
                     if c['direction'] == 'deduction' and c['liability_role'] == role), Decimal(0)) -
@@ -1282,6 +1322,7 @@ class PayrollService:
             if claimed.rowcount != 1:
                 raise PayrollConflict('Only draft pay runs can be deleted')
             tx.execute('DELETE FROM payroll_absence_run_items WHERE organisation_id=? AND pay_run_id=?', (organisation_id, run_id))
+            tx.execute('DELETE FROM payroll_withholding_run_lines WHERE organisation_id=? AND pay_run_id=?', (organisation_id, run_id))
             for table in ('pay_item_components', 'pay_item_context'):
                 tx.execute(f'DELETE FROM {table} WHERE organisation_id=? AND item_id IN (SELECT id FROM pay_run_items WHERE organisation_id=? AND pay_run_id=?)', (organisation_id, organisation_id, run_id))
             tx.execute('DELETE FROM pay_run_items WHERE organisation_id=? AND pay_run_id=?', (organisation_id, run_id))
