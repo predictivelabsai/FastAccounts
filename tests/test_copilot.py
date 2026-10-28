@@ -100,7 +100,7 @@ STAGED_CSV = "code,name\nP1,Synthetic widget\nP2,Another widget"
 
 def test_migration_count_rerun_and_ci(env):
     d = env
-    assert d["db"].scalar("SELECT COUNT(*) FROM schema_migrations") == 37
+    assert d["db"].scalar("SELECT COUNT(*) FROM schema_migrations") == 41
     assert d["db"].rows("SELECT * FROM copilot_messages") == []
     assert d["db"].rows("SELECT * FROM copilot_usage") == []
     for _ in range(2):

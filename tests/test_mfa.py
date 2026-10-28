@@ -340,7 +340,7 @@ def test_migration_rerun_preserves_data(env):
     db, client, _ = env
     secret, codes = enable(client)
     original = db.rows("SELECT * FROM mfa_recovery_codes")
-    assert db.scalar("SELECT COUNT(*) FROM schema_migrations") == 37
+    assert db.scalar("SELECT COUNT(*) FROM schema_migrations") == 41
     for _ in range(2):
         with db.transaction() as tx:
             tx.execute("DELETE FROM schema_migrations WHERE version='0027_mfa'")

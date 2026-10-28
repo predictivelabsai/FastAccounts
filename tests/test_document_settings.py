@@ -228,7 +228,7 @@ def test_migration_rerun_preserves_data_and_checks(env):
     upload(d)
     original = d['db'].rows('SELECT * FROM document_settings')
     attachments = d['db'].rows('SELECT * FROM attachments')
-    assert d['db'].scalar('SELECT COUNT(*) FROM schema_migrations') == 37
+    assert d['db'].scalar('SELECT COUNT(*) FROM schema_migrations') == 41
     for _ in range(2):
         with d['db'].transaction() as tx:
             tx.execute("DELETE FROM schema_migrations WHERE version='0028_document_settings'")

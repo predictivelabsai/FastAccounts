@@ -27,7 +27,7 @@ def customer(d, name):
 
 def test_migration_count_rerun_and_ci(sending):
     d = sending
-    assert d["db"].scalar("SELECT COUNT(*) FROM schema_migrations") == 37
+    assert d["db"].scalar("SELECT COUNT(*) FROM schema_migrations") == 41
     assert d["db"].rows("SELECT * FROM contact_groups") == []
     assert d["db"].rows("SELECT * FROM user_groups") == []
     for _ in range(2):

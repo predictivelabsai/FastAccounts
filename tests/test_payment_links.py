@@ -240,6 +240,8 @@ def test_upgrade_and_rerun_preserve_existing_data(tmp_path, monkeypatch):
     assert service.generate(org['id'], invoice['id'], method['id']) == link
     organisations_now = db.rows('SELECT * FROM organisations')
     assert all(row.pop('copilot_enabled') == 0 for row in organisations_now)
+    for row in organisations_now:
+        row.pop('language', None)
     contacts_now = db.rows('SELECT * FROM contacts')
     assert all(row.pop('active') == 1 for row in contacts_now)  # added by 0030_master_data_maintenance
     for table in tables:

@@ -334,6 +334,8 @@ def test_upgrade_adds_missing_roles_preserves_chart_and_ledger(tmp_path, monkeyp
         rows = db.rows(f"SELECT * FROM {table} ORDER BY id")
         if table == "organisations":
             assert all(row.pop("copilot_enabled") == 0 for row in rows)
+            for row in rows:
+                row.pop('language', None)
         assert rows == before[table]
     roles = {r["system_role"]: r for r in after_accounts if r["system_role"] and r["system_role"].endswith("PREPAYMENTS")}
     assert roles["SUPPLIER_PREPAYMENTS"]["code"] == ("1301" if country == "UK" else "1311")

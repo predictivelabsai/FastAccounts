@@ -234,6 +234,8 @@ def test_migration_upgrade_rerun_and_data_preservation(tmp_path, monkeypatch):
         tx.connection.executescript((original / 'sqlite' / '0023_analytical_objects.sql').read_text(encoding='utf-8'))
     after = {t: db.rows(f'SELECT * FROM {t} ORDER BY id') for t in tables}
     assert all(row.pop('copilot_enabled') == 0 for row in after['organisations'])
+    for row in after['organisations']:
+        row.pop('language', None)
     assert before == after
     assert db.rows('PRAGMA foreign_key_check') == []
 

@@ -346,7 +346,7 @@ def test_auth_csrf_wiring(sending):
 
 def test_migration_rerun_tenant_constraints_and_roles(db, ee_org, uk_org):
     root = Path(__file__).resolve().parents[1]
-    assert db.scalar('SELECT COUNT(*) FROM schema_migrations') == 37
+    assert db.scalar('SELECT COUNT(*) FROM schema_migrations') == 41
     assert db.migrate() == []
     sql = (root / 'migrations/sqlite/0026_fx_revaluations.sql').read_text(encoding='utf-8')
     with db.transaction() as tx:

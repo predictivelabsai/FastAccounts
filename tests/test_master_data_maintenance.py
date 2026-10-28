@@ -32,7 +32,7 @@ def item(d, code_name, name):
 
 def test_migration_count_rerun_and_ci(sending):
     d = sending
-    assert d["db"].scalar("SELECT COUNT(*) FROM schema_migrations") == 37
+    assert d["db"].scalar("SELECT COUNT(*) FROM schema_migrations") == 41
     for _ in range(2):
         with d["db"].transaction() as tx:
             tx.execute("DELETE FROM schema_migrations WHERE version='0030_master_data_maintenance'")

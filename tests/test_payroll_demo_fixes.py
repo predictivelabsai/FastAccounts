@@ -194,7 +194,7 @@ def test_month_end_shape_mappings_and_explicit_settlement(db, ee_org):
     salary_lines = [l for l in balanced(db, run['posted_batch_id']) if l['account_id'] == salary_account]
     assert [(money(l['debit']), money(l['credit'])) for l in salary_lines] == [(Decimal(0), Decimal('2000')), (Decimal('546.16'), Decimal(0))]
     assert run['declaration_state'] == 'none' and run['declaration_due_date'] == '2026-11-10'
-    assert declaration_due_date('2026-12').isoformat() == '2027-01-10'
+    assert declaration_due_date('2026-12').isoformat() == '2027-01-11'  # 10 January is Sunday, so EMTA moves the due date to Monday.
     TSDExportService(db).prepare(ee_org['id'], run['id'], actor=ACTOR)
     assert service.runs(ee_org['id'])[0]['declaration_state'] == 'prepared'
     before = db.rows('SELECT * FROM gl_entries WHERE posting_batch_id=? ORDER BY id', (run['posted_batch_id'],))

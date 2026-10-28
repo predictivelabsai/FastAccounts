@@ -297,6 +297,8 @@ def test_upgrade_preserves_data_and_existing_sequences(tmp_path, monkeypatch):
         after = db.rows(f'SELECT * FROM {table} ORDER BY id')
         if table == 'organisations':
             assert all(row.pop('copilot_enabled') == 0 for row in after)
+            for row in after:
+                row.pop('language', None)
         assert after == rows
     assert db.scalar("SELECT next_number FROM document_sequences WHERE document_type='invoice'") == 42
     assert db.scalar("SELECT next_number FROM document_sequences WHERE organisation_id=? AND document_type='quote'", (org['id'],)) == 1

@@ -418,7 +418,7 @@ def test_migration_role_seeding_and_wiring(tmp_path, monkeypatch, country, prefe
     monkeypatch.setattr(database, 'MIGRATIONS', original)
     assert db.migrate() == ['0025_fx_realised', '0026_fx_revaluations', '0027_mfa', '0028_document_settings', '0029_copilot', '0030_master_data_maintenance', '0031_master_data_groups', '0032_copilot_access', '0033_copilot_settings', '0034_payroll_demo_fixes', '0035_payroll_income_line', '0036_payroll_component_catalogue', '0037_employee_tax_settings', '0038_payroll_payday_rules', '0039_payroll_payouts', '0040_payroll_settlement_dates', '0041_payroll_sepa_details']
     assert db.migrate() == []
-    assert db.scalar('SELECT COUNT(*) FROM schema_migrations') == 37
+    assert db.scalar('SELECT COUNT(*) FROM schema_migrations') == 41
     role = db.one("SELECT * FROM accounts WHERE organisation_id=? AND system_role='FX_GAIN_LOSS'", (org['id'],))
     assert role['code'] == str(preferred if existing else preferred + 1)
     sql = (root / 'migrations/sqlite/0025_fx_realised.sql').read_text(encoding='utf-8')
