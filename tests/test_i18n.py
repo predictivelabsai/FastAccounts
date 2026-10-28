@@ -82,6 +82,22 @@ def test_apa_declaration_labels_exist_in_all_locales():
     assert estonian['Partially rejected'] == 'Osaliselt tagasi lükatud'
 
 
+def test_payroll_correction_workspace_labels_exist_in_all_locales():
+    labels = ('Create correction', 'Add supplementary run', 'Create supplementary run',
+              'Correction', 'Supplementary run', 'Original', 'Corrected', 'Difference',
+              'Employee receivable', 'Offset', 'Confirm offsets', 'Receivable offsets',
+              'Related runs', 'Taxes')
+    for language in ('en', 'et', 'lv', 'lt'):
+        workspace = i18n.catalog(language)['workspace']
+        assert all(workspace.get(label, '').strip() for label in labels)
+    estonian = i18n.catalog('et')['workspace']
+    assert {key: estonian[key] for key in ('Correction', 'Supplementary run', 'Original',
+        'Corrected', 'Difference', 'Employee receivable', 'Offset')} == {
+        'Correction': 'Parandus', 'Supplementary run': 'Täiendav palgaleht',
+        'Original': 'Algne', 'Corrected': 'Parandatud', 'Difference': 'Vahe',
+        'Employee receivable': 'Töötaja nõue', 'Offset': 'Tasaarvestus'}
+
+
 def test_workspace_literal_labels_and_table_headers_are_translated():
     source = (Path(__file__).resolve().parents[1] / "static/app.js").read_text(encoding="utf-8")
     literal = r'''(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')'''

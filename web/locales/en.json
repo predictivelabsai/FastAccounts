@@ -2740,5 +2740,25 @@
       "Locked period": "Locked period",
       "Period reopened": "Period reopened"
     }
+  },
+  "payroll_corrections": {
+    "workspace": {
+      "Create correction": "Create correction",
+      "Add supplementary run": "Add supplementary run",
+      "Create supplementary run": "Create supplementary run",
+      "Correction": "Correction",
+      "Supplementary run": "Supplementary run",
+      "Original": "Original",
+      "Corrected": "Corrected",
+      "Difference": "Difference",
+      "Employee receivable": "Employee receivable",
+      "Offset": "Offset",
+      "Confirm offsets": "Confirm offsets",
+      "Receivable offsets": "Receivable offsets",
+      "Related runs": "Related runs",
+      "Choose employees for the supplementary run.": "Choose employees for the supplementary run.",
+      "Choose at least one employee.": "Choose at least one employee.",
+      "Taxes": "Taxes"
+    }
   }
 }

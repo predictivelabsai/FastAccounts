@@ -2286,6 +2286,7 @@
                         { ...r, tsd_preparation: tsdByRun[String(r.id)] },
                         c,
                         accountingProviders,
+                        runs,
                       ),
                     ),
                   )
@@ -2312,6 +2313,17 @@
         payrollAccounts: () => payrollAccountsDialog(c),
         paydaySettings: () => paydaySettingsDialog(c),
         managePayouts: (b) => payrollPayoutsDialog(c, runs.find((run) => run.id === b.dataset.id), bankAccounts || []),
+        createCorrection: async (b) => { await post(c.url(`/pay-runs/${b.dataset.id}/corrections`), {}); await render(); },
+        createSupplementary: async (b) => {
+          const original = runs.find((run) => run.id === b.dataset.id);
+          const options = (original?.items || []).map((item) => `<label class="check-row"><input type="checkbox" name="employee_ids" value="${esc(item.employee_id)}" checked> ${esc(item.employee_name)}</label>`).join('');
+          const d = dialog('Add supplementary run', `<p>${tr('Choose employees for the supplementary run.')}</p><div class="full-width">${options}</div><button class="fs-btn fs-btn-ink" data-action="saveSupplementary">${tr('Create supplementary run')}</button>`);
+          d.querySelector('[data-action="saveSupplementary"]').onclick = async () => {
+            const employee_ids = [...d.querySelectorAll('[name="employee_ids"]:checked')].map((input) => input.value);
+            if (!employee_ids.length) { toast(tr('Choose at least one employee.'), 'error'); return; }
+            await post(c.url(`/pay-runs/${b.dataset.id}/supplementary`), {employee_ids}); closeDialog(d); await render();
+          };
+        },
         payoutSummary: () => payrollPayoutSummaryDialog(payoutSummary || []),
         archiveEmployee: async (b) => { await post(c.url(`/employees/${b.dataset.id}`), {active: false}, "PATCH"); await render(); },
         unarchiveEmployee: async (b) => { await post(c.url(`/employees/${b.dataset.id}`), {active: true}, "PATCH"); await render(); },
@@ -4682,8 +4694,12 @@
     const refresh = async () => api(c.url('/payroll/payouts') + `?run_id=${encodeURIComponent(run.id)}`);
     const renderBatches = (batches) => batches.length ? table(['Payout date', 'Status', 'Employees', 'Actions'], batches.map((batch) => row([
       td(esc(batch.payout_date)), td(pill(batch.status)), td(num(batch.lines.length)),
-      td((batch.status === 'Draft' ? button('Mark paid', 'payPayout', false, `data-id="${batch.id}"`) : '') + (batch.status !== 'Cancelled' ? button('Cancel payout', 'cancelPayout', false, `data-id="${batch.id}"`) : '') + (['Draft','Paid'].includes(batch.status) ? link('Download SEPA file', `/api${c.url(`/payroll/payouts/${batch.id}/pain001.xml`)}`) : '')),
+      td((batch.status === 'Draft' && batch.offsets?.some((offset) => offset.status === 'Proposed') ? button('Confirm offsets', 'confirmPayoutOffsets', false, `data-id="${batch.id}"`) : '') + (batch.status === 'Draft' && !batch.offsets?.some((offset) => offset.status === 'Proposed') ? button('Mark paid', 'payPayout', false, `data-id="${batch.id}"`) : '') + (batch.status !== 'Cancelled' ? button('Cancel payout', 'cancelPayout', false, `data-id="${batch.id}"`) : '') + (['Draft','Paid'].includes(batch.status) ? link('Download SEPA file', `/api${c.url(`/payroll/payouts/${batch.id}/pain001.xml`)}`) : '')),
     ]))) : `<p class="muted">${tr('No payouts for this run.')}</p>`;
+    const renderOffsets = (batches) => {
+      const offsets = batches.flatMap((batch) => (batch.offsets || []).map((offset) => ({...offset, payout_date: batch.payout_date})));
+      return offsets.length ? `<h3>${tr('Receivable offsets')}</h3>${table(['Employee receivable','Offset','Status','Payout date'], offsets.map((offset) => row([td(esc(offset.receivable_id)), cash(offset.amount,'EUR'), td(pill(offset.status)), td(esc(offset.payout_date))])))}` : '';
+    };
     let batches = await refresh();
     const bankOptions = bankAccounts.filter((bank) => bank.active).map((bank) => [bank.id, bank.name]);
     const renderEmployeeSummary = (summary) => table(['Employee', 'Net', 'Paid', 'Pending', 'Unpaid'], (summary?.employees || []).map((item) => row([
@@ -4691,23 +4707,31 @@
     ])));
     const refreshSummary = async () => (await api(c.url('/payroll/payouts/summary') + `?run_id=${encodeURIComponent(run.id)}`))[0];
     const employeeSummary = renderEmployeeSummary(await refreshSummary());
-    const d = dialog('Payroll payouts', `<p>${tr('Pay run')} ${esc(run.period)}</p><div data-payout-summary>${employeeSummary}</div><div data-payout-list>${renderBatches(batches)}</div>${button('Create salary payout', 'createPayout', true)}<div data-payout-bank>${bankOptions.length ? select('Bank account', 'bank_account_id', bankOptions, bankOptions[0][0]) : `<p class="notice">${tr('Add an active bank account first.')}</p>`}</div>`);
+    const d = dialog('Payroll payouts', `<p>${tr('Pay run')} ${esc(run.period)}</p><div data-payout-summary>${employeeSummary}</div><div data-payout-list>${renderBatches(batches)}${renderOffsets(batches)}</div>${button('Create salary payout', 'createPayout', true)}<div data-payout-bank>${bankOptions.length ? select('Bank account', 'bank_account_id', bankOptions, bankOptions[0][0]) : `<p class="notice">${tr('Add an active bank account first.')}</p>`}</div>`);
     d.querySelector('[data-action="createPayout"]').onclick = async () => {
       await post(c.url(`/pay-runs/${run.id}/payouts`), {payout_type: 'salary', bank_account_id: d.querySelector('[name="bank_account_id"]')?.value || null});
-      batches = await refresh(); d.querySelector('[data-payout-list]').innerHTML = renderBatches(batches);
+      batches = await refresh(); d.querySelector('[data-payout-list]').innerHTML = renderBatches(batches) + renderOffsets(batches);
       d.querySelector('[data-payout-summary]').innerHTML = renderEmployeeSummary(await refreshSummary());
       bindPayoutActions();
     };
     const bindPayoutActions = () => {
+      d.querySelectorAll('[data-action="confirmPayoutOffsets"]').forEach((buttonEl) => buttonEl.onclick = async () => {
+        const batch = batches.find((item) => item.id === buttonEl.dataset.id);
+        const proposed = (batch?.offsets || []).filter((offset) => offset.status === 'Proposed');
+        confirmAction(tr('Confirm offsets'), `${tr('Offset')}: ${esc(money(proposed.reduce((sum, offset) => sum + Number(offset.amount), 0), 'EUR'))}`, async () => {
+          await post(c.url(`/payroll/payouts/${buttonEl.dataset.id}/confirm-offsets`), {});
+          batches = await refresh(); d.querySelector('[data-payout-list]').innerHTML = renderBatches(batches) + renderOffsets(batches); bindPayoutActions();
+        });
+      });
       d.querySelectorAll('[data-action="payPayout"]').forEach((buttonEl) => buttonEl.onclick = async () => {
         if (!bankOptions.length) { toast(t('Add an active bank account first.'), 'info'); return; }
         await post(c.url(`/payroll/payouts/${buttonEl.dataset.id}/paid`), {bank_account_id: d.querySelector('[name="bank_account_id"]').value});
-        batches = await refresh(); d.querySelector('[data-payout-list]').innerHTML = renderBatches(batches); bindPayoutActions();
+        batches = await refresh(); d.querySelector('[data-payout-list]').innerHTML = renderBatches(batches) + renderOffsets(batches); bindPayoutActions();
         d.querySelector('[data-payout-summary]').innerHTML = renderEmployeeSummary(await refreshSummary());
       });
       d.querySelectorAll('[data-action="cancelPayout"]').forEach((buttonEl) => buttonEl.onclick = async () => {
         await post(c.url(`/payroll/payouts/${buttonEl.dataset.id}/cancel`));
-        batches = await refresh(); d.querySelector('[data-payout-list]').innerHTML = renderBatches(batches); bindPayoutActions();
+        batches = await refresh(); d.querySelector('[data-payout-list]').innerHTML = renderBatches(batches) + renderOffsets(batches); bindPayoutActions();
         d.querySelector('[data-payout-summary]').innerHTML = renderEmployeeSummary(await refreshSummary());
       });
     };
@@ -4869,9 +4893,11 @@
     monthInput.addEventListener('change', () => drawRecords());
     drawRecords();
   }
-  function renderRun(r, c, providers = []) {
+  function renderRun(r, c, providers = [], runs = []) {
     const draft = String(r.status).toLowerCase() === "draft",
       items = r.items || [],
+      original = r.original_run_id ? runs.find((candidate) => candidate.id === r.original_run_id) : null,
+      related = runs.filter((candidate) => candidate.original_run_id === r.id),
       preparation = r.tsd_preparation,
       tsdActions = preparation
         ? preparation.status === "Completed"
@@ -4888,7 +4914,7 @@
         (draft
           ? button("Delete draft", "delete", false, `data-id="${r.id}"`) +
               button("Approve & post", "approve", true, `data-id="${r.id}"`)
-          : button("Payroll payouts", "managePayouts", false, `data-id="${r.id}"`) + link(
+          : button("Payroll payouts", "managePayouts", false, `data-id="${r.id}"`) + (r.kind === 'regular' ? button('Create correction', 'createCorrection', false, `data-id="${r.id}"`) + button('Add supplementary run', 'createSupplementary', false, `data-id="${r.id}"`) : '') + link(
               "Payslips PDF",
               `/api${c.url(`/pay-runs/${r.id}/payslips.pdf`)}`,
             ) + tsdActions) +
@@ -4897,7 +4923,7 @@
             `/api${c.url(`/pay-runs/${r.id}/workbook.xlsx`)}`,
           ),
       ),
-    ])}<tr class="run-detail"><td colspan="6"><details ${draft ? "open" : ""}><summary>${tr("Employee breakdown")} (${num(items.length)})</summary>${table(
+    ])}<tr id="payroll-run-${esc(r.id)}" class="run-detail"><td colspan="6">${r.kind === 'correction' && original ? `<p>${tr('Correction')}: <a href="#payroll-run-${esc(original.id)}">${tr('Original')} ${esc(original.period)}</a></p>${table(['Employee','Original','Corrected','Difference'], items.map((item) => { const base = original.items.find((x) => x.employee_id === item.employee_id) || {}; const totals = (value) => [Number(value.gross || 0), Number(value.income_tax || 0) + Number(value.social_tax || 0) + Number(value.ui_employee || 0) + Number(value.funded_pension || 0), Number(value.net || 0)]; const before = totals(base), after = totals(item), cell = (values) => `${tr('Gross')}: ${esc(money(values[0], 'EUR'))}<br>${tr('Taxes')}: ${esc(money(values[1], 'EUR'))}<br>${tr('Net')}: ${esc(money(values[2], 'EUR'))}`; return row([td(esc(item.employee_name)), td(cell(before)), td(cell(after)), td(cell(after.map((value, index) => value - before[index])))]); }))}` : ''}${r.kind === 'regular' && related.length ? `<p>${tr('Related runs')}: ${related.map((child) => `<a href="#payroll-run-${esc(child.id)}">${tr(child.kind === 'correction' ? 'Correction' : 'Supplementary run')}</a>`).join(' · ')}</p>` : ''}<details ${draft ? "open" : ""}><summary>${tr("Employee breakdown")} (${num(items.length)})</summary>${table(
       [
         "Employee",
         ["Gross"],

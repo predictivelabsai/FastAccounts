@@ -2740,5 +2740,25 @@
       "Locked period": "Laikotarpis užrakintas",
       "Period reopened": "Laikotarpis atvertas"
     }
+  },
+  "payroll_corrections": {
+    "workspace": {
+      "Create correction": "Sukurti taisymą",
+      "Add supplementary run": "Pridėti papildomą darbo užmokesčio žiniaraštį",
+      "Create supplementary run": "Sukurti papildomą darbo užmokesčio žiniaraštį",
+      "Correction": "Taisymas",
+      "Supplementary run": "Papildomas darbo užmokesčio žiniaraštis",
+      "Original": "Pradinis",
+      "Corrected": "Pataisytas",
+      "Difference": "Skirtumas",
+      "Employee receivable": "Darbuotojo gautina suma",
+      "Offset": "Įskaitymas",
+      "Confirm offsets": "Patvirtinti įskaitymą",
+      "Receivable offsets": "Gautinų sumų įskaitymai",
+      "Related runs": "Susiję žiniaraščiai",
+      "Choose employees for the supplementary run.": "Pasirinkite papildomo žiniaraščio darbuotojus.",
+      "Choose at least one employee.": "Pasirinkite bent vieną darbuotoją.",
+      "Taxes": "Mokesčiai"
+    }
   }
 }

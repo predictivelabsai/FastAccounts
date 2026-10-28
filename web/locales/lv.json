@@ -2740,5 +2740,25 @@
       "Locked period": "Periods noslēgts",
       "Period reopened": "Periods atkārtoti atvērts"
     }
+  },
+  "payroll_corrections": {
+    "workspace": {
+      "Create correction": "Izveidot labojumu",
+      "Add supplementary run": "Pievienot papildu algas sarakstu",
+      "Create supplementary run": "Izveidot papildu algas sarakstu",
+      "Correction": "Labojums",
+      "Supplementary run": "Papildu algas saraksts",
+      "Original": "Sākotnējais",
+      "Corrected": "Labotais",
+      "Difference": "Starpība",
+      "Employee receivable": "Darbinieka prasījums",
+      "Offset": "Ieskaits",
+      "Confirm offsets": "Apstiprināt ieskaitu",
+      "Receivable offsets": "Prasījumu ieskaits",
+      "Related runs": "Saistītie algas saraksti",
+      "Choose employees for the supplementary run.": "Izvēlieties papildu algas saraksta darbiniekus.",
+      "Choose at least one employee.": "Izvēlieties vismaz vienu darbinieku.",
+      "Taxes": "Nodokļi"
+    }
   }
 }

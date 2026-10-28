@@ -2740,5 +2740,25 @@
       "Locked period": "Periood lukustatud",
       "Period reopened": "Periood taasavatud"
     }
+  },
+  "payroll_corrections": {
+    "workspace": {
+      "Create correction": "Loo parandus",
+      "Add supplementary run": "Lisa täiendav palgaleht",
+      "Create supplementary run": "Loo täiendav palgaleht",
+      "Correction": "Parandus",
+      "Supplementary run": "Täiendav palgaleht",
+      "Original": "Algne",
+      "Corrected": "Parandatud",
+      "Difference": "Vahe",
+      "Employee receivable": "Töötaja nõue",
+      "Offset": "Tasaarvestus",
+      "Confirm offsets": "Kinnita tasaarvestus",
+      "Receivable offsets": "Töötaja nõuete tasaarvestused",
+      "Related runs": "Seotud palgalehed",
+      "Choose employees for the supplementary run.": "Vali täiendavale palgalehele töötajad.",
+      "Choose at least one employee.": "Vali vähemalt üks töötaja.",
+      "Taxes": "Maksud"
+    }
   }
 }
