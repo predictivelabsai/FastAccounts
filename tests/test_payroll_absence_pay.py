@@ -161,7 +161,7 @@ def test_termination_compensation_and_vacation_payout_date():
 
 
 def test_sick_benefit_is_split_across_monthly_draft_runs_and_frozen_on_approval(db, ee_org):
-    from payroll import PayrollService
+    from payroll import PayrollConflict, PayrollService
     from payroll_absences import PayrollAbsenceService
     actor = 'owner@example.test'
     payroll = PayrollService(db)
@@ -169,7 +169,8 @@ def test_sick_benefit_is_split_across_monthly_draft_runs_and_frozen_on_approval(
                                      gross_salary='2200', apply_tax_free_minimum=False)
     absence = PayrollAbsenceService(db).save(ee_org['id'], employee['id'], actor=actor,
         absence_type='sick_leave', start_date='2026-10-30', end_date='2026-11-04')
-    october = payroll.create_run(ee_org['id'], period='2026-10', actor=actor)['items'][0]
+    october_run = payroll.create_run(ee_org['id'], period='2026-10', actor=actor)
+    october = october_run['items'][0]
     october_component = next(c for c in october['components'] if c['preset_key'] == 'employer_sick_pay')
     assert october_component['amount'] == october_component['breakdown']['amount']
     assert october_component['breakdown']['qualifying_days'] == 1
@@ -179,9 +180,10 @@ def test_sick_benefit_is_split_across_monthly_draft_runs_and_frozen_on_approval(
     november_component = next(c for c in november['components'] if c['preset_key'] == 'employer_sick_pay')
     assert november_component['breakdown']['qualifying_days'] == 3
     assert Decimal(october_component['amount']) + Decimal(november_component['amount']) > 0
-    with db.transaction() as tx:
-        tx.execute('UPDATE pay_runs SET status=\'Approved\' WHERE organisation_id=? AND period=?',
-                   (ee_org['id'], '2026-10'))
+    payroll.approve(ee_org['id'], october_run['id'], actor=actor)
+    with pytest.raises(PayrollConflict, match='draft'):
+        payroll.update_item(ee_org['id'], october_run['id'], october['id'], actor=actor,
+                            gross_salary='2500')
     frozen = payroll.runs(ee_org['id'])
     assert next(r for r in frozen if r['period'] == '2026-10')['items'][0]['components'][0]['breakdown']
 

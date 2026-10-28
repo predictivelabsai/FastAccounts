@@ -155,6 +155,47 @@ vacation-pay method, amount and reviewable average-pay breakdown. Pending
 snapshots can be recalculated; snapshots already marked in a payout or paid
 cannot be recalculated.
 
+Unit 5 is complete for the requested demo scope. Migration 0048 adds a nullable
+breakdown snapshot to payroll component rows. Draft payroll runs generate an
+employer sick benefit for qualifying days 2–5 overlapping the run period, using
+the existing income-tax-only preset. They also generate unused annual-leave
+compensation when the employment end date is in the run period. The component
+stores its calculation basis and average-pay breakdown. Editing a draft
+recalculates generated values and permits an accountant-entered override;
+approved runs remain immutable. Until leave lots are applied, the termination
+balance is current-year entitlement minus annual leave taken in the year plus
+the latest reviewed opening unused-day balance effective by termination.
+Extended and study leave are not deducted from annual entitlement.
+
+The Absences tab shows the method selector, fixed-amount input, calculation
+table and status for annual, extended and study leave. Pending records can be
+added to an existing Draft absence-pay batch or a new batch with the default
+payout date. The register is read-only for viewer and approver roles. Labels
+are present in en, et, lv and lt, including the requested Estonian wording.
+
+Validation commands and results:
+
+```powershell
+.tmp\venv312\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache312 --basetemp=.tmp\test-u5-ap-confirm tests\test_payroll_absence_pay.py
+# 9 passed
+.tmp\venv312\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache312 --basetemp=.tmp\test-u5-as-pass tests\test_payroll_absences.py
+# 10 passed
+.tmp\venv312\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache312 --basetemp=.tmp\test-u5-pay-final3 tests\test_payroll.py
+# 16 passed
+.tmp\venv312\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache312 --basetemp=.tmp\test-u5-ws-final6 tests\test_workspace_payroll.py
+# 17 passed
+.tmp\venv312\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache312 --basetemp=.tmp\test-u5-i18n-final3 tests\test_i18n.py
+# 15 passed
+.tmp\venv312\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache312 --basetemp=.tmp\test-u5-mig-final2 tests\test_migrations_and_tenancy.py
+# 16 passed
+node --check static\app.js
+# passed
+```
+
+No live network calls or PostgreSQL execution were used. The sickness rate and
+leave-balance interpretation still require Estonian accountant confirmation
+before production use.
+
 Command and result:
 
 ```powershell
@@ -171,11 +212,8 @@ Command and result:
 - Unit 5b below implements the vacation-pay payout, payment-date tax,
   exemption aggregation, frozen values, GL postings and TSD inclusion. Sick
   benefit and termination unused-leave amounts remain outside this path.
-- Sick benefit and termination unused-leave compensation are not yet wired as
-  run components. The termination trigger and leave-balance source need
-  implementation.
-- The absences tab does not yet expose the breakdown, method selection or
-  payout action. Labels for this workflow are not yet added in en/et/lv/lt.
+- Unit 5 implementation is complete; see its validation and accountant review
+  notes above.
 - The absence-pay method selection route has role, tenant and CSRF coverage.
   The payout lifecycle and TSD reporting coverage are recorded in Unit 5b.
 
@@ -264,11 +302,8 @@ Commands and results, Python 3.12.14:
 # 16 passed
 ```
 
-No live network calls or PostgreSQL execution were performed. Remaining Unit 5
-work is wiring employer sick benefit and termination unused-leave compensation
-as payroll components. The absence-pay UI and en/et/lv/lt labels are not part
-of Unit 5b. Statutory calculation assumptions remain subject to Estonian
-accountant confirmation.
+No live network calls or PostgreSQL execution were performed. Statutory
+calculation assumptions remain subject to Estonian accountant confirmation.
 
 ## Unit 5b design note (recorded before implementation)
 

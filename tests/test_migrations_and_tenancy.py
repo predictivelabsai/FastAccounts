@@ -126,6 +126,8 @@ def test_empty_migration_is_idempotent(tmp_path):
     assert {"matched_local_id", "match_json"} <= staged_columns
     sync_columns = {row["name"] for row in db.rows("PRAGMA table_info(sync_runs)")}
     assert {"reviewed_at", "reviewed_by"} <= sync_columns
+    component_columns = {row["name"] for row in db.rows("PRAGMA table_info(pay_item_components)")}
+    assert "breakdown_json" in component_columns
 
 
 def test_migration_preserves_existing_data(tmp_path):

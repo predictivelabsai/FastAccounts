@@ -16,10 +16,11 @@
   proration by interrupted working days, with hourly payroll unchanged and the
   ratio shown on the run and payslip. Unit 4 adds the pure, Decimal average-pay
   engine with approved wages, historical earnings, explicit absence exclusions,
-  three averages and a documented fallback breakdown. Absence pay, historical
-  import and liability work remains in progress. Unit 5 adds tested pure
-  vacation and sickness payment calculations, but pending-pay persistence,
-  payout linkage and payroll-run integration are outstanding. Migration 0045
+  three averages and a documented fallback breakdown. Unit 5 now includes
+  persisted vacation pay, payout linkage, draft payroll sick-benefit and
+  termination compensation components with stored calculation breakdowns, and
+  the translated Absences controls. Historical import and liability workflows
+  remain in progress. Migration 0045
   adds effective-dated entitlement, reviewed opening-balance and reviewed
   historical-earning tables. Import routes, UI and application logic remain
   outstanding. Unit 7 now has pure calendar-day accrual, FIFO/expiry and
@@ -30,8 +31,8 @@
   balances and optional payslip balances remain outstanding.
 - Targeted payroll regression tests for the absence service, averages, absence
   calculations, liability calculations and migration preservation pass. The
-  absence series is still in progress because payment integration, historical
-  import, persistent liability workflows and reserve posting are outstanding.
+  absence series remains in progress because historical import, persistent
+  liability workflows and reserve posting are outstanding.
 
 ## 2026-10-28: Payroll calendar and payouts
 

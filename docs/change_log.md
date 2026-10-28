@@ -34,9 +34,9 @@ delivered.
   listed for accountant confirmation in `payroll_absences_validation.md`.
 - Added `payroll_absence_pay.py` with Decimal vacation-pay method breakdowns,
   the explicit `EE-SICK-2026-v1` sick-benefit rule, unused-leave compensation
-  calculation and previous-working-day payout date. Four targeted tests pass.
-  Absence save/payout/run integration is still outstanding and is recorded as
-  such in the validation document.
+  calculation and previous-working-day payout date. Four pure calculation
+  tests passed. Absence save, payout and payroll-run integration was completed
+  in Unit 5, as recorded below.
 - Added migration 0045 for effective-dated leave entitlements, reviewed opening
   balances and reviewed historical earning rows with tenant/employee keys and
   idempotent source keys. This is the storage foundation only: staged import,
@@ -50,10 +50,16 @@ delivered.
   snapshots; the overview adds employees currently on annual leave and sick
   leave KPIs. Dashboard labels are translated in en/et/lv/lt. Remaining leave
   balances are not yet calculated in the payslip.
-- Added the final focused regression record to `payroll_absences_validation.md`.
-  It records the passing 25-test core run and clearly lists outstanding payout,
-  import, persisted-liability, reserve-posting and remaining-balance work. The
-  series remains in progress pending those implementations and accountant UAT.
+- Completed Unit 5 with migration 0048 for stored component breakdowns,
+  draft-run employer sick benefit and termination unused-leave compensation.
+  Draft edits recalculate generated amounts; accountant overrides are retained
+  for termination compensation, and approved runs stay frozen. The Absences tab
+  displays vacation-pay methods and breakdowns and links pending records to new
+  or existing Draft payouts. Labels cover en, et, lv and lt; viewer and approver
+  roles have read-only access. Targeted results are in
+  `payroll_absences_validation.md`. The series remains in progress because
+  historical import, persistent liability workflows, reserve posting and
+  accountant UAT are outstanding.
 
 ## 2026-10-28: Payroll calendar and payouts
 
