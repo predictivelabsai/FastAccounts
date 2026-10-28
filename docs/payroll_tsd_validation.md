@@ -96,6 +96,12 @@ subsequent replacement must use `R` and fresh line numbers. A later-month
 correction is exported from its own paid payout as a separate `R` transaction
 dated in that payment month.
 
+The transaction identity and date are tested for a later-month correction using
+an employee without a tax-free allowance. Correction TSD amounts are currently
+frozen at correction approval; recalculation of tax-free allowance when its
+payout date moves to another month remains open and can trigger the negative
+amount export block.
+
 The vendored developer guide section 4 and cancellation example define these
 operation rules. The requested offline test files pass individually: payroll
 corrections 7, payroll payouts 7, APA history 6, APA XML 6, TSD export 14 and

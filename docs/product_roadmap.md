@@ -2231,5 +2231,6 @@ accountant confirmation. Same-month corrections update the original workpaper
 and use APA `M`; later-month payouts are separate `R` transactions. API,
 tenant/role/CSRF and requested offline acceptance tests are implemented.
 Payroll workspace controls and en/et/lv/lt strings remain outstanding, along
-with accountant UAT and e-MTA acceptance. See
+with later-month correction tax recalculation when tax-free allowances apply,
+accountant UAT and e-MTA acceptance. See
 `payroll_corrections_validation.md` for design, limits and test results.

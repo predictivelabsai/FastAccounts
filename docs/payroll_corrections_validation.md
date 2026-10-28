@@ -115,8 +115,13 @@ commands, counts, commits and unresolved acceptance items here.
   - `pytest tests/test_migrations_and_tenancy.py -q`: 17 passed.
 - Remaining: payroll UI and en/et/lv/lt strings. The migration records
   `original_run_id` without a composite foreign key, so tenant-safe lineage
-  depends on service checks. Accountant UAT and e-MTA acceptance remain external
-  validation work.
+  depends on service checks. One tax calculation question also remains: correction
+  TSD deltas are frozen during approval, while the payout date is selected later.
+  The later-month APA test covers an employee without a tax-free allowance. A
+  later payout month with an allowance may require tax recalculation and can be
+  blocked by the offline negative-amount rule. Accountant review is needed before
+  claiming that case is supported. Accountant UAT and e-MTA acceptance remain
+  external validation work.
 
 ### Final requested test pass
 
@@ -131,5 +136,6 @@ Each requested file was run individually with the repository venv:
 
 Total: 57 passed and 2 existing deprecation warnings. No full suite or live
 network test was run. Implementation remaining: payroll UI and en/et/lv/lt
-strings. Open validation items: accountant UAT, e-MTA acceptance and adding a
-composite tenant foreign key for `original_run_id` in a future safe migration.
+strings. Open items: later-month tax recalculation for tax-free allowances,
+accountant UAT, e-MTA acceptance and a composite tenant foreign key for
+`original_run_id` in a future safe migration.
