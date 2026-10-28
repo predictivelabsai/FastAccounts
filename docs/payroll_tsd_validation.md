@@ -1,42 +1,64 @@
 # Payroll APA TSD validation
 
-Date: 2026-10-28. Branch: `feat/payroll-tsd-apa`, based on `200c715`.
+Date: 2026-10-28. Branch: `feat/payroll-tsd-apa`, based on `0be4197`.
 
 ## Implemented in this checkpoint
 
 Migrations 0052 and 0053 add tenant-scoped payment-type codes to component
 types, frozen component rows and base-pay run items, with preset defaults and
-backfills. Prepared records expose the base-pay code, and the editor accepts a
-component code with an Estonian label. `payroll_tsd_types.py` contains a small
-resident-person matrix extract and pure lookup function.
+backfills. Migration 0054 adds `pay_item_tsd_lines`. At approval, pay-run items
+and absence-pay calculations freeze one line per payment type. Salary and bonus
+amounts with code 10 are grouped together. The pure allocator preserves the
+existing aggregate pay calculation and assigns cent residuals to the largest
+record for each levy. A social-tax minimum top-up is placed on an eligible base
+salary record. Exemption 610 is allocated to the base salary record first and
+then by payment type, capped at each record's taxable amount.
 
-## Verification run
+TSD preparation reads the frozen lines. For earlier approved runs it rebuilds
+the split read-only from frozen component rows and employee context when those
+inputs are complete. Otherwise it retains one base-type record and displays the
+warning `Legacy run: per-type split unavailable`. Export rows continue to
+include payment type codes; absence-pay lines remain separate and use their
+payout date. Older database snapshots without migration 0054 skip persistence
+during approval until they are upgraded.
+
+## Verification
+
+The migration list is explicit in both `tests/test_migrations_and_tenancy.py`
+and `.github/workflows/ci.yml`. Each requested test file was run individually:
 
 ```powershell
-.venv\Scripts\python.exe -m pytest -x -q -o cache_dir=.tmp\pytest-cache --basetemp=.tmp\test-tsd-debug2 tests\test_migrations_and_tenancy.py::test_component_catalogue_upgrade_preserves_defaults_and_posted-payroll tests\test_tsd_export.py
+.venv\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache --basetemp=.tmp\test-tsd-repeat tests\test_tsd_export.py
+# 10 passed
+.venv\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache --basetemp=.tmp\test-absence-repeat tests\test_payroll_absence_pay.py
+# 10 passed
+.venv\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache --basetemp=.tmp\test-payouts tests\test_payroll_payouts.py
+# 7 passed
+.venv\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache --basetemp=.tmp\test-settlement tests\test_payroll_settlement.py
 # 8 passed
+.venv\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache --basetemp=.tmp\test-payroll tests\test_payroll.py
+# 16 passed
+.venv\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache --basetemp=.tmp\test-demo-fixes tests\test_payroll_demo_fixes.py
+# 24 passed
+.venv\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache --basetemp=.tmp\test-hourly tests\test_payroll_part_time_hourly.py
+# 30 passed
+.venv\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache --basetemp=.tmp\test-merit-final tests\test_merit_palk.py
+# 49 passed
+.venv\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache --basetemp=.tmp\test-migrations-repeat tests\test_migrations_and_tenancy.py
+# 16 passed
 ```
 
-The first test run found an undefined schema-capability flag in the draft item
-writer; this was fixed before the passing run. The full migration suite started
-but did not finish inside the short command window. No network calls or
-PostgreSQL execution were performed.
+Total: 170 passed. No live EMTA or other network calls were made. The full
+Merit Palk suite includes the older-schema upgrade test; approval skips new
+TSD-line persistence when migration 0054 has not been applied.
 
-## Remaining work in scope 4a
+## Remaining validation
 
-- Snapshot official payment types on base salary and board fee, and split each
-  recipient's frozen run and absence-pay calculation into records per payment
-  type and payment date.
-- Allocate social tax, monthly-minimum top-up, UI, II pillar, shared tax-free
-  amount and income tax across those records with deterministic cent residuals,
-  then reconcile all record totals to the frozen payroll calculation.
-- Replace the transitional review CSV with the Annex 1 legacy upload shape
-  documented by the 2024 guide, including its documented-code header assumption.
-- Add the APA TSD recipient/type workpaper views and XLSX export, validation
-  messages, full mixed-payment/reconciliation tests and role/CSRF tests.
 - Verify the exact component preset codes with an Estonian accountant. Author,
   parental, non-taxable expense and deduction classifications need confirmation.
-- Confirm generated APA XML and legacy CSV acceptance with EMTA before filing.
+- Confirm generated XBRL GL XML and transitional CSV acceptance with EMTA before
+  filing. Outputs remain review-only and are not submitted by the application.
 
-The current exporter still has its prior one-record-per-pay-run-item calculation
-logic. Therefore this checkpoint does not fulfil the full 4a acceptance scope.
+Exact preset and legal classifications still require Estonian accountant
+confirmation. XML and CSV output remain unverified against e-MTA, and direct
+submission remains disabled.

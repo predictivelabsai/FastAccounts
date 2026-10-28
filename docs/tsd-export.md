@@ -15,7 +15,10 @@ e-MTA supports XBRL GL file upload, and CSV upload is transitional only through
 the payment month. Annexes 3–8 are unchanged and are not produced here.
 
 This is an accountant-facing export from an **Approved** Estonian EUR pay run.
-TSD payment type codes are assigned from each frozen payment component. Preparing the export
+TSD records are grouped by recipient and frozen payment type. Base salary and
+components with the same type code form one record. Each approved run and
+absence-pay payout stores its per-type calculation lines in
+`pay_item_tsd_lines` in the approval transaction. Preparing the export
 creates a tenant-scoped `sync_runs` row with provider `emta`, direction `export`,
 object type `tsd`, and status `Review Required`. An owner, administrator, or
 accountant must mark that preparation reviewed before either file can be
@@ -29,12 +32,13 @@ downloaded. Downloading a file does not submit it.
    Annex 2 records from names, personal IDs, or other unreliable inference.
    Non-resident calculation and classification remain outside the payroll
    engine's current scope.
-2. The exporter uses the date of the run's non-cancelled salary payout when one
-   exists. Otherwise it uses the run's frozen payday-rule date, falling back to
-   period end for older runs. TSD is due on the 10th of the month after that
-   payment month; a weekend or Estonian public holiday moves the due date
-   forward to the next working day. The accountant must check payment records
-   before upload.
+2. Pay-run records use the date of the run's non-cancelled salary payout when
+   one exists. Otherwise they use the run's frozen payday-rule date, falling
+   back to period end for older runs. Approved absence-pay payouts are separate
+   records dated on their frozen payout date. TSD is due on the 10th of the
+   month following each payment month; a weekend or Estonian public holiday
+   moves the due date forward to the next working day. The accountant must
+   check payment records before upload.
 3. `EMPLOYMENT_SALARY`, `BOARD_MEMBER_FEE` and `CONTRACTOR_FEE` are FastAccounts semantic labels.
    The payroll plan does not specify official e-MTA payment-type codes, and
    these labels are not represented as verified EMTA codes. Services-contract
@@ -44,9 +48,10 @@ downloaded. Downloading a file does not submit it.
    TSD extension namespace (`urn:fastaccounts:ee:tsd:2026:review-only`). It is
    tested for well-formedness and the documented fields, not against an e-MTA
    schema or test environment.
-5. Amounts come from the frozen approved pay-run item and remain `Decimal`
-   values rounded by the payroll engine. No amount is recalculated with binary
-   floating point.
+5. Amounts come from frozen approved TSD lines and remain `Decimal` values.
+   Levy rounding residuals go to the largest eligible payment-type record so
+   each total matches the approved calculation. No money is recalculated with
+   binary floating point.
 6. The payer registration number and each frozen payee personal ID are
    required. Migration `0010_tsd_export` snapshots existing identifiers once;
    every new draft snapshots the identifier when the pay run is created.
@@ -66,8 +71,13 @@ are:
 | Author, parental, expenses and other deductions | 17, 10 or 16 | Needs accountant confirmation of the legal and tax basis |
 
 The payment-type editor lets an accountant change the code for future items.
-The current export does not yet include the code in its record or split a frozen
-item into multiple payment-type records; see `payroll_tsd_validation.md`.
+Legacy approved runs are reconstructed from their frozen component and employee
+context snapshots when all required inputs are present. If a snapshot is
+incomplete, the workpaper keeps one record using the frozen base payment type
+and displays `Legacy run: per-type split unavailable`. Legacy run values are
+never rewritten. Cent-allocation residuals go to the largest eligible record
+for the relevant levy. The social-tax minimum top-up goes on the base salary
+record, with the matrix eligibility checked.
 
 ## Per-payment field mapping
 
@@ -78,9 +88,9 @@ as `tsd:*` children of each XBRL GL `gl-cor:entryDetail`.
 | --- | --- |
 | `declaration` | Constant `TSD` |
 | `annex` | `1` for the currently supported resident-payment scope; `2` is reserved in the mapping table for future non-resident support |
-| `payment_record_id` | Immutable `pay_run_items.id` |
+| `payment_record_id` | Frozen TSD line ID, unique per pay-run item and payment type; legacy fallback uses the item ID |
 | `pay_run_id` | Tenant-scoped approved `pay_runs.id` |
-| `payment_date` | Salary payout date, frozen payday-rule date, or legacy period end |
+| `payment_date` | Salary payout date, frozen payday-rule date, legacy period end, or absence-pay payout date |
 | `payment_month` | `YYYY-MM` from `payment_date` |
 | `filing_deadline` | The 10th day after `payment_date`'s month, moved forward to the next working day when needed |
 | `payer_registration_no` | `organisations.registration_no` |
@@ -89,17 +99,17 @@ as `tsd:*` children of each XBRL GL `gl-cor:entryDetail`.
 | `payment_classification` | FastAccounts display label retained for compatibility |
 | `pay_basis` | Frozen `monthly`, `hourly`, `board_fee`, or `income_line` |
 | `currency` | Constant `EUR`; the service rejects non-EE/non-EUR books |
-| `gross_amount` | `pay_run_items.gross` |
-| `tax_free_minimum` | `pay_run_items.tax_free_minimum` |
-| `income_tax_base` | `max(0, gross − funded pension − employee unemployment insurance − tax-free minimum)` using `Decimal` |
-| `income_tax` | `pay_run_items.income_tax` |
-| `employee_unemployment_insurance` | `pay_run_items.ui_employee` |
-| `employer_unemployment_insurance` | `pay_run_items.ui_employer` |
-| `funded_pension` | `pay_run_items.funded_pension` |
-| `social_tax_base` | `pay_run_items.social_tax_base`, including the payroll engine's minimum-base treatment |
-| `social_tax` | `pay_run_items.social_tax` |
-| `net_amount` | `pay_run_items.net` |
-| `employer_cost` | `pay_run_items.employer_cost` |
+| `gross_amount` | Frozen TSD line amount for the payment type |
+| `tax_free_minimum` | Exemption 610 allocated to the payment type, capped at its taxable amount |
+| `income_tax_base` | Frozen per-type taxable amount plus the exemption allocated to that record |
+| `income_tax` | Frozen per-type allocation of the approved income-tax total |
+| `employee_unemployment_insurance` | Frozen per-type UI amount |
+| `employer_unemployment_insurance` | Frozen per-type employer UI amount |
+| `funded_pension` | Frozen per-type II-pillar amount |
+| `social_tax_base` | Frozen per-type social-tax base, including any eligible monthly-minimum top-up |
+| `social_tax` | Frozen per-type allocation of approved social tax |
+| `net_amount` | Approved net allocated across the payment-type records by gross amount |
+| `employer_cost` | Per-type gross plus social tax and employer UI |
 
 Before serialization, the sum of `gross_amount`, `net_amount`, and
 `employer_cost` must equal the corresponding approved pay-run totals. A mismatch
