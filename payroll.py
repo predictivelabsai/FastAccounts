@@ -39,6 +39,9 @@ from payroll_tax_repository import monthly_exemption_used
 from payroll_payday import payday_for_period
 from employee_details import validate_details, birth_date_from_personal_code
 from payroll_absences import PayrollAbsenceService
+from payroll_absence_pay import employer_sick_benefit, unused_leave_compensation
+from payroll_average import calculate_average_pay
+import json
 
 
 class PayrollConflict(ValueError):
@@ -221,6 +224,102 @@ def declaration_due_date(period, payment_date=None):
 class PayrollService:
     def __init__(self, db: Database | None = None):
         self.db = db or get_database()
+
+    @staticmethod
+    def _absence_component_lines(tx, organisation_id, employee, period, absences):
+        """Build draft-only statutory absence components with frozen calculation details."""
+        from datetime import date
+
+        employee_id = employee.get('employee_id') or employee['id']
+        live_employee = tx.one('SELECT * FROM employees WHERE organisation_id=? AND id=?',
+                               (organisation_id, employee_id))
+        if live_employee:
+            employee = employee | live_employee | {'id': employee_id}
+        year, month = map(int, period.split('-'))
+        first, last = date(year, month, 1), date(year + (month == 12), month % 12 + 1, 1) - timedelta(days=1)
+        absence_rows = tx.rows('SELECT absence_type,start_date,end_date FROM payroll_absences '
+                               'WHERE organisation_id=? AND employee_id=?',
+                               (organisation_id, employee['id']))
+        settings = {r['absence_type']: bool(r['paid_salary']) for r in tx.rows(
+            'SELECT absence_type,paid_salary FROM payroll_absence_type_settings WHERE organisation_id=?',
+            (organisation_id,))}
+        for row in absence_rows:
+            row['wage_paid'] = (row['absence_type'] == 'permitted_absence' and settings.get('permitted_absence', False)
+                                or row['absence_type'] not in ('permitted_absence', 'unpaid_leave', 'truancy'))
+        approved = tx.rows("SELECT i.*,r.period,r.status FROM pay_run_items i JOIN pay_runs r "
+                           "ON r.organisation_id=i.organisation_id AND r.id=i.pay_run_id "
+                           "WHERE i.organisation_id=? AND i.employee_id=? AND r.status='Approved'",
+                           (organisation_id, employee['id']))
+        for item in approved:
+            item['components'] = tx.rows('SELECT direction,amount,is_wage FROM pay_item_components '
+                                         'WHERE organisation_id=? AND item_id=?',
+                                         (organisation_id, item['id']))
+        history = tx.rows("SELECT earning_month AS period,wage_total FROM payroll_historical_earnings "
+                          "WHERE organisation_id=? AND employee_id=? AND status='Approved'",
+                          (organisation_id, employee['id']))
+        components = []
+        for absence in absences:
+            if absence['absence_type'] != 'sick_leave':
+                continue
+            start = max(first, date.fromisoformat(absence['start_date']))
+            end = min(last, date.fromisoformat(absence['end_date']))
+            if start > end:
+                continue
+            avg = calculate_average_pay(employee, date.fromisoformat(absence['start_date']),
+                                        approved_items=approved, historical_earnings=history,
+                                        absences=absence_rows)
+            breakdown = employer_sick_benefit(avg.average_daily_pay,
+                date.fromisoformat(absence['start_date']), start, end)
+            breakdown['average'] = avg.as_dict()
+            if Decimal(breakdown['amount']) > 0:
+                components.append(('employer_sick_pay', Decimal(breakdown['amount']), breakdown))
+
+        employment_end = employee.get('employment_end_date')
+        if employment_end and first <= date.fromisoformat(employment_end) <= last:
+            end_date = date.fromisoformat(employment_end)
+            entitlements = tx.rows('SELECT effective_from,days_per_year FROM payroll_leave_entitlements '
+                                   'WHERE organisation_id=? AND employee_id=? AND effective_from<=? ORDER BY effective_from',
+                                   (organisation_id, employee['id'], end_date.isoformat()))
+            applicable = next((r for r in reversed(entitlements) if r['effective_from'][:4] == str(year)), None)
+            entitlement = Decimal(str(applicable['days_per_year'])) if applicable else Decimal(0)
+            taken = Decimal(0)
+            for absence in absence_rows:
+                if (absence['absence_type'] == 'annual_leave' and absence['start_date'][:4] == str(year)
+                        and absence['start_date'] <= end_date.isoformat()):
+                    taken += Decimal(str(PayrollAbsenceService._counts(absence['absence_type'],
+                        absence['start_date'], min(absence['end_date'], end_date.isoformat()))['leave_days']))
+            opening_row = tx.one('SELECT unused_days FROM payroll_leave_openings '
+                                 'WHERE organisation_id=? AND employee_id=? AND cutover_date<=? '
+                                 'ORDER BY cutover_date DESC LIMIT 1',
+                                 (organisation_id, employee['id'], end_date.isoformat()))
+            opening = opening_row['unused_days'] if opening_row else 0
+            remaining = max(Decimal(0), Decimal(str(opening)) + entitlement - taken)
+            if remaining:
+                avg = calculate_average_pay(employee, end_date, approved_items=approved,
+                    historical_earnings=history, absences=absence_rows)
+                amount = unused_leave_compensation(remaining, avg.average_daily_pay)
+                breakdown = {'employment_end_date': end_date.isoformat(), 'entitlement_days': str(entitlement),
+                    'opening_unused_days': str(opening), 'taken_annual_leave_days': str(taken),
+                    'remaining_leave_days': str(remaining), 'average_daily_pay': str(avg.average_daily_pay),
+                    'amount': str(amount), 'average': avg.as_dict(), 'balance_method': 'annual entitlement minus taken leave plus opening unused days'}
+                components.append(('unused_leave', amount, breakdown))
+        return components
+
+    @staticmethod
+    def _save_absence_components(tx, organisation_id, item_id, generated, position):
+        for preset, amount, breakdown in generated:
+            ptype = tx.one('SELECT * FROM pay_component_types WHERE organisation_id=? AND preset_key=?',
+                           (organisation_id, preset))
+            if not ptype:
+                continue
+            fields = ('id','organisation_id','item_id','type_id','position','name','amount','direction',
+                      'income_tax','social_tax','ui_employee','ui_employer','funded_pension','social_minimum',
+                      'liability_role','is_wage','breakdown_json')
+            values = (new_id(), organisation_id, item_id, ptype['id'], position, ptype['name'],
+                db_number(amount), ptype['direction'], ptype['income_tax'], ptype['social_tax'],
+                ptype['ui_employee'], ptype['ui_employer'], ptype['funded_pension'], ptype['social_minimum'],
+                ptype['liability_role'], ptype.get('is_wage', 0), json.dumps(breakdown, sort_keys=True))
+            tx.execute('INSERT INTO pay_item_components('+','.join(fields)+') VALUES ('+','.join('?' for _ in fields)+')', values)
 
     def pushes(self, organisation_id, run_id):
         from push_service import PushService
@@ -415,7 +514,12 @@ class PayrollService:
         run['items'] = tx.rows('SELECT * FROM pay_run_items WHERE organisation_id=? AND pay_run_id=? ORDER BY employee_name,id', (organisation_id, run_id))
         for item in run['items']:
             item['components'] = [serialise(row) for row in tx.rows(
-                'SELECT * FROM pay_item_components WHERE organisation_id=? AND item_id=? ORDER BY position,id', (organisation_id, item['id']))]
+                'SELECT c.*,t.preset_key FROM pay_item_components c JOIN pay_component_types t '
+                'ON t.organisation_id=c.organisation_id AND t.id=c.type_id '
+                'WHERE c.organisation_id=? AND c.item_id=? ORDER BY c.position,c.id', (organisation_id, item['id']))]
+            for component in item['components']:
+                if component.get('breakdown_json'):
+                    component['breakdown'] = json.loads(component.pop('breakdown_json'))
             for key in (*AMOUNTS, 'gross_salary', 'funded_pension_percent'):
                 item[key] = db_number(money(item[key]))
             item['minimum_wage'] = None if item.get('minimum_wage') is None else db_number(money(item['minimum_wage']))
@@ -504,6 +608,7 @@ class PayrollService:
         item = next((item for item in run['items'] if item['id'] == item_id), None)
         if not item:
             raise KeyError('Pay run item not found')
+        component_overrides = {}
         if gross_salary is not None:
             if item['pay_basis'] not in ('monthly', 'board_fee'):
                 raise ValueError('Gross salary can be edited only for monthly or board fee employees')
@@ -533,6 +638,8 @@ class PayrollService:
                 data.setdefault('is_wage', True)
                 data.setdefault('active', True)
                 data.update(line)
+                if data.get('preset_key') in ('unused_leave', 'employer_sick_pay'):
+                    component_overrides[data['preset_key']] = decimal(data['amount'])
                 self._component_values(data)
                 try:
                     amount = decimal(data.get('amount'))
@@ -547,6 +654,28 @@ class PayrollService:
                 fields = ('id', 'organisation_id', 'item_id', 'type_id', 'position', 'name', 'amount', 'direction', *FLAGS, 'liability_role') + (('is_wage',) if metadata_ready else ())
                 values = (new_id(), organisation_id, item_id, data['id'], position, data['name'], db_number(amount), data['direction'], *(data[key] for key in FLAGS), data['liability_role']) + ((data['is_wage'],) if metadata_ready else ())
                 tx.execute('INSERT INTO pay_item_components(' + ','.join(fields) + ') VALUES (' + ','.join('?' for _ in fields) + ')', values)
+        tx.execute("DELETE FROM pay_item_components WHERE organisation_id=? AND item_id=? AND type_id IN "
+                   "(SELECT id FROM pay_component_types WHERE organisation_id=? AND preset_key IN ('employer_sick_pay','unused_leave'))",
+                   (organisation_id, item_id, organisation_id))
+        if tx.dialect == 'postgres':
+            absence_schema_ready = bool(tx.one("SELECT 1 FROM information_schema.tables WHERE table_schema=current_schema() AND table_name='payroll_absence_run_items'"))
+        else:
+            absence_schema_ready = bool(tx.one("SELECT 1 FROM sqlite_master WHERE type='table' AND name='payroll_absence_run_items'"))
+        if absence_schema_ready:
+            frozen_absences = tx.rows('SELECT a.* FROM payroll_absence_run_items x JOIN payroll_absences a '
+                'ON a.organisation_id=x.organisation_id AND a.id=x.absence_id '
+                'WHERE x.organisation_id=? AND x.pay_run_id=? AND x.employee_id=?',
+                (organisation_id, run_id, item['employee_id']))
+            generated = self._absence_component_lines(tx, organisation_id, item, run['period'], frozen_absences)
+        else:
+            generated = []
+        for index, (preset, amount, breakdown) in enumerate(generated):
+            if preset in component_overrides:
+                override = money(component_overrides[preset])
+                generated[index] = (preset, override, breakdown | {'accountant_override': db_number(override)})
+        next_position = tx.scalar('SELECT COALESCE(MAX(position),-1)+1 FROM pay_item_components WHERE organisation_id=? AND item_id=?',
+                                  (organisation_id, item_id)) or 0
+        self._save_absence_components(tx, organisation_id, item_id, generated, next_position)
         lines = tx.rows('SELECT * FROM pay_item_components WHERE organisation_id=? AND item_id=? ORDER BY position', (organisation_id, item_id))
         context = tx.one('SELECT * FROM pay_item_context WHERE organisation_id=? AND item_id=?', (organisation_id, item_id))
         if not context:
@@ -656,6 +785,7 @@ class PayrollService:
         for employee in employees:
             election = resolve_tax_settings(tx, organisation_id, employee, pay_date)
             employee = employee | election
+            employee_for_average = employee
             basis, fte, worked, required = pay_basis(employee), _fte(employee.get('fte')), None, None
             if basis == 'monthly':
                 # Part-time: the monthly minimum wage is pro-rated by the work-time fraction.
@@ -679,11 +809,19 @@ class PayrollService:
                     if norm_days_snapshot else Decimal(0)))}
                 required = money(agreement_minimum * Decimal(worked_days) / Decimal(norm_days_snapshot)
                                  if norm_days_snapshot else Decimal(0))
+            generated = self._absence_component_lines(tx, organisation_id, employee_for_average, period,
+                                                       absence_snapshot['absences'])
+            generated_lines = []
+            for preset, amount, _ in generated:
+                ptype = tx.one('SELECT * FROM pay_component_types WHERE organisation_id=? AND preset_key=?',
+                               (organisation_id, preset))
+                if ptype:
+                    generated_lines.append(ptype | {'amount': db_number(amount), 'direction': ptype['direction']})
             used_exemption = monthly_exemption_used(tx, organisation_id, employee['id'], pay_date.strftime('%Y-%m'))
             exemption_cap = remaining_monthly_exemption(
                 election['tax_free_mode'], election.get('tax_free_amount'),
                 rules_for(pay_date).basic_exemption, used_exemption)
-            amounts = calculate_pay(employee, period=period, hours=worked, settlement_on=pay_date,
+            amounts = calculate_pay(employee, period=period, hours=worked, components=generated_lines, settlement_on=pay_date,
                                     exemption_remaining=exemption_cap,
                                     allow_zero_monthly=basis == 'monthly' and worked_days == 0)
             item_id = new_id()
@@ -696,6 +834,7 @@ class PayrollService:
             tx.execute('INSERT INTO pay_run_items('+','.join(columns)+') VALUES ('+','.join('?' for _ in columns)+')',
                        values+tuple(db_number(amounts[k]) for k in AMOUNTS)+
                        (worked_days, norm_days_snapshot, absence_snapshot['absence_working_days']))
+            self._save_absence_components(tx, organisation_id, item_id, generated, 0)
             context_fields = ('tax_free_mode', 'tax_free_amount', 'unemployment_applies',
                               'tax_free_setting_id', 'pension_setting_id', 'unemployment_setting_id')
             tx.execute('INSERT INTO pay_item_context(organisation_id,item_id,apply_tax_free_minimum,employment_start_date,employment_end_date,' + ','.join(context_fields) + ') VALUES (?,?,?,?,?,?,?,?,?,?,?)',

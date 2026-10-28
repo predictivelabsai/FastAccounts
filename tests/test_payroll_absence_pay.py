@@ -158,3 +158,62 @@ def test_employer_sick_pay_covers_days_two_to_five_at_seventy_percent():
 def test_termination_compensation_and_vacation_payout_date():
     assert unused_leave_compensation(Decimal('3.5'), Decimal('40')) == Decimal('140.00')
     assert vacation_payout_date(date(2026, 10, 5)) == date(2026, 10, 2)
+
+
+def test_sick_benefit_is_split_across_monthly_draft_runs_and_frozen_on_approval(db, ee_org):
+    from payroll import PayrollService
+    from payroll_absences import PayrollAbsenceService
+    actor = 'owner@example.test'
+    payroll = PayrollService(db)
+    employee = payroll.save_employee(ee_org['id'], actor=actor, name='Cross-month sickness',
+                                     gross_salary='2200', apply_tax_free_minimum=False)
+    absence = PayrollAbsenceService(db).save(ee_org['id'], employee['id'], actor=actor,
+        absence_type='sick_leave', start_date='2026-10-30', end_date='2026-11-04')
+    october = payroll.create_run(ee_org['id'], period='2026-10', actor=actor)['items'][0]
+    october_component = next(c for c in october['components'] if c['preset_key'] == 'employer_sick_pay')
+    assert october_component['amount'] == october_component['breakdown']['amount']
+    assert october_component['breakdown']['qualifying_days'] == 1
+    assert october_component['income_tax'] is True
+    assert october_component['social_tax'] is False
+    november = payroll.create_run(ee_org['id'], period='2026-11', actor=actor)['items'][0]
+    november_component = next(c for c in november['components'] if c['preset_key'] == 'employer_sick_pay')
+    assert november_component['breakdown']['qualifying_days'] == 3
+    assert Decimal(october_component['amount']) + Decimal(november_component['amount']) > 0
+    with db.transaction() as tx:
+        tx.execute('UPDATE pay_runs SET status=\'Approved\' WHERE organisation_id=? AND period=?',
+                   (ee_org['id'], '2026-10'))
+    frozen = payroll.runs(ee_org['id'])
+    assert next(r for r in frozen if r['period'] == '2026-10')['items'][0]['components'][0]['breakdown']
+
+
+def test_termination_component_uses_opening_entitlement_and_taken_leave(db, ee_org):
+    from payroll import PayrollService
+    from payroll_absences import PayrollAbsenceService
+    actor = 'owner@example.test'
+    payroll = PayrollService(db)
+    employee = payroll.save_employee(ee_org['id'], actor=actor, name='Terminating employee',
+                                     gross_salary='2200', apply_tax_free_minimum=False)
+    with db.transaction() as tx:
+        tx.execute('UPDATE employees SET employment_end_date=? WHERE organisation_id=? AND id=?',
+                   ('2026-10-15', ee_org['id'], employee['id']))
+        tx.execute('INSERT INTO payroll_leave_entitlements(id,organisation_id,employee_id,effective_from,days_per_year,created_at) VALUES (?,?,?,?,?,?)',
+                   ('entitlement-unit5', ee_org['id'], employee['id'], '2026-01-01', '28', '2026-01-01'))
+        tx.execute('INSERT INTO payroll_leave_openings(organisation_id,employee_id,cutover_date,unused_days,source,reviewed_at,reviewed_by) VALUES (?,?,?,?,?,?,?)',
+                   (ee_org['id'], employee['id'], '2025-12-31', '5', 'manual', '2026-01-01', actor))
+    PayrollAbsenceService(db).save(ee_org['id'], employee['id'], actor=actor,
+        absence_type='annual_leave', start_date='2026-03-02', end_date='2026-03-04')
+    item = payroll.create_run(ee_org['id'], period='2026-10', actor=actor)['items'][0]
+    comp = next(c for c in item['components'] if c['preset_key'] == 'unused_leave')
+    assert comp['breakdown']['entitlement_days'] == '28'
+    assert comp['breakdown']['opening_unused_days'] == '5'
+    assert comp['breakdown']['taken_annual_leave_days'] == '3'
+    assert comp['breakdown']['remaining_leave_days'] == '30'
+    assert Decimal(comp['amount']) == Decimal(comp['breakdown']['average_daily_pay']) * 30
+    assert comp['social_tax'] is True and comp['ui_employee'] is True
+    edited = payroll.update_item(ee_org['id'], item['pay_run_id'], item['id'], actor=actor,
+        components=[{'type_id': comp['type_id'], 'name': comp['name'], 'amount': '999.00',
+            'direction': comp['direction'], **{key: comp[key] for key in
+                ('income_tax', 'social_tax', 'ui_employee', 'ui_employer', 'funded_pension', 'social_minimum')}}])
+    overridden = next(c for c in edited['items'][0]['components'] if c['preset_key'] == 'unused_leave')
+    assert overridden['amount'] == '999.00'
+    assert overridden['breakdown']['accountant_override'] == '999.00'
