@@ -423,3 +423,34 @@ translated message; no other year inherits 2026 rates. `settlement_date(period)`
 is the single settlement-date boundary and currently returns calendar month end.
 The legacy `calculate_pay` call without a period retains its 2026 defaults.
 The January to March and April onwards minimum-wage values are unchanged.
+
+## Effective-dated employee tax elections
+
+Migration 0037 adds organisation-scoped `employee_tax_settings` histories for
+`tax_free`, `pension` and `unemployment`. Initial rows use employment start or
+2026-01-01. Legacy exemption booleans become maximum/none applications; pension
+rates are retained; employee unemployment insurance starts enabled except for
+board fees. A limited application requires a non-negative amount with at most
+two decimal places, no greater than that year's verified monthly maximum.
+
+The final calendar day of the run month determines the effective row, including
+mid-month changes. There is no daily pro-rating of an application. Before the
+first history row, the defaults are no application, no funded pension and
+ordinary employee unemployment insurance. The flag affects the employee's
+unemployment deduction only; employer unemployment remains payable for ordinary
+employment. Board-fee base remuneration retains both automatic UI exclusions.
+
+Draft creation freezes the resolved mode, limit, pension rate, employee UI flag
+and source row identifiers alongside the existing pay item context. Draft edits
+reuse that snapshot. Later history changes affect newly created runs only.
+Approved source rows cannot be edited or deleted. Existing approved amounts are
+preserved; the migration does not infer historical elections from current data.
+
+Legacy `apply_tax_free_minimum` and `funded_pension_percent` fields remain readable
+and writable. They expose the legacy employee-master values, not a projection of
+the latest effective history. Changed values create/update the corresponding
+history row. `tax_settings_period` (YYYY-MM) selects its effective run month,
+starting on day 1. Without it, writes use the latest existing run month; before
+any run they use employment start or 2026-01-01. An unchanged value is a no-op.
+A write conflicting with an approved source row fails with 409; use an explicit
+later period or add a dated election. Existing drafts retain their snapshot.

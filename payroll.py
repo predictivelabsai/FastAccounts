@@ -34,6 +34,7 @@ from database import Database, get_database
 from ledger import LedgerService, PostingLine
 from payroll_components import FLAGS, ROLES, serialise
 from payroll_rules import rules_for, settlement_date
+from payroll_tax_settings import EmployeeTaxSettingsService, resolve as resolve_tax_settings
 
 
 class PayrollConflict(ValueError):
@@ -155,10 +156,12 @@ def calculate_pay(employee: dict, *, period: str | None = None, hours=None, comp
     if gross < 0 or (gross == 0 and basis != 'income_line') or any(value < 0 for value in bases.values()):
         raise ValueError('Payment components must leave positive gross and non-negative tax bases')
     pension = money(bases['funded_pension'] * decimal(employee['funded_pension_percent']) / 100)
-    ui = money(bases['ui_employee'] * rules.ui_employee_rate)
+    ui = money(bases['ui_employee'] * rules.ui_employee_rate) if employee.get('unemployment_applies', True) is not False and employee.get('unemployment_applies') != 0 else money(0)
     taxable = bases['income_tax'] - pension - ui
     # Record the basic exemption actually used: it cannot exceed the taxable amount.
-    exemption = money(min(rules.basic_exemption, max(Decimal('0'), taxable)) if employee['apply_tax_free_minimum'] else 0)
+    mode = employee.get('tax_free_mode') or ('maximum' if employee['apply_tax_free_minimum'] else 'none')
+    allowance = decimal(employee['tax_free_amount']) if mode == 'limited' else rules.basic_exemption
+    exemption = money(min(allowance, rules.basic_exemption, max(Decimal('0'), taxable)) if mode != 'none' else 0)
     income_tax = money(max(Decimal('0'), taxable - exemption) * rules.income_tax_rate)
     exemption_reason = ('board_member' if board else 'income_line' if basis == 'income_line'
                         else (employee.get('social_tax_minimum_exemption') or None))
@@ -307,6 +310,11 @@ class PayrollService:
             raise
 
     def _save_employee(self, organisation_id, *, actor, employee_id=None, tx=None, **changes):
+        period = changes.pop('tax_settings_period', None)
+        if period is not None:
+            if not re.fullmatch(r'[0-9]{4}-(0[1-9]|1[0-2])', period):
+                raise ValueError('Payroll periods must use YYYY-MM')
+            rules_for(settlement_date(period))
         fields = ('name', 'email', 'personal_id', 'gross_salary', 'funded_pension_percent',
                   'apply_tax_free_minimum', 'board_member', 'active', 'pay_basis', 'fte', 'hourly_rate',
                   'social_tax_minimum_exemption', 'employment_start_date', 'employment_end_date')
@@ -318,11 +326,11 @@ class PayrollService:
         if tx is None:
             with self.db.transaction() as owned_tx:
                 return self._save_employee_tx(
-                    owned_tx, organisation_id, actor, employee_id, fields, changes
+                    owned_tx, organisation_id, actor, employee_id, fields, changes, period
                 )
-        return self._save_employee_tx(tx, organisation_id, actor, employee_id, fields, changes)
+        return self._save_employee_tx(tx, organisation_id, actor, employee_id, fields, changes, period)
 
-    def _save_employee_tx(self, tx, organisation_id, actor, employee_id, fields, changes):
+    def _save_employee_tx(self, tx, organisation_id, actor, employee_id, fields, changes, period=None):
         self._organisation(tx, organisation_id)
         if employee_id:
             data = tx.one('SELECT * FROM employees WHERE organisation_id=? AND id=?', (organisation_id, employee_id))
@@ -334,11 +342,13 @@ class PayrollService:
                 elif data.get('pay_basis') == 'board_fee':
                     changes['pay_basis'] = 'monthly'
             previous_active = bool(data['active'])
+            legacy_changes = {k: v for k, v in changes.items() if data.get(k) != v}
             data.update(changes)
         else:
             data = dict(email=None, personal_id=None, apply_tax_free_minimum=False, board_member=False, active=True)
             data.update(changes)
             data.setdefault('funded_pension_percent', 0 if data['board_member'] else 2)
+            legacy_changes = changes
         data = self._employee_values(data)
         record_id = employee_id or new_id()
         if employee_id:
@@ -352,6 +362,9 @@ class PayrollService:
                                 (record_id, organisation_id, utc_now())+tuple(data.get(f) for f in fields))
         if result.rowcount != 1:
             raise PayrollConflict('An employee with this name already exists')
+        EmployeeTaxSettingsService(self.db).legacy_write(
+            tx, organisation_id, data | {'id': record_id}, legacy_changes, actor=actor,
+            period=period, creating=not employee_id)
         audit(tx, organisation_id, actor, 'payroll.employee.updated' if employee_id else 'payroll.employee.created', 'employee', record_id)
         if employee_id and previous_active != bool(data['active']):
             audit(tx, organisation_id, actor, 'payroll.employee.unarchived' if data['active'] else 'payroll.employee.archived', 'employee', record_id)
@@ -366,6 +379,7 @@ class PayrollService:
                 raise KeyError('Employee not found')
             if tx.one('SELECT id FROM pay_run_items WHERE organisation_id=? AND employee_id=?', (organisation_id, employee_id)):
                 raise PayrollConflict('This employee has been included in a pay run. Archive the employee instead.')
+            tx.execute('DELETE FROM employee_tax_settings WHERE organisation_id=? AND employee_id=?', (organisation_id, employee_id))
             tx.execute('DELETE FROM employees WHERE organisation_id=? AND id=?', (organisation_id, employee_id))
             audit(tx, organisation_id, actor, 'payroll.employee.deleted', 'employee', employee_id)
 
@@ -588,6 +602,8 @@ class PayrollService:
                    'board_member', 'funded_pension_percent', 'pay_basis', 'fte', 'hourly_rate', 'hours',
                    'minimum_wage', 'social_tax_minimum_exemption', *AMOUNTS)
         for employee in employees:
+            election = resolve_tax_settings(tx, organisation_id, employee, settlement_date(period))
+            employee = employee | election
             basis, fte, worked, required = pay_basis(employee), _fte(employee.get('fte')), None, None
             if basis == 'monthly':
                 # Part-time: the monthly minimum wage is pro-rated by the work-time fraction.
@@ -610,8 +626,10 @@ class PayrollService:
                       amounts['social_tax_minimum_exemption'])
             tx.execute('INSERT INTO pay_run_items('+','.join(columns)+') VALUES ('+','.join('?' for _ in columns)+')',
                        values+tuple(db_number(amounts[k]) for k in AMOUNTS))
-            tx.execute('INSERT INTO pay_item_context(organisation_id,item_id,apply_tax_free_minimum,employment_start_date,employment_end_date) VALUES (?,?,?,?,?)',
-                       (organisation_id, item_id, int(employee['apply_tax_free_minimum']), employee.get('employment_start_date'), employee.get('employment_end_date')))
+            context_fields = ('tax_free_mode', 'tax_free_amount', 'unemployment_applies',
+                              'tax_free_setting_id', 'pension_setting_id', 'unemployment_setting_id')
+            tx.execute('INSERT INTO pay_item_context(organisation_id,item_id,apply_tax_free_minimum,employment_start_date,employment_end_date,' + ','.join(context_fields) + ') VALUES (?,?,?,?,?,?,?,?,?,?,?)',
+                       (organisation_id, item_id, int(employee['apply_tax_free_minimum']), employee.get('employment_start_date'), employee.get('employment_end_date')) + tuple(election[k] for k in context_fields))
             for key in totals:
                 totals[key] += amounts[key]
         tx.execute('UPDATE pay_runs SET total_gross=?,total_net=?,total_employer_cost=? WHERE organisation_id=? AND id=?', tuple(db_number(totals[k]) for k in totals)+(organisation_id, run_id))

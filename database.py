@@ -232,6 +232,8 @@ class Database:
                     script = script.replace(
                         "accent_colour GLOB '#[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]'",
                         "accent_colour ~ '^#[0-9a-fA-F]{6}$'")
+                elif path.stem == "0037_employee_tax_settings":
+                    script = script.split('-- SQLITE_TAX_HISTORY_IMMUTABILITY', 1)[0] + _POSTGRES_TAX_HISTORY_GUARD
                 elif path.stem == "0035_payroll_income_line":
                     script = _POSTGRES_PAYROLL_0035
                 elif path.stem == "0034_payroll_demo_fixes":
@@ -491,4 +493,22 @@ FROM organisations WHERE country_code='EE' ON CONFLICT(organisation_id,preset_ke
 INSERT INTO pay_component_types(id,organisation_id,preset_key,name,direction,income_tax,social_tax,ui_employee,ui_employer,funded_pension,social_minimum,liability_role)
 SELECT id || '-component-base_adjustment',id,'base_adjustment','Põhipalga korrigeerimine','income',1,1,1,1,1,1,'PAYROLL_DEDUCTION'
 FROM organisations WHERE country_code='EE' ON CONFLICT(organisation_id,preset_key) DO NOTHING;
+"""
+
+
+_POSTGRES_TAX_HISTORY_GUARD = r"""
+CREATE OR REPLACE FUNCTION guard_employee_tax_settings() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+ IF EXISTS (SELECT 1 FROM pay_item_context c
+ JOIN pay_run_items i ON i.organisation_id=c.organisation_id AND i.id=c.item_id
+ JOIN pay_runs r ON r.organisation_id=i.organisation_id AND r.id=i.pay_run_id
+ WHERE c.organisation_id=OLD.organisation_id AND r.status='Approved'
+ AND (c.tax_free_setting_id=OLD.id OR c.pension_setting_id=OLD.id OR c.unemployment_setting_id=OLD.id)) THEN
+  RAISE EXCEPTION 'approved payroll tax settings are immutable';
+ END IF;
+ IF TG_OP='DELETE' THEN RETURN OLD; END IF;
+ RETURN NEW;
+END; $$;
+CREATE TRIGGER guard_employee_tax_settings BEFORE UPDATE OR DELETE ON employee_tax_settings
+FOR EACH ROW EXECUTE FUNCTION guard_employee_tax_settings();
 """

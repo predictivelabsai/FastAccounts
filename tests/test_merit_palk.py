@@ -493,7 +493,7 @@ def test_salary_hours_concurrent_apply_creates_one_draft(palk, ee_org, db):
     assert db.scalar("SELECT COUNT(*) FROM pay_run_items") == 1
 
 
-def test_income_line_migration_preserves_approved_payroll(tmp_path):
+def test_income_line_migration_preserves_approved_payroll(tmp_path, legacy_payroll):
     from database import Database, MIGRATIONS
     from shutil import copyfile
     old = tmp_path / "migrations"
@@ -505,12 +505,14 @@ def test_income_line_migration_preserves_approved_payroll(tmp_path):
     db.migrate(migrations=old)
     org = OrganisationService(db).create(name="Migration fixture", country_code="EE", entity_type="EE_OU", owner_email=ACTOR)
     payroll = PayrollService(db)
-    payroll.save_employee(org["id"], name="Existing Person", gross_salary="2400", fte="0.75", actor=ACTOR)
-    payroll.approve(org["id"], payroll.create_run(org["id"], period="2026-10", actor=ACTOR)["id"], actor=ACTOR)
+    run = legacy_payroll(db, org['id'], name='Existing Person', gross='2400', fte='0.75', actor=ACTOR)
+    payroll.approve(org['id'], run['id'], actor=ACTOR)
     tables = ("employees", "pay_runs", "pay_run_items", "pay_item_context", "gl_entries", "posting_batches")
     before = {t: db.rows(f"SELECT * FROM {t} ORDER BY 1") for t in tables}
-    assert db.migrate() == ["0035_payroll_income_line", "0036_payroll_component_catalogue"]
-    assert {t: db.rows(f"SELECT * FROM {t} ORDER BY 1") for t in tables} == before
+    assert db.migrate() == ["0035_payroll_income_line", "0036_payroll_component_catalogue", "0037_employee_tax_settings"]
+    for table in tables:
+        actual = db.rows(f'SELECT * FROM {table} ORDER BY 1')
+        assert [{key: row[key] for key in original} for row, original in zip(actual, before[table], strict=True)] == before[table]
     assert db.rows("PRAGMA foreign_key_check") == [] and db.migrate() == []
 
 

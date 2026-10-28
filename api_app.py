@@ -49,6 +49,7 @@ from integration_service import AccountMappingService, IntegrationService
 from ledger import LedgerService, PostingLine
 from organisations import APPROVE_ROLES, WRITE_ROLES, AccessDenied, OrganisationService
 from payroll import PayrollConflict, PayrollService
+from payroll_tax_settings import EmployeeTaxSettingsService, TaxSettingConflict, TaxSettingValidationError
 from tax import TaxService
 from tsd import TSDExportService
 from payment_orders import PaymentOrderService
@@ -536,9 +537,17 @@ async def invalid_value(_request: Request, error: ValueError):
     from payroll_rules import UnsupportedPayrollYear
     from web import i18n
     detail = str(error)
-    if isinstance(error, UnsupportedPayrollYear):
+    if isinstance(error, (UnsupportedPayrollYear, TaxSettingValidationError)):
         detail = i18n.catalog(i18n.get_lang(_request.scope.get('session', {}), _request)).get('workspace', {}).get(detail, detail)
     return JSONResponse({"detail": detail}, status_code=422)
+
+
+@api.exception_handler(TaxSettingConflict)
+async def tax_setting_conflict(request: Request, error: TaxSettingConflict):
+    from web import i18n
+    detail = str(error)
+    lang = i18n.get_lang(request.scope.get('session', {}), request)
+    return JSONResponse({'detail': i18n.catalog(lang).get('workspace', {}).get(detail, detail)}, status_code=409)
 
 
 @api.exception_handler(KeyError)
@@ -2150,6 +2159,7 @@ class EmployeeIn(BaseModel):
     social_tax_minimum_exemption: str | None = None
     employment_start_date: str | None = None
     employment_end_date: str | None = None
+    tax_settings_period: str | None = None
 
 
 class EmployeePatch(BaseModel):
@@ -2167,6 +2177,7 @@ class EmployeePatch(BaseModel):
     social_tax_minimum_exemption: str | None = None
     employment_start_date: str | None = None
     employment_end_date: str | None = None
+    tax_settings_period: str | None = None
 
 
 class PayRunIn(BaseModel):
@@ -2388,4 +2399,3 @@ def payroll_export_tsd_csv(organisation_id: str, run_id: str, preparation_id: st
     return Response(payload, media_type='text/csv', headers={
         'Content-Disposition': f'attachment; filename="tsd-{prepared["period"]}.csv"'
     })
-
