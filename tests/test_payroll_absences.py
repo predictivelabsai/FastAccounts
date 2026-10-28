@@ -83,9 +83,18 @@ def test_absence_api_requires_csrf_and_scopes_employee_to_organisation(db, ee_or
         created = client.post(root + '/absences', json=body, headers=headers)
         assert created.status_code == 201, created.text
         assert created.json()['leave_days'] == 3
+        method_url = root + f"/absences/{created.json()['id']}/pay"
+        assert client.post(method_url, json={'method':'average'}).status_code == 403
+        calculated = client.post(method_url, json={'method':'average'}, headers=headers)
+        assert calculated.status_code == 201, calculated.text
+        assert calculated.json()['status'] == 'pending'
         assert client.post(root + '/absences', json=body, headers=headers).status_code == 409
         foreign = {**body, 'employee_id':'missing-from-this-tenant', 'start_date':'2026-11-02', 'end_date':'2026-11-03'}
         assert client.post(root + '/absences', json=foreign, headers=headers).status_code == 404
+        other = __import__('organisations').OrganisationService(db).create(
+            name='Other pay tenant', country_code='EE', entity_type='EE_OU', owner_email='other@example.test')
+        assert client.post(f"/api/organisations/{other['id']}/payroll/absences/{created.json()['id']}/pay",
+                           json={'method':'average'}, headers=headers).status_code == 403
     finally:
         api.dependency_overrides.clear()
 
