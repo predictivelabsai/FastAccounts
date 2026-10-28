@@ -21,6 +21,16 @@ Date: 2026-10-28. Branch: `feat/payroll-withholdings`, based on
 
 - `.venv\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache --basetemp=.tmp\pytest-temp tests\test_migrations_and_tenancy.py` — 18 passed.
 - `.venv\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache --basetemp=.tmp\pytest-temp tests\test_payroll_withholdings.py` — 7 passed.
+- `tests\test_payroll.py` — 16 passed, one existing fastcore deprecation warning.
+- `tests\test_payroll_payouts.py` — 7 passed, one existing fastcore deprecation warning.
+- `tests\test_tsd_export.py` — 14 passed.
+- `tests\test_workspace_payroll.py` — 17 passed, one existing fastcore deprecation warning.
+- `tests\test_i18n.py` — 18 passed, one existing fastcore deprecation warning.
+- `py_compile api_app.py payroll_withholdings.py` and `git diff --check` passed.
+
+All pytest files ran separately using the ignored `.tmp` cache and basetemp.
+No new locale keys or workspace flows are included yet, so the passing locale
+and workspace suites do not validate the requested withholding UI.
 
 Commits: `01938f2` Add payroll withholding schema; `b52b850` Add withholding
 recipient and agreement services.
