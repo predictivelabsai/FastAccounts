@@ -1,4 +1,7 @@
 """Master-data maintenance: analysis findings, lifecycle actions, migration."""
+
+from tests.migration_catalogue import catalogue, catalogue_after
+
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -32,13 +35,13 @@ def item(d, code_name, name):
 
 def test_migration_count_rerun_and_ci(sending):
     d = sending
-    assert d["db"].scalar("SELECT COUNT(*) FROM schema_migrations") == 48
+    assert d["db"].scalar("SELECT COUNT(*) FROM schema_migrations") == len(catalogue())
     for _ in range(2):
         with d["db"].transaction() as tx:
             tx.execute("DELETE FROM schema_migrations WHERE version='0030_master_data_maintenance'")
         assert d["db"].migrate() == ["0030_master_data_maintenance"]
     assert d["db"].rows("SELECT name FROM pragma_table_info('contacts') WHERE name='active'")
-    assert '"0048_payroll_component_breakdown"]' in (ROOT / ".github/workflows/ci.yml").read_text()
+    assert '"0049_payroll_component_source"]' in (ROOT / ".github/workflows/ci.yml").read_text()
 
 
 def test_analysis_finds_all_four_categories(sending):

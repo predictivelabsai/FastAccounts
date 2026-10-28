@@ -1,4 +1,7 @@
 """Offline copilot contracts: kill switches, quotas, provider isolation, staging."""
+
+from tests.migration_catalogue import catalogue, catalogue_after
+
 from io import BytesIO
 from pathlib import Path
 import socket
@@ -100,7 +103,7 @@ STAGED_CSV = "code,name\nP1,Synthetic widget\nP2,Another widget"
 
 def test_migration_count_rerun_and_ci(env):
     d = env
-    assert d["db"].scalar("SELECT COUNT(*) FROM schema_migrations") == 48
+    assert d["db"].scalar("SELECT COUNT(*) FROM schema_migrations") == len(catalogue())
     assert d["db"].rows("SELECT * FROM copilot_messages") == []
     assert d["db"].rows("SELECT * FROM copilot_usage") == []
     for _ in range(2):
@@ -108,7 +111,7 @@ def test_migration_count_rerun_and_ci(env):
             tx.execute("DELETE FROM schema_migrations WHERE version='0029_copilot'")
         assert d["db"].migrate() == ["0029_copilot"]
     assert d["db"].rows("SELECT * FROM copilot_messages") == []
-    assert '"0048_payroll_component_breakdown"]' in (ROOT / ".github/workflows/ci.yml").read_text()
+    assert '"0049_payroll_component_source"]' in (ROOT / ".github/workflows/ci.yml").read_text()
 
 
 def test_kill_switches_block_before_any_provider_call(env, monkeypatch):

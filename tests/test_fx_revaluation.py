@@ -1,4 +1,7 @@
 """Offline delta revaluation, baseline integration, access and browser checks."""
+
+from tests.migration_catalogue import catalogue, catalogue_after
+
 import json
 import socket
 from decimal import Decimal
@@ -346,7 +349,7 @@ def test_auth_csrf_wiring(sending):
 
 def test_migration_rerun_tenant_constraints_and_roles(db, ee_org, uk_org):
     root = Path(__file__).resolve().parents[1]
-    assert db.scalar('SELECT COUNT(*) FROM schema_migrations') == 48
+    assert db.scalar('SELECT COUNT(*) FROM schema_migrations') == len(catalogue())
     assert db.migrate() == []
     sql = (root / 'migrations/sqlite/0026_fx_revaluations.sql').read_text(encoding='utf-8')
     with db.transaction() as tx:
@@ -354,7 +357,7 @@ def test_migration_rerun_tenant_constraints_and_roles(db, ee_org, uk_org):
         tx.connection.executescript(sql)
     for org, code in [(ee_org, '6990'), (uk_org, '7900')]:
         assert db.one("SELECT code FROM accounts WHERE organisation_id=? AND system_role='FX_GAIN_LOSS'", (org['id'],))['code'] == code
-    assert '"0048_payroll_component_breakdown"]' in (Path(__file__).resolve().parents[1] / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+    assert '"0049_payroll_component_source"]' in (Path(__file__).resolve().parents[1] / ".github/workflows/ci.yml").read_text(encoding="utf-8")
     data = setup(db, ee_org)
     doc = document(db, ee_org, data)
     import sqlite3

@@ -1,5 +1,8 @@
 """Public shell, integration catalogue, auth guard, and health checks."""
+
 from __future__ import annotations
+
+from tests.migration_catalogue import catalogue, catalogue_after
 
 from starlette.testclient import TestClient
 from bs4 import BeautifulSoup
@@ -433,7 +436,7 @@ def test_health_reports_every_connector_as_non_live():
     assert payload["integrations"] == len(integrations.CATALOGUE)
     assert payload["live_integrations"] == 0
     assert payload["database"]["status"] == "ok"
-    assert payload["database"]["migrations"] == 48
+    assert payload["database"]["migrations"] == len(catalogue())
 
 
 def test_public_violet_tokens_and_new_locale_keys():

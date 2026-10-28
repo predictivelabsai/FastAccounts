@@ -1,4 +1,7 @@
 """Offline realised FX, exact settlement and transit clearing acceptance checks."""
+
+from tests.migration_catalogue import catalogue, catalogue_after
+
 from decimal import Decimal
 from pathlib import Path
 import socket
@@ -416,13 +419,13 @@ def test_migration_role_seeding_and_wiring(tmp_path, monkeypatch, country, prefe
                    "VALUES ('custom',?,?, 'Synthetic existing', 'Expense','Debit',?)",
                    (org['id'], str(preferred), 'FX_GAIN_LOSS' if existing else None))
     monkeypatch.setattr(database, 'MIGRATIONS', original)
-    assert db.migrate() == ['0025_fx_realised', '0026_fx_revaluations', '0027_mfa', '0028_document_settings', '0029_copilot', '0030_master_data_maintenance', '0031_master_data_groups', '0032_copilot_access', '0033_copilot_settings', '0034_payroll_demo_fixes', '0035_payroll_income_line', '0036_payroll_component_catalogue', '0037_employee_tax_settings', '0038_payroll_payday_rules', '0039_payroll_payouts', '0040_payroll_settlement_dates', '0041_payroll_sepa_details', '0042_payroll_component_metadata', '0043_payroll_absences', '0044_payroll_absence_day_freeze', "0045_payroll_history", "0046_payroll_absence_pay", "0047_payroll_absence_payouts", "0048_payroll_component_breakdown"]
+    assert db.migrate() == catalogue_after('0024_reminder_rules')
     assert db.migrate() == []
-    assert db.scalar('SELECT COUNT(*) FROM schema_migrations') == 48
+    assert db.scalar('SELECT COUNT(*) FROM schema_migrations') == len(catalogue())
     role = db.one("SELECT * FROM accounts WHERE organisation_id=? AND system_role='FX_GAIN_LOSS'", (org['id'],))
     assert role['code'] == str(preferred if existing else preferred + 1)
     sql = (root / 'migrations/sqlite/0025_fx_realised.sql').read_text(encoding='utf-8')
     with db.transaction() as tx:
         tx.execute(sql[sql.index('WITH RECURSIVE'):])
     assert db.scalar("SELECT COUNT(*) FROM accounts WHERE organisation_id=? AND system_role='FX_GAIN_LOSS'", (org['id'],)) == 1
-    assert '"0048_payroll_component_breakdown"]' in (Path(__file__).resolve().parents[1] / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+    assert '"0049_payroll_component_source"]' in (Path(__file__).resolve().parents[1] / ".github/workflows/ci.yml").read_text(encoding="utf-8")

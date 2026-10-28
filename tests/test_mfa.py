@@ -1,4 +1,7 @@
 """Offline MFA engine, account persistence and browser-route regressions."""
+
+from tests.migration_catalogue import catalogue, catalogue_after
+
 import base64
 import json
 import re
@@ -279,7 +282,7 @@ def test_partial_migration_upgrade(env):
         tx.execute("DROP TABLE mfa_recovery_codes")
         tx.execute("ALTER TABLE user_accounts DROP COLUMN totp_enabled")
         tx.execute("ALTER TABLE user_accounts DROP COLUMN totp_last_step")
-    assert db.migrate() == ["0027_mfa"]
+    assert db.migrate() == ['0027_mfa']
     assert accounts.get(EMAIL)["totp_enabled"] == 0
     assert db.scalar("SELECT COUNT(*) FROM mfa_recovery_codes") == 0
 
@@ -340,14 +343,14 @@ def test_migration_rerun_preserves_data(env):
     db, client, _ = env
     secret, codes = enable(client)
     original = db.rows("SELECT * FROM mfa_recovery_codes")
-    assert db.scalar("SELECT COUNT(*) FROM schema_migrations") == 48
+    assert db.scalar("SELECT COUNT(*) FROM schema_migrations") == len(catalogue())
     for _ in range(2):
         with db.transaction() as tx:
             tx.execute("DELETE FROM schema_migrations WHERE version='0027_mfa'")
-        assert db.migrate() == ["0027_mfa"]
+        assert db.migrate() == ['0027_mfa']
     assert accounts.get(EMAIL)["totp_secret"] == secret
     assert db.rows("SELECT * FROM mfa_recovery_codes") == original
-    assert '"0048_payroll_component_breakdown"]' in (ROOT / ".github/workflows/ci.yml").read_text()
+    assert '"0049_payroll_component_source"]' in (ROOT / ".github/workflows/ci.yml").read_text()
 
 
 @pytest.mark.parametrize("lang", ["en", "et", "lt", "lv"])

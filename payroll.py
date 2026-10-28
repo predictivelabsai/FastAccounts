@@ -624,12 +624,29 @@ class PayrollService:
         if hours is not None and item['pay_basis'] != 'hourly':
             raise ValueError('Hours can be edited only for hourly employees')
         worked = self._hours(dict(id=item_id, name=item['employee_name']), {item_id: hours if hours is not None else item['hours']}) if item['pay_basis'] == 'hourly' else None
+        if tx.dialect == 'postgres':
+            component_columns = {row['column_name'] for row in tx.rows(
+                "SELECT column_name FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='pay_item_components'")}
+        else:
+            component_columns = {row['name'] for row in tx.rows('PRAGMA table_info(pay_item_components)')}
+        generated_column_ready = 'is_generated' in component_columns
+        breakdown_column_ready = 'breakdown_json' in component_columns
         if components is not None:
             if len(components) > 100:
                 raise ValueError('At most 100 payment lines are allowed per employee')
-            tx.execute('DELETE FROM pay_item_components WHERE organisation_id=? AND item_id=? AND is_generated=1',
-                       (organisation_id, item_id))
-            tx.execute('DELETE FROM pay_item_components WHERE organisation_id=? AND item_id=? AND is_generated=0', (organisation_id, item_id))
+            if generated_column_ready:
+                tx.execute('DELETE FROM pay_item_components WHERE organisation_id=? AND item_id=? AND is_generated=1',
+                           (organisation_id, item_id))
+                tx.execute('DELETE FROM pay_item_components WHERE organisation_id=? AND item_id=? AND is_generated=0',
+                           (organisation_id, item_id))
+            elif breakdown_column_ready:
+                tx.execute('DELETE FROM pay_item_components WHERE organisation_id=? AND item_id=? AND breakdown_json IS NOT NULL',
+                           (organisation_id, item_id))
+                tx.execute('DELETE FROM pay_item_components WHERE organisation_id=? AND item_id=? AND breakdown_json IS NULL',
+                           (organisation_id, item_id))
+            else:
+                tx.execute('DELETE FROM pay_item_components WHERE organisation_id=? AND item_id=?',
+                           (organisation_id, item_id))
             for position, line in enumerate(components):
                 allowed = {'type_id', 'name', 'amount', 'direction', 'liability_role', 'is_generated', *FLAGS}
                 if set(line) - allowed:
@@ -662,8 +679,12 @@ class PayrollService:
                 fields = ('id', 'organisation_id', 'item_id', 'type_id', 'position', 'name', 'amount', 'direction', *FLAGS, 'liability_role') + (('is_wage',) if metadata_ready else ())
                 values = (new_id(), organisation_id, item_id, data['id'], position, data['name'], db_number(amount), data['direction'], *(data[key] for key in FLAGS), data['liability_role']) + ((data['is_wage'],) if metadata_ready else ())
                 tx.execute('INSERT INTO pay_item_components(' + ','.join(fields) + ') VALUES (' + ','.join('?' for _ in fields) + ')', values)
-        tx.execute('DELETE FROM pay_item_components WHERE organisation_id=? AND item_id=? AND is_generated=1',
-                   (organisation_id, item_id))
+        if generated_column_ready:
+            tx.execute('DELETE FROM pay_item_components WHERE organisation_id=? AND item_id=? AND is_generated=1',
+                       (organisation_id, item_id))
+        elif breakdown_column_ready:
+            tx.execute('DELETE FROM pay_item_components WHERE organisation_id=? AND item_id=? AND breakdown_json IS NOT NULL',
+                       (organisation_id, item_id))
         if tx.dialect == 'postgres':
             absence_schema_ready = bool(tx.one("SELECT 1 FROM information_schema.tables WHERE table_schema=current_schema() AND table_name='payroll_absence_run_items'"))
         else:

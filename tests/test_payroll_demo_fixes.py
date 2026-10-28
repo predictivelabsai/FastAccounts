@@ -1,4 +1,7 @@
 """Offline bureau payroll lifecycle, component snapshots and journal contracts."""
+
+from tests.migration_catalogue import catalogue, catalogue_after
+
 from decimal import Decimal
 from io import BytesIO
 
