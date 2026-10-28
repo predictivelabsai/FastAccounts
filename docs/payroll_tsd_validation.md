@@ -36,13 +36,13 @@ and `.github/workflows/ci.yml`. Each requested test file was run individually:
 # 7 passed
 .venv\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache --basetemp=.tmp\test-settlement tests\test_payroll_settlement.py
 # 8 passed
-.venv\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache --basetemp=.tmp\test-payroll tests\test_payroll.py
+.venv\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache --basetemp=.tmp\test-payroll-final2 tests\test_payroll.py
 # 16 passed
 .venv\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache --basetemp=.tmp\test-demo-fixes tests\test_payroll_demo_fixes.py
 # 24 passed
 .venv\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache --basetemp=.tmp\test-hourly tests\test_payroll_part_time_hourly.py
 # 30 passed
-.venv\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache --basetemp=.tmp\test-merit-final tests\test_merit_palk.py
+.venv\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache --basetemp=.tmp\test-merit-final2 tests\test_merit_palk.py
 # 49 passed
 .venv\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache --basetemp=.tmp\test-migrations-repeat tests\test_migrations_and_tenancy.py
 # 16 passed
@@ -51,6 +51,8 @@ and `.github/workflows/ci.yml`. Each requested test file was run individually:
 Total: 170 passed. No live EMTA or other network calls were made. The full
 Merit Palk suite includes the older-schema upgrade test; approval skips new
 TSD-line persistence when migration 0054 has not been applied.
+The PostgreSQL migration branch has a matching immutability trigger, but no
+PostgreSQL server was used for integration testing.
 
 ## Remaining validation
 
