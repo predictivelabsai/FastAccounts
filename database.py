@@ -246,6 +246,15 @@ FROM pay_component_types t WHERE t.organisation_id=c.organisation_id AND t.id=c.
                     script += _POSTGRES_TSD_LINE_TRIGGERS
                 elif path.stem == "0055_tsd_apa_history":
                     script = script.replace("file_xml BLOB", "file_xml BYTEA")
+                elif path.stem == "0061_payroll_payout_tsd_lines":
+                    script = script.split("-- SQLITE_PAYOUT_TSD_IMMUTABILITY", 1)[0] + """
+CREATE OR REPLACE FUNCTION guard_payroll_payout_tsd_lines() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    RAISE EXCEPTION 'approved payout TSD lines are immutable';
+END; $$;
+CREATE TRIGGER guard_payroll_payout_tsd_update BEFORE UPDATE OR DELETE ON payroll_payout_tsd_lines
+FOR EACH ROW EXECUTE FUNCTION guard_payroll_payout_tsd_lines();
+"""
                 elif path.stem == "0060_payroll_run_lineage_tenancy":
                     script = """CREATE OR REPLACE FUNCTION guard_pay_run_original_tenant() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN

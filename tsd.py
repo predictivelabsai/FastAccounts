@@ -245,6 +245,17 @@ class TSDExportService:
                                  (organisation_id, item['id']))
             frozen_lines = tx.rows("SELECT * FROM pay_item_tsd_lines WHERE organisation_id=? AND source_kind='pay_run_item' AND source_id=? ORDER BY payment_type",
                                    (organisation_id, item['id']))
+            if run.get('kind') == 'correction':
+                payout_lines = tx.rows("SELECT l.* FROM payroll_payout_tsd_lines l JOIN payroll_payout_batches b "
+                    "ON b.organisation_id=l.organisation_id AND b.id=l.payout_batch_id "
+                    "WHERE l.organisation_id=? AND l.pay_run_item_id=? AND b.pay_run_id=? AND b.status='Paid' "
+                    "AND substr(b.payout_date,1,7)=? AND b.id=(SELECT first_paid.id FROM payroll_payout_batches first_paid "
+                    "WHERE first_paid.organisation_id=b.organisation_id AND first_paid.pay_run_id=b.pay_run_id "
+                    "AND first_paid.status='Paid' AND substr(first_paid.payout_date,1,7)=? "
+                    "ORDER BY first_paid.payout_date,first_paid.id LIMIT 1) ORDER BY l.payment_type",
+                    (organisation_id, item['id'], run_id, run['payment_date'][:7], run['payment_date'][:7]))
+                if payout_lines:
+                    frozen_lines = payout_lines
             correction_lines = []
             for correction in same_month_corrections:
                 correction_item = tx.one("SELECT i.id FROM pay_run_items i WHERE i.organisation_id=? AND i.pay_run_id=? AND i.employee_id=?",

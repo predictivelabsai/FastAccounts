@@ -48,13 +48,15 @@ def monthly_exemption_used(tx, organisation_id, employee_id, payment_month):
     year, month = map(int, payment_month.split('-'))
     start = date(year, month, 1)
     next_month = date(year + (month == 12), 1 if month == 12 else month + 1, 1)
-    rows = tx.rows("SELECT i.tax_free_minimum,r.period,r.settlement_date FROM pay_run_items i "
+    rows = tx.rows("SELECT i.tax_free_minimum,r.period,COALESCE((SELECT b.payout_date FROM payroll_payout_batches b "
+                   "WHERE b.organisation_id=r.organisation_id AND b.pay_run_id=r.id AND b.payout_type='salary' "
+                   "AND b.status!='Cancelled' ORDER BY b.payout_date,b.id LIMIT 1),r.settlement_date) payment_date FROM pay_run_items i "
                    "JOIN pay_runs r ON r.organisation_id=i.organisation_id AND r.id=i.pay_run_id "
                    "WHERE i.organisation_id=? AND i.employee_id=? AND r.status='Approved'",
                    (organisation_id, employee_id))
     used = decimal('0')
     for row in rows:
-        paid_on = date.fromisoformat(row['settlement_date']) if row['settlement_date'] else settlement_date(row['period'])
+        paid_on = date.fromisoformat(row['payment_date']) if row['payment_date'] else settlement_date(row['period'])
         if start <= paid_on < next_month:
             used += decimal(row['tax_free_minimum'])
     absence_rows = tx.rows("SELECT p.calculation_json FROM payroll_absence_pay p "

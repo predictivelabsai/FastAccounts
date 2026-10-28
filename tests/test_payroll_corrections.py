@@ -79,6 +79,53 @@ def test_positive_correction_delta_is_paid_as_separate_salary_payout(db, ee_org)
                                  amounts={approved['items'][0]['employee_id']: str(delta)})
 
 
+def test_later_month_positive_correction_uses_payment_month_allowance(db, ee_org):
+    from payroll_payouts import PayoutService
+
+    service = PayrollService(db)
+    employee = service.save_employee(ee_org['id'], actor=ACTOR, name='Tax-free correction employee',
+        gross_salary='2000', personal_id='49001010026', apply_tax_free_minimum=True)
+    original = service.approve(ee_org['id'], service.create_run(ee_org['id'], period='2026-10', actor=ACTOR)['id'], actor=ACTOR)
+    correction = service.create_correction(ee_org['id'], original['id'], actor=ACTOR)
+    service.update_item(ee_org['id'], correction['id'], correction['items'][0]['id'],
+                        actor=ACTOR, gross_salary='2500')
+    approved = service.approve(ee_org['id'], correction['id'], actor=ACTOR)
+    payout = PayoutService(db).create(ee_org['id'], approved['id'], actor=ACTOR,
+        payout_date='2026-11-20')
+    assert Decimal(str(payout['lines'][0]['amount'])) == Decimal('482.00')
+    tsd_line = db.one('SELECT * FROM payroll_payout_tsd_lines WHERE organisation_id=? AND payout_batch_id=?',
+                      (ee_org['id'], payout['id']))
+    assert Decimal(tsd_line['exemption_610']) == Decimal('482.00')
+    assert Decimal(tsd_line['income_tax']) == Decimal('0.00')
+    assert Decimal(str(approved['items'][0]['payout_net_delta'])) != Decimal('482.00')
+    adjustment = db.one("SELECT id FROM posting_batches WHERE organisation_id=? AND voucher_type='payroll_correction_tax_adjustment' AND voucher_id=?",
+                        (ee_org['id'], payout['id']))
+    assert adjustment
+    lines = db.rows('SELECT debit,credit FROM gl_entries WHERE organisation_id=? AND posting_batch_id=?',
+                    (ee_org['id'], adjustment['id']))
+    assert sum((Decimal(line['debit']) for line in lines), Decimal(0)) == sum(
+        (Decimal(line['credit']) for line in lines), Decimal(0))
+
+
+def test_later_month_negative_correction_amends_original_month(db, ee_org):
+    from payroll_payouts import PayoutService
+    from tsd import TSDExportService
+
+    service = PayrollService(db)
+    service.save_employee(ee_org['id'], actor=ACTOR, name='Negative tax-free correction employee',
+        gross_salary='2000', personal_id='49001010034', apply_tax_free_minimum=True)
+    original = service.approve(ee_org['id'], service.create_run(ee_org['id'], period='2026-10', actor=ACTOR)['id'], actor=ACTOR)
+    correction = service.create_correction(ee_org['id'], original['id'], actor=ACTOR)
+    service.update_item(ee_org['id'], correction['id'], correction['items'][0]['id'],
+                        actor=ACTOR, gross_salary='1800')
+    approved = service.approve(ee_org['id'], correction['id'], actor=ACTOR)
+    with pytest.raises(ValueError, match='No unpaid net remains'):
+        PayoutService(db).create(ee_org['id'], approved['id'], actor=ACTOR, payout_date='2026-11-20')
+    with db.transaction() as tx:
+        workpaper = TSDExportService(db)._workpaper(tx, ee_org['id'], original['id'])
+    assert workpaper['totals']['gross_amount'] == Decimal('1800.00')
+
+
 def test_negative_correction_creates_receivable_and_next_payout_offsets_it(db, ee_org):
     from payroll_payouts import PayoutService
 

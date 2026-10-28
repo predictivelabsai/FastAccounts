@@ -7,6 +7,10 @@ from database import Database, get_database
 from ledger import LedgerService, PostingLine
 from payroll_payday import payday_for_period
 from payroll_rules import settlement_date
+from payroll_rules import remaining_monthly_exemption, rules_for
+from payroll_tax_repository import monthly_exemption_used
+from payroll import calculate_pay
+from payroll_tsd_types import payment_type
 
 PAYOUT_TYPES = {'salary', 'advance', 'absence_pay', 'bonus', 'withholding'}
 
@@ -43,6 +47,77 @@ class PayoutService:
             item['unpaid'] = money(decimal(item['net']) - decimal(paid['amount']) - decimal(offsets['amount']))
         return items
 
+    def _recalculate_later_correction(self, tx, organisation_id, run, payout_date):
+        if run.get('kind') != 'correction' or payout_date[:7] == (run.get('settlement_date') or run['period'] + '-01')[:7]:
+            return {}
+        existing = tx.one("SELECT payout_date FROM payroll_payout_batches WHERE organisation_id=? AND pay_run_id=? "
+                          "AND payout_type='salary' AND status!='Cancelled' ORDER BY payout_date,id LIMIT 1",
+                          (organisation_id, run['id']))
+        if existing and existing['payout_date'][:7] != payout_date[:7]:
+            raise PayoutConflict('All later-month correction payouts must use the same payment month')
+        previous = tx.one("SELECT id FROM pay_runs WHERE organisation_id=? AND original_run_id=? AND kind='correction' "
+                          "AND status='Approved' AND id<>? ORDER BY approved_at DESC,id DESC LIMIT 1",
+                          (organisation_id, run['original_run_id'], run['id']))
+        baseline_id = previous['id'] if previous else run['original_run_id']
+        baseline = {row['employee_id']: row for row in tx.rows(
+            'SELECT * FROM pay_run_items WHERE organisation_id=? AND pay_run_id=?',
+            (organisation_id, baseline_id))}
+        from datetime import date
+        recalculated = {}
+        pay_date = date.fromisoformat(payout_date)
+        rules = rules_for(pay_date)
+        for item in tx.rows('SELECT * FROM pay_run_items WHERE organisation_id=? AND pay_run_id=? ORDER BY employee_id',
+                            (organisation_id, run['id'])):
+            prior = baseline.get(item['employee_id'])
+            if not prior:
+                raise PayoutConflict('Correction employees do not match the original run')
+            gross_delta = money(decimal(item['gross']) - decimal(prior['gross']))
+            if gross_delta <= 0:
+                continue
+            context = tx.one('SELECT * FROM pay_item_context WHERE organisation_id=? AND item_id=?',
+                             (organisation_id, item['id']))
+            if not context:
+                raise PayoutConflict('Correction tax calculation snapshot is missing')
+            mode = context.get('tax_free_mode') or ('maximum' if context.get('apply_tax_free_minimum') else 'none')
+            used = monthly_exemption_used(tx, organisation_id, item['employee_id'], payout_date[:7])
+            remaining = remaining_monthly_exemption(mode, context.get('tax_free_amount'),
+                                                     rules.basic_exemption, used)
+            employee = {
+                'gross_salary': str(gross_delta), 'funded_pension_percent': item['funded_pension_percent'],
+                'board_member': bool(item['board_member']), 'pay_basis': item['pay_basis'],
+                'apply_tax_free_minimum': bool(context.get('apply_tax_free_minimum')),
+                'tax_free_mode': mode, 'tax_free_amount': context.get('tax_free_amount'),
+                'unemployment_applies': context.get('unemployment_applies'),
+                'social_tax_minimum_exemption': item.get('social_tax_minimum_exemption'),
+                'employment_start_date': context.get('employment_start_date'),
+                'employment_end_date': context.get('employment_end_date'),
+            }
+            hours = None
+            if employee['pay_basis'] == 'hourly':
+                employee['hourly_rate'] = item['hourly_rate']
+                hours = gross_delta / decimal(item['hourly_rate'])
+            amounts = calculate_pay(employee, period=run['period'], hours=hours,
+                                    settlement_on=pay_date, exemption_remaining=remaining)
+            tx.execute('UPDATE pay_run_items SET payout_net_delta=? WHERE organisation_id=? AND id=?',
+                       (db_number(amounts['net']), organisation_id, item['id']))
+            tsd_item = item | amounts | {'gross': gross_delta, 'gross_salary': gross_delta}
+            from payroll_tsd_breakdown import calculate_tsd_breakdown
+            records = calculate_tsd_breakdown(item=tsd_item, components=[], context=context)
+            previous_net = money(decimal(item['net']) - decimal(prior['net']))
+            adjustments = {
+                'PAYROLL_SALARY_PAYABLE': money(amounts['net'] - previous_net),
+                'PAYROLL_INCOME_WITHHELD': money(amounts['income_tax'] - (decimal(item['income_tax']) - decimal(prior['income_tax']))),
+                'PAYROLL_PENSION_WITHHELD': money(amounts['funded_pension'] - (decimal(item['funded_pension']) - decimal(prior['funded_pension']))),
+                'PAYROLL_UI_ACCRUED': money(amounts['ui_employee'] + amounts['ui_employer'] -
+                    (decimal(item['ui_employee']) + decimal(item['ui_employer']) -
+                     decimal(prior['ui_employee']) - decimal(prior['ui_employer']))),
+                'PAYROLL_SOCIAL_ACCRUED': money(amounts['social_tax'] - (decimal(item['social_tax']) - decimal(prior['social_tax']))),
+                'PAYROLL_SOCIAL': money(-amounts['social_tax'] + (decimal(item['social_tax']) - decimal(prior['social_tax']))),
+                'PAYROLL_UI': money(-amounts['ui_employer'] + (decimal(item['ui_employer']) - decimal(prior['ui_employer']))),
+            }
+            recalculated[item['id']] = {'records': records, 'adjustments': adjustments}
+        return recalculated
+
     def create(self, organisation_id, run_id, *, actor, payout_date=None, payout_type='salary', amounts=None, bank_account_id=None):
         if payout_type not in PAYOUT_TYPES:
             raise ValueError('Invalid payout type')
@@ -53,6 +128,7 @@ class PayoutService:
             frozen_date = date.fromisoformat(run.get('settlement_date') or self._default_date(tx, organisation_id, run['period']).isoformat())
             if payout_type == 'salary' and run.get('kind', 'regular') == 'regular' and chosen_date[:7] != frozen_date.isoformat()[:7]:
                 raise PayoutConflict('The payout month differs from the frozen payroll calculation month; a correction is required')
+            payout_tsd = self._recalculate_later_correction(tx, organisation_id, run, chosen_date) if payout_type == 'salary' else {}
             outstanding = self._outstanding(tx, organisation_id, run_id)
             requested = amounts if amounts is not None else {row['employee_id']: str(row['unpaid']) for row in outstanding if row['unpaid'] > 0}
             known = {row['employee_id']: row for row in outstanding}
@@ -63,6 +139,32 @@ class PayoutService:
                 raise KeyError('Bank account not found')
             tx.execute('INSERT INTO payroll_payout_batches(id,organisation_id,pay_run_id,payout_type,payout_date,bank_account_id,created_at) VALUES (?,?,?,?,?,?,?)',
                        (batch_id, organisation_id, run_id, payout_type, chosen_date, bank_account_id, now))
+            adjustment_values = {}
+            for item_id, payout_data in payout_tsd.items():
+                for role, amount in payout_data['adjustments'].items():
+                    adjustment_values[role] = money(adjustment_values.get(role, Decimal(0)) + amount)
+                for record in payout_data['records']:
+                    tx.execute('INSERT INTO payroll_payout_tsd_lines(id,organisation_id,payout_batch_id,pay_run_item_id,payment_type,payment_type_name,amount,social_tax_base,social_tax,social_tax_minimum_topup,ui_employee_base,ui_employee,ui_employer_base,ui_employer,ii_pillar_base,ii_pillar,exemption_610,taxable_amount,income_tax) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+                               (f'{batch_id}:{item_id}:{record["payment_type"]}', organisation_id, batch_id,
+                                item_id, record['payment_type'], payment_type(record['payment_type']).name,
+                                *(db_number(record[field]) for field in ('amount','social_tax_base','social_tax','social_tax_minimum_topup',
+                                  'ui_employee_base','ui_employee','ui_employer_base','ui_employer','ii_pillar_base','ii_pillar',
+                                  'exemption_610','taxable_amount','income_tax'))))
+            if any(adjustment_values.values()):
+                frozen_accounts = {row['role']: row['account_id'] for row in tx.rows(
+                    'SELECT role,account_id FROM pay_run_posting_accounts WHERE organisation_id=? AND pay_run_id=?',
+                    (organisation_id, run_id))}
+                adjustment_lines = []
+                for role, signed_credit in adjustment_values.items():
+                    if not signed_credit:
+                        continue
+                    adjustment_lines.append(PostingLine(frozen_accounts[role], debit=abs(signed_credit) if signed_credit < 0 else Decimal(0),
+                        credit=signed_credit if signed_credit > 0 else Decimal(0), memo='Later-month payroll correction tax adjustment',
+                        source_line_type='payroll_payout', source_line_id=batch_id))
+                LedgerService(self.db).post(organisation_id=organisation_id,
+                    voucher_type='payroll_correction_tax_adjustment', voucher_id=batch_id,
+                    voucher_code='PAY-ADJ-' + batch_id[:12], posting_date=chosen_date,
+                    lines=adjustment_lines, actor=actor, currency='EUR', tx=tx)
             for employee_id, raw_amount in requested.items():
                 item = known.get(employee_id)
                 if not item:
