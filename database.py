@@ -246,6 +246,21 @@ FROM pay_component_types t WHERE t.organisation_id=c.organisation_id AND t.id=c.
                     script += _POSTGRES_TSD_LINE_TRIGGERS
                 elif path.stem == "0055_tsd_apa_history":
                     script = script.replace("file_xml BLOB", "file_xml BYTEA")
+                elif path.stem == "0060_payroll_run_lineage_tenancy":
+                    script = """CREATE OR REPLACE FUNCTION guard_pay_run_original_tenant() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF NEW.original_run_id IS NOT NULL AND NOT EXISTS (
+        SELECT 1 FROM pay_runs original
+        WHERE original.id=NEW.original_run_id AND original.organisation_id=NEW.organisation_id
+    ) THEN
+        RAISE EXCEPTION 'original pay run must belong to the same organisation';
+    END IF;
+    RETURN NEW;
+END; $$;
+CREATE TRIGGER pay_runs_original_same_organisation
+BEFORE INSERT OR UPDATE OF original_run_id,organisation_id ON pay_runs
+FOR EACH ROW EXECUTE FUNCTION guard_pay_run_original_tenant();
+"""
                 elif path.stem == "0035_payroll_income_line":
                     script = _POSTGRES_PAYROLL_0035
                 elif path.stem == "0034_payroll_demo_fixes":
