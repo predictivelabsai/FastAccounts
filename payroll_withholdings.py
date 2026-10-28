@@ -3,7 +3,7 @@ from datetime import date
 from decimal import Decimal
 import re
 
-from core_utils import audit, db_number, money, new_id, utc_now
+from core_utils import audit, db_number, decimal, money, new_id, utc_now
 from payment_orders import PaymentOrderService
 from payroll_rules import garnishable_amount, rules_for
 
@@ -130,12 +130,38 @@ class PayrollWithholdingService:
             audit(tx, organisation_id, actor, 'payroll.withholding_agreement.archived', 'payroll_withholding_agreement', agreement_id)
 
     def report(self, organisation_id, *, start, end):
-        return self.db.rows('SELECT e.name employee_name,r.name recipient_name,l.component_type,SUM(l.amount) amount '
+        rows = self.db.rows('SELECT e.name employee_name,r.name recipient_name,l.component_type,SUM(l.amount) amount '
             'FROM payroll_withholding_run_lines l JOIN pay_runs p ON p.organisation_id=l.organisation_id AND p.id=l.pay_run_id '
             'JOIN employees e ON e.organisation_id=l.organisation_id AND e.id=l.employee_id '
             'JOIN payroll_withholding_recipients r ON r.organisation_id=l.organisation_id AND r.id=l.recipient_id '
             'WHERE l.organisation_id=? AND p.period>=? AND p.period<=? GROUP BY e.name,r.name,l.component_type ORDER BY e.name,r.name,l.component_type',
             (organisation_id,start,end))
+        for row in rows:
+            row['amount'] = db_number(money(decimal(row['amount'])))
+        total = sum((money(decimal(row['amount'])) for row in rows), Decimal('0.00'))
+        return {'rows': rows, 'total': db_number(total), 'start': start, 'end': end}
+
+    def payout_report(self, organisation_id, *, start, end):
+        rows = self.db.rows('SELECT p.period,b.payout_date,b.status,b.id payout_id,r.name recipient_name,'
+            'l.description,l.amount FROM payroll_withholding_payout_lines l '
+            'JOIN payroll_withholding_payout_batches w ON w.organisation_id=l.organisation_id AND w.id=l.withholding_payout_id '
+            'JOIN payroll_payout_batches b ON b.organisation_id=w.organisation_id AND b.id=w.payout_batch_id '
+            'JOIN pay_runs p ON p.organisation_id=w.organisation_id AND p.id=w.pay_run_id '
+            'JOIN payroll_withholding_recipients r ON r.organisation_id=l.organisation_id AND r.id=l.recipient_id '
+            'WHERE l.organisation_id=? AND p.period>=? AND p.period<=? AND b.status!=\'Cancelled\' '
+            'ORDER BY p.period,b.payout_date,r.name,b.id', (organisation_id,start,end))
+        for row in rows:
+            row['amount'] = db_number(money(decimal(row['amount'])))
+        total = sum((money(decimal(row['amount'])) for row in rows), Decimal('0.00'))
+        return {'rows': rows, 'total': db_number(total), 'start': start, 'end': end}
+
+    def report_xlsx(self, organisation_id, *, start, end, payouts=False):
+        from excel_export import payroll_withholding_workbook
+        report = self.payout_report(organisation_id, start=start, end=end) if payouts else self.report(
+            organisation_id, start=start, end=end)
+        with self.db.transaction() as tx:
+            organisation = tx.one('SELECT * FROM organisations WHERE id=?', (organisation_id,))
+        return payroll_withholding_workbook(organisation, report, payouts=payouts)
 
     @staticmethod
     def generate_for_item(tx, organisation_id, run, item, *, gross, net, minimum_wage):

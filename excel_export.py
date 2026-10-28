@@ -67,6 +67,36 @@ def _total_row(ws, label_column: int, money_columns: tuple[int, ...], totals: di
         ws.cell(row=row, column=column).font = Font(bold=True)
 
 
+def payroll_withholding_workbook(organisation: dict, report: dict, *, payouts=False) -> bytes:
+    title = 'Payroll withholding payouts' if payouts else 'Payroll withholdings'
+    workbook = _book(organisation, title)
+    ws = workbook.active
+    ws.title = 'Withholding payouts' if payouts else 'Withholdings'
+    ws.append([title, f"{report['start']} to {report['end']}"])
+    ws['A1'].font = Font(bold=True, size=14)
+    if payouts:
+        headers = ('Payroll period', 'Payout date', 'Status', 'Recipient', 'Payment description', 'Amount (EUR)')
+        _header_row(ws, headers)
+        for row in report['rows']:
+            ws.append([row['period'], row['payout_date'], row['status'], row['recipient_name'], row['description'], None])
+            _put(ws, ws.max_row, 6, Decimal(str(row['amount'])))
+        _total_row(ws, 5, (6,), {6: Decimal(str(report['total']))})
+        ws.auto_filter.ref = f'A2:F{ws.max_row - 1}'
+    else:
+        headers = ('Employee', 'Recipient', 'Withholding type', 'Amount (EUR)')
+        _header_row(ws, headers)
+        for row in report['rows']:
+            ws.append([row['employee_name'], row['recipient_name'], row['component_type'], None])
+            _put(ws, ws.max_row, 4, Decimal(str(row['amount'])))
+        _total_row(ws, 3, (4,), {4: Decimal(str(report['total']))})
+        ws.auto_filter.ref = f'A2:D{ws.max_row - 1}'
+    ws.freeze_panes = 'A3'
+    for column in ws.columns:
+        letter = column[0].column_letter
+        ws.column_dimensions[letter].width = min(max(max(len(str(cell.value or '')) for cell in column) + 2, 12), 48)
+    return _finish(workbook)
+
+
 def pay_run_workbook(organisation: dict, run: dict, items: list[dict],
                      journal_lines: list[dict] | None = None) -> bytes:
     workbook = _book(organisation, "Payroll pay run")

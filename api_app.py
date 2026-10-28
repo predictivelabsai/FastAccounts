@@ -2529,6 +2529,37 @@ def payroll_withholding_report(organisation_id: str, start: str, end: str,
     return PayrollWithholdingService(get_database()).report(organisation_id, start=start, end=end)
 
 
+@api.get('/organisations/{organisation_id}/payroll/withholdings.xlsx')
+def payroll_withholding_report_xlsx(organisation_id: str, start: str, end: str,
+                                    user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    if not re.fullmatch(r'\d{4}-(0[1-9]|1[0-2])', start) or not re.fullmatch(r'\d{4}-(0[1-9]|1[0-2])', end) or start > end:
+        raise HTTPException(status_code=422, detail='Choose a valid payroll period range')
+    content = PayrollWithholdingService(get_database()).report_xlsx(organisation_id, start=start, end=end)
+    return Response(content, media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        headers={'Content-Disposition': f'attachment; filename="payroll-withholdings-{start}-{end}.xlsx"'})
+
+
+@api.get('/organisations/{organisation_id}/payroll/withholding-payouts')
+def payroll_withholding_payout_report(organisation_id: str, start: str, end: str,
+                                     user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    if not re.fullmatch(r'\d{4}-(0[1-9]|1[0-2])', start) or not re.fullmatch(r'\d{4}-(0[1-9]|1[0-2])', end) or start > end:
+        raise HTTPException(status_code=422, detail='Choose a valid payroll period range')
+    return PayrollWithholdingService(get_database()).payout_report(organisation_id, start=start, end=end)
+
+
+@api.get('/organisations/{organisation_id}/payroll/withholding-payouts.xlsx')
+def payroll_withholding_payout_report_xlsx(organisation_id: str, start: str, end: str,
+                                           user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    if not re.fullmatch(r'\d{4}-(0[1-9]|1[0-2])', start) or not re.fullmatch(r'\d{4}-(0[1-9]|1[0-2])', end) or start > end:
+        raise HTTPException(status_code=422, detail='Choose a valid payroll period range')
+    content = PayrollWithholdingService(get_database()).report_xlsx(organisation_id, start=start, end=end, payouts=True)
+    return Response(content, media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        headers={'Content-Disposition': f'attachment; filename="withholding-payouts-{start}-{end}.xlsx"'})
+
+
 @api.get('/organisations/{organisation_id}/payroll/payday-settings')
 def payroll_payday_settings(organisation_id: str, user: User = Depends(current_user)):
     _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
