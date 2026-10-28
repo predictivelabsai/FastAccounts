@@ -32,6 +32,16 @@ delivered.
   accepts reviewed historical earnings, and describes its agreed-salary
   fallback. Short-service, stable-salary and schedule-specific legal cases are
   listed for accountant confirmation in `payroll_absences_validation.md`.
+- Added `payroll_absence_pay.py` with Decimal vacation-pay method breakdowns,
+  the explicit `EE-SICK-2026-v1` sick-benefit rule, unused-leave compensation
+  calculation and previous-working-day payout date. Four targeted tests pass.
+  Absence save/payout/run integration is still outstanding and is recorded as
+  such in the validation document.
+- Added migration 0045 for effective-dated leave entitlements, reviewed opening
+  balances and reviewed historical earning rows with tenant/employee keys and
+  idempotent source keys. This is the storage foundation only: staged import,
+  review/apply routes and UI, plus Merit vacation-snapshot application, remain
+  outstanding.
 
 ## 2026-10-28: Payroll calendar and payouts
 

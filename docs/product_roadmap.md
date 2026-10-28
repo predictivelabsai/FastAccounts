@@ -17,7 +17,12 @@
   ratio shown on the run and payslip. Unit 4 adds the pure, Decimal average-pay
   engine with approved wages, historical earnings, explicit absence exclusions,
   three averages and a documented fallback breakdown. Absence pay, historical
-  import and liability work remains in progress.
+  import and liability work remains in progress. Unit 5 adds tested pure
+  vacation and sickness payment calculations, but pending-pay persistence,
+  payout linkage and payroll-run integration are outstanding. Migration 0045
+  adds effective-dated entitlement, reviewed opening-balance and reviewed
+  historical-earning tables. Import routes, UI and application logic remain
+  outstanding.
 
 ## 2026-10-28: Payroll calendar and payouts
 

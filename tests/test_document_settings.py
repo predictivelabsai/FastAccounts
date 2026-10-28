@@ -236,7 +236,7 @@ def test_migration_rerun_preserves_data_and_checks(env):
     assert d['db'].rows('SELECT * FROM document_settings') == original
     assert d['db'].rows('SELECT * FROM attachments') == attachments
     assert d['db'].rows('PRAGMA foreign_key_check') == []
-    assert "'0027_mfa', '0028_document_settings', '0029_copilot', '0030_master_data_maintenance', '0031_master_data_groups', '0032_copilot_access', '0033_copilot_settings', '0034_payroll_demo_fixes', '0035_payroll_income_line', '0036_payroll_component_catalogue', '0037_employee_tax_settings', '0038_payroll_payday_rules', '0039_payroll_payouts', '0040_payroll_settlement_dates', '0041_payroll_sepa_details', '0042_payroll_component_metadata', '0043_payroll_absences', '0044_payroll_absence_day_freeze']" in (ROOT / '.github/workflows/ci.yml').read_text()
+    assert "'0027_mfa', '0028_document_settings', '0029_copilot', '0030_master_data_maintenance', '0031_master_data_groups', '0032_copilot_access', '0033_copilot_settings', '0034_payroll_demo_fixes', '0035_payroll_income_line', '0036_payroll_component_catalogue', '0037_employee_tax_settings', '0038_payroll_payday_rules', '0039_payroll_payouts', '0040_payroll_settlement_dates', '0041_payroll_sepa_details', '0042_payroll_component_metadata', '0043_payroll_absences', '0044_payroll_absence_day_freeze', '0045_payroll_history']" in (ROOT / '.github/workflows/ci.yml').read_text()
     for column, value in [('accent_colour', '#GG0000'), ('accent_colour', '#1234567'), ('footer_text', 'a' * 501)]:
         with pytest.raises(sqlite3.IntegrityError), d['db'].transaction() as tx:
             tx.execute(f'UPDATE document_settings SET {column}=? WHERE organisation_id=?', (value, d['org']['id']))

@@ -146,3 +146,16 @@ Command and result:
 - Absence save, pending-pay persistence, payout-batch linkage, tax-month
   aggregation, run-component integration and termination trigger remain to be
   implemented. The pure calculations do not claim this workflow is complete.
+
+## Unit 6: Leave and earnings storage foundation
+
+Migration 0045 adds tenant-scoped effective-dated entitlement rows, reviewed
+opening unused-day balances and reviewed historical monthly earnings. Historical
+rows have unique source keys for idempotency. The upload adapter, staging review
+and apply handlers, entitlement UI/API and reviewed Merit snapshot application
+have not yet been implemented, so this unit is incomplete.
+
+```powershell
+.tmp\venv312\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache312 --basetemp=.tmp\test-payroll-unit6b tests\test_migrations_and_tenancy.py::test_empty_migration_is_idempotent tests\test_migrations_and_tenancy.py::test_historical_migration_catalogue_does_not_affect_other_databases
+# 2 passed
+```
