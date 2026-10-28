@@ -183,7 +183,7 @@ def test_later_month_correction_exports_as_new_apa_transaction(db, ee_org):
     from tsd import TSDExportService
     payroll = PayrollService(db)
     employee = payroll.save_employee(ee_org['id'], actor='owner@example.test', name='Later correction employee',
-                                     personal_id='49001010012', gross_salary='2000', apply_tax_free_minimum=False)
+                                     personal_id='49001010012', gross_salary='2000', apply_tax_free_minimum=True)
     run = payroll.approve(ee_org['id'], payroll.create_run(ee_org['id'], period='2026-10', actor='owner@example.test')['id'],
                           actor='owner@example.test')
     with db.transaction() as tx:
@@ -203,6 +203,11 @@ def test_later_month_correction_exports_as_new_apa_transaction(db, ee_org):
     correction_payout = payouts.create(ee_org['id'], correction['id'], actor='owner@example.test', payout_date='2026-11-20')
     payouts.mark_paid(ee_org['id'], correction_payout['id'], 'later-month-bank', actor='owner@example.test')
     tsd = TSDExportService(db)
+    with db.transaction() as tx:
+        workpaper = tsd._workpaper(tx, ee_org['id'], correction['id'])
+    assert workpaper['records'][0]['payment_month'] == '2026-11'
+    assert workpaper['records'][0]['tax_free_minimum'] == Decimal('482.00')
+    assert workpaper['records'][0]['income_tax'] == Decimal('0.00')
     prep = tsd.prepare(ee_org['id'], correction['id'], actor='owner@example.test')
     tsd.review(ee_org['id'], prep['id'], actor='owner@example.test')
     payload = tsd.export_apa_payout(ee_org['id'], prep['id'], correction_payout['id'], actor='owner@example.test')

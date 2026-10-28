@@ -4707,9 +4707,9 @@
     ])));
     const refreshSummary = async () => (await api(c.url('/payroll/payouts/summary') + `?run_id=${encodeURIComponent(run.id)}`))[0];
     const employeeSummary = renderEmployeeSummary(await refreshSummary());
-    const d = dialog('Payroll payouts', `<p>${tr('Pay run')} ${esc(run.period)}</p><div data-payout-summary>${employeeSummary}</div><div data-payout-list>${renderBatches(batches)}${renderOffsets(batches)}</div>${button('Create salary payout', 'createPayout', true)}<div data-payout-bank>${bankOptions.length ? select('Bank account', 'bank_account_id', bankOptions, bankOptions[0][0]) : `<p class="notice">${tr('Add an active bank account first.')}</p>`}</div>`);
+    const d = dialog('Payroll payouts', `<p>${tr('Pay run')} ${esc(run.period)}</p><div data-payout-summary>${employeeSummary}</div><div data-payout-list>${renderBatches(batches)}${renderOffsets(batches)}</div>${field('Payout date','payout_date',run.payment_date,'date','required')}${button('Create salary payout', 'createPayout', true)}<div data-payout-bank>${bankOptions.length ? select('Bank account', 'bank_account_id', bankOptions, bankOptions[0][0]) : `<p class="notice">${tr('Add an active bank account first.')}</p>`}</div>`);
     d.querySelector('[data-action="createPayout"]').onclick = async () => {
-      await post(c.url(`/pay-runs/${run.id}/payouts`), {payout_type: 'salary', bank_account_id: d.querySelector('[name="bank_account_id"]')?.value || null});
+      await post(c.url(`/pay-runs/${run.id}/payouts`), {payout_type: 'salary', payout_date: d.querySelector('[name="payout_date"]').value, bank_account_id: d.querySelector('[name="bank_account_id"]')?.value || null});
       batches = await refresh(); d.querySelector('[data-payout-list]').innerHTML = renderBatches(batches) + renderOffsets(batches);
       d.querySelector('[data-payout-summary]').innerHTML = renderEmployeeSummary(await refreshSummary());
       bindPayoutActions();
