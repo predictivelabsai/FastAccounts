@@ -556,7 +556,9 @@ class PayrollService:
             metadata_ready = bool(self.db.one("SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='pay_component_types' AND column_name='is_wage'"))
         else:
             metadata_ready = 'is_wage' in {row['name'] for row in self.db.rows('PRAGMA table_info(pay_component_types)')}
-        fields = ('name', 'direction', *FLAGS, 'liability_role') + (('is_wage', 'active') if metadata_ready else ())
+        has_tsd = ('tsd_payment_type' in {row['name'] for row in self.db.rows('PRAGMA table_info(pay_component_types)')}
+                   if self.db.dialect != 'postgres' else bool(self.db.one("SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='pay_component_types' AND column_name='tsd_payment_type'")))
+        fields = ('name', 'direction', *FLAGS, 'liability_role') + (('is_wage', 'active') if metadata_ready else ()) + (('tsd_payment_type',) if has_tsd else ())
         if set(changes) - set(fields):
             raise ValueError('Unknown payment component field')
         with self.db.transaction() as tx:
@@ -566,7 +568,7 @@ class PayrollService:
                 if not data:
                     raise KeyError('Payment type not found')
             else:
-                data = dict(name='', direction='income', liability_role='PAYROLL_DEDUCTION',
+                data = dict(name='', direction='income', liability_role='PAYROLL_DEDUCTION', tsd_payment_type=10,
                             is_wage=True, active=True, **{key: False for key in FLAGS})
             data.update(changes)
             self._component_values(data)
@@ -595,6 +597,8 @@ class PayrollService:
             if type(data.get(key)) not in (bool, int) or data[key] not in (0, 1):
                 raise ValueError('Payment type metadata must be boolean')
             data[key] = int(data[key])
+        if 'tsd_payment_type' in data and (type(data['tsd_payment_type']) is not int or data['tsd_payment_type'] not in (10,11,12,13,14,15,16,17,21,24,32,33,120)):
+            raise ValueError('Choose a supported TSD payment type')
         # All flags remain editable snapshots. They affect income lines only;
         # deduction lines are explicitly net withholdings, never tax relief.
         return data
@@ -678,8 +682,12 @@ class PayrollService:
                     metadata_ready = bool(tx.one("SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='pay_item_components' AND column_name='is_wage'"))
                 else:
                     metadata_ready = 'is_wage' in {row['name'] for row in tx.rows('PRAGMA table_info(pay_item_components)')}
-                fields = ('id', 'organisation_id', 'item_id', 'type_id', 'position', 'name', 'amount', 'direction', *FLAGS, 'liability_role') + (('is_wage',) if metadata_ready else ())
-                values = (new_id(), organisation_id, item_id, data['id'], position, data['name'], db_number(amount), data['direction'], *(data[key] for key in FLAGS), data['liability_role']) + ((data['is_wage'],) if metadata_ready else ())
+                if tx.dialect == 'postgres':
+                    has_tsd = bool(tx.one("SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='pay_item_components' AND column_name='tsd_payment_type'"))
+                else:
+                    has_tsd = 'tsd_payment_type' in {row['name'] for row in tx.rows('PRAGMA table_info(pay_item_components)')}
+                fields = ('id', 'organisation_id', 'item_id', 'type_id', 'position', 'name', 'amount', 'direction', *FLAGS, 'liability_role') + (('is_wage',) if metadata_ready else ()) + (('tsd_payment_type',) if has_tsd else ())
+                values = (new_id(), organisation_id, item_id, data['id'], position, data['name'], db_number(amount), data['direction'], *(data[key] for key in FLAGS), data['liability_role']) + ((data['is_wage'],) if metadata_ready else ()) + ((data.get('tsd_payment_type', 10),) if has_tsd else ())
                 tx.execute('INSERT INTO pay_item_components(' + ','.join(fields) + ') VALUES (' + ','.join('?' for _ in fields) + ')', values)
         if generated_column_ready:
             tx.execute('DELETE FROM pay_item_components WHERE organisation_id=? AND item_id=? AND is_generated=1',

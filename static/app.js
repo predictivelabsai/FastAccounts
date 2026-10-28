@@ -4627,6 +4627,7 @@
         field("Name", "name", values.name || "", "text", 'required maxlength="180"') +
         (values.description ? `<p class="full-width muted">${tr(values.description)}</p>` : "") +
         select("Direction", "direction", [["income", t("Income")], ["deduction", t("Deduction")]], values.direction) +
+        select("TSD payment type", "tsd_payment_type", [[10, "10 palgatulu"], [13, "13 kõrgete ametiisikute palgatulu"], [14, "14 sünnitoetus"], [15, "15 seaduse alusel tasu"], [16, "16 muu maksustatav väljamakse"], [17, "17 VÕS lepingutasu"], [21, "21 juhtorgani liikme tasu"], [24, "24 tööandja haigushüvitis"], [32, "32 tööõnnetuse hüvitis"], [33, "33 lõpetamise hüvitis"], [120, "120 mitteresidendi palgatulu"]], values.tsd_payment_type || 10) +
         select("Deduction liability", "liability_role", [["PAYROLL_DEDUCTION", t("Other deduction liability")], ["PAYROLL_BAILIFF", t("Bailiff withholding liability")]], values.liability_role) +
         check("Counts towards average and vacation pay", "is_wage", values.is_wage) + check("Active for new payment lines", "active", values.active) +
         `<div class="full-width component-flags">${componentFlagFields(values)}</div><p class="full-width muted">${tr("Levy flags apply to income lines. Deduction lines reduce net pay.")}</p>` + `<p class="full-width muted">${tr("Defaults can be overridden on each draft payment line. Confirm tax treatment before approval.")}</p>`,
@@ -4635,6 +4636,7 @@
         componentFlags.forEach(([key]) => data[key] = f.elements[key].checked);
         data.is_wage = f.elements.is_wage.checked;
         data.active = f.elements.active.checked;
+        data.tsd_payment_type = Number(f.elements.tsd_payment_type.value);
         await post(c.url(`/payroll/component-types${type ? `/${type.id}` : ""}`), data, type ? "PUT" : "POST");
         await saved(editor);
       });

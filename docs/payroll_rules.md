@@ -599,3 +599,5 @@ use the existing Save action; history changes save independently. The editor is
 read-only for viewers and approvers. Employee UI exclusions do not disable the
 employer contribution. Contract components retain their separately reviewed tax
 flags, and board-fee base remuneration keeps its automatic exclusions.
+
+Payment components also carry an editable EMTA VALJAMLIIK code. Preset defaults, matrix source and items needing accountant confirmation are listed in [tsd-export.md](tsd-export.md). These codes do not replace review of the recipient's legal relationship.

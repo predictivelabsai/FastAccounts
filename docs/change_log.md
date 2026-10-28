@@ -2252,3 +2252,7 @@ the entries below, plus one connector fix:
   remain the existing PostgreSQL opt-in checks. `node --check static/app.js`,
   diff checks and preservation of existing locale sections passed. EstNLTK is
   unavailable locally; Estonian copy follows the existing valuuta terminology.
+
+## 2026-10-28: Payroll APA TSD payment-type groundwork
+
+- Added migration 0052 for tenant component payment-type codes and preset backfill, plus an editor field with EMTA code labels and a resident rule extract. Implementation and validation are tracked in payroll_tsd_validation.md.

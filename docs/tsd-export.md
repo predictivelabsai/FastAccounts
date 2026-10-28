@@ -15,7 +15,7 @@ e-MTA supports XBRL GL file upload, and CSV upload is transitional only through
 the payment month. Annexes 3–8 are unchanged and are not produced here.
 
 This is an accountant-facing export from an **Approved** Estonian EUR pay run.
-One frozen `pay_run_items` row becomes one payment record. Preparing the export
+TSD payment type codes are assigned from each frozen payment component. Preparing the export
 creates a tenant-scoped `sync_runs` row with provider `emta`, direction `export`,
 object type `tsd`, and status `Review Required`. An owner, administrator, or
 accountant must mark that preparation reviewed before either file can be
@@ -52,12 +52,26 @@ downloaded. Downloading a file does not submit it.
    every new draft snapshots the identifier when the pay run is created.
    Later employee-master edits cannot change the export.
 
-The code-level classification tables are `TSD_PAYMENT_CLASSIFICATION` and
-`TSD_ANNEX_MAPPING` at the top of `tsd.py`.
+The rule extract is `payroll_tsd_types.py`, transcribed from resident
+natural-person rows in EMTA's 18 November 2025 matrix. Current preset defaults
+are:
+
+| Preset | VALJAMLIIK | Basis |
+| --- | ---: | --- |
+| Monthly/hourly base, base adjustment, bonus, overtime and ordinary employment additions | 10 | Legacy code 10 covers wages, supplements and holiday pay |
+| Board-member fee | 21 | Legacy code 21; no monthly minimum or unemployment insurance |
+| Services contract | 17 | Resident VÕS remuneration |
+| Employer sick benefit within the statutory limit | 24 | Excess must be separated as code 10 |
+| Termination compensation | 33 | Legacy termination compensation |
+| Author, parental, expenses and other deductions | 17, 10 or 16 | Needs accountant confirmation of the legal and tax basis |
+
+The payment-type editor lets an accountant change the code for future items.
+The current export does not yet include the code in its record or split a frozen
+item into multiple payment-type records; see `payroll_tsd_validation.md`.
 
 ## Per-payment field mapping
 
-The CSV header uses these fields in this order. The XML repeats the same fields
+The review CSV header uses these fields in this order. The XML repeats the same fields
 as `tsd:*` children of each XBRL GL `gl-cor:entryDetail`.
 
 | Export field | Source or derivation |
@@ -72,7 +86,7 @@ as `tsd:*` children of each XBRL GL `gl-cor:entryDetail`.
 | `payer_registration_no` | `organisations.registration_no` |
 | `recipient_personal_id` | Frozen `pay_run_items.employee_personal_id` |
 | `recipient_name` | Frozen `pay_run_items.employee_name` |
-| `payment_classification` | Monthly/hourly → `EMPLOYMENT_SALARY`; board fee → `BOARD_MEMBER_FEE` |
+| `payment_classification` | FastAccounts display label retained for compatibility |
 | `pay_basis` | Frozen `monthly`, `hourly`, `board_fee`, or `income_line` |
 | `currency` | Constant `EUR`; the service rejects non-EE/non-EUR books |
 | `gross_amount` | `pay_run_items.gross` |
@@ -128,3 +142,4 @@ after 31 December 2027. The CSV is not described as a permanent filing format.
 `EMTATSDExportProvider.submit()` always raises `PermissionError`. There is no
 X-tee client, SOAP client, e-MTA session, upload call, confirmation call, or
 status polling in this implementation.
+

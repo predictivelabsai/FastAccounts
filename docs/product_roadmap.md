@@ -2208,3 +2208,5 @@ checks remain follow-ups. The paired change log records details.
   parametrisation iterator in the MFA tests. No live provider calls or production
   accounting data are used. Python 3.12 runtime and live PostgreSQL checks remain
   unrun; the available Windows venv uses Python 3.14.6 and SQLite.
+
+- Payroll APA TSD component payment-type defaults and matrix rule extract are in progress; resident payment classification remains subject to accountant confirmation and EMTA validation.

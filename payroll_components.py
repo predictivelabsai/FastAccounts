@@ -68,6 +68,18 @@ PRESETS = (
     ('agreed_deduction', 'Muu kokkulepitud kinnipidamine', 'deduction', (0, 0, 0, 0, 0, 0), 'PAYROLL_DEDUCTION'),
 )
 
+TSD_PRESET_CODES = {
+    'base_adjustment': 10, 'contract': 17, 'bailiff': 16, 'author': 17,
+    'parental': 10, 'annual_leave': 10, 'unused_leave': 10,
+    'employer_sick_pay': 24, 'overtime': 10, 'extra_work': 10,
+    'bonus': 10, 'thirteenth_salary': 10, 'public_holiday': 10,
+    'night_work': 10, 'rest_day': 10, 'standby': 10, 'substitution': 10,
+    'commission': 10, 'study_leave': 10, 'average_pay': 10,
+    'severance': 33, 'expense_reimbursement': 16, 'salary_advance': 16,
+    'advance_recovery': 16, 'alimony': 16, 'union_fee': 16,
+    'agreed_deduction': 16,
+}
+
 # Translation keys describe the preset basis, independently of editable organisation names.
 PRESET_DESCRIPTIONS = {
     'base_adjustment': 'Gross employment pay correction. All ordinary levies apply.',
@@ -121,12 +133,16 @@ def seed_types(tx, organisation_id):
     else:
         metadata_ready = 'is_wage' in {row['name'] for row in tx.rows('PRAGMA table_info(pay_component_types)')}
     for key, name, direction, flags, role in PRESETS:
-        fields = ','.join(FLAGS) + ',liability_role' + (',is_wage,active' if metadata_ready else '')
+        has_tsd = ('tsd_payment_type' in {row['name'] for row in tx.rows('PRAGMA table_info(pay_component_types)')}
+                   if tx.dialect != 'postgres' else bool(tx.one("SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='pay_component_types' AND column_name='tsd_payment_type'")))
+        fields = ','.join(FLAGS) + ',liability_role' + (',is_wage,active' if metadata_ready else '') + (',tsd_payment_type' if has_tsd else '')
         values = (organisation_id + '-component-' + key, organisation_id, key, name, direction, *flags, role)
         if metadata_ready:
             values += (int(key not in {'bailiff', 'parental', 'annual_leave', 'unused_leave', 'employer_sick_pay',
                                       'severance', 'expense_reimbursement', 'salary_advance', 'advance_recovery',
                                       'alimony', 'union_fee', 'agreed_deduction'}), 1)
+        if has_tsd:
+            values += (TSD_PRESET_CODES[key],)
         tx.execute('INSERT INTO pay_component_types(id,organisation_id,preset_key,name,direction,' + fields +
                    ') VALUES (' + ','.join('?' for _ in values) +
                    ') ON CONFLICT(organisation_id,preset_key) DO NOTHING',
