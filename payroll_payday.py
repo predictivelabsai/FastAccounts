@@ -49,15 +49,17 @@ class PaydaySettingsService:
 
     def get(self, organisation_id: str) -> dict:
         with self.db.transaction() as tx:
+            organisation = tx.one('SELECT id,language FROM organisations WHERE id=?', (organisation_id,))
+            if not organisation:
+                self._missing()
             settings = tx.one('SELECT payroll_start_date FROM organisation_payroll_settings WHERE organisation_id=?', (organisation_id,))
             if not settings:
-                tx.one('SELECT id FROM organisations WHERE id=?', (organisation_id,)) or self._missing()
                 settings = {'payroll_start_date': None}
             history = tx.rows('SELECT id,start_date,rule,day FROM organisation_payday_rules WHERE organisation_id=? ORDER BY start_date', (organisation_id,))
-            return {'payroll_start_date': settings['payroll_start_date'], 'rules': history}
+            return {'payroll_start_date': settings['payroll_start_date'], 'language': organisation['language'], 'rules': history}
 
     def save(self, organisation_id: str, *, start_date: str | None, rule_start_date: str,
-             rule: str, day: int | None, actor: str) -> dict:
+             rule: str, day: int | None, actor: str, language: str | None = None) -> dict:
         date.fromisoformat(rule_start_date)
         if start_date is not None:
             date.fromisoformat(start_date)
@@ -65,11 +67,15 @@ class PaydaySettingsService:
             raise ValueError('Invalid payday rule')
         if day is not None and not 1 <= day <= 31:
             raise ValueError('Payday day must be between 1 and 31')
+        if language is not None and language not in {'en', 'et', 'lv', 'lt'}:
+            raise ValueError('Invalid organisation language')
         with self.db.transaction() as tx:
             tx.one('SELECT id FROM organisations WHERE id=?', (organisation_id,)) or self._missing()
             tx.execute('INSERT INTO organisation_payroll_settings(organisation_id,payroll_start_date) VALUES (?,?) '
                        'ON CONFLICT(organisation_id) DO UPDATE SET payroll_start_date=excluded.payroll_start_date',
                        (organisation_id, start_date))
+            if language:
+                tx.execute('UPDATE organisations SET language=? WHERE id=?', (language, organisation_id))
             existing = tx.one('SELECT id FROM organisation_payday_rules WHERE organisation_id=? AND start_date=?', (organisation_id, rule_start_date))
             if existing:
                 tx.execute('UPDATE organisation_payday_rules SET rule=?,day=? WHERE organisation_id=? AND id=?',

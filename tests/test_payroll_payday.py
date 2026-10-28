@@ -26,7 +26,7 @@ def test_dated_payday_rules_are_scoped_and_audited(db):
     service.save(org['id'], start_date='2026-01-01', rule_start_date='2026-07-01',
                  rule='current_month_day', day=10, actor='owner@example.test')
     assert [rule['start_date'] for rule in service.get(org['id'])['rules']] == ['2026-01-01', '2026-07-01']
-    assert service.get(other['id']) == {'payroll_start_date': None, 'rules': []}
+    assert service.get(other['id']) == {'payroll_start_date': None, 'language': 'et', 'rules': []}
     assert db.scalar("SELECT COUNT(*) FROM audit_events WHERE organisation_id=? AND action='payroll.payday_rule.saved'", (org['id'],)) == 2
     assert saved['payroll_start_date'] == '2026-01-01'
 

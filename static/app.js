@@ -3596,6 +3596,7 @@
             'required pattern="[A-Z]{3}"',
           ) +
           field("IBAN", "iban"),
+          field("BIC", "bic"),
         "Add account",
       ),
     );
@@ -4497,13 +4498,13 @@
     const refresh = async () => api(c.url('/payroll/payouts') + `?run_id=${encodeURIComponent(run.id)}`);
     const renderBatches = (batches) => batches.length ? table(['Payout date', 'Status', 'Employees', 'Actions'], batches.map((batch) => row([
       td(esc(batch.payout_date)), td(pill(batch.status)), td(num(batch.lines.length)),
-      td((batch.status === 'Draft' ? button('Mark paid', 'payPayout', false, `data-id="${batch.id}"`) : '') + (batch.status !== 'Cancelled' ? button('Cancel payout', 'cancelPayout', false, `data-id="${batch.id}"`) : '')),
+      td((batch.status === 'Draft' ? button('Mark paid', 'payPayout', false, `data-id="${batch.id}"`) : '') + (batch.status !== 'Cancelled' ? button('Cancel payout', 'cancelPayout', false, `data-id="${batch.id}"`) : '') + (['Draft','Paid'].includes(batch.status) ? link('Download SEPA file', `/api${c.url(`/payroll/payouts/${batch.id}/pain001.xml`)}`) : '')),
     ]))) : `<p class="muted">${tr('No payouts for this run.')}</p>`;
     let batches = await refresh();
     const bankOptions = bankAccounts.filter((bank) => bank.active).map((bank) => [bank.id, bank.name]);
     const d = dialog('Payroll payouts', `<p>${tr('Pay run')} ${esc(run.period)}</p><div data-payout-list>${renderBatches(batches)}</div>${button('Create salary payout', 'createPayout', true)}<div data-payout-bank>${bankOptions.length ? select('Bank account', 'bank_account_id', bankOptions, bankOptions[0][0]) : `<p class="notice">${tr('Add an active bank account first.')}</p>`}</div>`);
     d.querySelector('[data-action="createPayout"]').onclick = async () => {
-      await post(c.url(`/pay-runs/${run.id}/payouts`), {payout_type: 'salary'});
+      await post(c.url(`/pay-runs/${run.id}/payouts`), {payout_type: 'salary', bank_account_id: d.querySelector('[name="bank_account_id"]')?.value || null});
       batches = await refresh(); d.querySelector('[data-payout-list]').innerHTML = renderBatches(batches);
       bindPayoutActions();
     };
@@ -4527,6 +4528,7 @@
     const d = dialog('Payday settings', form(
       `<div class="full-width"><h3>${tr('Palgaarvestuse algus')}</h3>${history}</div>` +
       field('Palgaarvestuse algus', 'start_date', settings.payroll_start_date || '', 'date') +
+      select('Organisation language', 'language', [['en', 'English'], ['et', 'Eesti'], ['lv', 'Latviešu'], ['lt', 'Lietuvių']], settings.language || 'en') +
       field('Rule effective from', 'rule_start_date', latest.start_date || new Date().toISOString().slice(0, 10), 'date', 'required') +
       select('Payday rule', 'rule', [['next_month_day', tr('Järgmisel kuul')], ['current_month_day', tr('Jooksval kuul')], ['next_month_first_working_day', tr('Järgmise kuu esimesel tööpäeval')]], latest.rule || 'next_month_day') +
       field('Payday day', 'day', latest.day || '10', 'number', 'min="1" max="31"')

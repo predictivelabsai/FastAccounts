@@ -121,6 +121,14 @@ class OrganisationService:
                  registration_no.strip() or None, vat_no.strip() or None,
                  fiscal_year_start, now, now),
             )
+            if self.db.dialect == 'sqlite':
+                has_language = bool(tx.one("PRAGMA table_info(organisations)"))
+                if has_language:
+                    has_language = any(row['name'] == 'language' for row in tx.rows("PRAGMA table_info(organisations)"))
+            else:
+                has_language = bool(tx.one("SELECT column_name FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='organisations' AND column_name='language'"))
+            if has_language:
+                tx.execute('UPDATE organisations SET language=? WHERE id=?', ('et' if country == 'EE' else 'en', organisation_id))
             tx.execute(
                 "INSERT INTO memberships(id,organisation_id,email,role,created_at) VALUES (?,?,?,?,?)",
                 (new_id(), organisation_id, email, "owner", now),

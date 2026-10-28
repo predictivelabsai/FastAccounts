@@ -333,6 +333,7 @@ class BankAccountIn(BaseModel):
     currency: str
     iban: str = ""
     sort_code: str = ""
+    bic: str = ""
 
 
 class PaymentOrderIn(BaseModel):
@@ -2249,6 +2250,7 @@ class PayrollMappingIn(BaseModel):
 
 class PaydaySettingsIn(BaseModel):
     start_date: str | None = None
+    language: Literal['en', 'et', 'lv', 'lt'] | None = None
     rule_start_date: str
     rule: Literal['next_month_day', 'current_month_day', 'next_month_first_working_day']
     day: int | None = Field(default=None, ge=1, le=31)
@@ -2354,6 +2356,12 @@ def payroll_payouts(organisation_id: str, run_id: str | None = None, user: User 
     return PayoutService(get_database()).list(organisation_id, run_id=run_id)
 
 
+@api.get('/organisations/{organisation_id}/payroll/payouts/{payout_id}')
+def payroll_payout(organisation_id: str, payout_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    return PayoutService(get_database()).get(organisation_id, payout_id)
+
+
 @api.post('/organisations/{organisation_id}/pay-runs/{run_id}/payouts', status_code=201)
 def create_payroll_payout(organisation_id: str, run_id: str, payload: PayoutCreateIn,
                           user: User = Depends(require_csrf)):
@@ -2372,6 +2380,14 @@ def mark_payroll_payout_paid(organisation_id: str, payout_id: str, payload: Payo
 def cancel_payroll_payout(organisation_id: str, payout_id: str, user: User = Depends(require_csrf)):
     _require(organisation_id, user, WRITE_ROLES)
     return PayoutService(get_database()).cancel(organisation_id, payout_id, actor=user.email)
+
+
+@api.get('/organisations/{organisation_id}/payroll/payouts/{payout_id}/pain001.xml')
+def export_payroll_payout_sepa(organisation_id: str, payout_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    content = PaymentOrderService(get_database()).payroll_payout_xml(organisation_id, payout_id)
+    return Response(content=content, media_type='application/xml',
+                    headers={'Content-Disposition': f'attachment; filename="salary-payout-{payout_id}.xml"'})
 
 
 @api.post('/organisations/{organisation_id}/payroll/component-types', status_code=201)

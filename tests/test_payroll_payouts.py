@@ -5,6 +5,8 @@ import pytest
 from payroll import PayrollService
 from payroll_payouts import PayoutConflict, PayoutService
 from payroll_payday import PaydaySettingsService
+from payment_orders import PaymentOrderService, PAIN_NS
+from xml.etree import ElementTree as ET
 
 ACTOR = 'owner@example.test'
 IBAN = 'EE382200221020145685'
@@ -23,8 +25,8 @@ def bank_account(db, org_id):
     account = db.one("SELECT id FROM accounts WHERE organisation_id=? AND account_type='Asset' AND active=1 ORDER BY code LIMIT 1", (org_id,))
     assert account
     with db.transaction() as tx:
-        tx.execute("INSERT INTO bank_accounts(id,organisation_id,ledger_account_id,name,currency,iban_masked) VALUES ('payroll-bank',?,?,?,'EUR','********5685')",
-                   (org_id, account['id'], 'Salary bank'))
+        tx.execute("INSERT INTO bank_accounts(id,organisation_id,ledger_account_id,name,currency,iban_masked,iban,bic) VALUES ('payroll-bank',?,?,?,'EUR','********5685',?,'HABAEE2X')",
+                   (org_id, account['id'], 'Salary bank', 'EE382200221020145685'))
     return 'payroll-bank'
 
 
@@ -65,3 +67,55 @@ def test_salary_payout_cannot_move_an_approved_run_to_another_payment_month(db, 
         PayoutService(db).create(ee_org['id'], run['id'], actor=ACTOR, payout_date='2026-10-30')
     valid = PayoutService(db).create(ee_org['id'], run['id'], actor=ACTOR, payout_date='2026-11-10')
     assert valid['payout_date'] == '2026-11-10'
+
+
+def test_payout_routes_enforce_tenant_role_and_csrf(db, ee_org, legacy_payroll, monkeypatch):
+    from fastapi.testclient import TestClient
+    from api_app import api, current_user, User
+    from web_app import app
+    monkeypatch.setenv('FASTACCOUNTS_DB', db.path)
+    monkeypatch.setenv('DB_URL', '')
+    run = approved_run(db, ee_org, legacy_payroll)
+    base = f"/organisations/{ee_org['id']}"
+    api.dependency_overrides[current_user] = lambda: User(email=ACTOR)
+    client = TestClient(app)
+    try:
+        token = client.get('/api/csrf').json()['csrf_token']
+        body = {'payout_type': 'salary'}
+        assert client.post(f"/api{base}/pay-runs/{run['id']}/payouts", json=body).status_code == 403
+        created = client.post(f"/api{base}/pay-runs/{run['id']}/payouts", json=body,
+                              headers={'X-CSRF-Token': token})
+        assert created.status_code == 201, created.text
+        other = __import__('organisations').OrganisationService(db).create(
+            name='Other payout tenant', country_code='EE', entity_type='EE_OU', owner_email='other@example.test')
+        assert client.get(f"/api/organisations/{other['id']}/payroll/payouts/{created.json()['id']}").status_code == 403
+    finally:
+        api.dependency_overrides.clear()
+
+
+def test_salary_payout_pain001_contains_frozen_payments_and_control_totals(db, ee_org, legacy_payroll):
+    run = approved_run(db, ee_org, legacy_payroll)
+    bank_id = bank_account(db, ee_org['id'])
+    batch = PayoutService(db).create(ee_org['id'], run['id'], actor=ACTOR, bank_account_id=bank_id)
+    content = PaymentOrderService(db).payroll_payout_xml(ee_org['id'], batch['id'])
+    root = ET.fromstring(content)
+    ns = {'p': PAIN_NS}
+    assert root.tag == f'{{{PAIN_NS}}}Document'
+    assert root.findtext('.//p:GrpHdr/p:NbOfTxs', namespaces=ns) == '1'
+    assert root.findtext('.//p:GrpHdr/p:CtrlSum', namespaces=ns) == run['items'][0]['net']
+    assert root.findtext('.//p:DbtrAgt/p:FinInstnId/p:BIC', namespaces=ns) == 'HABAEE2X'
+    assert root.findtext('.//p:DbtrAcct/p:Id/p:IBAN', namespaces=ns) == 'EE382200221020145685'
+    assert root.findtext('.//p:CdtTrfTxInf/p:PmtId/p:EndToEndId', namespaces=ns) == batch['lines'][0]['id'].replace('-', '')
+    assert root.findtext('.//p:CdtTrfTxInf/p:RmtInf/p:Ustrd', namespaces=ns) == 'oktoober 2026 töötasu'
+
+
+@pytest.mark.parametrize('iban', [None, 'EE00'])
+def test_pain001_refuses_missing_or_invalid_employee_ibans(db, ee_org, legacy_payroll, iban):
+    run = approved_run(db, ee_org, legacy_payroll)
+    bank_id = bank_account(db, ee_org['id'])
+    batch = PayoutService(db).create(ee_org['id'], run['id'], actor=ACTOR, bank_account_id=bank_id)
+    with db.transaction() as tx:
+        tx.execute('UPDATE payroll_payout_lines SET iban=? WHERE organisation_id=? AND payout_batch_id=?',
+                   (iban, ee_org['id'], batch['id']))
+    with pytest.raises(ValueError, match='Payout employee'):
+        PaymentOrderService(db).payroll_payout_xml(ee_org['id'], batch['id'])

@@ -509,7 +509,7 @@ def test_income_line_migration_preserves_approved_payroll(tmp_path, legacy_payro
     payroll.approve(org['id'], run['id'], actor=ACTOR)
     tables = ("employees", "pay_runs", "pay_run_items", "pay_item_context", "gl_entries", "posting_batches")
     before = {t: db.rows(f"SELECT * FROM {t} ORDER BY 1") for t in tables}
-    assert db.migrate() == ["0035_payroll_income_line", "0036_payroll_component_catalogue", "0037_employee_tax_settings", "0038_payroll_payday_rules", "0039_payroll_payouts", "0040_payroll_settlement_dates"]
+    assert db.migrate() == ["0035_payroll_income_line", "0036_payroll_component_catalogue", "0037_employee_tax_settings", "0038_payroll_payday_rules", "0039_payroll_payouts", "0040_payroll_settlement_dates", "0041_payroll_sepa_details"]
     for table in tables:
         actual = db.rows(f'SELECT * FROM {table} ORDER BY 1')
         assert [{key: row[key] for key in original} for row, original in zip(actual, before[table], strict=True)] == before[table]

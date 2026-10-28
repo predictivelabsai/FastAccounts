@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
+import re
 from xml.etree import ElementTree as ET
 
 from core_utils import audit, db_number, decimal, money, new_id, utc_now
@@ -174,3 +175,87 @@ class PaymentOrderService:
                 _element(_element(_element(transfer, "CdtrAcct"), "Id"), "IBAN", line["creditor_iban"])
                 _element(_element(transfer, "RmtInf"), "Ustrd", line["reference"])
         return ET.tostring(root, encoding="utf-8", xml_declaration=True)
+
+    @staticmethod
+    def _valid_iban(value):
+        iban = re.sub(r'\s+', '', value or '').upper()
+        if not re.fullmatch(r'[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}', iban):
+            return False
+        expanded = ''.join(str(ord(char) - 55) if char.isalpha() else char for char in iban[4:] + iban[:4])
+        return int(expanded) % 97 == 1
+
+    @staticmethod
+    def _salary_remittance(period, language):
+        year, month = map(int, period.split('-'))
+        month_names = {
+            'en': ('January','February','March','April','May','June','July','August','September','October','November','December'),
+            'et': ('jaanuar','veebruar','märts','aprill','mai','juuni','juuli','august','september','oktoober','november','detsember'),
+            'lv': ('janvāris','februāris','marts','aprīlis','maijs','jūnijs','jūlijs','augusts','septembris','oktobris','novembris','decembris'),
+            'lt': ('sausis','vasaris','kovas','balandis','gegužė','birželis','liepa','rugpjūtis','rugsėjis','spalis','lapkritis','gruodis'),
+        }
+        name = month_names.get(language, month_names['en'])[month - 1]
+        if language == 'en':
+            return f'{name} {year} salary'
+        if language == 'et':
+            return f'{name} {year} töötasu'
+        if language == 'lv':
+            return f'{year}. gada {name} alga'
+        return f'{year} m. {name} mėn. atlyginimas'
+
+    def payroll_payout_xml(self, organisation_id, payout_id) -> bytes:
+        """Create pain.001.001.03 directly from frozen payroll payout lines."""
+        with self.db.transaction() as tx:
+            batch = tx.one('SELECT * FROM payroll_payout_batches WHERE organisation_id=? AND id=?', (organisation_id, payout_id))
+            if not batch:
+                raise KeyError('Payroll payout not found')
+            if batch['status'] not in {'Draft', 'Paid'}:
+                raise ValueError('A cancelled payroll payout cannot be exported')
+            org = self._organisation(tx, organisation_id)
+            bank = tx.one('SELECT * FROM bank_accounts WHERE organisation_id=? AND id=? AND active=1',
+                          (organisation_id, batch['bank_account_id'])) if batch['bank_account_id'] else None
+            if not bank or not self._valid_iban(bank['iban']):
+                raise ValueError('Choose an active debtor bank account with a valid IBAN')
+            run = tx.one('SELECT period FROM pay_runs WHERE organisation_id=? AND id=?',
+                         (organisation_id, batch['pay_run_id']))
+            lines = tx.rows('SELECT l.*,e.name employee_name FROM payroll_payout_lines l '
+                            'JOIN employees e ON e.organisation_id=l.organisation_id AND e.id=l.employee_id '
+                            'WHERE l.organisation_id=? AND l.payout_batch_id=? ORDER BY l.employee_id,l.id',
+                            (organisation_id, payout_id))
+        invalid = [f"{line['account_owner'] or line['employee_name']} ({'missing' if not line['iban'] else 'invalid'} IBAN)"
+                   for line in lines if not self._valid_iban(line['iban'])]
+        if invalid:
+            raise ValueError('Missing or invalid employee IBANs: ' + ', '.join(invalid))
+        if not lines:
+            raise ValueError('Payroll payout has no payment lines')
+        total = sum((money(line['amount']) for line in lines), Decimal('0'))
+        remittance = self._salary_remittance(run['period'], org.get('language') or 'en')
+        ET.register_namespace('', PAIN_NS)
+        root = ET.Element(f'{{{PAIN_NS}}}Document')
+        initiation = _element(root, 'CstmrCdtTrfInitn')
+        header = _element(initiation, 'GrpHdr')
+        _element(header, 'MsgId', payout_id.replace('-', '')[:35])
+        _element(header, 'CreDtTm', utc_now())
+        _element(header, 'NbOfTxs', len(lines))
+        _element(header, 'CtrlSum', f'{total:.2f}')
+        _element(_element(header, 'InitgPty'), 'Nm', org['name'])
+        info = _element(initiation, 'PmtInf')
+        _element(info, 'PmtInfId', payout_id.replace('-', '')[:35])
+        _element(info, 'PmtMtd', 'TRF')
+        _element(info, 'NbOfTxs', len(lines))
+        _element(info, 'CtrlSum', f'{total:.2f}')
+        _element(info, 'ReqdExctnDt', batch['payout_date'])
+        _element(_element(info, 'Dbtr'), 'Nm', org['name'])
+        _element(_element(_element(info, 'DbtrAcct'), 'Id'), 'IBAN', re.sub(r'\s+', '', bank['iban']).upper())
+        debtor_agent = _element(_element(info, 'DbtrAgt'), 'FinInstnId')
+        if bank.get('bic'):
+            _element(debtor_agent, 'BIC', bank['bic'])
+        else:
+            _element(_element(debtor_agent, 'Othr'), 'Id', 'NOTPROVIDED')
+        for line in lines:
+            transfer = _element(info, 'CdtTrfTxInf')
+            _element(_element(transfer, 'PmtId'), 'EndToEndId', line['id'].replace('-', '')[:35])
+            _element(_element(transfer, 'Amt'), 'InstdAmt', f"{money(line['amount']):.2f}", Ccy='EUR')
+            _element(_element(transfer, 'Cdtr'), 'Nm', line['account_owner'] or line['employee_name'])
+            _element(_element(_element(transfer, 'CdtrAcct'), 'Id'), 'IBAN', re.sub(r'\s+', '', line['iban']).upper())
+            _element(_element(transfer, 'RmtInf'), 'Ustrd', remittance)
+        return ET.tostring(root, encoding='utf-8', xml_declaration=True)

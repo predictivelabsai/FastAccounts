@@ -539,7 +539,10 @@ class DocumentService:
         return self.bill(bill_id)
 
     def create_bank_account(self, organisation_id: str, *, name: str, currency: str,
-                            iban: str = "", sort_code: str = "") -> dict:
+                            iban: str = "", sort_code: str = "", bic: str = "") -> dict:
+        bic = bic.strip().upper()
+        if bic and (len(bic) not in (8, 11) or not bic.isalnum()):
+            raise ValueError('Enter a valid 8 or 11 character BIC')
         account_id, bank_id = new_id(), new_id()
         with self.db.transaction() as tx:
             code = f"10{int(tx.scalar('SELECT COUNT(*) FROM bank_accounts WHERE organisation_id=?', (organisation_id,)) or 0) + 1:02d}"
@@ -554,6 +557,14 @@ class DocumentService:
                  f"…{sort_code.replace('-', '')[-2:]}" if sort_code else None,
                  iban.replace(" ", "").upper() or None),
             )
+            if self.db.dialect == 'sqlite':
+                has_bic = any(row['name'] == 'bic' for row in tx.rows('PRAGMA table_info(bank_accounts)'))
+            else:
+                has_bic = bool(tx.one("SELECT column_name FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='bank_accounts' AND column_name='bic'"))
+            if bic and not has_bic:
+                raise ValueError('BIC storage is unavailable until the bank account migration is applied')
+            if has_bic:
+                tx.execute('UPDATE bank_accounts SET bic=? WHERE organisation_id=? AND id=?', (bic or None, organisation_id, bank_id))
         return self.db.one("SELECT * FROM bank_accounts WHERE id=?", (bank_id,)) or {}
 
     def record_payment(self, organisation_id: str, *, payment_type: str, bank_account_id: str,
