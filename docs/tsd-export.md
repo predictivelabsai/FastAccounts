@@ -147,6 +147,30 @@ The CSV contains the per-payment fields above, encoded as UTF-8 with a BOM for
 spreadsheet compatibility. Export is rejected when the assumed payment date is
 after 31 December 2027. The CSV is not described as a permanent filing format.
 
+The separate **Legacy Annex 1 CSV upload** is a resident Part A row per frozen
+recipient and payment type. It contains codes 1000, 1010, 1020, 1030, 1040,
+1050, 1060-1090, 1100-1140 and 1150-1170. The 2024 Annex 1 guide does not
+define code 1040 and does not mention it between 1030 and 1050, so the column
+is kept blank. Code 1050 (A1/E101 country) is blank because the payroll snapshot
+does not record an A1 certificate. Codes 1070 and 1080 are zero because the
+payroll engine does not model those adjustments. Code 1090 contains only a
+positive frozen social-tax base excess above actual eligible payments. Codes
+1150/1160 contain exemption 610 when present. Code 1170 uses frozen withheld
+income tax, except payment types for which the guide excludes it.
+
+The guide defines the code meanings but does not specify an upload delimiter or
+number format. The upload file therefore uses semicolon delimiters, UTF-8
+without a BOM, and dot-decimal monetary amounts with exactly two decimal
+places. This is an implementation assumption and must be checked with e-MTA.
+This upload export is available only through payment month December 2027. The
+earlier internal review CSV remains available as `export.csv`.
+
+The accountant workpaper is available on screen and as XLSX, with payment list,
+payment-type and recipient views, month filter, record count, frozen levy
+totals and legacy-run warnings. The workbook has `Summary`, `Payments`, `By
+payment type` and `By recipient` sheets. UI totals combine employee and
+employer amounts.
+
 ## Submission boundary
 
 `EMTATSDExportProvider.submit()` always raises `PermissionError`. There is no

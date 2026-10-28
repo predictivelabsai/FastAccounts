@@ -44,6 +44,24 @@ def test_absence_pay_workspace_labels_exist_in_all_supported_locales():
     assert estonian['Calculation'] == 'Arvutuskäik'
 
 
+def test_tsd_workpaper_labels_exist_in_all_locales():
+    labels = ('Income tax withheld', 'Social tax', 'UI', 'II pillar', 'Total payable',
+              'Record count', 'Payment month', 'List', 'Group by payment type',
+              'Group by recipient', 'Legacy Annex 1 CSV upload (through 2027)', 'TSD workpaper XLSX')
+    for language in ('en', 'et', 'lv', 'lt'):
+        workspace = i18n.catalog(language)['workspace']
+        assert all(workspace.get(label, '').strip() for label in labels)
+    estonian = i18n.catalog('et')['workspace']
+    assert estonian['Income tax withheld'] == 'Kinnipeetud tulumaks'
+    assert estonian['Social tax'] == 'Sotsiaalmaks'
+    assert estonian['UI'] == 'Töötuskindlustusmakse'
+    assert estonian['II pillar'] == 'Kohustusliku kogumispensioni makse'
+    assert estonian['Total payable'] == 'Kokku'
+    assert estonian['List'] == 'Loetelu'
+    assert estonian['Group by payment type'] == 'Koonda väljamakse liigi järgi'
+    assert estonian['Group by recipient'] == 'Koonda saaja järgi'
+
+
 def test_workspace_literal_labels_and_table_headers_are_translated():
     source = (Path(__file__).resolve().parents[1] / "static/app.js").read_text(encoding="utf-8")
     literal = r'''(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')'''

@@ -4787,11 +4787,12 @@
     return (item.components || []).map((line) => `<small class="component-summary">${esc(t(line.name))}: ${esc(money(line.amount, 'EUR'))} · ${tr(line.direction === 'income' ? 'Income' : 'Deduction')}<br>${esc(componentFlags.filter(([key]) => line[key]).map(([, label]) => t(label)).join(', ') || t('No levies'))}</small>`).join('');
   }
   function tsdPreparationDialog(c, run, preparation) {
+    const payableTotal = preparation.summary_totals.total_payable;
     const reviewed = preparation.status === "Completed",
       base = c.url(`/pay-runs/${run.id}/tsd/${preparation.id}`),
       d = dialog(
         "TSD preparation for accountant",
-        `<div class="notice" role="status">${tr("NOT live-verified against e-MTA. Review the payment records before manual upload.")} ${tr("Direct e-MTA submission is disabled.")}</div><dl class="detail-grid"><div><dt>${tr("Payment date")}</dt><dd>${esc(preparation.payment_date)}</dd></div><div><dt>${tr("Filing deadline")}</dt><dd>${esc(preparation.filing_deadline)}</dd></div><div><dt>${tr("Status")}</dt><dd>${pill(preparation.status)}</dd></div></dl>${table(
+        `<div class="notice" role="status">${tr("NOT live-verified against e-MTA. Review the payment records before manual upload.")} ${tr("Direct e-MTA submission is disabled.")}</div>${(preparation.warnings || []).map((warning) => `<p class="notice">${esc(tr(warning))}</p>`).join("")}<label>${tr("Payment month")}<input type="month" data-tsd-month value="${esc(preparation.payment_date.slice(0, 7))}"></label><div class="detail-grid">${[["Income tax withheld", preparation.totals.income_tax], ["Social tax", preparation.totals.social_tax], ["UI", preparation.summary_totals.total_ui], ["II pillar", preparation.totals.funded_pension], ["Total payable", payableTotal]].map(([label, amount]) => `<div><dt>${tr(label)}</dt><dd>${esc(money(amount, "EUR"))}</dd></div>`).join("")}<div><dt>${tr("Record count")}</dt><dd>${preparation.records.length}</dd></div></div><div class="dialog-actions"><button type="button" data-tsd-view="list">${tr("List")}</button><button type="button" data-tsd-view="type">${tr("Group by payment type")}</button><button type="button" data-tsd-view="recipient">${tr("Group by recipient")}</button></div><div data-tsd-records></div>${table(
           ["Employee", "Annex", ["Gross"], ["Income tax"], ["Social tax"], ["Net"]],
           preparation.records.map((record) =>
             row([
@@ -4806,7 +4807,9 @@
         )}<div class="dialog-actions">${
           reviewed
             ? link("TSD XBRL GL XML", `/api${base}/export.xbrl.xml`) +
-              link("TSD CSV (through 2027)", `/api${base}/export.csv`)
+              link("TSD CSV (through 2027)", `/api${base}/export.csv`) +
+              link("Legacy Annex 1 CSV upload (through 2027)", `/api${base}/export-annex1.csv`) +
+              link("TSD workpaper XLSX", `/api${base}/workpaper.xlsx`)
             : button("Mark TSD reviewed", "tsd_confirm_review", true)
         }</div>`,
       );
@@ -4825,6 +4828,17 @@
           },
         ),
     });
+    const recordsHost = d.querySelector('[data-tsd-records]'), monthInput = d.querySelector('[data-tsd-month]');
+    const drawRecords = (mode = 'list') => {
+      const records = preparation.records.filter((record) => record.payment_month === monthInput.value);
+      if (mode === 'list') { recordsHost.innerHTML = table(['Employee', 'Payment type', 'Gross', 'Income tax', 'Social tax'], records.map((record) => row([td(esc(record.recipient_name)), td(record.tsd_payment_type), cash(record.gross_amount, 'EUR'), cash(record.income_tax, 'EUR'), cash(record.social_tax, 'EUR')]))); return; }
+      const key = mode === 'type' ? 'tsd_payment_type' : 'recipient_personal_id', groups = new Map();
+      records.forEach((record) => { const value = groups.get(record[key]) || {name: mode === 'type' ? String(record[key]) : record.recipient_name, gross: 0, income: 0, social: 0}; value.gross += Math.round(Number(record.gross_amount) * 100); value.income += Math.round(Number(record.income_tax) * 100); value.social += Math.round(Number(record.social_tax) * 100); groups.set(record[key], value); });
+      recordsHost.innerHTML = table(['Employee', 'Gross', 'Income tax', 'Social tax'], [...groups.values()].map((value) => row([td(esc(value.name)), cash(value.gross / 100, 'EUR'), cash(value.income / 100, 'EUR'), cash(value.social / 100, 'EUR')])));
+    };
+    d.querySelectorAll('[data-tsd-view]').forEach((button) => button.addEventListener('click', () => drawRecords(button.dataset.tsdView)));
+    monthInput.addEventListener('change', () => drawRecords());
+    drawRecords();
   }
   function renderRun(r, c, providers = []) {
     const draft = String(r.status).toLowerCase() === "draft",
@@ -4832,7 +4846,7 @@
       preparation = r.tsd_preparation,
       tsdActions = preparation
         ? preparation.status === "Completed"
-          ? `${pill("Reviewed")}${link("TSD XBRL GL XML", `/api${c.url(`/pay-runs/${r.id}/tsd/${preparation.id}/export.xbrl.xml`)}`)}${link("TSD CSV (through 2027)", `/api${c.url(`/pay-runs/${r.id}/tsd/${preparation.id}/export.csv`)}`)}`
+          ? `${pill("Reviewed")}${link("TSD XBRL GL XML", `/api${c.url(`/pay-runs/${r.id}/tsd/${preparation.id}/export.xbrl.xml`)}`)}${link("TSD CSV (through 2027)", `/api${c.url(`/pay-runs/${r.id}/tsd/${preparation.id}/export.csv`)}`)}${link("Legacy Annex 1 CSV upload (through 2027)", `/api${c.url(`/pay-runs/${r.id}/tsd/${preparation.id}/export-annex1.csv`)}`)}${link("TSD workpaper XLSX", `/api${c.url(`/pay-runs/${r.id}/tsd/${preparation.id}/workpaper.xlsx`)}`)}`
           : `${pill("Review Required")}${button("Review TSD preparation", "tsd_review", false, `data-id="${r.id}" data-preparation-id="${preparation.id}"`)}`
         : button("Prepare TSD", "tsd_prepare", false, `data-id="${r.id}"`);
     return `${row([

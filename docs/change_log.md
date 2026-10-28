@@ -4,6 +4,19 @@ Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as
 delivered.
 
+## 2026-10-28: Payroll APA TSD exports and workpaper
+
+- Added a separate resident Annex 1 legacy CSV upload from frozen TSD lines,
+  with codes 1000-1170, UTF-8 semicolon format and two-place dot decimals. Upload
+  is refused after December 2027; the internal review CSV remains available.
+- Added an accountant workpaper on screen and in XLSX with a summary and payment list,
+  payment-type and recipient views, month filter, frozen levy totals, count and
+  legacy-run validation warnings. Labels are available in en/et/lv/lt.
+- No migration was needed. The Annex 1 delimiter and decimal format are
+  assumptions pending confirmation with e-MTA. These outputs are not live
+  verified and direct filing remains disabled.
+- Focused test results are recorded in `payroll_tsd_validation.md`.
+
 ## 2026-10-28: Payroll leave liability and payslip balances
 
 - Added migration 0051 for basic and extended expiry policies, optional reserve

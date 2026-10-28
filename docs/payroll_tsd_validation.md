@@ -1,6 +1,6 @@
 # Payroll APA TSD validation
 
-Date: 2026-10-28. Branch: `feat/payroll-tsd-apa`, based on `0be4197`.
+Date: 2026-10-28. Branch: `feat/payroll-tsd-apa`, based on `e7cfb5e`.
 
 ## Implemented in this checkpoint
 
@@ -60,6 +60,26 @@ PostgreSQL server was used for integration testing.
   parental, non-taxable expense and deduction classifications need confirmation.
 - Confirm generated XBRL GL XML and transitional CSV acceptance with EMTA before
   filing. Outputs remain review-only and are not submitted by the application.
+
+## 4a completion
+
+Steps 4 and 5 are implemented. The legacy Annex 1 CSV upload is separate from
+the internal review CSV, UTF-8 semicolon-delimited with dot-decimal amounts to
+two places, and refuses payment dates after 31 December 2027. Codes 1040 and
+1050 are blank because the 2024 guide does not describe 1040 and the employee
+snapshot has no A1/E101 country. This file convention needs e-MTA confirmation.
+The XLSX accountant workpaper has Payments, By payment type and By recipient
+sheets. The on-screen preparation view includes list/group views, payment-month
+filter, frozen totals, record count and legacy-run warnings in en/et/lv/lt.
+
+These are implemented and locally tested export formats, not live-verified e-MTA
+uploads. Direct submission remains disabled.
+
+The final requested files passed individually: `tests/test_tsd_export.py` (14),
+`tests/test_workspace_payroll.py` (17), `tests/test_i18n.py` (16),
+`tests/test_payroll.py` (16) and `tests/test_merit_palk.py` (49). Node syntax and
+`git diff --check` passed. Python runtime was 3.14.6; no live network or
+PostgreSQL tests were used.
 
 Exact preset and legal classifications still require Estonian accountant
 confirmation. XML and CSV output remain unverified against e-MTA, and direct
