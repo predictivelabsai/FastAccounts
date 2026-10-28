@@ -569,6 +569,29 @@ defaults to the previous working day, using the Estonian payroll calendar.
 Unused leave compensation is remaining leave days multiplied by average daily
 pay; employee termination workflows do not yet offer this automatically.
 
+## Withholding implementation parameters (Build 7 in progress)
+
+The withholding register uses Decimal values and stores agreements by
+organisation, employee, recipient and effective dates. Its pure calculation
+helper caps a requested amount by remaining agreement cap, available net pay and
+any garnishable amount supplied by the caller. The garnishable amount is not yet
+derived from law or order-specific facts, so this helper must not be treated as
+a production bailiff calculation.
+
+The year parameters for protected wages and order exceptions still need
+accountant confirmation. Code of Enforcement Procedure §132 protects earnings
+up to the minimum monthly wage in the general case and provides distinct rules
+for periodic child maintenance and other enforcement claims. See the
+[Riigi Teataja English translation](https://www.riigiteataja.ee/en/akt/523012025002).
+
+Employer III pillar contributions are not ordinary salary exemption 610. EMTA's
+TSD handbook classifies them as payment type 25 and applies exemption type 640,
+tracked cumulatively against 15% of qualifying annual taxable payments and
+EUR 6,000. Excess contribution treatment and the qualifying annual base require
+accountant confirmation. See the [EMTA TSD handbook](https://emta.ee/node/330/handbook/20/pdf).
+These rules are documented for implementation and are not yet connected to
+pay-run tax calculations.
+
 ## Employee contact and bank details
 
 The employee API and workbook include optional `phone`, `iban`,

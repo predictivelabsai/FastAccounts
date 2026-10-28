@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import re
 import secrets
 from datetime import date
 from decimal import Decimal
@@ -54,6 +55,7 @@ from payroll_payday import PaydaySettingsService
 from payroll_payouts import PayoutConflict, PayoutService
 from payroll_absences import AbsenceConflict, PayrollAbsenceService, ABSENCE_TYPES
 from payroll_absence_payouts import AbsencePayoutService
+from payroll_withholdings import PayrollWithholdingService
 from payroll_leave_service import PayrollLeaveLiabilityService
 from employee_details import EmployeeDetailsError
 from tax import TaxService
@@ -2314,6 +2316,31 @@ class PayoutPaidIn(BaseModel):
     bank_account_id: str
 
 
+class WithholdingRecipientIn(BaseModel):
+    model_config = {'extra': 'forbid'}
+    name: str = Field(min_length=1, max_length=180)
+    registry_code: str = Field(min_length=1, max_length=40)
+    iban: str = Field(min_length=15, max_length=34)
+    reference_number: str | None = Field(default=None, max_length=100)
+    default_description: str = Field(default='', max_length=140)
+
+
+class WithholdingAgreementIn(BaseModel):
+    model_config = {'extra': 'forbid'}
+    employee_id: str
+    recipient_id: str
+    component_type: Literal['alimony','bailiff','union_fee','agreed_deduction','third_pillar']
+    method: Literal['fixed_sum','percent_of_gross','sum_x_qty','third_pillar_net']
+    start_date: str = Field(pattern=r'^\d{4}-\d{2}-\d{2}$')
+    end_date: str | None = Field(default=None, pattern=r'^\d{4}-\d{2}-\d{2}$')
+    monthly_amount: Decimal | None = Field(default=None, ge=0)
+    percentage: Decimal | None = Field(default=None, ge=0, le=100)
+    quantity: Decimal | None = Field(default=None, ge=0)
+    rate: Decimal | None = Field(default=None, ge=0)
+    total_cap: Decimal | None = Field(default=None, ge=0)
+    payment_description: str = Field(default='', max_length=140)
+
+
 class AbsencePayoutCreateIn(BaseModel):
     absence_pay_ids: list[str] = Field(min_length=1)
     payout_date: str | None = None
@@ -2430,6 +2457,76 @@ def delete_employee_tax_setting(organisation_id: str, employee_id: str, setting_
 def payroll_component_types(organisation_id: str, user: User = Depends(current_user)):
     _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
     return PayrollService().component_types(organisation_id)
+
+
+@api.get('/organisations/{organisation_id}/payroll/withholding-recipients')
+def payroll_withholding_recipients(organisation_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    return PayrollWithholdingService(get_database()).recipients(organisation_id)
+
+
+@api.post('/organisations/{organisation_id}/payroll/withholding-recipients', status_code=201)
+def payroll_create_withholding_recipient(organisation_id: str, payload: WithholdingRecipientIn,
+                                         user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return PayrollWithholdingService(get_database()).save_recipient(
+        organisation_id, actor=user.email, **payload.model_dump())
+
+
+@api.put('/organisations/{organisation_id}/payroll/withholding-recipients/{recipient_id}')
+def payroll_update_withholding_recipient(organisation_id: str, recipient_id: str,
+                                         payload: WithholdingRecipientIn, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return PayrollWithholdingService(get_database()).save_recipient(
+        organisation_id, actor=user.email, recipient_id=recipient_id, **payload.model_dump())
+
+
+@api.delete('/organisations/{organisation_id}/payroll/withholding-recipients/{recipient_id}', status_code=204)
+def payroll_delete_withholding_recipient(organisation_id: str, recipient_id: str,
+                                         user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    PayrollWithholdingService(get_database()).delete_recipient(organisation_id, recipient_id, actor=user.email)
+    return Response(status_code=204)
+
+
+@api.get('/organisations/{organisation_id}/payroll/withholding-agreements')
+def payroll_withholding_agreements(organisation_id: str, employee_id: str | None = None,
+                                   user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    return PayrollWithholdingService(get_database()).agreements(organisation_id, employee_id=employee_id)
+
+
+@api.post('/organisations/{organisation_id}/payroll/withholding-agreements', status_code=201)
+def payroll_create_withholding_agreement(organisation_id: str, payload: WithholdingAgreementIn,
+                                         user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return PayrollWithholdingService(get_database()).save_agreement(
+        organisation_id, actor=user.email, **payload.model_dump())
+
+
+@api.put('/organisations/{organisation_id}/payroll/withholding-agreements/{agreement_id}')
+def payroll_update_withholding_agreement(organisation_id: str, agreement_id: str,
+                                         payload: WithholdingAgreementIn, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return PayrollWithholdingService(get_database()).save_agreement(
+        organisation_id, actor=user.email, agreement_id=agreement_id, **payload.model_dump())
+
+
+@api.delete('/organisations/{organisation_id}/payroll/withholding-agreements/{agreement_id}', status_code=204)
+def payroll_delete_withholding_agreement(organisation_id: str, agreement_id: str,
+                                         user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    PayrollWithholdingService(get_database()).delete_agreement(organisation_id, agreement_id, actor=user.email)
+    return Response(status_code=204)
+
+
+@api.get('/organisations/{organisation_id}/payroll/withholdings')
+def payroll_withholding_report(organisation_id: str, start: str, end: str,
+                               user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    if not re.fullmatch(r'\d{4}-(0[1-9]|1[0-2])', start) or not re.fullmatch(r'\d{4}-(0[1-9]|1[0-2])', end) or start > end:
+        raise HTTPException(status_code=422, detail='Choose a valid payroll period range')
+    return PayrollWithholdingService(get_database()).report(organisation_id, start=start, end=end)
 
 
 @api.get('/organisations/{organisation_id}/payroll/payday-settings')

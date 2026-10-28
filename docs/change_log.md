@@ -4,6 +4,17 @@ Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as
 delivered.
 
+## 2026-10-28: Payroll withholdings (Build 7 in progress)
+
+- Added migration 0064 for tenant-scoped withholding recipients, agreements,
+  run-line snapshots and payout records. Added Decimal method/cap helpers and
+  recipient/agreement services with IBAN validation and audit entries.
+- Added role-checked, CSRF-protected recipient and agreement API endpoints and a
+  period report query.
+- Run generation, third-pillar TSD records, payout posting and SEPA, XLSX,
+  workspace UI, translations and remaining acceptance tests are still open.
+  Do not mark Build 7 complete. See `payroll_withholdings_validation.md`.
+
 ## 2026-10-28: Payroll pay-type methods (Build 6 complete)
 
 - Added migration 0063 for calculation methods, optional type defaults, frozen
