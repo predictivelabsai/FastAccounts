@@ -32,7 +32,7 @@ from decimal import Decimal, InvalidOperation
 from core_utils import audit, db_number, decimal, four_dp, money, new_id, utc_now
 from database import Database, get_database
 from ledger import LedgerService, PostingLine
-from payroll_components import FLAGS, ROLES, serialise
+from payroll_components import FLAGS, ROLES, serialise, CALCULATION_METHODS, PALK_ROWS, calculate_component_amount
 from payroll_rules import remaining_monthly_exemption, rules_for, settlement_date
 from payroll_tax_settings import EmployeeTaxSettingsService, resolve as resolve_tax_settings
 from payroll_tax_repository import monthly_exemption_used
@@ -559,6 +559,12 @@ class PayrollService:
         has_tsd = ('tsd_payment_type' in {row['name'] for row in self.db.rows('PRAGMA table_info(pay_component_types)')}
                    if self.db.dialect != 'postgres' else bool(self.db.one("SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='pay_component_types' AND column_name='tsd_payment_type'")))
         fields = ('name', 'direction', *FLAGS, 'liability_role') + (('is_wage', 'active') if metadata_ready else ()) + (('tsd_payment_type',) if has_tsd else ())
+        if self.db.dialect == 'postgres':
+            methods_ready = bool(self.db.one("SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='pay_component_types' AND column_name='calculation_method'"))
+        else:
+            methods_ready = 'calculation_method' in {row['name'] for row in self.db.rows('PRAGMA table_info(pay_component_types)')}
+        if methods_ready:
+            fields += ('calculation_method', 'default_rate', 'default_percentage', 'default_coefficient', 'palk_row')
         if set(changes) - set(fields):
             raise ValueError('Unknown payment component field')
         with self.db.transaction() as tx:
@@ -569,6 +575,8 @@ class PayrollService:
                     raise KeyError('Payment type not found')
             else:
                 data = dict(name='', direction='income', liability_role='PAYROLL_DEDUCTION', tsd_payment_type=10,
+                            calculation_method='fixed_sum', default_rate=None, default_percentage=None,
+                            default_coefficient=None, palk_row=5,
                             is_wage=True, active=True, **{key: False for key in FLAGS})
             data.update(changes)
             self._component_values(data)
@@ -599,6 +607,16 @@ class PayrollService:
             data[key] = int(data[key])
         if 'tsd_payment_type' in data and (type(data['tsd_payment_type']) is not int or data['tsd_payment_type'] not in (10,11,12,13,14,15,16,17,21,24,32,33)):
             raise ValueError('Choose a supported TSD payment type')
+        if 'calculation_method' in data and data['calculation_method'] not in CALCULATION_METHODS:
+            raise ValueError('Choose a supported calculation method')
+        if 'palk_row' in data and (type(data['palk_row']) is not int or data['palk_row'] not in PALK_ROWS):
+            raise ValueError('Choose a supported PALK row')
+        for key in ('default_rate', 'default_percentage', 'default_coefficient'):
+            if key in data and data[key] is not None:
+                value = decimal(data[key])
+                if not value.is_finite() or abs(value) > Decimal('9999999999.99'):
+                    raise ValueError('Payment defaults must be finite decimal values')
+                data[key] = db_number(value)
         # All flags remain editable snapshots. They affect income lines only;
         # deduction lines are explicitly net withholdings, never tax relief.
         return data
@@ -655,7 +673,8 @@ class PayrollService:
                 tx.execute('DELETE FROM pay_item_components WHERE organisation_id=? AND item_id=?',
                            (organisation_id, item_id))
             for position, line in enumerate(components):
-                allowed = {'type_id', 'name', 'amount', 'direction', 'liability_role', 'is_generated', *FLAGS}
+                allowed = {'type_id', 'name', 'amount', 'direction', 'liability_role', 'is_generated',
+                           'quantity', 'rate', 'coefficient', 'percentage', *FLAGS}
                 if set(line) - allowed:
                     raise ValueError('Unknown payment component field')
                 data = tx.one('SELECT * FROM pay_component_types WHERE organisation_id=? AND id=?', (organisation_id, line.get('type_id')))
@@ -668,6 +687,21 @@ class PayrollService:
                 data.setdefault('is_wage', True)
                 data.setdefault('active', True)
                 data.update(line)
+                method = data.get('calculation_method', 'fixed_sum')
+                component_amount = data.get('amount', 0)
+                if method != 'fixed_sum':
+                    hourly_rate = decimal(item.get('hourly_rate') or 0)
+                    if not hourly_rate and item.get('pay_basis') == 'monthly':
+                        from payroll_calendar import norm_hours
+                        hourly_rate = decimal(item.get('gross_salary') or 0) / Decimal(norm_hours(*map(int, run['period'].split('-'))))
+                    data['amount'] = calculate_component_amount(
+                        method, amount=component_amount,
+                        rate=data.get('rate', data.get('default_rate') or 0),
+                        quantity=data.get('quantity', 1),
+                        coefficient=data.get('coefficient', data.get('default_coefficient') or 1),
+                        percentage=data.get('percentage', data.get('default_percentage') or 0),
+                        base_pay=item.get('gross_salary') or item.get('gross') or 0,
+                        hourly_rate=hourly_rate, hours=data.get('quantity', 0))
                 if data.get('preset_key') == 'unused_leave':
                     component_overrides[data['preset_key']] = decimal(data['amount'])
                 self._component_values(data)
@@ -687,8 +721,9 @@ class PayrollService:
                     has_tsd = bool(tx.one("SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='pay_item_components' AND column_name='tsd_payment_type'"))
                 else:
                     has_tsd = 'tsd_payment_type' in {row['name'] for row in tx.rows('PRAGMA table_info(pay_item_components)')}
-                fields = ('id', 'organisation_id', 'item_id', 'type_id', 'position', 'name', 'amount', 'direction', *FLAGS, 'liability_role') + (('is_wage',) if metadata_ready else ()) + (('tsd_payment_type',) if has_tsd else ())
-                values = (new_id(), organisation_id, item_id, data['id'], position, data['name'], db_number(amount), data['direction'], *(data[key] for key in FLAGS), data['liability_role']) + ((data['is_wage'],) if metadata_ready else ()) + ((data.get('tsd_payment_type', 10),) if has_tsd else ())
+                methods_ready = ('calculation_method' in component_columns)
+                fields = ('id', 'organisation_id', 'item_id', 'type_id', 'position', 'name', 'amount', 'direction', *FLAGS, 'liability_role') + (('is_wage',) if metadata_ready else ()) + (('tsd_payment_type',) if has_tsd else ()) + (('calculation_method', 'quantity', 'rate', 'coefficient', 'percentage', 'palk_row') if methods_ready else ())
+                values = (new_id(), organisation_id, item_id, data['id'], position, data['name'], db_number(amount), data['direction'], *(data[key] for key in FLAGS), data['liability_role']) + ((data['is_wage'],) if metadata_ready else ()) + ((data.get('tsd_payment_type', 10),) if has_tsd else ()) + ((method, data.get('quantity'), data.get('rate', data.get('default_rate')), data.get('coefficient', data.get('default_coefficient')), data.get('percentage', data.get('default_percentage')), data.get('palk_row', 5)) if methods_ready else ())
                 tx.execute('INSERT INTO pay_item_components(' + ','.join(fields) + ') VALUES (' + ','.join('?' for _ in fields) + ')', values)
         if generated_column_ready:
             tx.execute('DELETE FROM pay_item_components WHERE organisation_id=? AND item_id=? AND is_generated=1',

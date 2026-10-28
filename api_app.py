@@ -2233,12 +2233,21 @@ class PayComponentIn(BaseModel):
     is_wage: bool = True
     active: bool = True
     tsd_payment_type: Literal[10, 11, 12, 13, 14, 15, 16, 17, 21, 24, 32, 33] = 10
+    calculation_method: Literal['fixed_sum','sum_x_qty_x_coef','percentage_of_base','percentage_of_hourly_rate','piece_rate','hourly','average_monthly_pay','average_hourly_pay','average_working_day_pay','gross_up_from_net','monthly_salary','monthly_salary_day_based','contract_sum','contract_sum_x_quantity','percentage'] = 'fixed_sum'
+    default_rate: Decimal | None = None
+    default_percentage: Decimal | None = None
+    default_coefficient: Decimal | None = None
+    palk_row: Literal[5,6,7,8,9,10,15,16,17,18] = 5
 
 
 class PayComponentLine(BaseModel):
     model_config = {'extra': 'forbid'}
     type_id: str
-    amount: Decimal = Field(max_digits=12, decimal_places=2)
+    amount: Decimal | None = Field(default=None, max_digits=12, decimal_places=2)
+    quantity: Decimal | None = None
+    rate: Decimal | None = None
+    coefficient: Decimal | None = None
+    percentage: Decimal | None = None
     name: str | None = Field(default=None, min_length=1, max_length=180)
     direction: Literal['income', 'deduction'] | None = None
     income_tax: bool | None = None

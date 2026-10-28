@@ -4642,6 +4642,11 @@
         (values.description ? `<p class="full-width muted">${tr(values.description)}</p>` : "") +
         select("Direction", "direction", [["income", t("Income")], ["deduction", t("Deduction")]], values.direction) +
         select("TSD payment type", "tsd_payment_type", [[10, "10 palgatulu"], [13, "13 kõrgete ametiisikute palgatulu"], [14, "14 sünnitoetus"], [15, "15 seaduse alusel tasu"], [16, "16 muu maksustatav väljamakse"], [17, "17 VÕS lepingutasu"], [21, "21 juhtorgani liikme tasu"], [24, "24 tööandja haigushüvitis"], [32, "32 tööõnnetuse hüvitis"], [33, "33 lõpetamise hüvitis"]], values.tsd_payment_type || 10) +
+        select("Calculation method", "calculation_method", [["fixed_sum","Fixed sum"],["sum_x_qty_x_coef","Sum x quantity x coefficient"],["percentage_of_base","Percentage of base salary"],["percentage_of_hourly_rate","Percentage of hourly rate"],["piece_rate","Piece rate"],["hourly","Hourly"],["average_monthly_pay","Average monthly pay"],["average_hourly_pay","Average hourly pay"],["average_working_day_pay","Average working-day pay"],["gross_up_from_net","Gross-up from net"],["monthly_salary","Monthly salary"],["monthly_salary_day_based","Monthly salary, day-based"],["contract_sum","Contract sum"],["contract_sum_x_quantity","Contract sum x quantity"],["percentage","Percentage"]], values.calculation_method || "fixed_sum") +
+        field("Default rate", "default_rate", values.default_rate ?? "", "number", 'step="0.0001"') +
+        field("Default percentage", "default_percentage", values.default_percentage ?? "", "number", 'step="0.0001"') +
+        field("Default coefficient", "default_coefficient", values.default_coefficient ?? "", "number", 'step="0.0001"') +
+        select("Statistics Estonia PALK row", "palk_row", [[5,"5 Base pay"],[6,"6 Overtime"],[7,"7 Shift, night, public holiday"],[8,"8 Irregular bonuses"],[9,"9 Non-worked time"],[10,"10 Non-monetary"],[15,"15 Benefits"],[16,"16 Benefits"],[17,"17 Benefits"],[18,"18 Benefits"]], values.palk_row || 5) +
         select("Deduction liability", "liability_role", [["PAYROLL_DEDUCTION", t("Other deduction liability")], ["PAYROLL_BAILIFF", t("Bailiff withholding liability")]], values.liability_role) +
         check("Counts towards average and vacation pay", "is_wage", values.is_wage) + check("Active for new payment lines", "active", values.active) +
         `<div class="full-width component-flags">${componentFlagFields(values)}</div><p class="full-width muted">${tr("Levy flags apply to income lines. Deduction lines reduce net pay.")}</p>` + `<p class="full-width muted">${tr("Defaults can be overridden on each draft payment line. Confirm tax treatment before approval.")}</p>`,
@@ -4651,6 +4656,7 @@
         data.is_wage = f.elements.is_wage.checked;
         data.active = f.elements.active.checked;
         data.tsd_payment_type = Number(f.elements.tsd_payment_type.value);
+        data.palk_row = Number(f.elements.palk_row.value);
         await post(c.url(`/payroll/component-types${type ? `/${type.id}` : ""}`), data, type ? "PUT" : "POST");
         await saved(editor);
       });

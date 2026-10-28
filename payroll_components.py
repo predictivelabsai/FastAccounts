@@ -6,6 +6,65 @@ https://www.emta.ee/ariklient/maksud-ja-tasumine/tulumaks-ja-sotsiaalmaks/maksum
 Bureau users may override every levy flag for each period.
 """
 from core_utils import db_number, money
+from decimal import Decimal, ROUND_HALF_UP
+
+CALCULATION_METHODS = ('fixed_sum', 'sum_x_qty_x_coef', 'percentage_of_base',
+    'percentage_of_hourly_rate', 'piece_rate', 'hourly', 'average_monthly_pay',
+    'average_hourly_pay', 'average_working_day_pay', 'gross_up_from_net',
+    'monthly_salary', 'monthly_salary_day_based', 'contract_sum',
+    'contract_sum_x_quantity', 'percentage')
+PALK_ROWS = (5, 6, 7, 8, 9, 10, 15, 16, 17, 18)
+
+
+def calculate_component_amount(method, *, amount=0, rate=0, quantity=1, coefficient=1,
+                               percentage=0, base_pay=0, hourly_rate=0, hours=0,
+                               average_monthly_pay=0, average_hourly_pay=0,
+                               average_working_day_pay=0, net_target=0,
+                               pension_percent=0, unemployment=True, exemption=0):
+    """Pure Decimal component calculator. Rates and percentages are entered as human units."""
+    d = lambda value: Decimal(str(value or 0))
+    method = method or 'fixed_sum'
+    if method not in CALCULATION_METHODS:
+        raise ValueError('Choose a supported calculation method')
+    if method == 'fixed_sum':
+        result = d(amount)
+    elif method in ('sum_x_qty_x_coef', 'contract_sum_x_quantity'):
+        result = d(rate) * d(quantity) * (d(coefficient) if method == 'sum_x_qty_x_coef' else Decimal(1))
+    elif method in ('percentage_of_base', 'percentage'):
+        result = d(base_pay) * d(percentage) / 100
+    elif method == 'percentage_of_hourly_rate':
+        result = d(hourly_rate) * d(percentage) / 100 * d(hours if quantity is None else quantity)
+    elif method == 'piece_rate':
+        result = d(rate) * d(quantity)
+    elif method == 'hourly':
+        result = d(rate) * d(hours if quantity is None else quantity)
+    elif method == 'average_monthly_pay':
+        result = d(average_monthly_pay) * d(quantity)
+    elif method == 'average_hourly_pay':
+        result = d(average_hourly_pay) * d(quantity)
+    elif method == 'average_working_day_pay':
+        result = d(average_working_day_pay) * d(quantity)
+    elif method == 'gross_up_from_net':
+        # Search cents in ascending order. This gives the smallest gross whose
+        # rounded net reaches the requested amount, including tax plateaus.
+        target = money(net_target)
+        lo, hi = 0, max(1, int(target * 3 * 100) + 100)
+        def net(cents):
+            gross = Decimal(cents) / 100
+            pension = money(gross * d(pension_percent) / 100)
+            ui = money(gross * Decimal('0.016')) if unemployment else Decimal(0)
+            tax_base = max(Decimal(0), gross - pension - ui - d(exemption))
+            return gross - pension - ui - money(tax_base * Decimal('0.22'))
+        while lo < hi:
+            mid = (lo + hi) // 2
+            if net(mid) >= target:
+                hi = mid
+            else:
+                lo = mid + 1
+        result = Decimal(lo) / 100
+    else:
+        result = d(amount)
+    return money(result)
 
 FLAGS = ('income_tax', 'social_tax', 'ui_employee', 'ui_employer',
          'funded_pension', 'social_minimum')
@@ -66,6 +125,12 @@ PRESETS = (
     ('union_fee', 'Ametiühingu liikmemaksu kinnipidamine', 'deduction', (0, 0, 0, 0, 0, 0), 'PAYROLL_DEDUCTION'),
     # Payroll rules: other agreed withholdings reduce net only, subject to lawful authority.
     ('agreed_deduction', 'Muu kokkulepitud kinnipidamine', 'deduction', (0, 0, 0, 0, 0, 0), 'PAYROLL_DEDUCTION'),
+    ('car_compensation', 'Isikliku sõiduauto hüvitis', 'income', (0, 0, 0, 0, 0, 0), 'PAYROLL_DEDUCTION'),
+    ('birth_allowance', 'Sünnitoetus', 'income', (0, 0, 0, 0, 0, 0), 'PAYROLL_DEDUCTION'),
+    ('work_accident_benefit', 'Tööõnnetushüvitis', 'income', (1, 1, 1, 1, 1, 1), 'PAYROLL_DEDUCTION'),
+    ('notice_pay', 'Etteteatamisaja hüvitis', 'income', (1, 1, 1, 1, 1, 1), 'PAYROLL_DEDUCTION'),
+    ('care_leave_pay', 'Hoolduspuhkuse tasu', 'income', (1, 1, 1, 1, 1, 1), 'PAYROLL_DEDUCTION'),
+    ('child_leave_pay', 'Lapsepuhkuse tasu', 'income', (1, 1, 1, 1, 1, 1), 'PAYROLL_DEDUCTION'),
 )
 
 TSD_PRESET_CODES = {
@@ -77,7 +142,23 @@ TSD_PRESET_CODES = {
     'commission': 10, 'study_leave': 10, 'average_pay': 10,
     'severance': 33, 'expense_reimbursement': 16, 'salary_advance': 16,
     'advance_recovery': 16, 'alimony': 16, 'union_fee': 16,
-    'agreed_deduction': 16,
+    'agreed_deduction': 16, 'car_compensation': 10, 'birth_allowance': 14,
+    'work_accident_benefit': 32, 'notice_pay': 33, 'care_leave_pay': 10,
+    'child_leave_pay': 10,
+}
+
+PRESET_METHODS = {
+    'overtime': ('percentage_of_hourly_rate', 150, 6),
+    'night_work': ('percentage_of_hourly_rate', 0, 7),
+    'public_holiday': ('percentage_of_hourly_rate', 0, 7),
+    'bonus': ('percentage_of_base', 0, 5),
+    'severance': ('average_monthly_pay', 0, 8),
+    'notice_pay': ('average_working_day_pay', 0, 8),
+    'car_compensation': ('fixed_sum', 0, 15),
+    'birth_allowance': ('fixed_sum', 0, 16),
+    'work_accident_benefit': ('fixed_sum', 0, 17),
+    'care_leave_pay': ('average_working_day_pay', 0, 9),
+    'child_leave_pay': ('average_working_day_pay', 0, 9),
 }
 
 # Translation keys describe the preset basis, independently of editable organisation names.
@@ -136,6 +217,11 @@ def seed_types(tx, organisation_id):
         has_tsd = ('tsd_payment_type' in {row['name'] for row in tx.rows('PRAGMA table_info(pay_component_types)')}
                    if tx.dialect != 'postgres' else bool(tx.one("SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='pay_component_types' AND column_name='tsd_payment_type'")))
         fields = ','.join(FLAGS) + ',liability_role' + (',is_wage,active' if metadata_ready else '') + (',tsd_payment_type' if has_tsd else '')
+        method, pct, palk_row = PRESET_METHODS.get(key, ('fixed_sum', 0, 5))
+        method_ready = (bool(tx.one("SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='pay_component_types' AND column_name='calculation_method'"))
+                        if tx.dialect == 'postgres' else 'calculation_method' in {row['name'] for row in tx.rows('PRAGMA table_info(pay_component_types)')})
+        if method_ready:
+            fields += ',calculation_method,default_percentage,palk_row'
         values = (organisation_id + '-component-' + key, organisation_id, key, name, direction, *flags, role)
         if metadata_ready:
             values += (int(key not in {'bailiff', 'parental', 'annual_leave', 'unused_leave', 'employer_sick_pay',
@@ -143,6 +229,8 @@ def seed_types(tx, organisation_id):
                                       'alimony', 'union_fee', 'agreed_deduction'}), 1)
         if has_tsd:
             values += (TSD_PRESET_CODES[key],)
+        if method_ready:
+            values += (method, pct or None, palk_row)
         tx.execute('INSERT INTO pay_component_types(id,organisation_id,preset_key,name,direction,' + fields +
                    ') VALUES (' + ','.join('?' for _ in values) +
                    ') ON CONFLICT(organisation_id,preset_key) DO NOTHING',
@@ -157,6 +245,9 @@ def serialise(row):
     for key in ('is_wage', 'active'):
         if key in row:
             row[key] = bool(row[key])
+    for key in ('default_rate', 'default_percentage', 'default_coefficient', 'quantity', 'rate', 'coefficient', 'percentage'):
+        if key in row and row[key] is not None:
+            row[key] = db_number(Decimal(str(row[key])))
     if 'amount' in row:
         row['amount'] = db_number(money(row['amount']))
     return row
