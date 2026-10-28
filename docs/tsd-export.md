@@ -33,9 +33,11 @@ downloaded. Downloading a file does not submit it.
    uses the final calendar day of the pay-run month as `payment_date` and
    derives the filing deadline from it. The accountant must check this date
    against the real payment before upload.
-3. `EMPLOYMENT_SALARY` and `BOARD_MEMBER_FEE` are FastAccounts semantic labels.
+3. `EMPLOYMENT_SALARY`, `BOARD_MEMBER_FEE` and `CONTRACTOR_FEE` are FastAccounts semantic labels.
    The payroll plan does not specify official e-MTA payment-type codes, and
-   these labels are not represented as verified EMTA codes.
+   these labels are not represented as verified EMTA codes. Services-contract
+   remuneration (`income_line`, töövõtulepingu tasu) uses `CONTRACTOR_FEE`;
+   its official code mapping is still pending.
 4. The XML uses published XBRL GL core element names plus a small FastAccounts
    TSD extension namespace (`urn:fastaccounts:ee:tsd:2026:review-only`). It is
    tested for well-formedness and the documented fields, not against an e-MTA
@@ -69,7 +71,7 @@ as `tsd:*` children of each XBRL GL `gl-cor:entryDetail`.
 | `recipient_personal_id` | Frozen `pay_run_items.employee_personal_id` |
 | `recipient_name` | Frozen `pay_run_items.employee_name` |
 | `payment_classification` | Monthly/hourly â†’ `EMPLOYMENT_SALARY`; board fee â†’ `BOARD_MEMBER_FEE` |
-| `pay_basis` | Frozen `monthly`, `hourly`, or `board_fee` |
+| `pay_basis` | Frozen `monthly`, `hourly`, `board_fee`, or `income_line` |
 | `currency` | Constant `EUR`; the service rejects non-EE/non-EUR books |
 | `gross_amount` | `pay_run_items.gross` |
 | `tax_free_minimum` | `pay_run_items.tax_free_minimum` |

@@ -30,6 +30,7 @@ TSD_PAYMENT_CLASSIFICATION = {
     "monthly": "EMPLOYMENT_SALARY",
     "hourly": "EMPLOYMENT_SALARY",
     "board_fee": "BOARD_MEMBER_FEE",
+    "income_line": "CONTRACTOR_FEE",
 }
 TSD_ANNEX_MAPPING = {
     "EE_RESIDENT_PAYMENT": "1",

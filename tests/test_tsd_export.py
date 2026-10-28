@@ -145,3 +145,24 @@ def test_tsd_api_review_gate_and_file_downloads(db, ee_org, monkeypatch):
 def test_tsd_provider_is_export_only():
     with pytest.raises(PermissionError, match="direct TSD filing is not enabled"):
         EMTATSDExportProvider().submit({"declaration": "TSD"})
+
+
+def test_services_contract_income_line_can_prepare_and_export(db, ee_org):
+    payroll = PayrollService(db)
+    payroll.save_employee(ee_org["id"], actor=ACTOR, name="Contractor Test",
+                          personal_id="49001010018", pay_basis="income_line")
+    run = payroll.create_run(ee_org["id"], period="2026-10", actor=ACTOR)
+    kind = next(t for t in payroll.component_types(ee_org["id"]) if t["preset_key"] == "contract")
+    payroll.update_item(ee_org["id"], run["id"], run["items"][0]["id"], actor=ACTOR,
+                        components=[{"type_id": kind["id"], "amount": "2000"}])
+    payroll.approve(ee_org["id"], run["id"], actor=ACTOR)
+    service = TSDExportService(db)
+    prepared = service.prepare(ee_org["id"], run["id"], actor=ACTOR)
+    assert prepared["records"][0]["payment_classification"] == "CONTRACTOR_FEE"
+    service.review(ee_org["id"], prepared["id"], actor=ACTOR)
+    rows = list(csv.DictReader(io.StringIO(service.export_csv(
+        ee_org["id"], prepared["id"], actor=ACTOR).decode("utf-8-sig"))))
+    assert rows[0]["pay_basis"] == "income_line"
+    assert rows[0]["gross_amount"] == "2000.00"
+    root = ET.fromstring(service.export_xbrl_gl(ee_org["id"], prepared["id"], actor=ACTOR))
+    assert root.findtext(".//{*}payment_classification") == "CONTRACTOR_FEE"
