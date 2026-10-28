@@ -163,8 +163,9 @@ class LedgerService:
             return perform(own_tx)
 
     def reverse(self, batch_id: str, *, reversal_date: str, actor: str,
-                reason: str = "") -> dict:
-        with self.db.transaction() as tx:
+                reason: str = "", tx=None) -> dict:
+        def perform(transaction):
+            tx = transaction
             batch = tx.one("SELECT * FROM posting_batches WHERE id=?", (batch_id,))
             if not batch or batch["status"] != "Posted":
                 raise ValueError("Only a posted, unreversed batch can be reversed")
@@ -193,6 +194,10 @@ class LedgerService:
             audit(tx, batch["organisation_id"], actor, "ledger.reversed", "posting_batch", batch_id,
                   {"reversal_batch_id": reversal["id"], "reason": reason})
             return reversal
+        if tx is not None:
+            return perform(tx)
+        with self.db.transaction() as own_tx:
+            return perform(own_tx)
 
     def lock_period(self, period_id: str, *, actor: str, reason: str) -> None:
         if not reason.strip():

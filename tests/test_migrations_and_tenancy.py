@@ -34,7 +34,7 @@ def test_employee_tax_settings_backfill_and_preservation(tmp_path, legacy_payrol
     tables = ('employees', 'pay_run_items', 'pay_item_context', 'pay_runs', 'gl_entries', 'posting_batches')
     before = {table: db.rows(f'SELECT * FROM {table} ORDER BY id' if table != 'pay_item_context'
                              else 'SELECT * FROM pay_item_context ORDER BY item_id') for table in tables}
-    assert db.migrate() == ['0037_employee_tax_settings', '0038_payroll_payday_rules']
+    assert db.migrate() == ['0037_employee_tax_settings', '0038_payroll_payday_rules', '0039_payroll_payouts']
     for table in tables:
         actual = db.rows(f'SELECT * FROM {table} ORDER BY id' if table != 'pay_item_context'
                          else 'SELECT * FROM pay_item_context ORDER BY item_id')
@@ -85,7 +85,7 @@ def test_component_catalogue_upgrade_preserves_defaults_and_posted_payroll(tmp_p
               'pay_run_posting_accounts', 'gl_entries', 'posting_batches', 'audit_events')
     before = {t: db.rows(f'SELECT * FROM {t} ORDER BY 1') for t in tables}
     existing = db.rows('SELECT * FROM pay_component_types ORDER BY id')
-    assert db.migrate() == ['0036_payroll_component_catalogue', '0037_employee_tax_settings', '0038_payroll_payday_rules']
+    assert db.migrate() == ['0036_payroll_component_catalogue', '0037_employee_tax_settings', '0038_payroll_payday_rules', '0039_payroll_payouts']
     for table in tables:
         actual = db.rows(f'SELECT * FROM {table} ORDER BY 1')
         assert [{key: row[key] for key in original} for row, original in zip(actual, before[table], strict=True)] == before[table]
@@ -112,9 +112,9 @@ def test_component_catalogue_upgrade_preserves_defaults_and_posted_payroll(tmp_p
 
 def test_empty_migration_is_idempotent(tmp_path):
     db = Database(path=str(tmp_path / "empty.sqlite"))
-    assert db.migrate() == ["0001_accounting_core", "0002_integrations", "0003_operations", "0004_document_immutability", "0005_payroll", "0006_payroll_part_time_hourly", "0007_automation", "0008_import_staging", "0009_local_accounts", "0010_tsd_export", "0011_account_mappings", "0012_external_gl", "0013_sync_review", "0014_sync_push", "0015_payment_orders", "0016_bank_feed_schedules", "0017_prepayments", "0018_fixed_assets", "0019_master_data_import", "0020_quotes", "0021_periodisation", "0022_payment_links", "0023_analytical_objects", "0024_reminder_rules", "0025_fx_realised", "0026_fx_revaluations", "0027_mfa", "0028_document_settings", "0029_copilot", "0030_master_data_maintenance", "0031_master_data_groups", "0032_copilot_access", "0033_copilot_settings", "0034_payroll_demo_fixes", "0035_payroll_income_line", "0036_payroll_component_catalogue", "0037_employee_tax_settings", "0038_payroll_payday_rules"]
+    assert db.migrate() == ["0001_accounting_core", "0002_integrations", "0003_operations", "0004_document_immutability", "0005_payroll", "0006_payroll_part_time_hourly", "0007_automation", "0008_import_staging", "0009_local_accounts", "0010_tsd_export", "0011_account_mappings", "0012_external_gl", "0013_sync_review", "0014_sync_push", "0015_payment_orders", "0016_bank_feed_schedules", "0017_prepayments", "0018_fixed_assets", "0019_master_data_import", "0020_quotes", "0021_periodisation", "0022_payment_links", "0023_analytical_objects", "0024_reminder_rules", "0025_fx_realised", "0026_fx_revaluations", "0027_mfa", "0028_document_settings", "0029_copilot", "0030_master_data_maintenance", "0031_master_data_groups", "0032_copilot_access", "0033_copilot_settings", "0034_payroll_demo_fixes", "0035_payroll_income_line", "0036_payroll_component_catalogue", "0037_employee_tax_settings", "0038_payroll_payday_rules", "0039_payroll_payouts"]
     assert db.migrate() == []
-    assert db.scalar("SELECT COUNT(*) FROM schema_migrations") == 38
+    assert db.scalar("SELECT COUNT(*) FROM schema_migrations") == 39
     assert db.scalar(
         "SELECT COUNT(*) FROM sqlite_master WHERE type='table' "
         "AND name IN ('account_mappings','external_gl_entries')"
@@ -154,9 +154,9 @@ def test_historical_migration_catalogue_does_not_affect_other_databases(tmp_path
         current_setup = pool.submit(current.migrate)
         assert old_setup.result() == sorted(versions)
         latest = current_setup.result()
-    assert latest[-1] == '0038_payroll_payday_rules'
+    assert latest[-1] == '0039_payroll_payouts'
     assert legacy.scalar('SELECT COUNT(*) FROM schema_migrations') == 5
-    assert current.scalar('SELECT COUNT(*) FROM schema_migrations') == 38
+    assert current.scalar('SELECT COUNT(*) FROM schema_migrations') == 39
     assert legacy.migrate() == latest[5:]
     assert legacy.migrate() == current.migrate() == []
 
@@ -316,7 +316,7 @@ def test_fixed_asset_upgrade_preserves_custom_charts_and_postings(tmp_path, monk
         lines=[PostingLine(accounts["BANK"], debit=Decimal("10")), PostingLine(accounts["CAPITAL"], credit=Decimal("10"))], actor="owner@example.test")
     before = {table: db.rows(f"SELECT * FROM {table} ORDER BY id") for table in ["organisations", "accounts", "gl_entries", "posting_batches", "audit_events"]}
     monkeypatch.setattr(database, "MIGRATIONS", original)
-    assert db.migrate() == ["0018_fixed_assets", "0019_master_data_import", "0020_quotes", "0021_periodisation", "0022_payment_links", "0023_analytical_objects", "0024_reminder_rules", "0025_fx_realised", "0026_fx_revaluations", "0027_mfa", "0028_document_settings", "0029_copilot", "0030_master_data_maintenance", "0031_master_data_groups", "0032_copilot_access", "0033_copilot_settings", "0034_payroll_demo_fixes", "0035_payroll_income_line", "0036_payroll_component_catalogue", "0037_employee_tax_settings", "0038_payroll_payday_rules"]
+    assert db.migrate() == ["0018_fixed_assets", "0019_master_data_import", "0020_quotes", "0021_periodisation", "0022_payment_links", "0023_analytical_objects", "0024_reminder_rules", "0025_fx_realised", "0026_fx_revaluations", "0027_mfa", "0028_document_settings", "0029_copilot", "0030_master_data_maintenance", "0031_master_data_groups", "0032_copilot_access", "0033_copilot_settings", "0034_payroll_demo_fixes", "0035_payroll_income_line", "0036_payroll_component_catalogue", "0037_employee_tax_settings", "0038_payroll_payday_rules", "0039_payroll_payouts"]
     assert db.migrate() == []
     after_accounts = db.rows("SELECT * FROM accounts ORDER BY id")
     assert all(row in after_accounts for row in before["accounts"])

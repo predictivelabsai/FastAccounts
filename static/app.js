@@ -2205,18 +2205,21 @@
           `<div class="notice" role="status">${tr("Payroll is available only for Estonian organisations with EUR books. Switch to an Estonian EUR organisation to manage payroll.")}</div>`));
         return;
       }
-      const [employees, runs, connections, tsdPreparations, componentTypes] = await Promise.all([
+      const [employees, runs, connections, tsdPreparations, componentTypes, payouts, bankAccounts] = await Promise.all([
         optionalPayroll(c.url("/employees")),
         optionalPayroll(c.url("/pay-runs")),
         api(c.url("/integrations")),
         optionalPayroll(c.url("/payroll/tsd-preparations")),
         optionalPayroll(c.url("/payroll/component-types")),
+        optionalPayroll(c.url("/payroll/payouts")),
+        optionalPayroll(c.url("/bank-accounts")),
       ]);
       const accountingProviders = connections.filter((entry) => ["merit", "smartaccounts"].includes(entry.provider) && entry.status !== "Disconnected");
       await Promise.all((runs || []).map(async (run) => {
         run.pushes = await api(c.url(`/pay-runs/${run.id}/pushes`));
       }));
       const unavailable = employees === null || runs === null;
+      (runs || []).forEach((run) => run.payouts = (payouts || []).filter((payout) => payout.pay_run_id === run.id));
       const tsdByRun = Object.fromEntries(
         [...(tsdPreparations || [])].reverse().map((preparation) => [
           String(preparation.pay_run_id),
@@ -2296,6 +2299,7 @@
         paymentTypes: () => paymentTypesDialog(c, componentTypes || []),
         payrollAccounts: () => payrollAccountsDialog(c),
         paydaySettings: () => paydaySettingsDialog(c),
+        managePayouts: (b) => payrollPayoutsDialog(c, runs.find((run) => run.id === b.dataset.id), bankAccounts || []),
         archiveEmployee: async (b) => { await post(c.url(`/employees/${b.dataset.id}`), {active: false}, "PATCH"); await render(); },
         unarchiveEmployee: async (b) => { await post(c.url(`/employees/${b.dataset.id}`), {active: true}, "PATCH"); await render(); },
         deleteEmployee: (b) => confirmAction("Delete employee", tr("Delete this employee permanently? Employees with pay run history must be archived instead."), async () => {
@@ -4488,6 +4492,34 @@
       await saved(d);
     });
   }
+  async function payrollPayoutsDialog(c, run, bankAccounts) {
+    if (!run) return;
+    const refresh = async () => api(c.url('/payroll/payouts') + `?run_id=${encodeURIComponent(run.id)}`);
+    const renderBatches = (batches) => batches.length ? table(['Payout date', 'Status', 'Employees', 'Actions'], batches.map((batch) => row([
+      td(esc(batch.payout_date)), td(pill(batch.status)), td(num(batch.lines.length)),
+      td((batch.status === 'Draft' ? button('Mark paid', 'payPayout', false, `data-id="${batch.id}"`) : '') + (batch.status !== 'Cancelled' ? button('Cancel payout', 'cancelPayout', false, `data-id="${batch.id}"`) : '')),
+    ]))) : `<p class="muted">${tr('No payouts for this run.')}</p>`;
+    let batches = await refresh();
+    const bankOptions = bankAccounts.filter((bank) => bank.active).map((bank) => [bank.id, bank.name]);
+    const d = dialog('Payroll payouts', `<p>${tr('Pay run')} ${esc(run.period)}</p><div data-payout-list>${renderBatches(batches)}</div>${button('Create salary payout', 'createPayout', true)}<div data-payout-bank>${bankOptions.length ? select('Bank account', 'bank_account_id', bankOptions, bankOptions[0][0]) : `<p class="notice">${tr('Add an active bank account first.')}</p>`}</div>`);
+    d.querySelector('[data-action="createPayout"]').onclick = async () => {
+      await post(c.url(`/pay-runs/${run.id}/payouts`), {payout_type: 'salary'});
+      batches = await refresh(); d.querySelector('[data-payout-list]').innerHTML = renderBatches(batches);
+      bindPayoutActions();
+    };
+    const bindPayoutActions = () => {
+      d.querySelectorAll('[data-action="payPayout"]').forEach((buttonEl) => buttonEl.onclick = async () => {
+        if (!bankOptions.length) { toast(t('Add an active bank account first.'), 'info'); return; }
+        await post(c.url(`/payroll/payouts/${buttonEl.dataset.id}/paid`), {bank_account_id: d.querySelector('[name="bank_account_id"]').value});
+        batches = await refresh(); d.querySelector('[data-payout-list]').innerHTML = renderBatches(batches); bindPayoutActions();
+      });
+      d.querySelectorAll('[data-action="cancelPayout"]').forEach((buttonEl) => buttonEl.onclick = async () => {
+        await post(c.url(`/payroll/payouts/${buttonEl.dataset.id}/cancel`));
+        batches = await refresh(); d.querySelector('[data-payout-list]').innerHTML = renderBatches(batches); bindPayoutActions();
+      });
+    };
+    bindPayoutActions();
+  }
   async function paydaySettingsDialog(c) {
     const settings = await api(c.url('/payroll/payday-settings'));
     const latest = settings.rules.at(-1) || {};
@@ -4615,7 +4647,7 @@
         (draft
           ? button("Delete draft", "delete", false, `data-id="${r.id}"`) +
               button("Approve & post", "approve", true, `data-id="${r.id}"`)
-          : link(
+          : button("Payroll payouts", "managePayouts", false, `data-id="${r.id}"`) + link(
               "Payslips PDF",
               `/api${c.url(`/pay-runs/${r.id}/payslips.pdf`)}`,
             ) + tsdActions) +

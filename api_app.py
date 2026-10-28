@@ -51,6 +51,7 @@ from organisations import APPROVE_ROLES, WRITE_ROLES, AccessDenied, Organisation
 from payroll import PayrollConflict, PayrollService
 from payroll_tax_settings import EmployeeTaxSettingsService, TaxSettingConflict, TaxSettingValidationError
 from payroll_payday import PaydaySettingsService
+from payroll_payouts import PayoutConflict, PayoutService
 from employee_details import EmployeeDetailsError
 from tax import TaxService
 from tsd import TSDExportService
@@ -2253,8 +2254,24 @@ class PaydaySettingsIn(BaseModel):
     day: int | None = Field(default=None, ge=1, le=31)
 
 
+class PayoutCreateIn(BaseModel):
+    payout_date: str | None = None
+    payout_type: Literal['salary', 'advance', 'absence_pay', 'bonus', 'withholding'] = 'salary'
+    amounts: dict[str, Decimal] | None = None
+    bank_account_id: str | None = None
+
+
+class PayoutPaidIn(BaseModel):
+    bank_account_id: str
+
+
 @api.exception_handler(PayrollConflict)
 async def payroll_conflict(_request: Request, error: PayrollConflict):
+    return JSONResponse({'detail': str(error)}, status_code=409)
+
+
+@api.exception_handler(PayoutConflict)
+async def payout_conflict(_request: Request, error: PayoutConflict):
     return JSONResponse({'detail': str(error)}, status_code=409)
 
 
@@ -2329,6 +2346,32 @@ def save_payroll_payday_settings(organisation_id: str, payload: PaydaySettingsIn
                                  user: User = Depends(require_csrf)):
     _require(organisation_id, user, WRITE_ROLES & {'owner', 'administrator'})
     return PaydaySettingsService(get_database()).save(organisation_id, actor=user.email, **payload.model_dump())
+
+
+@api.get('/organisations/{organisation_id}/payroll/payouts')
+def payroll_payouts(organisation_id: str, run_id: str | None = None, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    return PayoutService(get_database()).list(organisation_id, run_id=run_id)
+
+
+@api.post('/organisations/{organisation_id}/pay-runs/{run_id}/payouts', status_code=201)
+def create_payroll_payout(organisation_id: str, run_id: str, payload: PayoutCreateIn,
+                          user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return PayoutService(get_database()).create(organisation_id, run_id, actor=user.email, **payload.model_dump())
+
+
+@api.post('/organisations/{organisation_id}/payroll/payouts/{payout_id}/paid')
+def mark_payroll_payout_paid(organisation_id: str, payout_id: str, payload: PayoutPaidIn,
+                             user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return PayoutService(get_database()).mark_paid(organisation_id, payout_id, payload.bank_account_id, actor=user.email)
+
+
+@api.post('/organisations/{organisation_id}/payroll/payouts/{payout_id}/cancel')
+def cancel_payroll_payout(organisation_id: str, payout_id: str, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return PayoutService(get_database()).cancel(organisation_id, payout_id, actor=user.email)
 
 
 @api.post('/organisations/{organisation_id}/payroll/component-types', status_code=201)
