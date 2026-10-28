@@ -2356,6 +2356,12 @@ def payroll_payouts(organisation_id: str, run_id: str | None = None, user: User 
     return PayoutService(get_database()).list(organisation_id, run_id=run_id)
 
 
+@api.get('/organisations/{organisation_id}/payroll/payouts/summary')
+def payroll_payout_summary(organisation_id: str, run_id: str | None = None, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    return PayoutService(get_database()).summary(organisation_id, run_id=run_id)
+
+
 @api.get('/organisations/{organisation_id}/payroll/payouts/{payout_id}')
 def payroll_payout(organisation_id: str, payout_id: str, user: User = Depends(current_user)):
     _require(organisation_id, user, APPROVE_ROLES | {'viewer'})

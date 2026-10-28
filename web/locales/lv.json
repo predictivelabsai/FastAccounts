@@ -1976,6 +1976,7 @@
     "The payout month differs from the frozen payroll calculation month; a correction is required": "Izmaksas mēnesis atšķiras no fiksētā algas aprēķina mēneša. Nepieciešams labojums.",
     "Organisation language": "Uzņēmuma valoda",
     "Download SEPA file": "Lejupielādēt SEPA failu",
+    "Payout summary": "Izmaksu kopsavilkums",
     "BIC": "BIC",
     "Salary expense": "Algu izdevumi",
     "Social tax expense": "Sociālā nodokļa izdevumi",

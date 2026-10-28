@@ -11,12 +11,15 @@ from __future__ import annotations
 import calendar
 import csv
 import io
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 from xml.etree import ElementTree as ET
 
 from core_utils import audit, db_number, decimal, money, new_id, utc_now
 from database import Database, get_database
+from payroll_calendar import is_working_day
+from payroll_payday import payday_for_period
+from payroll_rules import settlement_date
 
 
 XBRLI_NS = "http://www.xbrl.org/2003/instance"
@@ -98,8 +101,12 @@ def _month_end(period: str) -> date:
 
 def _filing_deadline(payment_date: date) -> date:
     if payment_date.month == 12:
-        return date(payment_date.year + 1, 1, 10)
-    return date(payment_date.year, payment_date.month + 1, 10)
+        due = date(payment_date.year + 1, 1, 10)
+    else:
+        due = date(payment_date.year, payment_date.month + 1, 10)
+    while not is_working_day(due):
+        due += timedelta(days=1)
+    return due
 
 
 class TSDExportService:
@@ -131,6 +138,16 @@ class TSDExportService:
             raise KeyError("Pay run not found")
         if run["status"] != "Approved":
             raise ValueError("Only an approved pay run can be prepared for TSD export")
+        if 'settlement_date' in run:
+            payout = tx.one("SELECT payout_date FROM payroll_payout_batches WHERE organisation_id=? AND pay_run_id=? "
+                            "AND payout_type='salary' AND status!='Cancelled' ORDER BY payout_date,id LIMIT 1",
+                            (organisation_id, run_id))
+            payday_date = payday_for_period(tx, organisation_id, run['period'])
+            run['payment_date'] = settlement_date(run['period'],
+                salary_payout_date=payout['payout_date'] if payout else None,
+                payday_rule_date=run['settlement_date'] or payday_date).isoformat()
+        else:
+            run['payment_date'] = _month_end(run['period']).isoformat()
         run["items"] = tx.rows(
             "SELECT * FROM pay_run_items WHERE organisation_id=? AND pay_run_id=? "
             "ORDER BY employee_name,id",
@@ -149,7 +166,7 @@ class TSDExportService:
 
     @staticmethod
     def _record(organisation: dict, run: dict, item: dict) -> dict:
-        payment_date = _month_end(run["period"])
+        payment_date = date.fromisoformat(run['payment_date'])
         pension = money(item["funded_pension"])
         employee_ui = money(item["ui_employee"])
         exemption = money(item["tax_free_minimum"])

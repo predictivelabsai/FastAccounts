@@ -36,6 +36,8 @@ def test_partial_payout_caps_unpaid_net_and_cancellation_releases_amount(db, ee_
     net = Decimal(str(run['items'][0]['net']))
     first = service.create(ee_org['id'], run['id'], actor=ACTOR, amounts={'legacy-employee': str(net / 2)})
     assert Decimal(str(first['lines'][0]['amount'])) == net / 2
+    summary = service.summary(ee_org['id'], run_id=run['id'])[0]
+    assert Decimal(summary['paid']) == 0 and Decimal(summary['pending']) == net / 2 and Decimal(summary['unpaid']) == net / 2
     with pytest.raises(PayoutConflict, match='exceeds'):
         service.create(ee_org['id'], run['id'], actor=ACTOR, amounts={'legacy-employee': str(net)})
     service.cancel(ee_org['id'], first['id'], actor=ACTOR)
@@ -51,6 +53,8 @@ def test_paid_payout_posts_balanced_bank_transfer_and_reversal_on_cancel(db, ee_
     batch = service.create(ee_org['id'], run['id'], actor=ACTOR, bank_account_id=bank_id)
     assert batch['lines'][0]['iban'] == IBAN
     paid = service.mark_paid(ee_org['id'], batch['id'], bank_id, actor=ACTOR)
+    summary = service.summary(ee_org['id'], run_id=run['id'])[0]
+    assert Decimal(summary['paid']) == Decimal(run['items'][0]['net'])
     rows = db.rows('SELECT debit,credit FROM gl_entries WHERE organisation_id=? AND posting_batch_id=?',
                    (ee_org['id'], paid['posted_batch_id']))
     assert sum((Decimal(str(row['debit'])) for row in rows), Decimal(0)) == sum((Decimal(str(row['credit'])) for row in rows), Decimal(0))
@@ -86,6 +90,9 @@ def test_payout_routes_enforce_tenant_role_and_csrf(db, ee_org, legacy_payroll, 
         created = client.post(f"/api{base}/pay-runs/{run['id']}/payouts", json=body,
                               headers={'X-CSRF-Token': token})
         assert created.status_code == 201, created.text
+        summary = client.get(f"/api{base}/payroll/payouts/summary?run_id={run['id']}")
+        assert summary.status_code == 200 and summary.json()[0]['pending'] == run['total_net']
+        assert 'iban' not in summary.json()[0]['employees'][0]
         other = __import__('organisations').OrganisationService(db).create(
             name='Other payout tenant', country_code='EE', entity_type='EE_OU', owner_email='other@example.test')
         assert client.get(f"/api/organisations/{other['id']}/payroll/payouts/{created.json()['id']}").status_code == 403

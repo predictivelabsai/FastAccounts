@@ -1976,6 +1976,7 @@
     "The payout month differs from the frozen payroll calculation month; a correction is required": "Išmokos mėnuo skiriasi nuo užfiksuoto darbo užmokesčio skaičiavimo mėnesio. Reikia pataisymo.",
     "Organisation language": "Organizacijos kalba",
     "Download SEPA file": "Atsisiųsti SEPA failą",
+    "Payout summary": "Išmokų suvestinė",
     "BIC": "BIC",
     "Salary expense": "Darbo užmokesčio sąnaudos",
     "Social tax expense": "Socialinio mokesčio sąnaudos",

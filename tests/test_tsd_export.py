@@ -17,6 +17,8 @@ from tsd import (
     TSDExportService,
     XBRL_GL_CORE_NS,
 )
+from payroll_payday import PaydaySettingsService
+from payroll_payouts import PayoutService
 
 
 ACTOR = "owner@example.test"
@@ -166,3 +168,13 @@ def test_services_contract_income_line_can_prepare_and_export(db, ee_org):
     assert rows[0]["gross_amount"] == "2000.00"
     root = ET.fromstring(service.export_xbrl_gl(ee_org["id"], prepared["id"], actor=ACTOR))
     assert root.findtext(".//{*}payment_classification") == "CONTRACTOR_FEE"
+
+
+def test_tsd_payment_date_uses_salary_payout_and_shifts_weekend_deadline(db, ee_org):
+    PaydaySettingsService(db).save(ee_org['id'], start_date='2026-01-01', rule_start_date='2026-01-01',
+                                   rule='next_month_day', day=10, actor=ACTOR)
+    run = _approved_run(db, ee_org)
+    PayoutService(db).create(ee_org['id'], run['id'], actor=ACTOR, payout_date='2026-11-05')
+    preparation = TSDExportService(db).prepare(ee_org['id'], run['id'], actor=ACTOR)
+    assert preparation['payment_date'] == '2026-11-05'
+    assert preparation['filing_deadline'] == '2026-12-10'

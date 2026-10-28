@@ -1976,6 +1976,7 @@
     "The payout month differs from the frozen payroll calculation month; a correction is required": "The payout month differs from the frozen payroll calculation month. A correction is required.",
     "Organisation language": "Organisation language",
     "Download SEPA file": "Download SEPA file",
+    "Payout summary": "Payout summary",
     "BIC": "BIC",
     "Salary expense": "Salary expense",
     "Social tax expense": "Social tax expense",

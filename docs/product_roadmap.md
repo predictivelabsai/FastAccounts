@@ -3,6 +3,36 @@
 **Research baseline:** 2026-08-10  
 **Status:** engineering pilot implemented; independent UK/EE accountant UAT and provider approvals pending
 
+## 2026-10-28: Payroll calendar and payouts
+
+- Added the Estonian working calendar with Riigipühad, Gregorian Easter
+  calculations and TLS § 53 shortened pre-holiday norms. 2026 February, June,
+  October and December day/hour totals are documented and tested.
+- Added migration 0038 for payroll start date and dated payday rules. Day rules
+  clamp to month end and weekend/public-holiday dates move backwards; first
+  working day of next month moves forward. Payroll settings support English,
+  Estonian, Latvian and Lithuanian, with owner/administrator writes and viewer
+  reads.
+- Added migration 0039 for run-linked employee payout batches, frozen IBAN and
+  account-owner details, partial net payments, paid ledger posting, cancellation
+  reversals and state audits. Run and organisation views show paid, pending and
+  unpaid amounts. Approved runs reject a salary payout moved to a different
+  payment month.
+- Added migration 0040 for a frozen payroll settlement date. Later approved
+  pay-run items share the remaining tax-free exemption within the same employee
+  payment month. TSD payment dates now use the salary payout, frozen payday date
+  or legacy period end, in that order. Filing due dates move forward from the
+  10th when it falls on a non-working day.
+- Added migration 0041 for optional bank BIC and organisation language. Payroll
+  payouts can download structured pain.001.001.03 XML with stable transaction
+  IDs, remittance text, totals and explicit employee IBAN validation. No
+  pain.001 XSD is vendored; validation is structural. Live bank acceptance and
+  accountant UAT remain pending.
+- Targeted tests cover calendar norms, payday histories, payout partials and
+  reversals, tenant/role/CSRF checks, payment-month exemption sharing, TSD dates,
+  migration preservation and pain.001 content. See
+  `payroll_payouts_validation.md` for exact commands and limits.
+
 ## 2026-10-28: Payroll tax settings and employee details
 
 - Implemented date-selected, immutable payroll rules with every verified 2026

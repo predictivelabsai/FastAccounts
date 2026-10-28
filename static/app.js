@@ -2205,7 +2205,7 @@
           `<div class="notice" role="status">${tr("Payroll is available only for Estonian organisations with EUR books. Switch to an Estonian EUR organisation to manage payroll.")}</div>`));
         return;
       }
-      const [employees, runs, connections, tsdPreparations, componentTypes, payouts, bankAccounts] = await Promise.all([
+      const [employees, runs, connections, tsdPreparations, componentTypes, payouts, bankAccounts, payoutSummary] = await Promise.all([
         optionalPayroll(c.url("/employees")),
         optionalPayroll(c.url("/pay-runs")),
         api(c.url("/integrations")),
@@ -2213,6 +2213,7 @@
         optionalPayroll(c.url("/payroll/component-types")),
         optionalPayroll(c.url("/payroll/payouts")),
         optionalPayroll(c.url("/bank-accounts")),
+        optionalPayroll(c.url("/payroll/payouts/summary")),
       ]);
       const accountingProviders = connections.filter((entry) => ["merit", "smartaccounts"].includes(entry.provider) && entry.status !== "Disconnected");
       await Promise.all((runs || []).map(async (run) => {
@@ -2231,7 +2232,7 @@
           page(
             t("Payroll"),
             t("People, payslips and postings for this client."),
-            button("Add employee", "employee") +
+            button("Add employee", "employee") + button("Payout summary", "payoutSummary") +
               button("Payment types", "paymentTypes") + button("Payroll accounts", "payrollAccounts") + button("Payday settings", "paydaySettings") +
               button("Run payroll for month", "run", true),
             `${unavailable ? `<div class="notice">${tr("Payroll is not available yet.")}</div>` : ""}<section class="section"><div class="section-head"><h2>${tr("Employees")}</h2><span class="muted">${num(employees?.filter((x) => x.active).length)} ${tr("employees")}</span>${employees === null ? '' : link('Export Excel', `/api${c.url('/reports/employees.xlsx')}`)}</div>${table(
@@ -2300,6 +2301,7 @@
         payrollAccounts: () => payrollAccountsDialog(c),
         paydaySettings: () => paydaySettingsDialog(c),
         managePayouts: (b) => payrollPayoutsDialog(c, runs.find((run) => run.id === b.dataset.id), bankAccounts || []),
+        payoutSummary: () => payrollPayoutSummaryDialog(payoutSummary || []),
         archiveEmployee: async (b) => { await post(c.url(`/employees/${b.dataset.id}`), {active: false}, "PATCH"); await render(); },
         unarchiveEmployee: async (b) => { await post(c.url(`/employees/${b.dataset.id}`), {active: true}, "PATCH"); await render(); },
         deleteEmployee: (b) => confirmAction("Delete employee", tr("Delete this employee permanently? Employees with pay run history must be archived instead."), async () => {
@@ -4502,10 +4504,16 @@
     ]))) : `<p class="muted">${tr('No payouts for this run.')}</p>`;
     let batches = await refresh();
     const bankOptions = bankAccounts.filter((bank) => bank.active).map((bank) => [bank.id, bank.name]);
-    const d = dialog('Payroll payouts', `<p>${tr('Pay run')} ${esc(run.period)}</p><div data-payout-list>${renderBatches(batches)}</div>${button('Create salary payout', 'createPayout', true)}<div data-payout-bank>${bankOptions.length ? select('Bank account', 'bank_account_id', bankOptions, bankOptions[0][0]) : `<p class="notice">${tr('Add an active bank account first.')}</p>`}</div>`);
+    const renderEmployeeSummary = (summary) => table(['Employee', 'Net', 'Paid', 'Pending', 'Unpaid'], (summary?.employees || []).map((item) => row([
+      td(esc(item.name)), cash(item.net, 'EUR'), cash(item.paid, 'EUR'), cash(item.pending, 'EUR'), cash(item.unpaid, 'EUR'),
+    ])));
+    const refreshSummary = async () => (await api(c.url('/payroll/payouts/summary') + `?run_id=${encodeURIComponent(run.id)}`))[0];
+    const employeeSummary = renderEmployeeSummary(await refreshSummary());
+    const d = dialog('Payroll payouts', `<p>${tr('Pay run')} ${esc(run.period)}</p><div data-payout-summary>${employeeSummary}</div><div data-payout-list>${renderBatches(batches)}</div>${button('Create salary payout', 'createPayout', true)}<div data-payout-bank>${bankOptions.length ? select('Bank account', 'bank_account_id', bankOptions, bankOptions[0][0]) : `<p class="notice">${tr('Add an active bank account first.')}</p>`}</div>`);
     d.querySelector('[data-action="createPayout"]').onclick = async () => {
       await post(c.url(`/pay-runs/${run.id}/payouts`), {payout_type: 'salary', bank_account_id: d.querySelector('[name="bank_account_id"]')?.value || null});
       batches = await refresh(); d.querySelector('[data-payout-list]').innerHTML = renderBatches(batches);
+      d.querySelector('[data-payout-summary]').innerHTML = renderEmployeeSummary(await refreshSummary());
       bindPayoutActions();
     };
     const bindPayoutActions = () => {
@@ -4513,13 +4521,20 @@
         if (!bankOptions.length) { toast(t('Add an active bank account first.'), 'info'); return; }
         await post(c.url(`/payroll/payouts/${buttonEl.dataset.id}/paid`), {bank_account_id: d.querySelector('[name="bank_account_id"]').value});
         batches = await refresh(); d.querySelector('[data-payout-list]').innerHTML = renderBatches(batches); bindPayoutActions();
+        d.querySelector('[data-payout-summary]').innerHTML = renderEmployeeSummary(await refreshSummary());
       });
       d.querySelectorAll('[data-action="cancelPayout"]').forEach((buttonEl) => buttonEl.onclick = async () => {
         await post(c.url(`/payroll/payouts/${buttonEl.dataset.id}/cancel`));
         batches = await refresh(); d.querySelector('[data-payout-list]').innerHTML = renderBatches(batches); bindPayoutActions();
+        d.querySelector('[data-payout-summary]').innerHTML = renderEmployeeSummary(await refreshSummary());
       });
     };
     bindPayoutActions();
+  }
+  function payrollPayoutSummaryDialog(summary) {
+    dialog('Payout summary', table(['Period', 'Net', 'Paid', 'Pending', 'Unpaid'], summary.map((item) => row([
+      td(esc(item.period)), cash(item.net, 'EUR'), cash(item.paid, 'EUR'), cash(item.pending, 'EUR'), cash(item.unpaid, 'EUR'),
+    ]))));
   }
   async function paydaySettingsDialog(c) {
     const settings = await api(c.url('/payroll/payday-settings'));

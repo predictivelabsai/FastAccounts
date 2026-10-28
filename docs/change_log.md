@@ -4,6 +4,30 @@ Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as
 delivered.
 
+## 2026-10-28: Payroll calendar and payouts
+
+- Added the Estonian public-holiday calendar, Easter computation, working-day
+  helpers and monthly full-time hours with shortened pre-holiday days.
+- Added effective-dated company payday settings and the payroll start date.
+  Configured day paydays clamp to month end and shift back over weekends and
+  public holidays. The first working day rule moves forward. The settings view
+  supports four languages and applies owner/administrator write access.
+- Added partial run-linked payroll payouts with frozen employee bank details,
+  paid/unpaid summaries, audited Draft, Paid and Cancelled transitions, balanced
+  salary-payable to bank posting, and ledger reversal when a paid payout is
+  cancelled.
+- Tax calculations now freeze their selected payment date. Approved salary
+  payouts cannot change the payment month; prior approved items share the
+  employee's remaining monthly tax-free exemption. The TSD due date follows the
+  payment month and moves forward to the next working day when needed.
+- Added downloadable pain.001.001.03 credit-transfer XML for payroll payout
+  batches, including totals, stable end-to-end IDs, optional debtor BIC,
+  organisation-language remittance text and a list of missing or invalid
+  employee IBANs. No vendored XSD or live bank validation is available.
+- Validation records exact targeted pytest commands and outcomes in
+  `payroll_payouts_validation.md`. The full test suite and live bank/e-MTA UAT
+  were not run.
+
 ## 2026-10-28: Payroll tax settings and employee details
 
 - Fixed the TSD export crash for approved `income_line` services-contract runs.

@@ -141,6 +141,44 @@ class PayoutService:
         query += ' ORDER BY payout_date,id'
         return [self.get(organisation_id, row['id']) for row in self.db.rows(query, params)]
 
+    def summary(self, organisation_id, *, run_id=None):
+        with self.db.transaction() as tx:
+            self._org(tx, organisation_id)
+            query = "SELECT id,period,total_net FROM pay_runs WHERE organisation_id=? AND status='Approved'"
+            params = [organisation_id]
+            if run_id:
+                query += ' AND id=?'; params.append(run_id)
+            query += ' ORDER BY period DESC,id'
+            runs = tx.rows(query, params)
+            result = []
+            for run in runs:
+                items = self._outstanding(tx, organisation_id, run['id'])
+                safe_items = []
+                for item in items:
+                    paid = tx.one("SELECT COALESCE(SUM(l.amount),0) amount FROM payroll_payout_lines l "
+                                  "JOIN payroll_payout_batches b ON b.organisation_id=l.organisation_id AND b.id=l.payout_batch_id "
+                                  "WHERE b.organisation_id=? AND b.pay_run_id=? AND b.status='Paid' AND l.employee_id=?",
+                                  (organisation_id, run['id'], item['employee_id']))
+                    item['paid'] = money(paid['amount'])
+                    item['pending'] = money(decimal(item['net']) - item['unpaid'] - item['paid'])
+                    item['net'] = money(item['net'])
+                    safe_items.append({key: item[key] for key in
+                                       ('employee_id', 'name', 'net', 'paid', 'pending', 'unpaid')})
+                result.append({
+                    'pay_run_id': run['id'], 'period': run['period'],
+                    'net': db_number(money(run['total_net'])),
+                    'paid': db_number(sum((item['paid'] for item in items), Decimal('0'))),
+                    'pending': db_number(sum((item['pending'] for item in items), Decimal('0'))),
+                    'unpaid': db_number(sum((item['unpaid'] for item in items), Decimal('0'))),
+                    'employees': safe_items,
+                })
+            return result
+
+    @staticmethod
+    def _org(tx, organisation_id):
+        if not tx.one('SELECT id FROM organisations WHERE id=?', (organisation_id,)):
+            raise KeyError('Organisation not found')
+
 
 class PayoutConflict(ValueError):
     pass
