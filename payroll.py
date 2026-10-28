@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import calendar
 import re
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation
 
 from core_utils import audit, db_number, decimal, four_dp, money, new_id, utc_now
@@ -206,9 +206,14 @@ def _fraction(value) -> str:
     return text.rstrip('0').rstrip('.') if '.' in text else text
 
 
-def declaration_due_date(period):
-    year, month = map(int, period.split('-'))
-    return date(year + (month == 12), 1 if month == 12 else month + 1, 10)
+def declaration_due_date(period, payment_date=None):
+    paid_on = date.fromisoformat(payment_date) if isinstance(payment_date, str) else payment_date
+    year, month = (paid_on.year, paid_on.month) if paid_on else map(int, period.split('-'))
+    due = date(year + (month == 12), 1 if month == 12 else month + 1, 10)
+    from payroll_calendar import is_working_day
+    while not is_working_day(due):
+        due += timedelta(days=1)
+    return due
 
 
 class PayrollService:
@@ -418,12 +423,13 @@ class PayrollService:
             item['board_member'] = bool(item['board_member'])
         for key in ('total_gross', 'total_net', 'total_employer_cost'):
             run[key] = db_number(money(run[key]))
-        run['declaration_due_date'] = declaration_due_date(run['period']).isoformat()
+        due_date = declaration_due_date(run['period'], run['payment_date'])
+        run['declaration_due_date'] = due_date.isoformat()
         settlement = tx.one('SELECT posted_batch_id FROM pay_run_settlements WHERE organisation_id=? AND pay_run_id=?', (organisation_id, run_id))
         prepared = tx.one("SELECT id FROM sync_runs WHERE organisation_id=? AND provider='emta' AND object_type='tsd' AND direction='export' AND cursor_before=?", (organisation_id, run_id))
         run['declaration_state'] = 'settled' if settlement else 'prepared' if prepared else 'none'
         run['declaration_batch_id'] = settlement['posted_batch_id'] if settlement else None
-        run['declaration_overdue'] = run['status'] == 'Approved' and run['declaration_state'] != 'settled' and declaration_due_date(run['period']) < date.today()
+        run['declaration_overdue'] = run['status'] == 'Approved' and run['declaration_state'] != 'settled' and due_date < date.today()
         return run
 
     def runs(self, organisation_id):
@@ -772,7 +778,7 @@ class PayrollService:
                 target = self._posting_account(tx, organisation_id, payable)
                 lines.append(PostingLine(target['id'], credit=value, memo=memo, source_line_type='pay_run', source_line_id=run_id))
             batch = LedgerService(self.db).post(organisation_id=organisation_id, voucher_type='payroll_tsd', voucher_id=run_id,
-                voucher_code='TSD-' + run['period'], posting_date=declaration_due_date(run['period']).isoformat(),
+                voucher_code='TSD-' + run['period'], posting_date=declaration_due_date(run['period'], run['payment_date']).isoformat(),
                 lines=lines, actor=actor, currency='EUR', tx=tx)
             tx.execute('UPDATE pay_run_settlements SET posted_batch_id=? WHERE organisation_id=? AND pay_run_id=?', (batch['id'], organisation_id, run_id))
             audit(tx, organisation_id, actor, 'payroll.declaration.settled', 'pay_run', run_id, {'posted_batch_id': batch['id']})

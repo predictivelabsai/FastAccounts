@@ -29,10 +29,12 @@ downloaded. Downloading a file does not submit it.
    Annex 2 records from names, personal IDs, or other unreliable inference.
    Non-resident calculation and classification remain outside the payroll
    engine's current scope.
-2. A pay run stores a month, not an actual salary payment date. The exporter
-   uses the final calendar day of the pay-run month as `payment_date` and
-   derives the filing deadline from it. The accountant must check this date
-   against the real payment before upload.
+2. The exporter uses the date of the run's non-cancelled salary payout when one
+   exists. Otherwise it uses the run's frozen payday-rule date, falling back to
+   period end for older runs. TSD is due on the 10th of the month after that
+   payment month; a weekend or Estonian public holiday moves the due date
+   forward to the next working day. The accountant must check payment records
+   before upload.
 3. `EMPLOYMENT_SALARY`, `BOARD_MEMBER_FEE` and `CONTRACTOR_FEE` are FastAccounts semantic labels.
    The payroll plan does not specify official e-MTA payment-type codes, and
    these labels are not represented as verified EMTA codes. Services-contract
@@ -64,9 +66,9 @@ as `tsd:*` children of each XBRL GL `gl-cor:entryDetail`.
 | `annex` | `1` for the currently supported resident-payment scope; `2` is reserved in the mapping table for future non-resident support |
 | `payment_record_id` | Immutable `pay_run_items.id` |
 | `pay_run_id` | Tenant-scoped approved `pay_runs.id` |
-| `payment_date` | Last calendar day of `pay_runs.period` (assumption above) |
+| `payment_date` | Salary payout date, frozen payday-rule date, or legacy period end |
 | `payment_month` | `YYYY-MM` from `payment_date` |
-| `filing_deadline` | The 10th day of the month following `payment_date` |
+| `filing_deadline` | The 10th day after `payment_date`'s month, moved forward to the next working day when needed |
 | `payer_registration_no` | `organisations.registration_no` |
 | `recipient_personal_id` | Frozen `pay_run_items.employee_personal_id` |
 | `recipient_name` | Frozen `pay_run_items.employee_name` |

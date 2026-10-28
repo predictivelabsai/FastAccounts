@@ -4,7 +4,7 @@ from decimal import Decimal
 import pytest
 
 from payroll_rules import remaining_monthly_exemption, settlement_date
-from payroll import PayrollService
+from payroll import PayrollService, declaration_due_date
 from payroll_tax_repository import monthly_exemption_used
 
 
@@ -12,6 +12,11 @@ def test_settlement_date_priority_and_month_end_fallback():
     assert settlement_date('2026-10', '2026-11-05', '2026-11-10') == date(2026, 11, 5)
     assert settlement_date('2026-10', payday_rule_date='2026-11-10') == date(2026, 11, 10)
     assert settlement_date('2026-10') == date(2026, 10, 31)
+
+
+def test_tsd_due_date_moves_forward_from_weekend():
+    assert declaration_due_date('2026-09', '2026-09-30') == date(2026, 10, 12)
+    assert declaration_due_date('2026-10', '2026-10-31') == date(2026, 11, 10)
 
 
 @pytest.mark.parametrize(('mode', 'amount', 'used', 'expected'), [

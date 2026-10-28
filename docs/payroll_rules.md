@@ -386,7 +386,8 @@ accounts dialog lets the organisation select codes such as Sunio's 7001/7500/755
 Each approved run has declaration state `none`, `prepared` after the existing
 TSD preparation flow, or `settled` after explicit bureau reclassification.
 `POST /pay-runs/{run_id}/tsd/settle` creates one separate,
-immutable balanced batch dated the 10th of the following month:
+immutable balanced batch dated on the TSD due date: the 10th of the month after
+the payment month, moved forward to the next working day when needed:
 
 | Debit accrual role | Credit payable role | Default payable code |
 |---|---|---|
@@ -407,7 +408,6 @@ means this reclassification only; it does not claim a bank payment or EMTA
 submission. Run responses include `declaration_state`, `declaration_due_date`,
 `declaration_overdue` and `declaration_batch_id`. The month-end panel lists all
 approved periods; the dashboard links to the count overdue after the due date.
-The demo uses the literal following-month 10th, without weekend/holiday shifts.
 
 Accrual account IDs are frozen at approval so a later mapping change cannot
 strand the original liability. Reclassification of runs approved before 0034
