@@ -648,3 +648,11 @@ regular bonuses, 6 overtime, 7 shift/night/public-holiday work, 8 irregular
 bonuses, 9 non-worked time, 10 non-monetary benefits, and 15-18 benefits. This
 classification is stored for a later PALK report and is not currently exported.
 
+The PALK preset mapping assigns base adjustment, contract, author, extra work,
+regular bonus, standby, substitution and commission to row 5; overtime to row 6;
+night, public-holiday and rest-day work to row 7; thirteenth salary and
+termination payments to row 8; parental, leave, sickness, study-leave, average,
+care-leave and child-leave payments to row 9; and documented reimbursements and
+private-car benefits to row 15. Birth allowance maps to row 16 and work-accident
+benefit to row 17. Custom types default to row 5 and can be changed in the type
+editor. This is a stored classification for a later report.

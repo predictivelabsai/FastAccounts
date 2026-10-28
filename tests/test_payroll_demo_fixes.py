@@ -19,7 +19,7 @@ def test_full_catalogue_defaults_and_descriptions(db, ee_org, uk_org):
     from payroll_components import PRESETS, PRESET_DESCRIPTIONS, seed_types
     service = PayrollService(db)
     types = {t['preset_key']: t for t in service.component_types(ee_org['id'])}
-    assert len(types) == len(PRESETS) == 27
+    assert len(types) == len(PRESETS) == 33
     assert set(types) == set(PRESET_DESCRIPTIONS)
     for key, name, direction, flags, role in PRESETS:
         actual = types[key]
@@ -34,12 +34,13 @@ def test_full_catalogue_defaults_and_descriptions(db, ee_org, uk_org):
     assert all(types[key][f] for key in ('severance', 'author', 'parental') for f in FLAGS)
     wage_presets = {'base_adjustment', 'contract', 'author', 'overtime', 'extra_work', 'bonus',
                     'thirteenth_salary', 'public_holiday', 'night_work', 'rest_day', 'standby',
-                    'substitution', 'commission', 'study_leave', 'average_pay'}
+                    'substitution', 'commission', 'study_leave', 'average_pay', 'notice_pay',
+                    'work_accident_benefit', 'care_leave_pay', 'child_leave_pay'}
     assert {key for key, value in types.items() if value['is_wage']} == wage_presets
     assert all(value['active'] for value in types.values())
     with db.transaction() as tx:
         seed_types(tx, ee_org['id'])
-    assert len(service.component_types(ee_org['id'])) == 27
+    assert len(service.component_types(ee_org['id'])) == 33
     assert db.scalar('SELECT COUNT(*) FROM pay_component_types WHERE organisation_id=?', (uk_org['id'],)) == 0
 
 

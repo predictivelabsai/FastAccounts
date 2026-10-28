@@ -59,7 +59,7 @@ def test_settings_payment_types_create_edit_and_payroll_reuse(monkeypatch, db, e
         editor.get_by_role('button', name=labels['Save'], exact=True).click()
         playwright.expect(page.locator('#app-content')).to_contain_text('Synthetic edited category')
         types = PayrollService(db).component_types(ee_org['id'])
-        assert len(types) == 28
+        assert len(types) == 34
         assert next(t for t in types if t['name'] == 'Synthetic edited category')['preset_key'] is None
         page.evaluate("location.hash = 'payroll'")
         page.get_by_role('button', name=labels['Payment types'], exact=True).click()

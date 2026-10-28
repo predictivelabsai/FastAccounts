@@ -24,6 +24,8 @@ class PayrollRules:
     social_tax_rate: Decimal
     social_tax_monthly_base: Decimal
     minimum_wages: tuple[tuple[date, Decimal, Decimal], ...]
+    private_car_rate_per_km: Decimal
+    private_car_monthly_limit: Decimal
 
     def minimum_wage(self, applies_on: date) -> tuple[Decimal, Decimal]:
         if applies_on.year != self.year:
@@ -46,7 +48,8 @@ _RULES = {2026: PayrollRules(
     2026, Decimal('0.22'), Decimal('700'), Decimal('0.016'), Decimal('0.008'),
     Decimal('0.33'), Decimal('886'),
     ((date(2026, 1, 1), Decimal('886'), Decimal('5.31')),
-     (date(2026, 4, 1), Decimal('946'), Decimal('5.67')))),
+     (date(2026, 4, 1), Decimal('946'), Decimal('5.67'))),
+    Decimal('0.30'), Decimal('335')),
 }
 
 _SICK_BENEFIT_RULES = {

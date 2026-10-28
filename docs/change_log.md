@@ -4,17 +4,20 @@ Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as
 delivered.
 
-## 2026-10-28: Payroll pay-type methods (Build 6 in progress)
+## 2026-10-28: Payroll pay-type methods (Build 6 complete)
 
 - Added migration 0063 for calculation methods, optional type defaults, frozen
   line inputs and Statistics Estonia PALK row designation. Existing entries
   default to fixed sums and preserve their stored amounts.
 - Added Decimal calculation helpers, Merit-style component presets and TSD
   payment codes. The payment-type editor exposes method, defaults and PALK row.
-- Unit calculation tests and the migration/tenancy file pass. Full method-driven
-  run-line UI and the remaining requested per-file acceptance run are pending.
-- The 2026 private-car compensation reference defaults to EUR 0.30/km and
-  EUR 335/month; tax-free/taxable splitting remains accountant-reviewed.
+- Added method-driven run-line inputs with immediate previews and server-side
+  recalculation. Added 2026 private-car limit parameters, preset translations,
+  and PALK row snapshots. All requested offline acceptance files pass
+  individually.
+- The private-car preset stores EUR 0.30/km and EUR 335/month reference limits;
+  it does not split tax-free and taxable amounts. Accountant confirmation of
+  limits, payment classifications and the PALK mapping remains open.
 
 ## 2026-10-28: Payroll correction payouts and APA history
 

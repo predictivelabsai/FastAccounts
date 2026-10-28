@@ -6,7 +6,9 @@ https://www.emta.ee/ariklient/maksud-ja-tasumine/tulumaks-ja-sotsiaalmaks/maksum
 Bureau users may override every levy flag for each period.
 """
 from core_utils import db_number, money
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal
+from datetime import date
+from payroll_rules import rules_for
 
 CALCULATION_METHODS = ('fixed_sum', 'sum_x_qty_x_coef', 'percentage_of_base',
     'percentage_of_hourly_rate', 'piece_rate', 'hourly', 'average_monthly_pay',
@@ -20,7 +22,8 @@ def calculate_component_amount(method, *, amount=0, rate=0, quantity=1, coeffici
                                percentage=0, base_pay=0, hourly_rate=0, hours=0,
                                average_monthly_pay=0, average_hourly_pay=0,
                                average_working_day_pay=0, net_target=0,
-                               pension_percent=0, unemployment=True, exemption=0):
+                               pension_percent=0, unemployment=True, exemption=0,
+                               income_tax_rate=Decimal('0.22'), unemployment_rate=Decimal('0.016')):
     """Pure Decimal component calculator. Rates and percentages are entered as human units."""
     d = lambda value: Decimal(str(value or 0))
     method = method or 'fixed_sum'
@@ -56,9 +59,9 @@ def calculate_component_amount(method, *, amount=0, rate=0, quantity=1, coeffici
         def net(cents):
             gross = Decimal(cents) / 100
             pension = money(gross * d(pension_percent) / 100)
-            ui = money(gross * Decimal('0.016')) if unemployment else Decimal(0)
+            ui = money(gross * d(unemployment_rate)) if unemployment else Decimal(0)
             tax_base = max(Decimal(0), gross - pension - ui - d(exemption))
-            return gross - pension - ui - money(tax_base * Decimal('0.22'))
+            return gross - pension - ui - money(tax_base * d(income_tax_rate))
         while lo < hi:
             mid = (lo + hi) // 2
             if net(mid) >= target:
@@ -164,7 +167,20 @@ PRESET_METHODS = {
     'care_leave_pay': ('average_working_day_pay', 0, 9),
     'child_leave_pay': ('average_working_day_pay', 0, 9),
 }
-PRESET_DEFAULTS = {'car_compensation': ('0.30', None, '335')}
+PRESET_PALK_ROWS = {
+    'base_adjustment': 5, 'contract': 5, 'author': 5, 'parental': 9,
+    'annual_leave': 9, 'unused_leave': 9, 'employer_sick_pay': 9,
+    'overtime': 6, 'extra_work': 5, 'bonus': 5, 'thirteenth_salary': 8,
+    'public_holiday': 7, 'night_work': 7, 'rest_day': 7, 'standby': 5,
+    'substitution': 5, 'commission': 5, 'study_leave': 9, 'average_pay': 9,
+    'severance': 8, 'expense_reimbursement': 15,
+    'car_compensation': 15, 'birth_allowance': 16,
+    'work_accident_benefit': 17, 'notice_pay': 8,
+    'care_leave_pay': 9, 'child_leave_pay': 9,
+}
+_CAR_RULES = rules_for(date(2026, 1, 1))
+PRESET_DEFAULTS = {'car_compensation': (_CAR_RULES.private_car_rate_per_km, None,
+                                        _CAR_RULES.private_car_monthly_limit)}
 
 # Translation keys describe the preset basis, independently of editable organisation names.
 PRESET_DESCRIPTIONS = {
@@ -228,7 +244,8 @@ def seed_types(tx, organisation_id):
         has_tsd = ('tsd_payment_type' in {row['name'] for row in tx.rows('PRAGMA table_info(pay_component_types)')}
                    if tx.dialect != 'postgres' else bool(tx.one("SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='pay_component_types' AND column_name='tsd_payment_type'")))
         fields = ','.join(FLAGS) + ',liability_role' + (',is_wage,active' if metadata_ready else '') + (',tsd_payment_type' if has_tsd else '')
-        method, pct, palk_row = PRESET_METHODS.get(key, ('fixed_sum', 0, 5))
+        method, pct, _ = PRESET_METHODS.get(key, ('fixed_sum', 0, 5))
+        palk_row = PRESET_PALK_ROWS.get(key, 5)
         method_ready = (bool(tx.one("SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='pay_component_types' AND column_name='calculation_method'"))
                         if tx.dialect == 'postgres' else 'calculation_method' in {row['name'] for row in tx.rows('PRAGMA table_info(pay_component_types)')})
         if method_ready:
@@ -237,12 +254,13 @@ def seed_types(tx, organisation_id):
         if metadata_ready:
             values += (int(key not in {'bailiff', 'parental', 'annual_leave', 'unused_leave', 'employer_sick_pay',
                                       'severance', 'expense_reimbursement', 'salary_advance', 'advance_recovery',
-                                      'alimony', 'union_fee', 'agreed_deduction'}), 1)
+                                      'alimony', 'union_fee', 'agreed_deduction', 'car_compensation', 'birth_allowance'}), 1)
         if has_tsd:
             values += (TSD_PRESET_CODES[key],)
         if method_ready:
-            rate, coefficient = PRESET_DEFAULTS.get(key, (None, None, None))[0], PRESET_DEFAULTS.get(key, (None, None, None))[2]
-            values += (method, rate, pct or None, coefficient, palk_row)
+            rate, _, coefficient = PRESET_DEFAULTS.get(key, (None, None, None))
+            values += (method, db_number(rate) if rate is not None else None, pct or None,
+                       db_number(coefficient) if coefficient is not None else None, palk_row)
         tx.execute('INSERT INTO pay_component_types(id,organisation_id,preset_key,name,direction,' + fields +
                    ') VALUES (' + ','.join('?' for _ in values) +
                    ') ON CONFLICT(organisation_id,preset_key) DO NOTHING',

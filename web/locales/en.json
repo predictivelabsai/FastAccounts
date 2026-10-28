@@ -2341,7 +2341,20 @@
     "Statistics Estonia PALK row": "Statistics Estonia PALK row",
     "Average hourly pay": "Average hourly pay",
     "Contract sum": "Contract sum",
-    "Average working-day pay": "Average working-day pay"
+    "Average working-day pay": "Average working-day pay",
+    "Sünnitoetus": "Birth allowance",
+    "Business use of a private car. Default exemption reference is EUR 0.30/km up to EUR 335/month; verify records, eligibility and current legal limits before approval.": "Business use of a private car. Default exemption reference is EUR 0.30/km up to EUR 335/month; verify records, eligibility and current legal limits before approval.",
+    "Lapsepuhkuse tasu": "Child-leave pay",
+    "Birth allowance using TSD type 14. Confirm recipient and legal eligibility.": "Birth allowance using TSD type 14. Confirm recipient and legal eligibility.",
+    "Work-accident benefit using TSD type 32. Confirm the legal basis and applicable levies.": "Work-accident benefit using TSD type 32. Confirm the legal basis and applicable levies.",
+    "Hoolduspuhkuse tasu": "Care-leave pay",
+    "Calculation method": "Calculation method",
+    "Isikliku sõiduauto hüvitis": "Private car compensation",
+    "Notice-period compensation using the average working-day pay method and TSD type 33.": "Notice-period compensation using the average working-day pay method and TSD type 33.",
+    "Tööõnnetushüvitis": "Work-accident benefit",
+    "Care-leave payment. Confirm the payer and legal basis.": "Care-leave payment. Confirm the payer and legal basis.",
+    "Etteteatamisaja hüvitis": "Notice pay",
+    "Child-leave payment. Confirm the payer and legal basis.": "Child-leave payment. Confirm the payer and legal basis."
   },
   "views": {
     "overview": "Overview",

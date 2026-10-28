@@ -2221,15 +2221,15 @@ checks remain follow-ups. The paired change log records details.
   workpaper complete 4a. Resident payment classifications and upload format
   remain subject to accountant confirmation and EMTA validation.
 
-## Payroll pay-type methods (Build 6 in progress, 2026-10-28)
+## Payroll pay-type methods (Build 6 complete, 2026-10-28)
 
 Migration 0063 adds method/default metadata, frozen component inputs and PALK
-row designation. The pure Decimal calculator, TSD-coded presets and editor
-metadata are implemented. Focused unit and migration tests pass. Remaining work
-is to finish method-driven run-line inputs and verify all requested payroll,
-workspace, locale and TSD files individually. Car compensation uses editable
-EUR 0.30/km and EUR 335/month references but does not calculate a taxable split.
-See `payroll_pay_type_methods_validation.md`.
+row designation. The Decimal calculator supports the Merit-style methods,
+including deterministic cent-level net gross-up. Presets, TSD codes and en/et/lv/lt
+editors are implemented. All requested offline acceptance files pass
+individually. The private-car tax-free values are year-specific payroll rule
+parameters, while the taxable split remains accountant-reviewed. See
+`payroll_pay_type_methods_validation.md`.
 
 ## Payroll corrections (Build 5 complete, 2026-10-28)
 

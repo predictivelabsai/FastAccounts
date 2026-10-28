@@ -2341,7 +2341,20 @@
     "Statistics Estonia PALK row": "Statistikaameti PALK rida",
     "Average hourly pay": "Keskmine tunnitasu",
     "Contract sum": "Lepingusumma",
-    "Average working-day pay": "Keskmine tööpäevatasu"
+    "Average working-day pay": "Keskmine tööpäevatasu",
+    "Sünnitoetus": "Sünnitoetus",
+    "Business use of a private car. Default exemption reference is EUR 0.30/km up to EUR 335/month; verify records, eligibility and current legal limits before approval.": "Isikliku sõiduauto kasutamine tööülesanneteks. Vaikimisi maksuvaba määr on 0,30 eurot/km kuni 335 eurot kuus; kontrolli sõidupäevikut, õigust ja kehtivaid piirmäärasid.",
+    "Lapsepuhkuse tasu": "Lapsepuhkuse tasu",
+    "Birth allowance using TSD type 14. Confirm recipient and legal eligibility.": "Sünnitoetus TSD liigiga 14. Kontrolli saajat ja seaduslikku alust.",
+    "Work-accident benefit using TSD type 32. Confirm the legal basis and applicable levies.": "Tööõnnetushüvitis TSD liigiga 32. Kontrolli seaduslikku alust ja makse käsitlust.",
+    "Hoolduspuhkuse tasu": "Hoolduspuhkuse tasu",
+    "Calculation method": "Arvutusmeetod",
+    "Isikliku sõiduauto hüvitis": "Isikliku sõiduauto hüvitis",
+    "Notice-period compensation using the average working-day pay method and TSD type 33.": "Etteteatamisaja hüvitis keskmise tööpäevatasu meetodil, TSD liik 33.",
+    "Tööõnnetushüvitis": "Tööõnnetushüvitis",
+    "Care-leave payment. Confirm the payer and legal basis.": "Hoolduspuhkuse tasu. Kontrolli maksjat ja seaduslikku alust.",
+    "Etteteatamisaja hüvitis": "Etteteatamisaja hüvitis",
+    "Child-leave payment. Confirm the payer and legal basis.": "Lapsepuhkuse tasu. Kontrolli maksjat ja seaduslikku alust."
   },
   "views": {
     "overview": "Ülevaade",

@@ -37,7 +37,7 @@ def test_absence_pay_workspace_labels_exist_in_all_supported_locales():
     assert estonian['Average'] == 'Keskmine töötasu'
     assert estonian['Unchanged salary'] == 'Muutumatu tasu'
     assert estonian['Best of'] == 'Parima valiku alusel'
-    assert estonian['Fixed sum'] == 'Fikseeritud summa'
+    assert estonian['Fixed sum'] == 'Summa'
     assert estonian['Sick benefit'] == 'Haigushüvitis'
     assert estonian['Unused leave compensation'] == 'Kasutamata puhkuse hüvitis'
     assert estonian['Add to payout'] == 'Lisa väljamaksesse'

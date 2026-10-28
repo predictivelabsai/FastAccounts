@@ -4642,7 +4642,7 @@
         (values.description ? `<p class="full-width muted">${tr(values.description)}</p>` : "") +
         select("Direction", "direction", [["income", t("Income")], ["deduction", t("Deduction")]], values.direction) +
         select("TSD payment type", "tsd_payment_type", [[10, "10 palgatulu"], [13, "13 kõrgete ametiisikute palgatulu"], [14, "14 sünnitoetus"], [15, "15 seaduse alusel tasu"], [16, "16 muu maksustatav väljamakse"], [17, "17 VÕS lepingutasu"], [21, "21 juhtorgani liikme tasu"], [24, "24 tööandja haigushüvitis"], [32, "32 tööõnnetuse hüvitis"], [33, "33 lõpetamise hüvitis"]], values.tsd_payment_type || 10) +
-        select("Calculation method", "calculation_method", [["fixed_sum","Fixed sum"],["sum_x_qty_x_coef","Sum x quantity x coefficient"],["percentage_of_base","Percentage of base salary"],["percentage_of_hourly_rate","Percentage of hourly rate"],["piece_rate","Piece rate"],["hourly","Hourly"],["average_monthly_pay","Average monthly pay"],["average_hourly_pay","Average hourly pay"],["average_working_day_pay","Average working-day pay"],["gross_up_from_net","Gross-up from net"],["monthly_salary","Monthly salary"],["monthly_salary_day_based","Monthly salary, day-based"],["contract_sum","Contract sum"],["contract_sum_x_quantity","Contract sum x quantity"],["percentage","Percentage"]], values.calculation_method || "fixed_sum") +
+        select("Calculation method", "calculation_method", [["fixed_sum","Fixed sum"],["sum_x_qty_x_coef","Sum x quantity x coefficient"],["percentage_of_base","Percentage of base salary"],["percentage_of_hourly_rate","Percentage of hourly rate"],["piece_rate","Piece rate"],["hourly","Hourly"],["average_monthly_pay","Average monthly pay"],["average_hourly_pay","Average hourly pay"],["average_working_day_pay","Average working-day pay"],["gross_up_from_net","Gross-up from net"],["monthly_salary","Monthly salary"],["monthly_salary_day_based","Monthly salary, day-based"],["contract_sum","Contract sum"],["contract_sum_x_quantity","Contract sum x quantity"],["percentage","Percentage"]].map(([value,label]) => [value,t(label)]), values.calculation_method || "fixed_sum") +
         field("Default rate", "default_rate", values.default_rate ?? "", "number", 'step="0.0001"') +
         field("Default percentage", "default_percentage", values.default_percentage ?? "", "number", 'step="0.0001"') +
         field("Default coefficient", "default_coefficient", values.default_coefficient ?? "", "number", 'step="0.0001"') +
@@ -4657,6 +4657,7 @@
         data.active = f.elements.active.checked;
         data.tsd_payment_type = Number(f.elements.tsd_payment_type.value);
         data.palk_row = Number(f.elements.palk_row.value);
+        for (const key of ['default_rate','default_percentage','default_coefficient']) data[key] = data[key] || null;
         await post(c.url(`/payroll/component-types${type ? `/${type.id}` : ""}`), data, type ? "PUT" : "POST");
         await saved(editor);
       });
@@ -4782,29 +4783,37 @@
     const container = d.querySelector('.payment-lines');
     const methodLabels = {fixed_sum:'Sum',sum_x_qty_x_coef:'Sum x quantity x coefficient',percentage_of_base:'Percentage of base salary',percentage_of_hourly_rate:'Percentage of hourly rate',piece_rate:'Piece rate',hourly:'Hourly',average_monthly_pay:'Average monthly pay',average_hourly_pay:'Average hourly pay',average_working_day_pay:'Average working-day pay',gross_up_from_net:'Gross-up from net',monthly_salary:'Monthly salary',monthly_salary_day_based:'Monthly salary, day-based',contract_sum:'Contract sum',contract_sum_x_quantity:'Contract sum x quantity',percentage:'Percentage'};
     const methodInputs = {sum_x_qty_x_coef:['rate','quantity','coefficient'],percentage_of_base:['percentage'],percentage:['percentage'],percentage_of_hourly_rate:['percentage','quantity'],piece_rate:['rate','quantity'],hourly:['rate','quantity'],average_monthly_pay:['quantity'],average_hourly_pay:['quantity'],average_working_day_pay:['quantity'],gross_up_from_net:['net_target'],contract_sum:['amount'],contract_sum_x_quantity:['rate','quantity'],monthly_salary:['amount'],monthly_salary_day_based:['amount','quantity']};
-    const preview = (method, v, base) => { const n=(k)=>Number(v[k]||0); let x=n('amount'); if(method==='sum_x_qty_x_coef')x=n('rate')*n('quantity')*n('coefficient'); else if(['percentage_of_base','percentage'].includes(method))x=base*n('percentage')/100; else if(method==='percentage_of_hourly_rate')x=(Number(item.hourly_rate||0)||base/176)*n('percentage')/100*n('quantity'); else if(['piece_rate','hourly','contract_sum_x_quantity'].includes(method))x=n('rate')*n('quantity'); else if(method==='average_monthly_pay')x=Number(v.average_monthly_pay||0)*n('quantity'); else if(method==='average_hourly_pay')x=Number(v.average_hourly_pay||0)*n('quantity'); else if(method==='average_working_day_pay')x=Number(v.average_working_day_pay||0)*n('quantity'); return Number.isFinite(x)?x.toFixed(2):'0.00'; };
+    const preview = (method, v, base) => { const n=(k)=>Number(v[k]||0); let x=n('amount'); if(method==='sum_x_qty_x_coef')x=n('rate')*n('quantity')*n('coefficient'); else if(['percentage_of_base','percentage'].includes(method))x=base*n('percentage')/100; else if(method==='percentage_of_hourly_rate')x=(Number(item.hourly_rate||0)||base/176)*n('percentage')/100*n('quantity'); else if(['piece_rate','hourly','contract_sum_x_quantity'].includes(method))x=n('rate')*n('quantity'); else if(method==='monthly_salary_day_based')x=n('amount')*n('quantity'); else if(method==='average_monthly_pay')x=Number(v.average_monthly_pay||0)*n('quantity'); else if(method==='average_hourly_pay')x=Number(v.average_hourly_pay||0)*n('quantity'); else if(method==='average_working_day_pay')x=Number(v.average_working_day_pay||0)*n('quantity'); else if(method==='gross_up_from_net') { const target=n('net_target'), pension=Number(item.funded_pension_percent||0); let lo=0,hi=Math.max(1,Math.ceil(target*3*100)); const net=(c)=>{const g=c/100,p=Math.round(g*pension)/100,ui=Math.round(g*.016*100)/100,tax=Math.round(Math.max(0,g-p-ui)*.22*100)/100;return g-p-ui-tax;}; while(lo<hi){const mid=Math.floor((lo+hi)/2);if(net(mid)>=target)hi=mid;else lo=mid+1;} x=lo/100;} return Number.isFinite(x)?x.toFixed(2):'0.00'; };
     const add = (line) => {
       if (!types.length) { toast(t("Add a payment type first."), "info"); return; }
       const value = line || {...types[0], type_id: types[0].id};
       const el = document.createElement('fieldset'); el.className = 'payment-line';
       const availableTypes = types.filter((x) => x.active || x.id === value.type_id);
-      const selected = types.find((x) => x.id === value.type_id) || types[0], method = value.calculation_method || selected.calculation_method || 'fixed_sum';
-      const input = (key) => field(key === 'net_target' ? 'Net target' : key[0].toUpperCase()+key.slice(1), key, value[key] ?? selected[`default_${key}`] ?? (key==='quantity' || key==='coefficient' ? 1 : ''), 'number', 'step="0.0001"');
-      const dynamic = (methodInputs[method] || []).map(input).join('');
-      el.innerHTML = `<legend>${tr("Payment line")}</legend><div class="form-grid">${select("Payment type", "type_id", availableTypes.map((x) => [x.id, t(x.name)]), value.type_id)}<p class="full-width muted">${tr(methodLabels[method] || 'Sum')}. ${tr('The server recalculates and validates this amount when saved.')}</p>${method==='fixed_sum' ? field("Amount", "amount", value.amount || "", "number", 'required step="0.01"') : `<output class="full-width" data-computed-amount>${esc(value.amount || '0.00')}</output>`}${dynamic}${select("Direction", "direction", [["income", t("Income")], ["deduction", t("Deduction")]], value.direction)}${field("Name", "name", value.name, "text", 'required maxlength="180"')}<div class="full-width component-flags">${componentFlagFields(value)}</div></div>${button("Remove payment line", "removePayment")}`;
-      container.append(el);
-      const direction = el.querySelector('[name="direction"]');
-      const liability = document.createElement('div');
-      liability.innerHTML = select("Deduction liability", "liability_role", [["PAYROLL_DEDUCTION", t("Other deduction liability")], ["PAYROLL_BAILIFF", t("Bailiff withholding liability")]], value.liability_role);
-      el.querySelector('.form-grid').append(liability.firstElementChild);
-      el.querySelector('[name="type_id"]').onchange = (e) => {
-        const type = types.find((x) => x.id === e.target.value);
-        value.calculation_method = type.calculation_method || 'fixed_sum';
-        el.querySelector('[name="name"]').value = type.name;
-        direction.value = type.direction;
-        el.querySelector('[name="liability_role"]').value = type.liability_role;
-        componentFlags.forEach(([key]) => el.querySelector(`[name="${key}"]`).checked = type[key]);
+      const selected = types.find((x) => x.id === value.type_id) || types[0];
+      let method = value.calculation_method || selected.calculation_method || 'fixed_sum';
+      const draw = () => {
+        const input = (key) => field(key === 'net_target' ? 'Net target' : key[0].toUpperCase()+key.slice(1), key, value[key] ?? selected[`default_${key}`] ?? (key==='quantity' || key==='coefficient' ? 1 : ''), 'number', 'step="0.0001"');
+        const dynamic = (methodInputs[method] || []).map(input).join('');
+        el.innerHTML = `<legend>${tr("Payment line")}</legend><div class="form-grid">${select("Payment type", "type_id", availableTypes.map((x) => [x.id, t(x.name)]), value.type_id)}<p class="full-width muted">${tr(methodLabels[method] || 'Sum')}. ${tr('The server recalculates and validates this amount when saved.')}</p>${method==='fixed_sum' ? field("Amount", "amount", value.amount || "", "number", 'required step="0.01"') : `<output class="full-width" data-computed-amount>${esc(value.amount || '0.00')}</output>`}<div data-calc-fields class="full-width form-grid">${dynamic}</div>${select("Direction", "direction", [["income", t("Income")], ["deduction", t("Deduction")]], value.direction)}${field("Name", "name", value.name, "text", 'required maxlength="180"')}<div class="full-width component-flags">${componentFlagFields(value)}</div></div>${button("Remove payment line", "removePayment")}`;
+        const liability = document.createElement('div');
+        liability.innerHTML = select("Deduction liability", "liability_role", [["PAYROLL_DEDUCTION", t("Other deduction liability")], ["PAYROLL_BAILIFF", t("Bailiff withholding liability")]], value.liability_role);
+        el.querySelector('.form-grid').append(liability.firstElementChild);
       };
+      draw();
+      container.append(el);
+      el.addEventListener('change', (e) => {
+        if (e.target.name !== 'type_id') return;
+        const type = types.find((x) => x.id === e.target.value);
+        for (const key of ['amount','quantity','rate','coefficient','percentage','net_target']) { const input=el.querySelector(`[name="${key}"]`); if(input) value[key]=input.value; }
+        selected.name=type.name; selected.direction=type.direction; selected.liability_role=type.liability_role;
+        selected.calculation_method=type.calculation_method || 'fixed_sum';
+        method=selected.calculation_method; value.type_id=type.id; value.calculation_method=method;
+        value.name=type.name; value.direction=type.direction; value.liability_role=type.liability_role;
+        componentFlags.forEach(([key]) => value[key]=type[key]);
+        el.querySelector('[name="name"]').value = type.name;
+        componentFlags.forEach(([key]) => el.querySelector(`[name="${key}"]`).checked = type[key]);
+        draw();
+      });
       el.addEventListener('input', () => { const output=el.querySelector('[data-computed-amount]'); if(output) { const values=Object.fromEntries([...el.querySelectorAll('input')].map((x)=>[x.name,x.value])); output.value=preview(method, values, Number(item.gross_salary||0)); } });
       el.querySelector('[data-action="removePayment"]').onclick = () => el.remove();
     };
@@ -4814,6 +4823,7 @@
       const components = [...container.children].map((el) => {
         const value = {};
         for (const key of ['type_id', 'name', 'amount', 'direction', 'liability_role','quantity','rate','coefficient','percentage','net_target']) { const input=el.querySelector(`[name="${key}"]`); if(input) value[key] = input.value; }
+        for (const key of ['quantity','rate','coefficient','percentage','net_target']) if (value[key] === '') value[key] = null;
         for (const [key] of componentFlags) value[key] = el.querySelector(`[name="${key}"]`).checked;
         return value;
       });

@@ -316,11 +316,14 @@ class PayrollService:
                 continue
             fields = ('id','organisation_id','item_id','type_id','position','name','amount','direction',
                       'income_tax','social_tax','ui_employee','ui_employer','funded_pension','social_minimum',
-                      'liability_role','is_wage','breakdown_json','is_generated')
+                      'liability_role','is_wage','breakdown_json','is_generated','calculation_method',
+                      'quantity','rate','coefficient','percentage','net_target','palk_row')
             values = (new_id(), organisation_id, item_id, ptype['id'], position, ptype['name'],
                 db_number(amount), ptype['direction'], ptype['income_tax'], ptype['social_tax'],
                 ptype['ui_employee'], ptype['ui_employer'], ptype['funded_pension'], ptype['social_minimum'],
-                ptype['liability_role'], ptype.get('is_wage', 0), json.dumps(breakdown, sort_keys=True), 1)
+                ptype['liability_role'], ptype.get('is_wage', 0), json.dumps(breakdown, sort_keys=True), 1,
+                ptype.get('calculation_method', 'fixed_sum'), None, ptype.get('default_rate'),
+                ptype.get('default_coefficient'), ptype.get('default_percentage'), None, ptype.get('palk_row', 5))
             tx.execute('INSERT INTO pay_item_components('+','.join(fields)+') VALUES ('+','.join('?' for _ in fields)+')', values)
 
     def pushes(self, organisation_id, run_id):
@@ -674,7 +677,7 @@ class PayrollService:
                            (organisation_id, item_id))
             for position, line in enumerate(components):
                 allowed = {'type_id', 'name', 'amount', 'direction', 'liability_role', 'is_generated',
-                           'quantity', 'rate', 'coefficient', 'percentage', *FLAGS}
+                           'quantity', 'rate', 'coefficient', 'percentage', 'net_target', *FLAGS}
                 if set(line) - allowed:
                     raise ValueError('Unknown payment component field')
                 data = tx.one('SELECT * FROM pay_component_types WHERE organisation_id=? AND id=?', (organisation_id, line.get('type_id')))
@@ -688,20 +691,73 @@ class PayrollService:
                 data.setdefault('active', True)
                 data.update(line)
                 method = data.get('calculation_method', 'fixed_sum')
-                component_amount = data.get('amount', 0)
-                if method != 'fixed_sum':
+                component_amount = data.get('amount')
+                formula_inputs = {
+                    'sum_x_qty_x_coef': ('rate', 'quantity', 'coefficient'),
+                    'percentage_of_base': ('percentage',), 'percentage': ('percentage',),
+                    'percentage_of_hourly_rate': ('percentage', 'quantity'),
+                    'piece_rate': ('rate', 'quantity'), 'hourly': ('rate', 'quantity'),
+                    'average_monthly_pay': ('quantity',), 'average_hourly_pay': ('quantity',),
+                    'average_working_day_pay': ('quantity',), 'gross_up_from_net': ('net_target',),
+                    'monthly_salary_day_based': ('quantity',),
+                    'contract_sum_x_quantity': ('rate', 'quantity'),
+                }
+                should_calculate = method != 'fixed_sum' and (component_amount in (None, '') or
+                    any(line.get(key) not in (None, '') for key in formula_inputs.get(method, ())))
+                if should_calculate:
                     hourly_rate = decimal(item.get('hourly_rate') or 0)
                     if not hourly_rate and item.get('pay_basis') == 'monthly':
                         from payroll_calendar import norm_hours
                         hourly_rate = decimal(item.get('gross_salary') or 0) / Decimal(norm_hours(*map(int, run['period'].split('-'))))
+                    context_for_method = tx.one('SELECT * FROM pay_item_context WHERE organisation_id=? AND item_id=?',
+                                                (organisation_id, item_id)) or {}
+                    amount_rules = rules_for(settlement_date(run['period']))
+                    mode = context_for_method.get('tax_free_mode') or ('maximum' if context_for_method.get('apply_tax_free_minimum') else 'none')
+                    prior_exemption = monthly_exemption_used(tx, organisation_id, item['employee_id'],
+                        settlement_date(run['period']).strftime('%Y-%m'))
+                    prior_exemption += decimal(item.get('tax_free_minimum') or 0)
+                    available_exemption = remaining_monthly_exemption(mode,
+                        decimal(context_for_method.get('tax_free_amount')) if context_for_method.get('tax_free_amount') is not None else None,
+                        amount_rules.basic_exemption, prior_exemption)
+                    average_values = {}
+                    if method in {'average_monthly_pay', 'average_hourly_pay', 'average_working_day_pay'}:
+                        event_date = settlement_date(run['period'])
+                        approved = tx.rows("SELECT i.*,r.period,r.status FROM pay_run_items i JOIN pay_runs r "
+                            "ON r.organisation_id=i.organisation_id AND r.id=i.pay_run_id "
+                            "WHERE i.organisation_id=? AND i.employee_id=? AND r.status='Approved'",
+                            (organisation_id, item['employee_id']))
+                        for approved_item in approved:
+                            approved_item['components'] = tx.rows('SELECT direction,amount,is_wage FROM pay_item_components WHERE organisation_id=? AND item_id=?',
+                                                                 (organisation_id, approved_item['id']))
+                        history = tx.rows("SELECT h.earning_month AS period,h.wage_total,h.unpaid_absence_days FROM payroll_historical_earnings h "
+                            "WHERE h.organisation_id=? AND h.employee_id=? AND h.status='Approved' "
+                            "AND NOT EXISTS (SELECT 1 FROM pay_runs r WHERE r.organisation_id=h.organisation_id "
+                            "AND r.period=h.earning_month AND r.status='Approved')", (organisation_id, item['employee_id']))
+                        absences = tx.rows('SELECT absence_type,start_date,end_date FROM payroll_absences WHERE organisation_id=? AND employee_id=?',
+                                           (organisation_id, item['employee_id']))
+                        paid_permitted = bool(tx.scalar("SELECT paid_salary FROM payroll_absence_type_settings WHERE organisation_id=? AND absence_type='permitted_absence'", (organisation_id,)) or 0)
+                        for absence in absences:
+                            absence['wage_paid'] = (absence['absence_type'] == 'permitted_absence' and paid_permitted
+                                or absence['absence_type'] not in ('permitted_absence', 'unpaid_leave', 'truancy'))
+                        avg = calculate_average_pay(item, event_date, approved_items=approved,
+                                                    historical_earnings=history, absences=absences)
+                        average_values = {'average_monthly_pay': avg.wage_total / Decimal(6),
+                                          'average_hourly_pay': avg.average_hourly_pay,
+                                          'average_working_day_pay': avg.average_working_day_pay}
                     data['amount'] = calculate_component_amount(
                         method, amount=component_amount,
-                        rate=data.get('rate', data.get('default_rate') or 0),
-                        quantity=data.get('quantity', 1),
-                        coefficient=data.get('coefficient', data.get('default_coefficient') or 1),
-                        percentage=data.get('percentage', data.get('default_percentage') or 0),
+                        rate=data.get('rate') if data.get('rate') is not None else data.get('default_rate') or 0,
+                        quantity=data.get('quantity') if data.get('quantity') is not None else 1,
+                        coefficient=data.get('coefficient') if data.get('coefficient') is not None else data.get('default_coefficient') or 1,
+                        percentage=data.get('percentage') if data.get('percentage') is not None else data.get('default_percentage') or 0,
                         base_pay=item.get('gross_salary') or item.get('gross') or 0,
-                        hourly_rate=hourly_rate, hours=data.get('quantity', 0))
+                        hourly_rate=hourly_rate, hours=data.get('quantity') or 0,
+                        net_target=data.get('net_target', 0),
+                        pension_percent=item.get('funded_pension_percent', 0),
+                        unemployment=(context_for_method.get('unemployment_applies') is not False
+                                       and context_for_method.get('unemployment_applies') != 0),
+                        exemption=available_exemption, income_tax_rate=amount_rules.income_tax_rate,
+                        unemployment_rate=amount_rules.ui_employee_rate, **average_values)
                 if data.get('preset_key') == 'unused_leave':
                     component_overrides[data['preset_key']] = decimal(data['amount'])
                 self._component_values(data)
@@ -722,8 +778,8 @@ class PayrollService:
                 else:
                     has_tsd = 'tsd_payment_type' in {row['name'] for row in tx.rows('PRAGMA table_info(pay_item_components)')}
                 methods_ready = ('calculation_method' in component_columns)
-                fields = ('id', 'organisation_id', 'item_id', 'type_id', 'position', 'name', 'amount', 'direction', *FLAGS, 'liability_role') + (('is_wage',) if metadata_ready else ()) + (('tsd_payment_type',) if has_tsd else ()) + (('calculation_method', 'quantity', 'rate', 'coefficient', 'percentage', 'palk_row') if methods_ready else ())
-                values = (new_id(), organisation_id, item_id, data['id'], position, data['name'], db_number(amount), data['direction'], *(data[key] for key in FLAGS), data['liability_role']) + ((data['is_wage'],) if metadata_ready else ()) + ((data.get('tsd_payment_type', 10),) if has_tsd else ()) + ((method, data.get('quantity'), data.get('rate', data.get('default_rate')), data.get('coefficient', data.get('default_coefficient')), data.get('percentage', data.get('default_percentage')), data.get('palk_row', 5)) if methods_ready else ())
+                fields = ('id', 'organisation_id', 'item_id', 'type_id', 'position', 'name', 'amount', 'direction', *FLAGS, 'liability_role') + (('is_wage',) if metadata_ready else ()) + (('tsd_payment_type',) if has_tsd else ()) + (('calculation_method', 'quantity', 'rate', 'coefficient', 'percentage', 'net_target', 'palk_row') if methods_ready else ())
+                values = (new_id(), organisation_id, item_id, data['id'], position, data['name'], db_number(amount), data['direction'], *(data[key] for key in FLAGS), data['liability_role']) + ((data['is_wage'],) if metadata_ready else ()) + ((data.get('tsd_payment_type', 10),) if has_tsd else ()) + ((method, data.get('quantity'), data.get('rate', data.get('default_rate')), data.get('coefficient', data.get('default_coefficient')), data.get('percentage', data.get('default_percentage')), data.get('net_target'), data.get('palk_row', 5)) if methods_ready else ())
                 tx.execute('INSERT INTO pay_item_components(' + ','.join(fields) + ') VALUES (' + ','.join('?' for _ in fields) + ')', values)
         if generated_column_ready:
             tx.execute('DELETE FROM pay_item_components WHERE organisation_id=? AND item_id=? AND is_generated=1',

@@ -2248,6 +2248,7 @@ class PayComponentLine(BaseModel):
     rate: Decimal | None = None
     coefficient: Decimal | None = None
     percentage: Decimal | None = None
+    net_target: Decimal | None = Field(default=None, ge=0, max_digits=12, decimal_places=2)
     name: str | None = Field(default=None, min_length=1, max_length=180)
     direction: Literal['income', 'deduction'] | None = None
     income_tax: bool | None = None

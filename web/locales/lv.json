@@ -2341,7 +2341,20 @@
     "Statistics Estonia PALK row": "Igaunijas Statistikas pārvaldes PALK rinda",
     "Average hourly pay": "Vidējā stundas likme",
     "Contract sum": "Līguma summa",
-    "Average working-day pay": "Vidējā darba dienas samaksa"
+    "Average working-day pay": "Vidējā darba dienas samaksa",
+    "Sünnitoetus": "Bērna piedzimšanas pabalsts",
+    "Business use of a private car. Default exemption reference is EUR 0.30/km up to EUR 335/month; verify records, eligibility and current legal limits before approval.": "Privātās automašīnas izmantošana darba vajadzībām. Noklusējuma neapliekamā likme ir 0,30 EUR/km, nepārsniedzot 335 EUR mēnesī; pārbaudiet uzskaiti, tiesības un aktuālos ierobežojumus.",
+    "Lapsepuhkuse tasu": "Bērna atvaļinājuma samaksa",
+    "Birth allowance using TSD type 14. Confirm recipient and legal eligibility.": "Bērna piedzimšanas pabalsts ar TSD veidu 14. Pārbaudiet saņēmēju un tiesisko pamatu.",
+    "Work-accident benefit using TSD type 32. Confirm the legal basis and applicable levies.": "Atlīdzība par nelaimes gadījumu darbā ar TSD veidu 32. Pārbaudiet tiesisko pamatu un nodokļus.",
+    "Hoolduspuhkuse tasu": "Aprūpes atvaļinājuma samaksa",
+    "Calculation method": "Aprēķina metode",
+    "Isikliku sõiduauto hüvitis": "Personīgās automašīnas kompensācija",
+    "Notice-period compensation using the average working-day pay method and TSD type 33.": "Uzteikuma termiņa atlīdzība pēc vidējās darba dienas samaksas, TSD veids 33.",
+    "Tööõnnetushüvitis": "Atlīdzība par nelaimes gadījumu darbā",
+    "Care-leave payment. Confirm the payer and legal basis.": "Aprūpes atvaļinājuma samaksa. Pārbaudiet maksātāju un tiesisko pamatu.",
+    "Etteteatamisaja hüvitis": "Atlīdzība par uzteikuma termiņu",
+    "Child-leave payment. Confirm the payer and legal basis.": "Bērna atvaļinājuma samaksa. Pārbaudiet maksātāju un tiesisko pamatu."
   },
   "views": {
     "overview": "Overview",

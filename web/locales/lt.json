@@ -2341,7 +2341,20 @@
     "Statistics Estonia PALK row": "Estijos statistikos departamento PALK eilutė",
     "Average hourly pay": "Vidutinis valandinis atlygis",
     "Contract sum": "Sutarties suma",
-    "Average working-day pay": "Vidutinis darbo dienos atlygis"
+    "Average working-day pay": "Vidutinis darbo dienos atlygis",
+    "Sünnitoetus": "Gimimo išmoka",
+    "Business use of a private car. Default exemption reference is EUR 0.30/km up to EUR 335/month; verify records, eligibility and current legal limits before approval.": "Asmeninio automobilio naudojimas darbo reikmėms. Numatyta neapmokestinama riba 0,30 EUR/km, bet ne daugiau kaip 335 EUR per mėnesį; patikrinkite žurnalą, tinkamumą ir galiojančius limitus.",
+    "Lapsepuhkuse tasu": "Vaiko atostogų atlygis",
+    "Birth allowance using TSD type 14. Confirm recipient and legal eligibility.": "Gimimo išmoka, TSD tipas 14. Patikrinkite gavėją ir teisinį pagrindą.",
+    "Work-accident benefit using TSD type 32. Confirm the legal basis and applicable levies.": "Išmoka dėl nelaimingo atsitikimo darbe, TSD tipas 32. Patikrinkite teisinį pagrindą ir mokesčius.",
+    "Hoolduspuhkuse tasu": "Slaugos atostogų atlygis",
+    "Calculation method": "Skaičiavimo būdas",
+    "Isikliku sõiduauto hüvitis": "Asmeninio automobilio kompensacija",
+    "Notice-period compensation using the average working-day pay method and TSD type 33.": "Atlygis už įspėjimo laikotarpį pagal vidutinį darbo dienos atlygį, TSD tipas 33.",
+    "Tööõnnetushüvitis": "Išmoka dėl nelaimingo atsitikimo darbe",
+    "Care-leave payment. Confirm the payer and legal basis.": "Slaugos atostogų atlygis. Patikrinkite mokėtoją ir teisinį pagrindą.",
+    "Etteteatamisaja hüvitis": "Atlygis už įspėjimo laikotarpį",
+    "Child-leave payment. Confirm the payer and legal basis.": "Vaiko atostogų atlygis. Patikrinkite mokėtoją ir teisinį pagrindą."
   },
   "views": {
     "overview": "Overview",

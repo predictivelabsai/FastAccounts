@@ -187,7 +187,7 @@ def test_existing_books_upgrade(tmp_path):
     assert db.migrate() == catalogue_after('0004_document_immutability')
     after = db.rows("SELECT * FROM accounts WHERE organisation_id=? AND system_role NOT LIKE 'PAYROLL_%' ORDER BY code", (org['id'],))
     assert before == after
-    assert len(db.rows("SELECT * FROM accounts WHERE organisation_id=? AND system_role LIKE 'PAYROLL_%'", (org['id'],))) == 19
+    assert len(db.rows("SELECT * FROM accounts WHERE organisation_id=? AND system_role LIKE 'PAYROLL_%'", (org['id'],))) == 20
 
 
 def test_concurrent_approvals_post_once(db, ee_org):
