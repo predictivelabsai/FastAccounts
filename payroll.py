@@ -595,7 +595,7 @@ class PayrollService:
         result = tx.execute("INSERT INTO pay_runs(id,organisation_id,period,total_gross,total_net,total_employer_cost,created_by,created_at) VALUES (?,?,?,0,0,0,?,?) ON CONFLICT(organisation_id,period) DO NOTHING", (run_id, organisation_id, period, actor, utc_now()))
         if result.rowcount != 1:
             raise PayrollConflict(f'A pay run already exists for {period}')
-        employees = [e for e in tx.rows('SELECT * FROM employees WHERE organisation_id=? AND active=1 ORDER BY name,id', (organisation_id,))
+        employees = [e for e in tx.rows('SELECT * FROM employees WHERE organisation_id=? AND active=1 ORDER BY id', (organisation_id,))
                      if employed_days(e, period)[0] > 0]
         if not employees:
             raise ValueError('A pay run requires at least one active employee')
@@ -642,6 +642,12 @@ class PayrollService:
     def approve(self, organisation_id, run_id, *, actor):
         from web import i18n
         with self.db.transaction() as tx:
+            # Use the same employee lock order as election writes before a
+            # draft's source rows become protected by approval.
+            for row in tx.rows('SELECT employee_id FROM pay_run_items WHERE organisation_id=? AND pay_run_id=? ORDER BY employee_id',
+                               (organisation_id, run_id)):
+                tx.execute('UPDATE employees SET active=active WHERE organisation_id=? AND id=?',
+                           (organisation_id, row['employee_id']))
             # Conditional write serializes concurrent approvals on SQLite and PostgreSQL.
             claimed = tx.execute("UPDATE pay_runs SET status='Approved',approved_at=? WHERE organisation_id=? AND id=? AND status='Draft'", (utc_now(), organisation_id, run_id))
             run = self._run(tx, organisation_id, run_id)

@@ -4,6 +4,32 @@ Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as
 delivered.
 
+## 2026-10-28: Payroll tax settings and employee details
+
+- Fixed the TSD export crash for approved `income_line` services-contract runs.
+  XML and CSV use `CONTRACTOR_FEE` as an internal label; official e-MTA payment
+  code mapping remains pending.
+- Moved 2026 tax, social-tax, UI, exemption and minimum-wage values into immutable
+  date-selected rules. Existing figures and rounding are unchanged. Unsupported
+  years fail translated validation instead of inheriting 2026 rates.
+- Added additive migration 0037 for tax-free income application, funded-pension
+  and employee UI histories, backfilled from existing employee settings. New
+  drafts resolve at calendar month end and freeze the values and source IDs.
+  Existing approved pay and ledger amounts are preserved. Used source rows are
+  protected against updates/deletion in services and both database dialects.
+- Added audited, tenant-scoped history CRUD for owner/administrator/accountant
+  roles with CSRF checks, viewer read-only access, translated 409 conflicts and
+  employee-dialog controls in all four languages. Legacy employee fields remain
+  available with an explicit `tax_settings_period` compatibility option.
+- Added optional employee phone, validated IBAN, bank-account owner, address and
+  date of birth to the API, employee dialog and XLSX export. Estonian personal
+  codes supply a birth date when no manual date is provided.
+- Verified the EUR 2,000 Merit calculation, all application modes and pension
+  rates, date boundaries, UI exclusion, frozen runs, migration preservation,
+  access/CSRF gates and offline mobile/desktop workflows. Commands and limits
+  are in `payroll_tax_settings_validation.md`. Production accountant UAT,
+  official TSD classification mapping and actual payout dates remain pending.
+
 ## 2026-10-25: Expanded Estonian payroll payment categories
 
 - Expanded the Estonian payroll catalogue from five to 27 stable presets, with

@@ -26,8 +26,9 @@ Each employee's rounded amounts are then summed; aggregate taxes are not recompu
   The supplied specification freezes those rates through 2028; this demo only
   accepts 2026 periods and does not extend other rules to later years.
 - Income tax: 22% of max(0, gross - pension - employee unemployment - exemption).
-- Exemption: flat EUR 700 monthly only on the employee's application
-  (`apply_tax_free_minimum=true`), otherwise zero. It is an allowance, not a deduction.
+- Exemption: up to EUR 700 monthly on the employee's effective application
+  (maximum, limited amount, or none). The legacy boolean remains compatible.
+  It is an allowance, not a deduction.
   `tax_free_minimum` records the amount actually used, capped at
   gross − pension − employee unemployment (e.g. 688.80 on a EUR 700 part-time salary).
 - Withholding total: pension + employee unemployment + income tax + net deductions.
@@ -464,3 +465,28 @@ Date of birth is derived from a recognisable Estonian personal code when absent;
 a supplied valid YYYY-MM-DD date takes precedence. Existing personal codes are
 also derived on read when there is no stored date. These employee-master details
 use the existing organisation and audit boundary and do not change posted pay.
+
+## History API and editor
+
+`/organisations/{organisation_id}/employees/{employee_id}/tax-settings` supports
+GET (all histories, including a `frozen` indicator) and POST (a complete row).
+Append `/{setting_id}` for PUT (replace an unused row's date/value, retaining its
+kind) or DELETE. A row has `kind`, `start_date` and exactly the relevant payload:
+
+- `tax_free`: `mode` in maximum/limited/none, with `amount` required only for limited.
+- `pension`: `rate` in 0/2/4/6.
+- `unemployment`: boolean `applies` for employee unemployment withholding.
+
+Duplicate effective dates return 409. Rows referenced by approved payroll cannot
+be edited or deleted and return a translated 409. Future-dated and unused rows
+can be edited/deleted; this includes rows used only by a draft, whose values are
+already frozen. Migration backfill rows are not asserted to represent elections
+for old approved runs. Their existing calculation snapshots remain authoritative.
+
+Owner, administrator and accountant roles can write. Viewers and approvers can
+read. Every history write requires CSRF. The dialog lists the three histories,
+shows protected rows, and edits unused rows inline. Contact/master-data changes
+use the existing Save action; history changes save independently. The editor is
+read-only for viewers and approvers. Employee UI exclusions do not disable the
+employer contribution. Contract components retain their separately reviewed tax
+flags, and board-fee base remuneration keeps its automatic exclusions.

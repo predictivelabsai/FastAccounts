@@ -3,6 +3,29 @@
 **Research baseline:** 2026-08-10  
 **Status:** engineering pilot implemented; independent UK/EE accountant UAT and provider approvals pending
 
+## 2026-10-28: Payroll tax settings and employee details
+
+- Implemented date-selected, immutable payroll rules with every verified 2026
+  value unchanged, including the April minimum-wage switch. Unsupported years
+  fail translated validation; no rates for other years are supplied.
+- Added migration 0037 for effective-dated tax-free income applications (maximum,
+  limited or none), II pillar pension rates (0/2/4/6%) and employee unemployment
+  insurance elections. Existing settings are backfilled at employment start or
+  2026-01-01. Month-end resolution and pay-item snapshots preserve approved pay;
+  actual payout-date selection remains a later item.
+- Added tenant-scoped, audited history editing with payroll role and CSRF checks,
+  viewer read-only access and translated frozen-row conflicts. Employee dialogs
+  show all three histories in English, Estonian, Latvian and Lithuanian.
+- Added phone, checksum-validated IBAN, account owner, address and derived or
+  manual birth date to employee writes, dialogs and XLSX exports.
+- Fixed services-contract TSD preparation/export using an internal contractor-fee
+  classification. Official e-MTA code mapping and accountant production UAT remain
+  pending. No direct filing, payment execution or broader HR scope is added.
+- Regression coverage includes the EUR 2,000 Merit vector (net EUR 1,657.84),
+  dated elections, frozen rows, upgrades, tenant isolation, CSRF and offline
+  mobile/desktop browser flows. See `payroll_rules.md` for API compatibility and
+  `payroll_tax_settings_validation.md` for commands and verification limits.
+
 ## 2026-10-24: On-demand Merit Palk imports
 
 - Implemented the documented Estonian Merit Palk API as a separate pull-only

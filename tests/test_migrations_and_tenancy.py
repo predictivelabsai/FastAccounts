@@ -9,6 +9,50 @@ from organisations import AccessDenied, OrganisationService
 from payroll_components import ACCOUNTS as PAYROLL_COMPONENT_ACCOUNTS
 
 
+def test_employee_tax_settings_backfill_and_preservation(tmp_path, legacy_payroll):
+    from shutil import copyfile
+    from database import MIGRATIONS
+    from payroll import PayrollService
+    old = tmp_path / 'before-tax-history' / 'sqlite'
+    old.mkdir(parents=True)
+    for path in (MIGRATIONS / 'sqlite').glob('*.sql'):
+        if path.stem < '0037':
+            copyfile(path, old / path.name)
+    db = Database(path=str(tmp_path / 'tax-backfill.sqlite'))
+    db.migrate(migrations=old.parent)
+    org = OrganisationService(db).create(name='Synthetic backfill', country_code='EE', entity_type='EE_OU',
+                                          owner_email='owner@example.test')
+    run = legacy_payroll(db, org['id'], name='Existing employee', gross='2000')
+    payroll = PayrollService(db)
+    payroll.approve(org['id'], run['id'], actor='owner@example.test')
+    with db.transaction() as tx:
+        tx.execute("UPDATE employees SET apply_tax_free_minimum=1,funded_pension_percent=6,"
+                   "employment_start_date='2025-06-15',personal_id='49001010018' WHERE id='legacy-employee'")
+        tx.execute("INSERT INTO employees(id,organisation_id,name,gross_salary,board_member,pay_basis,"
+                   "funded_pension_percent,created_at) VALUES ('board',?,'Synthetic board',500,1,'board_fee',0,'2026-01-01')",
+                   (org['id'],))
+    tables = ('employees', 'pay_run_items', 'pay_item_context', 'pay_runs', 'gl_entries', 'posting_batches')
+    before = {table: db.rows(f'SELECT * FROM {table} ORDER BY id' if table != 'pay_item_context'
+                             else 'SELECT * FROM pay_item_context ORDER BY item_id') for table in tables}
+    assert db.migrate() == ['0037_employee_tax_settings']
+    for table in tables:
+        actual = db.rows(f'SELECT * FROM {table} ORDER BY id' if table != 'pay_item_context'
+                         else 'SELECT * FROM pay_item_context ORDER BY item_id')
+        assert [{key: row[key] for key in original} for row, original in zip(actual, before[table], strict=True)] == before[table]
+    rows = db.rows('SELECT * FROM employee_tax_settings WHERE organisation_id=?', (org['id'],))
+    assert len(rows) == 6
+    staff = {r['kind']: r for r in rows if r['employee_id'] == 'legacy-employee'}
+    board = {r['kind']: r for r in rows if r['employee_id'] == 'board'}
+    assert {r['start_date'] for r in staff.values()} == {'2025-06-15'}
+    assert staff['tax_free']['mode'] == 'maximum' and staff['pension']['rate'] == 6
+    assert staff['unemployment']['applies'] == 1
+    assert {r['start_date'] for r in board.values()} == {'2026-01-01'}
+    assert board['tax_free']['mode'] == 'none' and board['pension']['rate'] == 0
+    assert board['unemployment']['applies'] == 0
+    assert payroll.employees(org['id'])[0]['date_of_birth'] == '1990-01-01'
+    assert db.migrate() == [] and db.rows('PRAGMA foreign_key_check') == []
+
+
 def test_component_catalogue_upgrade_preserves_defaults_and_posted_payroll(tmp_path, legacy_payroll):
     from shutil import copyfile
     from database import MIGRATIONS

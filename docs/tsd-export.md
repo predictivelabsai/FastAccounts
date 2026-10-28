@@ -36,7 +36,7 @@ downloaded. Downloading a file does not submit it.
 3. `EMPLOYMENT_SALARY`, `BOARD_MEMBER_FEE` and `CONTRACTOR_FEE` are FastAccounts semantic labels.
    The payroll plan does not specify official e-MTA payment-type codes, and
    these labels are not represented as verified EMTA codes. Services-contract
-   remuneration (`income_line`, töövõtulepingu tasu) uses `CONTRACTOR_FEE`;
+   remuneration (`income_line`, tÃ¶Ã¶vÃµtulepingu tasu) uses `CONTRACTOR_FEE`;
    its official code mapping is still pending.
 4. The XML uses published XBRL GL core element names plus a small FastAccounts
    TSD extension namespace (`urn:fastaccounts:ee:tsd:2026:review-only`). It is
