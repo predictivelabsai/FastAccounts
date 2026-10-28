@@ -1086,6 +1086,11 @@ confirmation or network client, and the TSD provider boundary rejects direct
 submission. Production accountant UAT and e-MTA upload verification remain
 pending.
 
+Scope 4b adds one XML file per paid payout, month ZIP downloads, cancellation
+and feedback history, and an offline validator for an initial subset of APA
+business rules. The remaining rule mapping and declaration-panel controls are
+in progress; see `payroll_tsd_validation.md`.
+
 ## 33. Payment orders and document evidence (PR1, 2026-10-11)
 
 - [x] Add migration `0015_payment_orders`, full bank and supplier IBAN fields,

@@ -514,6 +514,8 @@ class TSDExportService:
                             scaled[field] = money(money(row[field]) * ratio)
                         records.append(scaled)
                 if records:
+                    from tsd_apa_rules import require_exportable
+                    require_exportable(payout, records)
                     result.append((payout, generate_apa_xml(organisation, payout, records), records))
             absence_batches = tx.rows("SELECT * FROM payroll_absence_payout_batches WHERE organisation_id=? "
                                       "AND status='Paid' AND substr(payout_date,1,7)=substr((SELECT settlement_date FROM pay_runs "
@@ -522,6 +524,8 @@ class TSDExportService:
             for payout in absence_batches:
                 records = [dict(row) for row in workpaper["records"] if row["pay_run_id"] == payout["id"]]
                 if records:
+                    from tsd_apa_rules import require_exportable
+                    require_exportable(payout, records)
                     result.append((payout, generate_apa_xml(organisation, payout, records), records))
         if not result:
             raise ValueError("No paid payout transactions are available for APA export")

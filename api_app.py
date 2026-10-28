@@ -2849,7 +2849,13 @@ def payroll_export_tsd_apa_payout(organisation_id: str, run_id: str, preparation
     prepared = service.get(organisation_id, preparation_id)
     if prepared['pay_run_id'] != run_id:
         raise KeyError('TSD preparation not found')
-    payload = service.export_apa_payout(organisation_id, preparation_id, payout_id, actor=user.email)
+    try:
+        payload = service.export_apa_payout(organisation_id, preparation_id, payout_id, actor=user.email)
+    except ValueError as exc:
+        from tsd_apa_rules import APAValidationError
+        if isinstance(exc, APAValidationError):
+            raise HTTPException(status_code=409, detail=exc.findings) from exc
+        raise
     return Response(payload, media_type='application/xml', headers={
         'Content-Disposition': f'attachment; filename="tsd-{payout_id}.xml"'
     })
@@ -2859,7 +2865,13 @@ def payroll_export_tsd_apa_payout(organisation_id: str, run_id: str, preparation
 def payroll_export_tsd_apa_month_zip(organisation_id: str, payment_month: str,
                                      user: User = Depends(current_user)):
     _require(organisation_id, user, WRITE_ROLES)
-    payload = TSDExportService().export_apa_month_zip(organisation_id, payment_month, actor=user.email)
+    try:
+        payload = TSDExportService().export_apa_month_zip(organisation_id, payment_month, actor=user.email)
+    except ValueError as exc:
+        from tsd_apa_rules import APAValidationError
+        if isinstance(exc, APAValidationError):
+            raise HTTPException(status_code=409, detail=exc.findings) from exc
+        raise
     return Response(payload, media_type='application/zip', headers={
         'Content-Disposition': f'attachment; filename="tsd-{payment_month}-payouts.zip"'
     })

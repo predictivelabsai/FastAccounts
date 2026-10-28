@@ -16,6 +16,9 @@ delivered.
   assumptions pending confirmation with e-MTA. These outputs are not live
   verified and direct filing remains disabled.
 - Focused test results are recorded in `payroll_tsd_validation.md`.
+- Started scope 4b step 5 with a pure offline APA validator for frozen payout
+  data. Its implemented rule subset and offline data gaps are recorded in
+  `payroll_tsd_validation.md`; this step remains in progress.
 
 ## 2026-10-28: Payroll leave liability and payslip balances
 

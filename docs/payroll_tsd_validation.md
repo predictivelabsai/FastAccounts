@@ -106,6 +106,27 @@ Remaining 4b work includes offline APA business-rule validation and declaration
 panel controls. Full XBRL GL schema validation and live e-MTA acceptance remain
 pending. No live network calls were made.
 
+## Scope 4b step 5 checkpoint
+
+Added pure frozen-record checks in `tsd_apa_rules.py`. The implemented subset is
+`KR_YLD_03` (personal-code format and checksum), `KR_KALK_YLD_01` (resident
+payment type), `KR_KALK_XML_FAIL_05` (payment month), `KR_YLD_01` (negative
+amounts), `KR_TK_1`, `KR_KOP_01` and `KR_MVT_08`. MUST and PUNANE findings block
+APA payout and month ZIP export with HTTP 409 and the findings in the response;
+SININE findings remain non-blocking. Findings include Estonian text and English
+text, with English used for non-Estonian locales.
+
+| Rule codes | Status | Offline limitation |
+| --- | --- | --- |
+| KR_YLD_03, KR_KALK_YLD_01, KR_KALK_XML_FAIL_05, KR_YLD_01, KR_TK_1, KR_KOP_01, KR_MVT_08 | Implemented | Evaluated from frozen recipient code, payment type, date/month and amounts. |
+| Other payment-type/levy compatibility rules, including `KR_SM_05` | Not implemented | The frozen APA records do not include all EMTA recipient states, exemption types, work capacity, A1 and levy-rate inputs needed to decide these conditions safely. |
+| Calendar-year/month cumulative caps, declaration amendments and confirmation state rules | Not implemented | Require other payouts across all payers, MTA-held state or declaration status unavailable in this tenant's frozen payout snapshot. |
+| XML structure, payer authorisation, current classifications and catalogue rules | Not implemented | Require schema validation, request context, current EMTA catalogue or external authorisation data. |
+
+This is a partial checkpoint. Further rules from the supplied 24 July 2026
+extract remain to be mapped before step 5 can be marked complete. Full XBRL GL
+schema validation and live e-MTA acceptance remain pending.
+
 ## Scope 4b steps 2 and 4
 
 APA payout downloads are recorded by organisation and payout, with stable
