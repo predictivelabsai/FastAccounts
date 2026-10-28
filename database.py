@@ -241,6 +241,9 @@ DROP TRIGGER IF EXISTS guard_pay_item_components ON pay_item_components;
 UPDATE pay_item_components c SET is_wage=t.is_wage
 FROM pay_component_types t WHERE t.organisation_id=c.organisation_id AND t.id=c.type_id;
 """ + _postgres_payroll_component_triggers()
+                elif path.stem == "0054_payroll_tsd_lines":
+                    script = script.split("CREATE TRIGGER guard_pay_item_tsd_lines_update", 1)[0]
+                    script += _POSTGRES_TSD_LINE_TRIGGERS
                 elif path.stem == "0035_payroll_income_line":
                     script = _POSTGRES_PAYROLL_0035
                 elif path.stem == "0034_payroll_demo_fixes":
@@ -440,6 +443,19 @@ DROP TRIGGER IF EXISTS bill_lines_approved_update ON bill_lines;
 CREATE TRIGGER bill_lines_approved_update BEFORE UPDATE ON bill_lines FOR EACH ROW EXECUTE FUNCTION protect_bill_line();
 DROP TRIGGER IF EXISTS bill_lines_approved_delete ON bill_lines;
 CREATE TRIGGER bill_lines_approved_delete BEFORE DELETE ON bill_lines FOR EACH ROW EXECUTE FUNCTION protect_bill_line();
+"""
+
+_POSTGRES_TSD_LINE_TRIGGERS = r"""
+CREATE OR REPLACE FUNCTION guard_pay_item_tsd_lines_immutable() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    RAISE EXCEPTION 'approved TSD lines are immutable';
+END; $$;
+DROP TRIGGER IF EXISTS guard_pay_item_tsd_lines_update ON pay_item_tsd_lines;
+DROP TRIGGER IF EXISTS guard_pay_item_tsd_lines_delete ON pay_item_tsd_lines;
+CREATE TRIGGER guard_pay_item_tsd_lines_update BEFORE UPDATE ON pay_item_tsd_lines
+FOR EACH ROW EXECUTE FUNCTION guard_pay_item_tsd_lines_immutable();
+CREATE TRIGGER guard_pay_item_tsd_lines_delete BEFORE DELETE ON pay_item_tsd_lines
+FOR EACH ROW EXECUTE FUNCTION guard_pay_item_tsd_lines_immutable();
 """
 
 
