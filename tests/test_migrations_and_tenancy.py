@@ -115,7 +115,7 @@ def test_empty_migration_is_idempotent(tmp_path):
     db = Database(path=str(tmp_path / "empty.sqlite"))
     assert db.migrate() == ["0001_accounting_core", "0002_integrations", "0003_operations", "0004_document_immutability", "0005_payroll", "0006_payroll_part_time_hourly", "0007_automation", "0008_import_staging", "0009_local_accounts", "0010_tsd_export", "0011_account_mappings", "0012_external_gl", "0013_sync_review", "0014_sync_push", "0015_payment_orders", "0016_bank_feed_schedules", "0017_prepayments", "0018_fixed_assets", "0019_master_data_import", "0020_quotes", "0021_periodisation", "0022_payment_links", "0023_analytical_objects", "0024_reminder_rules", "0025_fx_realised", "0026_fx_revaluations", "0027_mfa", "0028_document_settings", "0029_copilot", "0030_master_data_maintenance", "0031_master_data_groups", "0032_copilot_access", "0033_copilot_settings", "0034_payroll_demo_fixes", "0035_payroll_income_line", "0036_payroll_component_catalogue", "0037_employee_tax_settings", "0038_payroll_payday_rules", "0039_payroll_payouts", "0040_payroll_settlement_dates", "0041_payroll_sepa_details", "0042_payroll_component_metadata", "0043_payroll_absences", "0044_payroll_absence_day_freeze", "0045_payroll_history", "0046_payroll_absence_pay"]
     assert db.migrate() == []
-    assert db.scalar("SELECT COUNT(*) FROM schema_migrations") == 45
+    assert db.scalar("SELECT COUNT(*) FROM schema_migrations") == 46
     assert db.scalar(
         "SELECT COUNT(*) FROM sqlite_master WHERE type='table' "
         "AND name IN ('account_mappings','external_gl_entries')"
@@ -157,7 +157,7 @@ def test_historical_migration_catalogue_does_not_affect_other_databases(tmp_path
         latest = current_setup.result()
     assert latest[-1] == '0046_payroll_absence_pay'
     assert legacy.scalar('SELECT COUNT(*) FROM schema_migrations') == 5
-    assert current.scalar('SELECT COUNT(*) FROM schema_migrations') == 45
+    assert current.scalar('SELECT COUNT(*) FROM schema_migrations') == 46
     assert legacy.migrate() == latest[5:]
     assert legacy.migrate() == current.migrate() == []
 
