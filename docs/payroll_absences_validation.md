@@ -228,3 +228,27 @@ and optional mapped reserve journals; and display remaining leave balances.
 Migration 0045 storage alone does not make the import workflow available.
 PostgreSQL execution was not performed. The date-based and statutory parameters
 listed above still need Estonian accountant review.
+
+## Unit 5b: Absence-pay payout and tax integration design
+
+A pending vacation-pay snapshot becomes taxable payroll when it is added to an
+`absence_pay` payout batch. Batch creation freezes one payroll calculation per
+employee and payment: gross equals the saved vacation-pay amount, and the
+calculation period is the payout date month. The calculation uses the employee's
+frozen tax settings, including II pillar, unemployment insurance, income tax and
+social tax settings. The tax-free exemption is calculated with
+`calculate_pay` after subtracting exemption already consumed by frozen payroll
+payments for that employee in the same payment month. This makes a later salary
+run in the month eligible only for the remaining exemption.
+
+Approval posts the frozen payroll amounts once as a balanced general-ledger
+batch, debiting vacation-pay expense (or the configured payroll gross role) and
+crediting net payable and the applicable employee and employer tax liabilities.
+Marking the payout Paid posts a second balanced batch, debiting net payable and
+crediting the selected bank account. The month's TSD workpaper treats each
+frozen absence-pay calculation as its own payment record, dated with the payout
+date, alongside salary payments. Cancelled batches release their absence-pay
+records to pending; any posted accounting entries are reversed with linked
+reversal batches. Status and posting changes are tenant-scoped and transactional,
+so a snapshot can only enter one live payout and its gross is included once in
+payroll tax aggregation and reporting.
