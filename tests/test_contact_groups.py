@@ -27,14 +27,14 @@ def customer(d, name):
 
 def test_migration_count_rerun_and_ci(sending):
     d = sending
-    assert d["db"].scalar("SELECT COUNT(*) FROM schema_migrations") == 41
+    assert d["db"].scalar("SELECT COUNT(*) FROM schema_migrations") == 48
     assert d["db"].rows("SELECT * FROM contact_groups") == []
     assert d["db"].rows("SELECT * FROM user_groups") == []
     for _ in range(2):
         with d["db"].transaction() as tx:
             tx.execute("DELETE FROM schema_migrations WHERE version='0031_master_data_groups'")
         assert d["db"].migrate() == ["0031_master_data_groups"]
-    assert "'0030_master_data_maintenance', '0031_master_data_groups', '0032_copilot_access', '0033_copilot_settings', '0034_payroll_demo_fixes', '0035_payroll_income_line', '0036_payroll_component_catalogue', '0037_employee_tax_settings', '0038_payroll_payday_rules', '0039_payroll_payouts', '0040_payroll_settlement_dates', '0041_payroll_sepa_details', '0042_payroll_component_metadata', '0043_payroll_absences', '0044_payroll_absence_day_freeze', "0045_payroll_history", "0046_payroll_absence_pay"]" in (ROOT / ".github/workflows/ci.yml").read_text()
+    assert '"0048_payroll_component_breakdown"]' in (ROOT / ".github/workflows/ci.yml").read_text()
 
 
 def test_group_crud_membership_and_filter(sending):

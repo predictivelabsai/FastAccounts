@@ -203,7 +203,7 @@ def test_report_date_filters_and_read_only(env, tab):
     for kind in LIST_HEADERS:
         assert download(d, kind + '/export.csv').status_code == 200
     assert {t['name']: d['db'].rows('SELECT * FROM "' + t['name'] + '"') for t in tables} == before
-    assert d['db'].scalar('SELECT COUNT(*) FROM schema_migrations') == 41
+    assert d['db'].scalar('SELECT COUNT(*) FROM schema_migrations') == 48
 
 
 @pytest.mark.parametrize('tab', ['trial-balance', 'profit-and-loss', 'general-ledger'])
