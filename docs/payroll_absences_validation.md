@@ -144,14 +144,16 @@ Command and result:
 - Confirm the treatment of TLS § 19 unpaid absence, the 2024 sick-leave day
   exclusions and TLS § 37 reduced-pay periods for the applicable event type.
 
-## Unit 5: Absence-pay calculation rules
+## Unit 5: Absence-pay wiring
 
 `payroll_absence_pay.py` implements Decimal calculations for average,
 unchanged-salary, best-of and fixed-sum vacation pay, employer sick benefit,
 unused leave compensation and the default payout date. `EE-SICK-2026-v1` uses
-days 2–5 at 70%, day 1 unpaid and Tervisekassa from day 6. The payout date is
-the previous payroll-calendar working day. Tests cover all methods, the sick
-period and termination compensation.
+days 2–5 at 70%, day 1 unpaid and Tervisekassa from day 6. Migration 0046 adds
+tenant-scoped absence-pay snapshots. The absences API can persist a pending
+vacation-pay method, amount and reviewable average-pay breakdown. Pending
+snapshots can be recalculated; snapshots already marked in a payout or paid
+cannot be recalculated.
 
 Command and result:
 
@@ -166,9 +168,18 @@ Command and result:
   sickness-period continuation certificates before production use.
 - Confirm the unchanged-salary and best-of amounts for part-time employees and
   the statutory fixed-sum agreement conditions.
-- Absence save, pending-pay persistence, payout-batch linkage, tax-month
-  aggregation, run-component integration and termination trigger remain to be
-  implemented. The pure calculations do not claim this workflow is complete.
+- Absence-pay payout batches, payment-date tax calculations and exemption
+  aggregation, frozen tax values, GL posting and TSD inclusion are not yet
+  implemented. The existing payout model requires an approved pay run, while
+  TSD reads approved run items. A separate absence-pay liability and reporting
+  path is needed to avoid counting the gross twice.
+- Sick benefit and termination unused-leave compensation are not yet wired as
+  run components. The termination trigger and leave-balance source need
+  implementation.
+- The absences tab does not yet expose the breakdown, method selection or
+  payout action. Labels for this workflow are not yet added in en/et/lv/lt.
+- Role, tenant isolation and CSRF coverage for the new method-selection route,
+  and end-to-end payout/reporting tests remain outstanding.
 
 ## Unit 6: Leave and earnings storage foundation
 
