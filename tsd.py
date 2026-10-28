@@ -21,6 +21,7 @@ from database import Database, get_database
 from payroll_calendar import is_working_day
 from payroll_payday import payday_for_period
 from payroll_rules import settlement_date
+from payroll_tsd_breakdown import calculate_tsd_breakdown, _allocate
 
 
 XBRLI_NS = "http://www.xbrl.org/2003/instance"
@@ -167,21 +168,29 @@ class TSDExportService:
         return run
 
     @staticmethod
-    def _record(organisation: dict, run: dict, item: dict) -> dict:
+    def _record(organisation: dict, run: dict, item: dict, line: dict | None = None) -> dict:
         payment_date = date.fromisoformat(run['payment_date'])
-        pension = money(item["funded_pension"])
-        employee_ui = money(item["ui_employee"])
-        exemption = money(item["tax_free_minimum"])
-        gross = money(item["gross"])
+        pension = money(line["ii_pillar"] if line else item["funded_pension"])
+        employee_ui = money(line["ui_employee"] if line else item["ui_employee"])
+        exemption = money(line["exemption_610"] if line else item["tax_free_minimum"])
+        gross = money(line["amount"] if line else item["gross"])
         excluded_income = sum((money(line['amount']) for line in item.get('components', [])
                                if line['direction'] == 'income' and not line['income_tax']), Decimal(0))
-        income_tax_base = money(max(Decimal("0"), gross - excluded_income - pension - employee_ui - exemption))
+        income_tax_base = money(line["taxable_amount"] + exemption if line else
+            max(Decimal("0"), gross - excluded_income - pension - employee_ui - exemption))
+        net = money(line["net_amount"] if line and "net_amount" in line else item["net"])
+        employer_cost = money(line["employer_cost"] if line and "employer_cost" in line
+                              else gross + money(line["social_tax"]) + money(line["ui_employer"]) if line else item["employer_cost"])
+        payment_type = int(line["payment_type"]) if line else int(item.get("tsd_payment_type") or
+            {"monthly": 10, "hourly": 10, "board_fee": 21, "income_line": 17}[item["pay_basis"]])
+        classification = {10: "EMPLOYMENT_SALARY", 17: "CONTRACTOR_FEE", 21: "BOARD_MEMBER_FEE",
+                          24: "EMPLOYER_SICK_BENEFIT", 33: "TERMINATION_COMPENSATION"}.get(payment_type, "OTHER_PAYMENT")
         values = {
             "declaration": "TSD",
             # Current payroll scope contains resident calculations only. Annex 2
             # stays in the declared mapping/scope and is not fabricated.
             "annex": TSD_ANNEX_MAPPING["EE_RESIDENT_PAYMENT"],
-            "payment_record_id": item["id"],
+            "payment_record_id": line.get("id", f"{item['id']}:{payment_type}") if line else item["id"],
             "pay_run_id": run["id"],
             "payment_date": payment_date.isoformat(),
             "payment_month": payment_date.strftime("%Y-%m"),
@@ -189,21 +198,21 @@ class TSDExportService:
             "payer_registration_no": organisation["registration_no"].strip(),
             "recipient_personal_id": item["employee_personal_id"].strip(),
             "recipient_name": item["employee_name"],
-            "payment_classification": TSD_PAYMENT_CLASSIFICATION[item["pay_basis"]],
-            "tsd_payment_type": int(item.get("tsd_payment_type") or {"monthly": 10, "hourly": 10, "board_fee": 21, "income_line": 17}[item["pay_basis"]]),
+            "payment_classification": classification,
+            "tsd_payment_type": payment_type,
             "pay_basis": item["pay_basis"],
             "currency": "EUR",
             "gross_amount": gross,
             "tax_free_minimum": exemption,
             "income_tax_base": income_tax_base,
-            "income_tax": money(item["income_tax"]),
+            "income_tax": money(line["income_tax"] if line else item["income_tax"]),
             "employee_unemployment_insurance": employee_ui,
-            "employer_unemployment_insurance": money(item["ui_employer"]),
+            "employer_unemployment_insurance": money(line["ui_employer"] if line else item["ui_employer"]),
             "funded_pension": pension,
-            "social_tax_base": money(item["social_tax_base"]),
-            "social_tax": money(item["social_tax"]),
-            "net_amount": money(item["net"]),
-            "employer_cost": money(item["employer_cost"]),
+            "social_tax_base": money(line["social_tax_base"] if line else item["social_tax_base"]),
+            "social_tax": money(line["social_tax"] if line else item["social_tax"]),
+            "net_amount": net,
+            "employer_cost": employer_cost,
         }
         if set(values) != set(TSD_PAYMENT_FIELDS):
             raise AssertionError("TSD payment field mapping is incomplete")
@@ -214,7 +223,30 @@ class TSDExportService:
         run = self._run(tx, organisation_id, run_id)
         for item in run['items']:
             item['components'] = tx.rows('SELECT * FROM pay_item_components WHERE organisation_id=? AND item_id=? ORDER BY position', (organisation_id, item['id']))
-        records = [self._record(organisation, run, item) for item in run["items"]]
+        records, warnings = [], []
+        for item in run["items"]:
+            components = tx.rows('SELECT * FROM pay_item_components WHERE organisation_id=? AND item_id=? ORDER BY position',
+                                 (organisation_id, item['id']))
+            frozen_lines = tx.rows("SELECT * FROM pay_item_tsd_lines WHERE organisation_id=? AND source_kind='pay_run_item' AND source_id=? ORDER BY payment_type",
+                                   (organisation_id, item['id']))
+            if not frozen_lines:
+                context = tx.one('SELECT * FROM pay_item_context WHERE organisation_id=? AND item_id=?',
+                                 (organisation_id, item['id']))
+                if context is not None and all('tsd_payment_type' in component for component in components):
+                    try:
+                        frozen_lines = calculate_tsd_breakdown(item=item, components=components, context=context)
+                        for line in frozen_lines:
+                            line['id'] = f"{item['id']}:run:{line['payment_type']}"
+                    except (KeyError, TypeError, ValueError):
+                        frozen_lines = []
+                if not frozen_lines:
+                    warnings.append('Legacy run: per-type split unavailable')
+                    records.append(self._record(organisation, run, item))
+                    continue
+            nets = _allocate(item['net'], {line['payment_type']: line['amount'] for line in frozen_lines})
+            for line in frozen_lines:
+                line['net_amount'] = nets[line['payment_type']]
+                records.append(self._record(organisation, run, item, line))
         payment_month = run['payment_date'][:7]
         absence_rows = tx.rows("SELECT p.*,b.payout_date FROM payroll_absence_pay p "
                                "JOIN payroll_absence_payout_batches b ON b.organisation_id=p.organisation_id AND b.id=p.absence_payout_batch_id "
@@ -225,28 +257,33 @@ class TSDExportService:
             if not (calc.get('employee_personal_id') or '').strip():
                 raise ValueError('TSD preparation requires a frozen personal ID for every absence payment record')
             payment_date = date.fromisoformat(absence['payout_date'])
-            gross = money(calc['gross'])
-            pension = money(calc['funded_pension'])
-            ui_employee = money(calc['ui_employee'])
-            exemption = money(calc['tax_free_minimum'])
-            income_base = money(max(Decimal('0'), gross - pension - ui_employee - exemption))
-            records.append({
+            absence_lines = tx.rows("SELECT * FROM pay_item_tsd_lines WHERE organisation_id=? AND source_kind='absence_pay' AND source_id=? AND payout_batch_id=? ORDER BY payment_type",
+                                    (organisation_id, absence['id'], absence['absence_payout_batch_id']))
+            if not absence_lines:
+                absence_lines = calculate_tsd_breakdown(item=calc | {'tsd_payment_type': 10, 'pay_basis': 'monthly'},
+                                                        components=[], context=calc)
+                for line in absence_lines:
+                    line['id'] = f"{absence['id']}:{absence['absence_payout_batch_id']}:{line['payment_type']}"
+            absence_nets = _allocate(calc['net'], {line['payment_type']: line['amount'] for line in absence_lines})
+            for line in absence_lines:
+                line['net_amount'] = absence_nets[line['payment_type']]
+                records.append({
                 'declaration':'TSD','annex':TSD_ANNEX_MAPPING['EE_RESIDENT_PAYMENT'],
-                'payment_record_id':absence['id'],'pay_run_id':absence['absence_payout_batch_id'],
-                'payment_date':payment_date.isoformat(),'payment_month':payment_month,
+                'payment_record_id':line.get('id', f"{absence['id']}:{absence['absence_payout_batch_id']}:{line['payment_type']}"),'pay_run_id':absence['absence_payout_batch_id'],
+                'payment_date':payment_date.isoformat(),'payment_month':payment_date.strftime('%Y-%m'),
                 'filing_deadline':_filing_deadline(payment_date).isoformat(),
                 'payer_registration_no':organisation['registration_no'].strip(),
                 'recipient_personal_id':(calc.get('employee_personal_id') or '').strip(),
-                'recipient_name':calc['employee_name'],'payment_classification':'EMPLOYMENT_SALARY',
-                'tsd_payment_type':10,
-                'pay_basis':'monthly','currency':'EUR','gross_amount':gross,
-                'tax_free_minimum':exemption,'income_tax_base':income_base,
-                'income_tax':money(calc['income_tax']),
-                'employee_unemployment_insurance':ui_employee,
-                'employer_unemployment_insurance':money(calc['ui_employer']),
-                'funded_pension':pension,'social_tax_base':money(calc['social_tax_base']),
-                'social_tax':money(calc['social_tax']),'net_amount':money(calc['net']),
-                'employer_cost':money(calc['employer_cost']),
+                'recipient_name':calc['employee_name'],'payment_classification':{10:'EMPLOYMENT_SALARY',17:'CONTRACTOR_FEE',21:'BOARD_MEMBER_FEE',24:'EMPLOYER_SICK_BENEFIT'}.get(line['payment_type'],'OTHER_PAYMENT'),
+                'tsd_payment_type':line['payment_type'],
+                'pay_basis':'monthly','currency':'EUR','gross_amount':money(line['amount']),
+                'tax_free_minimum':line['exemption_610'],'income_tax_base':money(line['taxable_amount']+line['exemption_610']),
+                'income_tax':money(line['income_tax']),
+                'employee_unemployment_insurance':money(line['ui_employee']),
+                'employer_unemployment_insurance':money(line['ui_employer']),
+                'funded_pension':money(line['ii_pillar']),'social_tax_base':money(line['social_tax_base']),
+                'social_tax':money(line['social_tax']),'net_amount':money(line['net_amount']),
+                'employer_cost':money(line['amount']+line['social_tax']+line['ui_employer']),
             })
         totals = {
             field: money(sum((decimal(record[field]) for record in records), Decimal("0")))
@@ -272,6 +309,7 @@ class TSDExportService:
             "warnings": [
                 "NOT live-verified against e-MTA; accountant review and manual upload are required",
                 "Current payroll calculations are resident-only, so payment records map to TSD Annex 1",
+                *warnings,
             ],
         }
 

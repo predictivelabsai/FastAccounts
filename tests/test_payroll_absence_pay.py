@@ -36,6 +36,10 @@ def test_vacation_payout_and_salary_share_payment_month_exemption_and_reverse(db
     with db.transaction() as tx:
         assert monthly_exemption_used(tx, ee_org['id'], employee['id'], '2026-11') == Decimal('700.00')
     approved = payouts.approve(ee_org['id'], batch['id'], actor=actor)
+    frozen_tsd = db.rows("SELECT * FROM pay_item_tsd_lines WHERE organisation_id=? AND source_kind='absence_pay' AND source_id=?",
+                         (ee_org['id'], snapshot['id']))
+    assert len(frozen_tsd) == 1 and frozen_tsd[0]['payment_type'] == 10
+    assert Decimal(str(frozen_tsd[0]['amount'])) == Decimal('275.00')
     gl = db.rows('SELECT debit,credit FROM gl_entries WHERE organisation_id=? AND posting_batch_id=?',
                  (ee_org['id'], approved['posted_batch_id']))
     assert sum((Decimal(str(row['debit'])) for row in gl), Decimal(0)) == sum(
@@ -67,6 +71,11 @@ def test_vacation_payout_and_salary_share_payment_month_exemption_and_reverse(db
                   (ee_org['id'], approved['posted_batch_id']))['status'] == 'Reversed'
     assert db.one('SELECT status FROM posting_batches WHERE organisation_id=? AND id=?',
                   (ee_org['id'], paid['paid_batch_id']))['status'] == 'Reversed'
+    retry = payouts.create(ee_org['id'], [snapshot['id']], actor=actor)
+    payouts.approve(ee_org['id'], retry['id'], actor=actor)
+    frozen_retries = db.rows("SELECT payout_batch_id FROM pay_item_tsd_lines WHERE organisation_id=? AND source_kind='absence_pay' AND source_id=? ORDER BY payout_batch_id",
+                             (ee_org['id'], snapshot['id']))
+    assert [row['payout_batch_id'] for row in frozen_retries] == [batch['id'], retry['id']]
 
 
 def test_absence_payout_routes_enforce_roles_tenant_and_csrf(db, ee_org, monkeypatch):

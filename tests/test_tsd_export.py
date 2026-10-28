@@ -180,3 +180,87 @@ def test_tsd_payment_date_uses_salary_payout_and_shifts_weekend_deadline(db, ee_
     preparation = TSDExportService(db).prepare(ee_org['id'], run['id'], actor=ACTOR)
     assert preparation['payment_date'] == '2026-11-05'
     assert preparation['filing_deadline'] == '2026-12-10'
+
+
+def test_approved_tsd_lines_group_codes_and_reconcile_frozen_levies(db, ee_org):
+    payroll = PayrollService(db)
+    employee = payroll.save_employee(ee_org['id'], actor=ACTOR, name='Mixed payment recipient',
+                                     personal_id='49001010018', gross_salary='2000',
+                                     apply_tax_free_minimum=True)
+    run = payroll.create_run(ee_org['id'], period='2026-10', actor=ACTOR)
+    types = {row['preset_key']: row for row in payroll.component_types(ee_org['id'])}
+    types['board_fee'] = payroll.save_component_type(ee_org['id'], actor=ACTOR,
+        name='Board member fee', direction='income', tsd_payment_type=21,
+        income_tax=True, social_tax=True, ui_employee=False, ui_employer=False,
+        funded_pension=True, social_minimum=False)
+    payroll.update_item(ee_org['id'], run['id'], run['items'][0]['id'], actor=ACTOR, components=[
+        {'type_id': types['bonus']['id'], 'amount': '100'},
+        {'type_id': types['board_fee']['id'], 'amount': '300'},
+        {'type_id': types['contract']['id'], 'amount': '400'},
+        {'type_id': types['employer_sick_pay']['id'], 'amount': '100'},
+    ])
+    approved = payroll.approve(ee_org['id'], run['id'], actor=ACTOR)
+    item = approved['items'][0]
+    lines = db.rows("SELECT * FROM pay_item_tsd_lines WHERE organisation_id=? AND source_kind='pay_run_item' AND source_id=? ORDER BY payment_type",
+                    (ee_org['id'], item['id']))
+    assert [line['payment_type'] for line in lines] == [10, 17, 21, 24]
+    assert Decimal(str(next(line for line in lines if line['payment_type'] == 10)['amount'])) == Decimal('2100.00')
+    assert sum((Decimal(line['amount']) for line in lines), Decimal(0)) == Decimal(item['gross'])
+    for field, item_field in [('social_tax', 'social_tax'), ('ui_employee', 'ui_employee'),
+                              ('ui_employer', 'ui_employer'), ('ii_pillar', 'funded_pension'),
+                              ('income_tax', 'income_tax'), ('exemption_610', 'tax_free_minimum')]:
+        assert sum((Decimal(str(line[field])) for line in lines), Decimal(0)) == Decimal(str(item[item_field]))
+    assert sum((Decimal(str(line['social_tax_base'])) for line in lines), Decimal(0)) == Decimal(str(item['social_tax_base']))
+    assert sum((Decimal(str(line['ui_employee_base'])) for line in lines), Decimal(0)) == Decimal('2500.00')
+    assert sum((Decimal(str(line['ui_employer_base'])) for line in lines), Decimal(0)) == Decimal('2500.00')
+    assert sum((Decimal(str(line['ii_pillar_base'])) for line in lines), Decimal(0)) == Decimal('2800.00')
+    assert Decimal(str(next(line for line in lines if line['payment_type'] == 24)['social_tax_base'])) == 0
+    assert Decimal(str(next(line for line in lines if line['payment_type'] == 10)['exemption_610'])) == Decimal(str(item['tax_free_minimum']))
+
+
+def test_tsd_legacy_missing_context_warns_without_mutating_frozen_values(db, ee_org):
+    payroll = PayrollService(db)
+    payroll.save_employee(ee_org['id'], actor=ACTOR, name='Legacy recipient',
+                          personal_id='49001010018', gross_salary='2000')
+    draft = payroll.create_run(ee_org['id'], period='2026-10', actor=ACTOR)
+    item_id = draft['items'][0]['id']
+    with db.transaction() as tx:
+        tx.execute('DELETE FROM pay_item_context WHERE organisation_id=? AND item_id=?',
+                   (ee_org['id'], item_id))
+        tx.execute("UPDATE pay_runs SET status='Approved' WHERE organisation_id=? AND id=?",
+                   (ee_org['id'], draft['id']))
+    frozen_gross = db.scalar('SELECT gross FROM pay_run_items WHERE organisation_id=? AND id=?',
+                             (ee_org['id'], item_id))
+    prepared = TSDExportService(db).prepare(ee_org['id'], draft['id'], actor=ACTOR)
+    assert 'Legacy run: per-type split unavailable' in prepared['warnings']
+    assert len(prepared['records']) == 1 and prepared['records'][0]['tsd_payment_type'] == 10
+    assert db.scalar('SELECT gross FROM pay_run_items WHERE organisation_id=? AND id=?',
+                     (ee_org['id'], item_id)) == frozen_gross
+
+
+def test_tsd_breakdown_assigns_minimum_topup_and_exemption_to_salary_first():
+    from payroll_tsd_breakdown import calculate_tsd_breakdown
+
+    all_flags = {'income_tax': 1, 'social_tax': 1, 'ui_employee': 1,
+                 'ui_employer': 1, 'funded_pension': 1}
+    item = {'gross': '1000.00', 'pay_basis': 'monthly', 'tsd_payment_type': 10,
+            'social_tax_base': '1200.00', 'social_tax': '396.00',
+            'ui_employee': '16.00', 'ui_employer': '8.00', 'funded_pension': '20.00',
+            'tax_free_minimum': '700.00', 'income_tax': '62.39'}
+    component = {'amount': '400.00', 'direction': 'income', 'tsd_payment_type': 17, **all_flags}
+    lines = calculate_tsd_breakdown(item=item, components=[component], context={})
+    by_type = {line['payment_type']: line for line in lines}
+    assert by_type[10]['amount'] == Decimal('600.00')
+    assert by_type[17]['amount'] == Decimal('400.00')
+    assert by_type[10]['social_tax_minimum_topup'] == Decimal('200.00')
+    assert by_type[17]['social_tax_minimum_topup'] == Decimal('0.00')
+    assert by_type[10]['exemption_610'] == Decimal('578.40')
+    assert by_type[17]['exemption_610'] == Decimal('121.60')
+    for field, expected in [('social_tax', '396.00'), ('ui_employee', '16.00'),
+                            ('ui_employer', '8.00'), ('ii_pillar', '20.00'),
+                            ('exemption_610', '700.00'), ('income_tax', '62.39')]:
+        assert sum((line[field] for line in lines), Decimal(0)) == Decimal(expected)
+    assert sum((line['social_tax_base'] for line in lines), Decimal(0)) == Decimal('1200.00')
+    assert sum((line['ui_employee_base'] for line in lines), Decimal(0)) == Decimal('1000.00')
+    assert sum((line['ui_employer_base'] for line in lines), Decimal(0)) == Decimal('1000.00')
+    assert sum((line['ii_pillar_base'] for line in lines), Decimal(0)) == Decimal('1000.00')

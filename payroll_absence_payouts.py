@@ -117,6 +117,12 @@ class AbsencePayoutService:
                                  (utc_now(), actor, organisation_id, batch_id))
             if claimed.rowcount != 1:
                 raise ValueError('Absence payout is no longer a draft')
+            from payroll_tsd_breakdown import freeze_tsd_breakdown
+            for line in batch['lines']:
+                frozen = line['calculation']
+                freeze_tsd_breakdown(tx, organisation_id, 'absence_pay', line['id'],
+                                     item=frozen | {'tsd_payment_type': 10, 'pay_basis': 'monthly'},
+                                     components=[], context=frozen, payout_batch_id=batch_id)
             payroll = PayrollService(self.db)
             accounts = {role: payroll._posting_account(tx, organisation_id, role) for role in
                         ('PAYROLL_SALARY','PAYROLL_SALARY_PAYABLE','PAYROLL_INCOME_WITHHELD',

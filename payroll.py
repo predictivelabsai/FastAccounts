@@ -902,6 +902,14 @@ class PayrollService:
             if any(money(item['gross']) <= 0 and not (item['pay_basis'] == 'monthly' and item.get('worked_days') == 0)
                    for item in run['items']):
                 raise ValueError('Every employee requires positive gross pay before approval')
+            from payroll_tsd_breakdown import freeze_tsd_breakdown
+            for item in run['items']:
+                context = tx.one('SELECT * FROM pay_item_context WHERE organisation_id=? AND item_id=?',
+                                 (organisation_id, item['id']))
+                if not context:
+                    raise ValueError('Pay run calculation snapshot is missing')
+                freeze_tsd_breakdown(tx, organisation_id, 'pay_run_item', item['id'],
+                                     item=item, components=item['components'], context=context)
             totals = {k: sum((decimal(i[k]) for i in run['items']), Decimal(0)) for k in AMOUNTS}
             memo = f"Payroll {run['period']}"
             # The social tax minimum shortfall is an employer cost on the existing social-tax
