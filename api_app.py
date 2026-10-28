@@ -2227,7 +2227,7 @@ class PayComponentIn(BaseModel):
     liability_role: Literal['PAYROLL_BAILIFF', 'PAYROLL_DEDUCTION'] = 'PAYROLL_DEDUCTION'
     is_wage: bool = True
     active: bool = True
-    tsd_payment_type: Literal[10, 11, 12, 13, 14, 15, 16, 17, 21, 24, 32, 33, 120] = 10
+    tsd_payment_type: Literal[10, 11, 12, 13, 14, 15, 16, 17, 21, 24, 32, 33] = 10
 
 
 class PayComponentLine(BaseModel):

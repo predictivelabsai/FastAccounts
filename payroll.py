@@ -597,7 +597,7 @@ class PayrollService:
             if type(data.get(key)) not in (bool, int) or data[key] not in (0, 1):
                 raise ValueError('Payment type metadata must be boolean')
             data[key] = int(data[key])
-        if 'tsd_payment_type' in data and (type(data['tsd_payment_type']) is not int or data['tsd_payment_type'] not in (10,11,12,13,14,15,16,17,21,24,32,33,120)):
+        if 'tsd_payment_type' in data and (type(data['tsd_payment_type']) is not int or data['tsd_payment_type'] not in (10,11,12,13,14,15,16,17,21,24,32,33)):
             raise ValueError('Choose a supported TSD payment type')
         # All flags remain editable snapshots. They affect income lines only;
         # deduction lines are explicitly net withholdings, never tax relief.
@@ -818,7 +818,7 @@ class PayrollService:
         monthly_minimum, hourly_minimum = minimum_wage(period)
         totals = dict(gross=Decimal(0), net=Decimal(0), employer_cost=Decimal(0))
         columns = ('id', 'pay_run_id', 'organisation_id', 'employee_id', 'employee_name', 'employee_personal_id', 'gross_salary',
-                   'board_member', 'funded_pension_percent', 'pay_basis', 'fte', 'hourly_rate', 'hours',
+                   'board_member', 'funded_pension_percent', 'pay_basis', 'tsd_payment_type', 'fte', 'hourly_rate', 'hours',
                    'minimum_wage', 'social_tax_minimum_exemption', *AMOUNTS,
                    'worked_days', 'norm_days', 'absence_working_days')
         for employee in employees:
@@ -867,6 +867,7 @@ class PayrollService:
             values = (item_id, run_id, organisation_id, employee['id'], employee['name'], employee.get('personal_id'),
                       db_number(amounts['gross'] if basis in ('hourly', 'income_line') else money(employee['gross_salary'])),
                       int(basis == 'board_fee'), db_number(decimal(employee['funded_pension_percent'])), basis,
+                      {'monthly': 10, 'hourly': 10, 'board_fee': 21, 'income_line': 17}[basis],
                       db_number(four_dp(fte)), None if basis != 'hourly' else db_number(four_dp(employee['hourly_rate'])),
                       None if worked is None else db_number(worked), None if required is None else db_number(money(required)),
                       amounts['social_tax_minimum_exemption'])
