@@ -75,18 +75,23 @@ commands, counts, commits and unresolved acceptance items here.
 
 ## 2026-10-28 implementation checkpoint
 
-- Branch created from `15be8ce`; design note committed as `7afc5fe`.
-- Migration 0056 and explicit migration-list updates committed as `170ac1b`.
-- Added a migration regression test for regular uniqueness and linked
-  correction/supplementary rows. `tests/test_migrations_and_tenancy.py`: 17
-  passed.
-- Remaining: correction/supplementary creation and cloning; employee/component
-  editing; delta computation across successive corrections; balanced delta-only
-  ledger posting and full reversal; receivables and visible offsets; payment-date
-  selection and additional payouts; APA `M` replacement / `T` cancellation / new
-  `R` identifiers for subsequent versions; TSD corrected line versions; API/UI
-  routes and en/et/lv/lt strings; tenant/role/CSRF and acceptance tests; targeted
-  runs of the requested payroll, payout, settlement and TSD test files.
-- The migration currently records `original_run_id` without a composite foreign
-  key. Tenant-safe service validation must be added before exposing these kinds
-  through API routes.
+- Design and migration commits: `7afc5fe`, `170ac1b`.
+- Service/API commit: `7788af3` adds tenant-safe correction cloning, one-draft
+  validation, support for correction zero values, and compatibility with the
+  partial regular-period unique index.
+- Approval/API/test commit: `f239f91` adds supplementary runs with zero starting
+  pay, correction delta calculation against the last approved snapshot, balanced
+  delta-only GL posting, immutable per-payment-type TSD delta lines, and
+  organisation-scoped create routes protected by role and CSRF dependencies.
+- Correction tests cover salary increases and decreases, successive corrections,
+  full reversal, supplementary exemption sharing, tenant boundaries and route
+  authorisation/CSRF dependency. Targeted results:
+  - `pytest tests/test_payroll.py -q`: 16 passed, 1 dependency deprecation warning.
+  - `pytest tests/test_payroll_corrections.py -q`: 5 passed.
+  - `pytest tests/test_payroll_settlement.py -q`: 8 passed.
+  - `pytest tests/test_migrations_and_tenancy.py -q`: 17 passed.
+- Remaining: negative net receivables and visible offsets; additional payouts and
+  correction payment-date handling; TSD/APA declaration versioning including
+  replacement `M`, cancellation `T` and later `R` line identifiers; payroll UI
+  and en/et/lv/lt strings. The migration records `original_run_id` without a
+  composite foreign key, so tenant-safe lineage depends on the service checks.
