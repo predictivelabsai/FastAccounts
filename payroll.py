@@ -808,7 +808,7 @@ class PayrollService:
         pay_date = settlement_date(period, payday_rule_date=payday_for_period(tx, organisation_id, period))
         rules_for(pay_date)
         run_id = new_id()
-        result = tx.execute("INSERT INTO pay_runs(id,organisation_id,period,total_gross,total_net,total_employer_cost,created_by,created_at,settlement_date,show_leave_balance) VALUES (?,?,?,0,0,0,?,?,?,?) ON CONFLICT(organisation_id,period) DO NOTHING", (run_id, organisation_id, period, actor, utc_now(), pay_date.isoformat(), int(bool(show_leave_balance))))
+        result = tx.execute("INSERT INTO pay_runs(id,organisation_id,period,total_gross,total_net,total_employer_cost,created_by,created_at,settlement_date,show_leave_balance) VALUES (?,?,?,0,0,0,?,?,?,?) ON CONFLICT DO NOTHING", (run_id, organisation_id, period, actor, utc_now(), pay_date.isoformat(), int(bool(show_leave_balance))))
         if result.rowcount != 1:
             raise PayrollConflict(f'A pay run already exists for {period}')
         employees = [e for e in tx.rows('SELECT * FROM employees WHERE organisation_id=? AND active=1 ORDER BY id', (organisation_id,))
@@ -884,6 +884,50 @@ class PayrollService:
         tx.execute('UPDATE pay_runs SET total_gross=?,total_net=?,total_employer_cost=? WHERE organisation_id=? AND id=?', tuple(db_number(totals[k]) for k in totals)+(organisation_id, run_id))
         audit(tx, organisation_id, actor, 'payroll.drafted', 'pay_run', run_id, {'period': period})
         return self._run(tx, organisation_id, run_id)
+
+    def create_correction(self, organisation_id, original_run_id, *, actor):
+        """Create an editable copy of an approved regular payroll run."""
+        with self.db.transaction() as tx:
+            original = tx.one('SELECT * FROM pay_runs WHERE organisation_id=? AND id=?',
+                              (organisation_id, original_run_id))
+            if not original:
+                raise KeyError('Pay run not found')
+            if original.get('kind', 'regular') != 'regular' or original['status'] != 'Approved':
+                raise PayrollConflict('Corrections require an approved regular pay run')
+            existing = tx.one("SELECT id FROM pay_runs WHERE organisation_id=? AND original_run_id=? AND kind='correction' AND status='Draft'",
+                              (organisation_id, original_run_id))
+            if existing:
+                raise PayrollConflict('A draft correction already exists for this pay run')
+            run_id = new_id()
+            tx.execute("INSERT INTO pay_runs(id,organisation_id,period,total_gross,total_net,total_employer_cost,created_by,created_at,settlement_date,show_leave_balance,kind,original_run_id) "
+                       "VALUES (?,?,?,?,?,?,?,?,?,?, 'correction',?)",
+                       (run_id, organisation_id, original['period'], 0, 0, 0, actor, utc_now(),
+                        original.get('settlement_date'), original.get('show_leave_balance', 0), original_run_id))
+            for source in tx.rows('SELECT * FROM pay_run_items WHERE organisation_id=? AND pay_run_id=? ORDER BY employee_id',
+                                  (organisation_id, original_run_id)):
+                item_id = new_id()
+                values = dict(source)
+                values.update(id=item_id, pay_run_id=run_id)
+                self._insert_copied_row(tx, 'pay_run_items', values)
+                for table, key in (('pay_item_context', 'item_id'), ('pay_item_components', 'item_id')):
+                    for child in tx.rows(f'SELECT * FROM {table} WHERE organisation_id=? AND item_id=?',
+                                         (organisation_id, source['id'])):
+                        copied = dict(child)
+                        copied[key] = item_id
+                        if 'id' in copied:
+                            copied['id'] = new_id()
+                        self._insert_copied_row(tx, table, copied)
+            tx.execute('UPDATE pay_runs SET total_gross=?,total_net=?,total_employer_cost=? WHERE organisation_id=? AND id=?',
+                       (original['total_gross'], original['total_net'], original['total_employer_cost'], organisation_id, run_id))
+            audit(tx, organisation_id, actor, 'payroll.correction.drafted', 'pay_run', run_id,
+                  {'original_run_id': original_run_id})
+            return self._run(tx, organisation_id, run_id)
+
+    @staticmethod
+    def _insert_copied_row(tx, table, values):
+        columns = tuple(values)
+        tx.execute(f'INSERT INTO {table} (' + ','.join(columns) + ') VALUES (' +
+                   ','.join('?' for _ in columns) + ')', tuple(values[column] for column in columns))
 
     def approve(self, organisation_id, run_id, *, actor):
         from web import i18n
