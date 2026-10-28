@@ -354,7 +354,7 @@ def test_migration_rerun_tenant_constraints_and_roles(db, ee_org, uk_org):
         tx.connection.executescript(sql)
     for org, code in [(ee_org, '6990'), (uk_org, '7900')]:
         assert db.one("SELECT code FROM accounts WHERE organisation_id=? AND system_role='FX_GAIN_LOSS'", (org['id'],))['code'] == code
-    assert "'0025_fx_realised', '0026_fx_revaluations', '0027_mfa', '0028_document_settings', '0029_copilot', '0030_master_data_maintenance', '0031_master_data_groups', '0032_copilot_access', '0033_copilot_settings', '0034_payroll_demo_fixes', '0035_payroll_income_line', '0036_payroll_component_catalogue', '0037_employee_tax_settings', '0038_payroll_payday_rules', '0039_payroll_payouts', '0040_payroll_settlement_dates', '0041_payroll_sepa_details', '0042_payroll_component_metadata', '0043_payroll_absences', '0044_payroll_absence_day_freeze', '0045_payroll_history']" in (root / '.github/workflows/ci.yml').read_text(encoding='utf-8')
+    assert "'0025_fx_realised', '0026_fx_revaluations', '0027_mfa', '0028_document_settings', '0029_copilot', '0030_master_data_maintenance', '0031_master_data_groups', '0032_copilot_access', '0033_copilot_settings', '0034_payroll_demo_fixes', '0035_payroll_income_line', '0036_payroll_component_catalogue', '0037_employee_tax_settings', '0038_payroll_payday_rules', '0039_payroll_payouts', '0040_payroll_settlement_dates', '0041_payroll_sepa_details', '0042_payroll_component_metadata', '0043_payroll_absences', '0044_payroll_absence_day_freeze', "0045_payroll_history", "0046_payroll_absence_pay"]" in (root / '.github/workflows/ci.yml').read_text(encoding='utf-8')
     data = setup(db, ee_org)
     doc = document(db, ee_org, data)
     import sqlite3
