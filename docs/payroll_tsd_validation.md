@@ -102,7 +102,22 @@ elements. A reviewed payment-month ZIP gathers one file per paid payout across
 the organisation. The former review-only XBRL endpoint remains available and is
 marked deprecated in `docs/tsd-export.md`.
 
-Remaining 4b work includes export history/version persistence, cancellation,
-feedback import, offline APA business-rule validation, and declaration panel
-controls. Full XBRL GL schema validation and live e-MTA acceptance remain
+Remaining 4b work includes offline APA business-rule validation and declaration
+panel controls. Full XBRL GL schema validation and live e-MTA acceptance remain
 pending. No live network calls were made.
+
+## Scope 4b steps 2 and 4
+
+APA payout downloads are recorded by organisation and payout, with stable
+transaction IDs for unchanged files, SHA-256 hashes, version numbers, actor,
+timestamp and status. A changed payload creates a new version. Cancellation
+downloads follow the vendored EMTA cancellation XML structure and mark the
+history row `Cancelled`; repeated cancellation is rejected. Feedback uploads
+store the transaction result and each validation message, including line
+references, and update the matching organisation's export status. Unknown
+transaction IDs are saved as unmatched results without affecting another
+tenant. API route tests cover write roles, viewer access, tenant checks and CSRF.
+
+Feedback is structurally parsed because the active venv does not contain
+`lxml` or `xmlschema`. The vendored feedback XSD is not run. The four EMTA
+feedback examples are covered by local tests; no network tests were run.

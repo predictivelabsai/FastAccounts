@@ -227,3 +227,31 @@ Source: vendored `tests/fixtures/emta/APA_TSD_lahteandmed_ariuhingule_naide_XML_
 | `gl-cor:taxes/gl-cor:taxPercentageRate` | Applicable tax rate | Conditional | Frozen rate only if stored; otherwise omitted |
 
 The example contains non-resident, foreign-work/A1 and other conditional variants. The supported exporter emits the resident fields above only. It must not infer country roles, allocation codes, tax-rate metadata, or calculation timestamps absent from the frozen payout snapshot. Each output file represents exactly one payout transaction, as specified by the developer guide's file examples and transaction-level upload model.
+
+## APA export history, cancellation and feedback (4b steps 2 and 4)
+
+Each downloaded APA payout XML has a tenant-scoped history row containing the
+payout, transaction ID, version, SHA-256, creation time and actor. Repeating an
+unchanged export returns the stored bytes and transaction ID. A changed file
+creates the next version and a new deterministic transaction ID. Export rows
+are immutable apart from their status, which moves through `Exported`,
+`Cancelled`, `Accepted`, `Rejected` or `PartiallyRejected`; actor and event
+details are retained in `audit_events`.
+
+Cancellation is a CSRF-protected POST download. It follows the vendored EMTA
+example and developer guide: the XBRL GL entry keeps the original unique
+`gl-cor:lineNumber`, includes `gl-cor:lineNumberCounter`, and contains only the
+operation codelist pair `T` / `TOIMINGUTYYP2023ap`. The export status changes to
+`Cancelled` in the same transaction. A second cancellation is refused.
+
+Feedback is uploaded as XML with the transaction ID selected by the caller.
+Results are matched inside the organisation and saved per transaction and per
+validation message, including rule code, category, message and any line
+references. Unknown transaction IDs are retained as unmatched results. The
+feedback routes require a payroll write role and CSRF token; history and result
+reads allow payroll approval roles and viewers.
+
+The local venv has neither `lxml` nor `xmlschema`, so uploads receive a
+structural XML parse rather than XSD validation. The XSD remains vendored at
+`tests/fixtures/emta/APA_TSD_20260330_feedbackReport.xsd`; no dependency was
+installed. All four recorded feedback examples are covered by offline tests.

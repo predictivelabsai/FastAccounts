@@ -482,7 +482,7 @@ class TSDExportService:
         self._record_export(preparation, workpaper, actor=actor, format_name="xbrl-gl-xml")
         return payload
 
-    def _apa_payouts(self, organisation_id: str, preparation_id: str) -> list[tuple[dict, bytes]]:
+    def _apa_payouts(self, organisation_id: str, preparation_id: str) -> list[tuple[dict, bytes, list[dict]]]:
         preparation, workpaper = self._reviewed_workpaper(organisation_id, preparation_id)
         run_id = preparation["cursor_before"]
         with self.db.transaction() as tx:
@@ -514,7 +514,7 @@ class TSDExportService:
                             scaled[field] = money(money(row[field]) * ratio)
                         records.append(scaled)
                 if records:
-                    result.append((payout, generate_apa_xml(organisation, payout, records)))
+                    result.append((payout, generate_apa_xml(organisation, payout, records), records))
             absence_batches = tx.rows("SELECT * FROM payroll_absence_payout_batches WHERE organisation_id=? "
                                       "AND status='Paid' AND substr(payout_date,1,7)=substr((SELECT settlement_date FROM pay_runs "
                                       "WHERE organisation_id=? AND id=?),1,7) ORDER BY payout_date,id",
@@ -522,7 +522,7 @@ class TSDExportService:
             for payout in absence_batches:
                 records = [dict(row) for row in workpaper["records"] if row["pay_run_id"] == payout["id"]]
                 if records:
-                    result.append((payout, generate_apa_xml(organisation, payout, records)))
+                    result.append((payout, generate_apa_xml(organisation, payout, records), records))
         if not result:
             raise ValueError("No paid payout transactions are available for APA export")
         return result
@@ -535,10 +535,12 @@ class TSDExportService:
 
     def export_apa_payout(self, organisation_id: str, preparation_id: str, payout_id: str, *, actor: str) -> bytes:
         exports = self._apa_payouts(organisation_id, preparation_id)
-        for payout, payload in exports:
+        from tsd_apa_history import APAHistoryService
+        history = APAHistoryService(self.db)
+        for payout, payload, records in exports:
             if payout["id"] == payout_id:
                 self._audit_apa_exports(organisation_id, [(payout, payload)], actor=actor)
-                return payload
+                return history.export_version(organisation_id, payout, records, actor=actor)[1]
         raise KeyError("Paid payout not found in this reviewed TSD preparation")
 
     def export_apa_month_zip(self, organisation_id: str, payment_month: str, *, actor: str) -> bytes:
@@ -566,16 +568,19 @@ class TSDExportService:
                 raise ValueError("No reviewed TSD preparation exists for paid payouts in this month")
         exports_by_id = {}
         for prep in runs:
-            for payout, payload in self._apa_payouts(organisation_id, prep["id"]):
+            for payout, payload, records in self._apa_payouts(organisation_id, prep["id"]):
                 if payout["payout_date"][:7] == payment_month:
-                    exports_by_id[payout["id"]] = (payout, payload)
+                    exports_by_id[payout["id"]] = (payout, payload, records)
         if not exports_by_id:
             raise ValueError("No paid payout transactions are available for APA export in this month")
         output = BytesIO()
         with ZipFile(output, "w", ZIP_DEFLATED) as archive:
-            for payout, payload in sorted(exports_by_id.values(), key=lambda pair: (pair[0]["payout_date"], pair[0]["id"])):
+            from tsd_apa_history import APAHistoryService
+            history = APAHistoryService(self.db)
+            for payout, payload, records in sorted(exports_by_id.values(), key=lambda pair: (pair[0]["payout_date"], pair[0]["id"])):
+                _, payload = history.export_version(organisation_id, payout, records, actor=actor)
                 archive.writestr(f"tsd-{payout['payout_date']}-{payout['id']}.xml", payload)
-        self._audit_apa_exports(organisation_id, list(exports_by_id.values()), actor=actor)
+        self._audit_apa_exports(organisation_id, [(payout, payload) for payout, payload, _ in exports_by_id.values()], actor=actor)
         return output.getvalue()
 
     def export_csv(self, organisation_id: str, preparation_id: str, *, actor: str) -> bytes:

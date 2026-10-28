@@ -244,6 +244,8 @@ FROM pay_component_types t WHERE t.organisation_id=c.organisation_id AND t.id=c.
                 elif path.stem == "0054_payroll_tsd_lines":
                     script = script.split("CREATE TRIGGER guard_pay_item_tsd_lines_update", 1)[0]
                     script += _POSTGRES_TSD_LINE_TRIGGERS
+                elif path.stem == "0055_tsd_apa_history":
+                    script = script.replace("file_xml BLOB", "file_xml BYTEA")
                 elif path.stem == "0035_payroll_income_line":
                     script = _POSTGRES_PAYROLL_0035
                 elif path.stem == "0034_payroll_demo_fixes":

@@ -92,9 +92,15 @@ def test_apa_routes_require_role_and_tenant_and_zip_one_file_per_payout(db, ee_o
     base = f"/organisations/{ee_org['id']}/pay-runs/{run['id']}/tsd/{prep['id']}"
     assert client.get(base + f"/payouts/{payout['id']}/apa.xml", headers={"X-Test-User": "outsider@example.test"}).status_code == 403
     xml = client.get(base + f"/payouts/{payout['id']}/apa.xml", headers={"X-Test-User": "owner@example.test"})
+    repeated_xml = client.get(base + f"/payouts/{payout['id']}/apa.xml", headers={"X-Test-User": "owner@example.test"})
     zipped = client.get(f"/organisations/{ee_org['id']}/payroll/tsd-apa/2026-10.zip",
                         headers={"X-Test-User": "owner@example.test"})
     assert xml.status_code == 200 and ET.fromstring(xml.content).tag.endswith("}xbrl")
+    assert repeated_xml.content == xml.content
+    history = db.rows("SELECT version,transaction_id,file_sha256,status FROM tsd_apa_exports WHERE organisation_id=? AND payout_id=?",
+                      (ee_org["id"], payout["id"]))
+    assert len(history) == 1 and history[0]["version"] == 1 and history[0]["status"] == "Exported"
+    assert history[0]["transaction_id"] in xml.text and len(history[0]["file_sha256"]) == 64
     assert zipped.status_code == 200
     from zipfile import ZipFile
     import io

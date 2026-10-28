@@ -2763,6 +2763,44 @@ def payroll_tsd_preparations(organisation_id: str, user: User = Depends(current_
     return TSDExportService().preparations(organisation_id)
 
 
+@api.get('/organisations/{organisation_id}/payroll/tsd-apa/history')
+def payroll_tsd_apa_history(organisation_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    from tsd_apa_history import APAHistoryService
+    return APAHistoryService(get_database()).exports(organisation_id)
+
+
+@api.post('/organisations/{organisation_id}/payroll/tsd-apa/history/{export_id}/cancellation.xml')
+def payroll_tsd_apa_cancellation(organisation_id: str, export_id: str, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    from tsd_apa_history import APAHistoryService
+    payload = APAHistoryService(get_database()).cancellation(organisation_id, export_id, actor=user.email)
+    return Response(payload, media_type='application/xml', headers={
+        'Content-Disposition': f'attachment; filename="tsd-cancel-{export_id}.xml"'})
+
+
+@api.post('/organisations/{organisation_id}/payroll/tsd-apa/feedback')
+async def payroll_tsd_apa_feedback(organisation_id: str, request: Request, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    form = await request.form()
+    upload = form.get('file')
+    transaction_id = str(form.get('transaction_id', '')).strip()
+    if upload is None or not hasattr(upload, 'read') or not transaction_id:
+        raise ValueError('Feedback XML and transaction_id are required')
+    payload = await upload.read(2_000_001)
+    if len(payload) > 2_000_000:
+        raise ValueError('Feedback XML exceeds 2 MB')
+    from tsd_apa_history import APAHistoryService
+    return APAHistoryService(get_database()).import_feedback(organisation_id, transaction_id, payload, actor=user.email)
+
+
+@api.get('/organisations/{organisation_id}/payroll/tsd-apa/history/{export_id}/feedback')
+def payroll_tsd_apa_feedback_results(organisation_id: str, export_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    from tsd_apa_history import APAHistoryService
+    return APAHistoryService(get_database()).feedback_results(organisation_id, export_id)
+
+
 @api.post('/organisations/{organisation_id}/pay-runs/{run_id}/tsd/prepare')
 def payroll_prepare_tsd(organisation_id: str, run_id: str,
                         user: User = Depends(require_csrf)):
