@@ -2237,7 +2237,8 @@
             t("Payroll"),
             t("People, payslips and postings for this client."),
             button("Add employee", "employee") + button("Payout summary", "payoutSummary") +
-              button("Absences", "absences") +
+              button("Absences", "absences") + button("Leave liability", "leaveLiability") +
+              (['owner','administrator'].includes(org?.role) ? button("Leave settings", "leaveSettings") : "") +
               button("Payment types", "paymentTypes") + button("Payroll accounts", "payrollAccounts") + button("Payday settings", "paydaySettings") +
               button("Run payroll for month", "run", true),
             `${unavailable ? `<div class="notice">${tr("Payroll is not available yet.")}</div>` : ""}<section class="section"><div class="section-head"><h2>${tr("Employees")}</h2><span class="muted">${num(employees?.filter((x) => x.active).length)} ${tr("employees")}</span>${employees === null ? '' : link('Export Excel', `/api${c.url('/reports/employees.xlsx')}`)}</div>${table(
@@ -2304,6 +2305,8 @@
         employee: () => employeeDialog(),
         paymentTypes: () => paymentTypesDialog(c, componentTypes || []),
         absences: () => payrollAbsencesDialog(c, employees || []),
+        leaveLiability: () => payrollLeaveLiabilityDialog(c),
+        leaveSettings: () => payrollLeaveSettingsDialog(c),
         payrollAccounts: () => payrollAccountsDialog(c),
         paydaySettings: () => paydaySettingsDialog(c),
         managePayouts: (b) => payrollPayoutsDialog(c, runs.find((run) => run.id === b.dataset.id), bankAccounts || []),
@@ -4395,6 +4398,7 @@
       "Run payroll for month",
       form(
         field("Month", "period", today().slice(0, 7), "month", "required") +
+          `<label class="check"><input type="checkbox" name="show_leave_balance"><span>${tr("Show remaining leave days on payslips")}</span></label>` +
           `<div class="full-width"><h3>${tr("Included employees")}</h3>${table(
             ["Name", ["Gross salary"], ["Hours worked"]],
             active.map((x) =>
@@ -4428,7 +4432,7 @@
         "Create payroll draft",
         `${tr("Month")}: ${esc(data.period)}<br>${num(active.length)} ${tr("employees")}`,
         async () => {
-          await post(url, { period: data.period, hours });
+          await post(url, { period: data.period, hours, show_leave_balance: Boolean(d.querySelector('[name="show_leave_balance"]')?.checked) });
           await saved(d);
         },
       );
@@ -4441,6 +4445,7 @@
   ];
   const payrollRoleLabels = {
     PAYROLL_SALARY: "Salary expense", PAYROLL_SOCIAL: "Social tax expense", PAYROLL_UI: "Employer unemployment expense",
+    PAYROLL_VACATION_RESERVE_EXPENSE: "Vacation reserve expense", PAYROLL_VACATION_RESERVE_LIABILITY: "Vacation reserve liability",
     PAYROLL_SALARY_PAYABLE: "Salary payable", PAYROLL_BAILIFF: "Bailiff withholding liability", PAYROLL_DEDUCTION: "Other deduction liability",
     PAYROLL_SOCIAL_ACCRUED: "Social tax accrued", PAYROLL_INCOME_WITHHELD: "Income tax withheld", PAYROLL_PENSION_WITHHELD: "Funded pension withheld",
     PAYROLL_UI_ACCRUED: "Unemployment insurance accrued", PAYROLL_SOCIAL_PAYABLE: "Social tax and pension payable",
@@ -4639,7 +4644,7 @@
   async function payrollAccountsDialog(c) {
     const [mappings, accounts] = await Promise.all([api(c.url('/payroll/posting-mappings')), api(c.url('/accounts'))]);
     const d = dialog("Payroll accounts", form(mappings.map((mapping) => {
-      const expense = ["PAYROLL_SALARY", "PAYROLL_SOCIAL", "PAYROLL_UI"].includes(mapping.role);
+      const expense = ["PAYROLL_SALARY", "PAYROLL_SOCIAL", "PAYROLL_UI", "PAYROLL_VACATION_RESERVE_EXPENSE"].includes(mapping.role);
       return select(payrollRoleLabels[mapping.role], mapping.role, accounts.filter((a) => a.active && a.account_type === (expense ? "Expense" : "Liability")).map((a) => [a.code, `${a.code} ${a.name}`]), mapping.account_code);
     }).join("")));
     bindForm(d, async (data) => {
@@ -4649,6 +4654,24 @@
       }
       await saved(d);
     });
+  }
+  async function payrollLeaveSettingsDialog(c) {
+    const url = c.url('/payroll/leave-settings'), settings = await api(url);
+    const policy = [['none', 'No expiry'], ['1_january_year_plus_2', '1 January of year +2'], ['31_december_year_plus_1', '31 December of year +1']];
+    const d = dialog('Leave settings', form(select('Basic leave expiry', 'basic_expiry_policy', policy.map(([v,l]) => [v,tr(l)]), settings.basic_expiry_policy) +
+      select('Extended leave expiry', 'extended_expiry_policy', policy.map(([v,l]) => [v,tr(l)]), settings.extended_expiry_policy) +
+      `<label class="check"><input type="checkbox" name="reserve_posting_enabled" ${settings.reserve_posting_enabled ? 'checked' : ''}><span>${tr('Post monthly vacation reserve')}</span></label>`));
+    bindForm(d, async (data) => { data.reserve_posting_enabled = Boolean(d.querySelector('[name="reserve_posting_enabled"]')?.checked); await post(url, data, 'PUT'); await saved(d); });
+  }
+  async function payrollLeaveLiabilityDialog(c) {
+    const asAt = today();
+    const load = async (dateValue) => api(c.url('/payroll/leave-liability') + `?as_at=${encodeURIComponent(dateValue)}`);
+    let report = await load(asAt), settings = await api(c.url('/payroll/leave-settings'));
+    const renderReport = (result) => { const rows = result.employees.map((item) => row([td(esc(item.employee_name)), td(item.remaining_days), cash(item.average_daily_pay,'EUR'), cash(item.wage_liability,'EUR'), cash(item.social_tax,'EUR'), cash(item.employer_unemployment,'EUR'), cash(item.total_liability,'EUR')])); rows.push(row([td(tr('Total')),td(result.totals.remaining_days),td(''),cash(result.totals.wage_liability,'EUR'),cash(result.totals.social_tax,'EUR'),cash(result.totals.employer_unemployment,'EUR'),cash(result.totals.total_liability,'EUR')])); return `<p>${tr('As at')} ${esc(result.as_at)}</p>${settings.reserve_posting_enabled ? button('Post monthly vacation reserve', 'postLeaveReserve', true, `data-period="${esc(result.as_at.slice(0,7))}"`) : ''}${table(['Employee','Remaining days','Average daily pay','Wage liability','Social tax','Employer unemployment','Total liability'], rows)}${result.employees.map((item) => `<details><summary>${esc(item.employee_name)} · ${tr('Leave liability details')}</summary>${table(['Movement','Date','Kind','Days','Expiry date'], item.movements.map((move) => row([td(tr(move.type === 'expired' ? 'Expired' : move.type[0].toUpperCase() + move.type.slice(1))),td(esc(move.date)),td(tr(move.kind)),td(esc(move.days)),td(esc(move.expires_on || ''))])))}</details>`).join('')}`; };
+    const d = dialog('Detailed leave liability report', `<div>${field('As at','as_at',asAt,'date')}<a data-liability-xlsx href="/api${c.url('/payroll/leave-liability.xlsx')}?as_at=${encodeURIComponent(asAt)}">${tr('Export Excel')}</a></div><div data-liability-report>${renderReport(report)}</div>`);
+    const input = d.querySelector('[name="as_at"]');
+    input.addEventListener('change', async () => { try { report = await load(input.value); d.querySelector('[data-liability-report]').innerHTML = renderReport(report); d.querySelector('[data-liability-xlsx]').href = `/api${c.url('/payroll/leave-liability.xlsx')}?as_at=${encodeURIComponent(input.value)}`; } catch(error) { toast(error.message,'error'); } });
+    d.addEventListener('click', async (event) => { const b = event.target.closest('[data-action="postLeaveReserve"]'); if (!b) return; confirmAction('Post vacation reserve', `${tr('Period')}: ${esc(b.dataset.period)}`, async () => { await post(c.url('/payroll/leave-reserve-postings'), {period:b.dataset.period}); toast(tr('Vacation reserve posted'),'success'); }); });
   }
   async function payrollPayoutsDialog(c, run, bankAccounts) {
     if (!run) return;

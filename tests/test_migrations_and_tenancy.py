@@ -115,7 +115,7 @@ def test_component_catalogue_upgrade_preserves_defaults_and_posted_payroll(tmp_p
 
 def test_empty_migration_is_idempotent(tmp_path):
     db = Database(path=str(tmp_path / "empty.sqlite"))
-    assert db.migrate() == ["0001_accounting_core", "0002_integrations", "0003_operations", "0004_document_immutability", "0005_payroll", "0006_payroll_part_time_hourly", "0007_automation", "0008_import_staging", "0009_local_accounts", "0010_tsd_export", "0011_account_mappings", "0012_external_gl", "0013_sync_review", "0014_sync_push", "0015_payment_orders", "0016_bank_feed_schedules", "0017_prepayments", "0018_fixed_assets", "0019_master_data_import", "0020_quotes", "0021_periodisation", "0022_payment_links", "0023_analytical_objects", "0024_reminder_rules", "0025_fx_realised", "0026_fx_revaluations", "0027_mfa", "0028_document_settings", "0029_copilot", "0030_master_data_maintenance", "0031_master_data_groups", "0032_copilot_access", "0033_copilot_settings", "0034_payroll_demo_fixes", "0035_payroll_income_line", "0036_payroll_component_catalogue", "0037_employee_tax_settings", "0038_payroll_payday_rules", "0039_payroll_payouts", "0040_payroll_settlement_dates", "0041_payroll_sepa_details", "0042_payroll_component_metadata", "0043_payroll_absences", "0044_payroll_absence_day_freeze", "0045_payroll_history", "0046_payroll_absence_pay", "0047_payroll_absence_payouts", "0048_payroll_component_breakdown", "0049_payroll_component_source", "0050_payroll_history_import"]
+    assert db.migrate() == ["0001_accounting_core", "0002_integrations", "0003_operations", "0004_document_immutability", "0005_payroll", "0006_payroll_part_time_hourly", "0007_automation", "0008_import_staging", "0009_local_accounts", "0010_tsd_export", "0011_account_mappings", "0012_external_gl", "0013_sync_review", "0014_sync_push", "0015_payment_orders", "0016_bank_feed_schedules", "0017_prepayments", "0018_fixed_assets", "0019_master_data_import", "0020_quotes", "0021_periodisation", "0022_payment_links", "0023_analytical_objects", "0024_reminder_rules", "0025_fx_realised", "0026_fx_revaluations", "0027_mfa", "0028_document_settings", "0029_copilot", "0030_master_data_maintenance", "0031_master_data_groups", "0032_copilot_access", "0033_copilot_settings", "0034_payroll_demo_fixes", "0035_payroll_income_line", "0036_payroll_component_catalogue", "0037_employee_tax_settings", "0038_payroll_payday_rules", "0039_payroll_payouts", "0040_payroll_settlement_dates", "0041_payroll_sepa_details", "0042_payroll_component_metadata", "0043_payroll_absences", "0044_payroll_absence_day_freeze", "0045_payroll_history", "0046_payroll_absence_pay", "0047_payroll_absence_payouts", "0048_payroll_component_breakdown", "0049_payroll_component_source", "0050_payroll_history_import", "0051_payroll_leave_liability"]
     assert db.migrate() == []
     assert db.scalar("SELECT COUNT(*) FROM schema_migrations") == len(catalogue())
     assert db.scalar(
@@ -159,7 +159,7 @@ def test_historical_migration_catalogue_does_not_affect_other_databases(tmp_path
         current_setup = pool.submit(current.migrate)
         assert old_setup.result() == sorted(versions)
         latest = current_setup.result()
-    assert latest[-1] == '0050_payroll_history_import'
+    assert latest[-1] == '0051_payroll_leave_liability'
     assert legacy.scalar('SELECT COUNT(*) FROM schema_migrations') == 5
     assert current.scalar('SELECT COUNT(*) FROM schema_migrations') == len(catalogue())
     assert legacy.migrate() == latest[5:]
@@ -220,6 +220,8 @@ def test_organisation_entity_country_and_seed_data(db):
         "6110": "Palgakulu",
         "6120": "Sotsiaalmaksu kulu",
         "6130": "Tööandja töötuskindlustusmakse kulu",
+        "6140": "Puhkusereservi kulu",
+        "2260": "Puhkusereservi kohustus",
         "2210": "Palgavõlg töötajatele",
         "2220": "Kinnipeetud tulumaksu võlg",
         "2230": "Pensioni- ja töötuskindlustusmaksete võlg",

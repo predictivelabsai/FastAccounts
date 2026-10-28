@@ -1089,6 +1089,8 @@ def payroll_pdf(organisation: dict, run: dict) -> bytes:
                 details.append(f"{label(et_name, en_name)}: {absence['start_date']}–{absence['end_date']} ({absence['leave_days']} {catalogue('Leave days').lower()})")
         if item.get('fte') not in (None, '1'):
             details.append(f"{catalogue('Work-time fraction (FTE)')}: {item['fte']}")
+        if item.get('remaining_leave_days') is not None:
+            details.append(f"{catalogue('Remaining leave days')}: {item['remaining_leave_days']}")
         reason = item.get('social_tax_minimum_exemption')
         if reason in SOCIAL_TAX_MINIMUM_EXEMPTION_LABELS:
             details.append(f"{catalogue('Social tax minimum exemption')}: {catalogue(SOCIAL_TAX_MINIMUM_EXEMPTION_LABELS[reason])}")

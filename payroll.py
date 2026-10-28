@@ -750,7 +750,7 @@ class PayrollService:
         with self.db.transaction() as tx:
             self._organisation(tx, organisation_id)
             account = tx.one('SELECT * FROM accounts WHERE organisation_id=? AND code=? AND active=1', (organisation_id, account_code))
-            expected = 'Expense' if role in ('PAYROLL_SALARY', 'PAYROLL_SOCIAL', 'PAYROLL_UI') else 'Liability'
+            expected = 'Expense' if role in ('PAYROLL_SALARY', 'PAYROLL_SOCIAL', 'PAYROLL_UI', 'PAYROLL_VACATION_RESERVE_EXPENSE') else 'Liability'
             if not account or account['account_type'] != expected:
                 raise ValueError('Choose an active account of the required payroll account type')
             provider, now = 'payroll:' + role.lower(), utc_now()
@@ -771,7 +771,7 @@ class PayrollService:
             account = tx.one('SELECT * FROM accounts WHERE organisation_id=? AND system_role=? AND active=1', (organisation_id, role))
         if not account:
             raise ValueError('A payroll posting account is missing or inactive')
-        expected = 'Expense' if role in ('PAYROLL_SALARY', 'PAYROLL_SOCIAL', 'PAYROLL_UI') else 'Liability'
+        expected = 'Expense' if role in ('PAYROLL_SALARY', 'PAYROLL_SOCIAL', 'PAYROLL_UI', 'PAYROLL_VACATION_RESERVE_EXPENSE') else 'Liability'
         if account['account_type'] != expected:
             raise ValueError('Choose an active account of the required payroll account type')
         return account
@@ -789,17 +789,18 @@ class PayrollService:
             raise ValueError(f"{employee['name']}: hours must be a positive number with at most two decimals")
         return money(value)
 
-    def create_run(self, organisation_id, *, period, actor, hours=None, tx=None):
+    def create_run(self, organisation_id, *, period, actor, hours=None, show_leave_balance=False, tx=None):
         if not re.fullmatch(r'[0-9]{4}-(0[1-9]|1[0-2])', period):
             raise ValueError('Payroll periods must use YYYY-MM')
         if tx is None:
             with self.db.transaction() as owned_tx:
-                return self.create_run(organisation_id, period=period, actor=actor, hours=hours, tx=owned_tx)
+                return self.create_run(organisation_id, period=period, actor=actor, hours=hours,
+                                       show_leave_balance=show_leave_balance, tx=owned_tx)
         self._organisation(tx, organisation_id)
         pay_date = settlement_date(period, payday_rule_date=payday_for_period(tx, organisation_id, period))
         rules_for(pay_date)
         run_id = new_id()
-        result = tx.execute("INSERT INTO pay_runs(id,organisation_id,period,total_gross,total_net,total_employer_cost,created_by,created_at,settlement_date) VALUES (?,?,?,0,0,0,?,?,?) ON CONFLICT(organisation_id,period) DO NOTHING", (run_id, organisation_id, period, actor, utc_now(), pay_date.isoformat()))
+        result = tx.execute("INSERT INTO pay_runs(id,organisation_id,period,total_gross,total_net,total_employer_cost,created_by,created_at,settlement_date,show_leave_balance) VALUES (?,?,?,0,0,0,?,?,?,?) ON CONFLICT(organisation_id,period) DO NOTHING", (run_id, organisation_id, period, actor, utc_now(), pay_date.isoformat(), int(bool(show_leave_balance))))
         if result.rowcount != 1:
             raise PayrollConflict(f'A pay run already exists for {period}')
         employees = [e for e in tx.rows('SELECT * FROM employees WHERE organisation_id=? AND active=1 ORDER BY id', (organisation_id,))
@@ -1011,6 +1012,15 @@ class PayrollService:
                     'ON a.organisation_id=x.organisation_id AND a.id=x.absence_id '
                     'WHERE x.organisation_id=? AND x.pay_run_id=? AND x.employee_id=? ORDER BY a.start_date,a.id',
                     (organisation_id, run_id, item['employee_id']))
+        if run.get('show_leave_balance'):
+            from payroll_leave_service import PayrollLeaveLiabilityService
+            period = run['period']
+            year, month = map(int, period.split('-'))
+            as_at = date(year + (month == 12), month % 12 + 1, 1) - timedelta(days=1)
+            balances = {row['employee_id']: row['remaining_days'] for row in
+                        PayrollLeaveLiabilityService(self.db).report(organisation_id, as_at)['employees']}
+            for item in run['items']:
+                item['remaining_leave_days'] = balances.get(item['employee_id'], '0')
         return payroll_pdf(org, run)
 
     def workbook_xlsx(self, organisation_id, run_id):

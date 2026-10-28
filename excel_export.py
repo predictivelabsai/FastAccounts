@@ -273,3 +273,29 @@ def document_list_workbook(organisation: dict, documents: list[dict], kind: str)
                 sheet.cell(row=row, column=column).data_type = "s"
     # Currency is retained on each row; mixed currencies are never summed.
     return _finish(workbook)
+
+
+def leave_liability_workbook(organisation: dict, report: dict) -> bytes:
+    workbook = _book(organisation, 'Leave liability')
+    sheet = workbook.active
+    sheet.title = 'Leave liability'
+    _header_row(sheet, ('Employee', 'Remaining days', 'Average daily pay', 'Wage liability',
+                        'Social tax', 'Employer unemployment', 'Total liability', 'As at'))
+    for employee in report['employees']:
+        sheet.append([employee['employee_name'], Decimal(employee['remaining_days']),
+                      Decimal(employee['average_daily_pay']), Decimal(employee['wage_liability']),
+                      Decimal(employee['social_tax']), Decimal(employee['employer_unemployment']),
+                      Decimal(employee['total_liability']), report['as_at']])
+    sheet.append(['Total', Decimal(report['totals']['remaining_days']), None,
+                  Decimal(report['totals']['wage_liability']), Decimal(report['totals']['social_tax']),
+                  Decimal(report['totals']['employer_unemployment']), Decimal(report['totals']['total_liability']),
+                  report['as_at']])
+    for cell in sheet[sheet.max_row]:
+        cell.font = Font(bold=True)
+    detail = workbook.create_sheet('Movements')
+    _header_row(detail, ('Employee', 'Movement', 'Date', 'Kind', 'Days', 'Expiry date', 'Absence reference'))
+    for employee in report['employees']:
+        for movement in employee['movements']:
+            detail.append([employee['employee_name'], movement['type'], movement['date'], movement['kind'],
+                           Decimal(movement['days']), movement.get('expires_on') or '', movement.get('absence_id') or ''])
+    return _finish(workbook)

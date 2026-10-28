@@ -27,15 +27,19 @@
   Reviewed Merit Palk vacation snapshots can be applied as opening balances.
   Average-pay calculations use reviewed history for periods without approved
   FastAccounts runs and use the vacation-pay payout date for the earning window.
-  Unit 7 now has pure calendar-day accrual, FIFO/expiry and
-  employer-cost valuation functions with focused tests. Leave-lot persistence,
-  organisation expiry settings, reports and reserve posting remain outstanding.
-  Unit 8 adds run-snapshot absences to payslips and dashboard counts for annual
-  leave and sick leave today, with labels in all four locales. Remaining leave
-  balances and optional payslip balances remain outstanding.
+  Unit 7 derives employee leave lots and movements from reviewed source records,
+  applies FIFO by event date, supports separate expiry policies, and provides
+  liability and movement reports with XLSX export. Optional monthly reserve
+  postings use mapped expense/liability accounts, balanced immutable ledger
+  batches, duplicate-period refusal and ledger reversal. Unit 8 adds an
+  opt-in period-end leave balance to payslips. Labels are available in en/et/lv/lt.
+- Migration 0051 adds organisation leave policies, reserve posting state and
+  the per-run payslip option. Source records remain the rebuild input; no
+  hand-edited leave balance snapshot is stored. Payroll production UAT and
+  accountant confirmation remain pending.
 - Payroll history import, Merit application, average-pay, role/tenant/CSRF and
-  migration regression tests pass. The absence series remains in progress
-  because persistent liability workflows and reserve posting are outstanding.
+  migration regression tests pass. The absence series remains in progress until
+  the requested regression commands and accountant review are recorded.
 
 ## 2026-10-28: Payroll calendar and payouts
 

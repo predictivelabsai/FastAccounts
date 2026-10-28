@@ -239,7 +239,7 @@ def test_migration_rerun_preserves_data_and_checks(env):
     assert d['db'].rows('SELECT * FROM document_settings') == original
     assert d['db'].rows('SELECT * FROM attachments') == attachments
     assert d['db'].rows('PRAGMA foreign_key_check') == []
-    assert '"0050_payroll_history_import"]' in (ROOT / ".github/workflows/ci.yml").read_text()
+    assert f'"{catalogue()[-1]}"]' in (ROOT / ".github/workflows/ci.yml").read_text()
     for column, value in [('accent_colour', '#GG0000'), ('accent_colour', '#1234567'), ('footer_text', 'a' * 501)]:
         with pytest.raises(sqlite3.IntegrityError), d['db'].transaction() as tx:
             tx.execute(f'UPDATE document_settings SET {column}=? WHERE organisation_id=?', (value, d['org']['id']))

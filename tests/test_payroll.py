@@ -54,9 +54,13 @@ def test_minimum_wage(db, ee_org, period, salary, valid):
 
 def test_workflow_snapshot_balance_pdf_and_delete(db, ee_org):
     service = PayrollService(db)
-    e = employee(service, ee_org, apply_tax_free_minimum=True)
+    e = employee(service, ee_org, apply_tax_free_minimum=True, employment_start_date='2026-01-01')
+    from core_utils import new_id
+    with db.transaction() as tx:
+        tx.execute('INSERT INTO payroll_leave_entitlements(id,organisation_id,employee_id,effective_from,days_per_year,created_at) VALUES (?,?,?,?,?,?)',
+            (new_id(), ee_org['id'], e['id'], '2026-01-01', '28', '2026-01-01'))
     employee(service, ee_org, name='Board', board_member=True, gross_salary='500')
-    run = service.create_run(ee_org['id'], period='2026-07', actor=ACTOR)
+    run = service.create_run(ee_org['id'], period='2026-07', actor=ACTOR, show_leave_balance=True)
     service.save_employee(ee_org['id'], employee_id=e['id'], actor=ACTOR, gross_salary='3000', name='Changed', active=False)
     with pytest.raises(PayrollConflict):
         service.create_run(ee_org['id'], period='2026-07', actor=ACTOR)
@@ -79,6 +83,7 @@ def test_workflow_snapshot_balance_pdf_and_delete(db, ee_org):
     assert len(reader.pages) == 2
     text = '\n'.join(p.extract_text() for p in reader.pages)
     assert '1657.84' in text and '342.16' in text and 'Kinnipeetud summad kokku' in text
+    assert '16.26' in text, text
     draft = service.create_run(ee_org['id'], period='2026-08', actor=ACTOR)
     service.delete_run(ee_org['id'], draft['id'], actor=ACTOR)
     assert len(service.runs(ee_org['id'])) == 1
@@ -182,7 +187,7 @@ def test_existing_books_upgrade(tmp_path):
     assert db.migrate() == catalogue_after('0004_document_immutability')
     after = db.rows("SELECT * FROM accounts WHERE organisation_id=? AND system_role NOT LIKE 'PAYROLL_%' ORDER BY code", (org['id'],))
     assert before == after
-    assert len(db.rows("SELECT * FROM accounts WHERE organisation_id=? AND system_role LIKE 'PAYROLL_%'", (org['id'],))) == 17
+    assert len(db.rows("SELECT * FROM accounts WHERE organisation_id=? AND system_role LIKE 'PAYROLL_%'", (org['id'],))) == 19
 
 
 def test_concurrent_approvals_post_once(db, ee_org):

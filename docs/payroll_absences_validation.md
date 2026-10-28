@@ -1,6 +1,6 @@
 # Payroll absences validation
 
-Date: 2026-10-28. Branch: `feat/payroll-absences`, based on `de88d0f`.
+Date: 2026-10-28. Branch: `feat/payroll-absences`, based on `2f7fdf2`.
 
 ## Unit 1: Payment-type wage and active metadata
 
@@ -82,28 +82,36 @@ Targeted command and result:
 # 2 passed
 ```
 
-## Unit 7: Liability calculation core
+## Unit 7: Leave liability, reporting and reserve posting
 
-`payroll_leave_liability.py` calculates entitlement pro rata by calendar day,
-supports both requested expiry-date policies and no expiry, consumes available
-leave FIFO, and values remaining days with average daily pay plus employer
-social tax and unemployment insurance. Four focused tests cover accrual, expiry,
-consumption and valuation. Persistent entitlement lots, organisation settings,
-employee reports, XLSX output, account mapping and balanced monthly reserve
-posting are not implemented.
+`payroll_leave_liability.py` provides pure Decimal accrual, FIFO and valuation
+calculations. Migration 0051 adds leave expiry settings, an optional monthly
+reserve setting and the per-run payslip option. The database-backed service
+rebuilds accrual lots from effective-dated entitlement and reviewed opening
+records, replays annual and extended leave consumption by event date, and
+reports expiry movements. No editable or hand-maintained balance is stored.
+Liability reports use `payroll_average` as at the requested date, add social tax
+and employer unemployment, show employee movements and totals, and export to
+XLSX. Optional monthly reserve postings use mapped accounts and balanced
+immutable ledger batches; duplicate periods are refused and reversal uses
+`LedgerService.reverse`.
+
+Focused validation command and result:
 
 ```powershell
-.tmp\venv312\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache312 --basetemp=.tmp\test-liability-core2 tests\test_payroll_leave_liability.py
-# 4 passed
+.tmp\venv312\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache312 --basetemp=.tmp\test-leave-report-xlsx tests\test_payroll_leave_liability.py
+# 9 passed (includes tenant settings/report, XLSX, reserve balance, duplicate refusal and reversal)
 ```
 
 ### Needs accountant confirmation
 
 - Confirm whether entitlement precision is four decimal days and how rounding
   occurs when a leave event consumes a fractional day.
-- Confirm the exact inclusive expiry boundary and FIFO ordering across basic,
-  extended and opening-balance lots. The pure functions currently treat a lot
-  as expired on its expiry date and order by accrual date.
+- Confirm the exact inclusive expiry boundary, fractional-day rounding, and
+  expiry-year treatment of imported opening snapshots whose original earning
+  years are unavailable.
+- Confirm the statutory average-pay interpretation and the 2026 liability
+  employer-cost rates with an Estonian accountant before production UAT.
 
 The fixture covers the 21/22 October example (EUR 2,200 becomes EUR 2,100),
 minimum-wage ratio, hourly pay unchanged, and approved-run absence protection.
@@ -275,33 +283,46 @@ PostgreSQL execution were performed.
 ## Unit 8: Payslip and dashboard
 
 Payslips show absences frozen into the run, including date range and leave-day
-count. The dashboard shows employees with annual or extended leave today and
-employees on sick leave today. Labels are translated in en/et/lv/lt. Remaining
-leave balance display is not implemented because entitlement and leave-lot
-application are not yet connected.
+count. An opt-in pay-run setting freezes whether each payslip shows remaining
+leave days as at that run's period end. Labels are translated in en/et/lv/lt.
+The dashboard continues to show annual/extended and sick leave today.
 
 ```powershell
 node --check static\app.js
 .tmp\venv312\Scripts\python.exe -c "import json,pathlib; [json.loads(p.read_text(encoding='utf-8')) for p in pathlib.Path('web/locales').glob('*.json')]"
-.tmp\venv312\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache312 --basetemp=.tmp\test-payroll-unit8 tests\test_payroll.py::test_workflow_snapshot_balance_pdf_and_delete tests\test_workspace_payroll.py::test_payroll_absences_register_can_create_localised_leave
-# 5 passed; JavaScript syntax and locale JSON checks passed
+.tmp\venv312\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache312 --basetemp=.tmp\test-payslip-remaining3 tests\test_payroll.py::test_workflow_snapshot_balance_pdf_and_delete
+# 1 passed
+node --check static\app.js
+.tmp\venv312\Scripts\python.exe -c "import json,pathlib; [json.loads(p.read_text(encoding='utf-8')) for p in pathlib.Path('web/locales').glob('*.json')]"
+# JavaScript syntax and locale JSON checks passed
 ```
 
 ## Unit 9: Regression and delivery record
 
-The final core regression command below passed. Earlier targeted commands
-covered the four-language absence register browser flow, payslip PDF rendering,
-day-based and hourly payroll, permitted paid absence, and schema migration.
+The requested payroll, workspace and support suites were run separately. Each
+`tests/test_payroll_*.py` file was run individually; the twelve files passed
+126 tests in total. The core payroll, workspace payroll, migration/tenancy,
+public-page and i18n suites passed 16, 17, 16, 60 and 15 tests respectively.
+Ten migration-catalogue consumer tests across seven files passed after their CI
+checks were changed to derive the latest migration name from the shared catalogue.
+JavaScript syntax and all four locale JSON catalogues also passed validation.
 
 ```powershell
-.tmp\venv312\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache312 --basetemp=.tmp\test-payroll-absence-final tests\test_payroll_absences.py tests\test_payroll_average.py tests\test_payroll_absence_pay.py tests\test_payroll_leave_liability.py tests\test_migrations_and_tenancy.py::test_empty_migration_is_idempotent tests\test_migrations_and_tenancy.py::test_historical_migration_catalogue_does_not_affect_other_databases
-# 25 passed
+.tmp\venv312\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache312 --basetemp=.tmp\test-payroll-core2 tests\test_payroll.py
+# 16 passed
+.tmp\venv312\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache312 --basetemp=.tmp\test-workspace-final2 tests\test_workspace_payroll.py
+# 17 passed
+.tmp\venv312\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache312 --basetemp=.tmp\test-migrations-final tests\test_migrations_and_tenancy.py
+# 16 passed
+.tmp\venv312\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache312 --basetemp=.tmp\test-public-final tests\test_public.py
+# 60 passed
+.tmp\venv312\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache312 --basetemp=.tmp\test-i18n-final2 tests\test_i18n.py
+# 15 passed
 ```
 
-Outstanding work before the absence series can be considered complete: connect
-leave entitlement and opening balances to annual accrual and expiry; add
-liability reports and optional mapped reserve journals; and display remaining
-leave balances. Payroll production UAT remains pending.
+Outstanding before the absence series can be considered complete: run and record
+accountant confirmation of the listed statutory assumptions and complete payroll
+production UAT. No PostgreSQL server or live network tests were used.
 PostgreSQL execution was not performed. The date-based and statutory parameters
 listed above still need Estonian accountant review.
 

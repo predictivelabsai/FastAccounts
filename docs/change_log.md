@@ -4,6 +4,22 @@ Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as
 delivered.
 
+## 2026-10-28: Payroll leave liability and payslip balances
+
+- Added migration 0051 for basic and extended expiry policies, optional reserve
+  posting, reserve posting records and the payslip balance option. Entitlement,
+  reviewed opening snapshots and annual leave records are replayed by event date
+  to derive lots and FIFO consumption without editable balance state.
+- Added owner/administrator policy controls and a payroll liability report with
+  employee movements, average daily pay, employer social tax, unemployment
+  insurance and totals. The report exports to XLSX in two sheets.
+- Added optional, audited monthly reserve postings using mapped expense and
+  liability accounts, immutable balanced ledger batches, one-posting-per-month
+  refusal and reversal through `LedgerService.reverse`.
+- Pay runs can opt to include period-end remaining leave days on payslips.
+  Labels are translated in en/et/lv/lt. Validation and accountant review status
+  are recorded in `payroll_absences_validation.md`.
+
 ## 2026-10-28: Payroll opening balances and historical earnings
 
 - Added migration 0050 for separate extended opening days and source keys on

@@ -111,7 +111,7 @@ def test_migration_count_rerun_and_ci(env):
             tx.execute("DELETE FROM schema_migrations WHERE version='0029_copilot'")
         assert d["db"].migrate() == ["0029_copilot"]
     assert d["db"].rows("SELECT * FROM copilot_messages") == []
-    assert '"0050_payroll_history_import"]' in (ROOT / ".github/workflows/ci.yml").read_text()
+    assert f'"{catalogue()[-1]}"]' in (ROOT / ".github/workflows/ci.yml").read_text()
 
 
 def test_kill_switches_block_before_any_provider_call(env, monkeypatch):

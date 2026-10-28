@@ -54,6 +54,7 @@ from payroll_payday import PaydaySettingsService
 from payroll_payouts import PayoutConflict, PayoutService
 from payroll_absences import AbsenceConflict, PayrollAbsenceService, ABSENCE_TYPES
 from payroll_absence_payouts import AbsencePayoutService
+from payroll_leave_service import PayrollLeaveLiabilityService
 from employee_details import EmployeeDetailsError
 from tax import TaxService
 from tsd import TSDExportService
@@ -2200,6 +2201,7 @@ class PayRunIn(BaseModel):
     period: str = Field(pattern=r'^\d{4}-(0[1-9]|1[0-2])$')
     # Hours worked per hourly employee id for this month.
     hours: dict[str, Decimal] | None = None
+    show_leave_balance: bool = False
 
 
 class EmployeeTaxSettingIn(BaseModel):
@@ -2258,6 +2260,30 @@ class PaydaySettingsIn(BaseModel):
     rule_start_date: str
     rule: Literal['next_month_day', 'current_month_day', 'next_month_first_working_day']
     day: int | None = Field(default=None, ge=1, le=31)
+
+
+class PayrollLeaveSettingsIn(BaseModel):
+    model_config = {'extra': 'forbid'}
+    basic_expiry_policy: Literal['none', '1_january_year_plus_2', '31_december_year_plus_1']
+    extended_expiry_policy: Literal['none', '1_january_year_plus_2', '31_december_year_plus_1']
+    reserve_posting_enabled: bool = Field(strict=True)
+
+
+class PayrollLeaveReserveIn(BaseModel):
+    model_config = {'extra': 'forbid'}
+    period: str = Field(pattern=r'^\d{4}-(0[1-9]|1[0-2])$')
+
+
+class PayrollLeaveReserveReversalIn(BaseModel):
+    model_config = {'extra': 'forbid'}
+    reversal_date: str = Field(pattern=r'^\d{4}-\d{2}-\d{2}$')
+    reason: str = Field(default='', max_length=500)
+
+    @field_validator('reversal_date')
+    @classmethod
+    def validate_reversal_date(cls, value):
+        date.fromisoformat(value)
+        return value
 
 
 class PayoutCreateIn(BaseModel):
@@ -2625,6 +2651,46 @@ def payroll_posting_mappings(organisation_id: str, user: User = Depends(current_
     return PayrollService().posting_mappings(organisation_id)
 
 
+@api.get('/organisations/{organisation_id}/payroll/leave-settings')
+def payroll_leave_settings(organisation_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    return PayrollLeaveLiabilityService().settings(organisation_id)
+
+
+@api.put('/organisations/{organisation_id}/payroll/leave-settings')
+def payroll_save_leave_settings(organisation_id: str, payload: PayrollLeaveSettingsIn, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES & {'owner', 'administrator'})
+    return PayrollLeaveLiabilityService().save_settings(organisation_id, actor=user.email, **payload.model_dump())
+
+
+@api.get('/organisations/{organisation_id}/payroll/leave-liability')
+def payroll_leave_liability(organisation_id: str, as_at: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    return PayrollLeaveLiabilityService().report(organisation_id, as_at)
+
+
+@api.get('/organisations/{organisation_id}/payroll/leave-liability.xlsx')
+def payroll_leave_liability_xlsx(organisation_id: str, as_at: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    return Response(PayrollLeaveLiabilityService().workbook_xlsx(organisation_id, as_at),
+        media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        headers={'Content-Disposition': 'attachment; filename="leave-liability.xlsx"'})
+
+
+@api.post('/organisations/{organisation_id}/payroll/leave-reserve-postings', status_code=201)
+def payroll_post_leave_reserve(organisation_id: str, payload: PayrollLeaveReserveIn, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, APPROVE_ROLES)
+    return PayrollLeaveLiabilityService().post_reserve(organisation_id, payload.period, actor=user.email)
+
+
+@api.post('/organisations/{organisation_id}/payroll/leave-reserve-postings/{period}/reverse')
+def payroll_reverse_leave_reserve(organisation_id: str, period: str, payload: PayrollLeaveReserveReversalIn,
+                                 user: User = Depends(require_csrf)):
+    _require(organisation_id, user, APPROVE_ROLES)
+    return PayrollLeaveLiabilityService().reverse_reserve(organisation_id, period,
+        reversal_date=payload.reversal_date, actor=user.email, reason=payload.reason)
+
+
 @api.put('/organisations/{organisation_id}/payroll/posting-mappings/{role}')
 def payroll_save_mapping(organisation_id: str, role: str, payload: PayrollMappingIn, user: User = Depends(require_csrf)):
     _require(organisation_id, user, APPROVE_ROLES)
@@ -2656,7 +2722,8 @@ def payroll_runs(organisation_id: str, user: User = Depends(current_user)):
 @api.post('/organisations/{organisation_id}/pay-runs', status_code=201)
 def payroll_create_run(organisation_id: str, payload: PayRunIn, user: User = Depends(require_csrf)):
     _require(organisation_id, user, WRITE_ROLES)
-    return PayrollService().create_run(organisation_id, period=payload.period, actor=user.email, hours=payload.hours)
+    return PayrollService().create_run(organisation_id, period=payload.period, actor=user.email, hours=payload.hours,
+                                      show_leave_balance=payload.show_leave_balance)
 
 
 @api.post('/organisations/{organisation_id}/pay-runs/{run_id}/approve')

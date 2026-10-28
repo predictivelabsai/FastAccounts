@@ -110,7 +110,9 @@ ACCOUNTS = (
     ('2258', 'Tasumisele kuuluv tulumaks', 'PAYROLL_INCOME_PAYABLE'),
     ('2259', 'Tasumisele kuuluvad töötuskindlustusmaksed', 'PAYROLL_UI_PAYABLE'),
 )
-ROLES = ('PAYROLL_SALARY', 'PAYROLL_SOCIAL', 'PAYROLL_UI', *(a[2] for a in ACCOUNTS))
+ROLES = ('PAYROLL_SALARY', 'PAYROLL_SOCIAL', 'PAYROLL_UI',
+         'PAYROLL_VACATION_RESERVE_EXPENSE', 'PAYROLL_VACATION_RESERVE_LIABILITY',
+         *(a[2] for a in ACCOUNTS))
 
 
 def seed_types(tx, organisation_id):
