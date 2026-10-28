@@ -435,6 +435,13 @@ before 24 February, 23 June, 24 December or 1 January. For 2026, October is
 22 days / 176 hours; February is 19 / 149, June is 20 / 157, and December is
 21 / 162. These are calendar norms, before individual schedules or leave.
 
+Company payday histories are effective-dated. `next_month_day` and
+`current_month_day` clamp dates beyond the target month's length. A resulting
+weekend or public holiday shifts the payday backwards to the previous working
+day. `next_month_first_working_day` starts on the first day of the next month
+and moves forward to its first working day. The company payroll start date is
+stored separately from the dated payday rule history.
+
 ## Effective-dated employee tax elections
 
 Migration 0037 adds organisation-scoped `employee_tax_settings` histories for

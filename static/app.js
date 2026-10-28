@@ -2229,7 +2229,7 @@
             t("Payroll"),
             t("People, payslips and postings for this client."),
             button("Add employee", "employee") +
-              button("Payment types", "paymentTypes") + button("Payroll accounts", "payrollAccounts") +
+              button("Payment types", "paymentTypes") + button("Payroll accounts", "payrollAccounts") + button("Payday settings", "paydaySettings") +
               button("Run payroll for month", "run", true),
             `${unavailable ? `<div class="notice">${tr("Payroll is not available yet.")}</div>` : ""}<section class="section"><div class="section-head"><h2>${tr("Employees")}</h2><span class="muted">${num(employees?.filter((x) => x.active).length)} ${tr("employees")}</span>${employees === null ? '' : link('Export Excel', `/api${c.url('/reports/employees.xlsx')}`)}</div>${table(
               [
@@ -2295,6 +2295,7 @@
         employee: () => employeeDialog(),
         paymentTypes: () => paymentTypesDialog(c, componentTypes || []),
         payrollAccounts: () => payrollAccountsDialog(c),
+        paydaySettings: () => paydaySettingsDialog(c),
         archiveEmployee: async (b) => { await post(c.url(`/employees/${b.dataset.id}`), {active: false}, "PATCH"); await render(); },
         unarchiveEmployee: async (b) => { await post(c.url(`/employees/${b.dataset.id}`), {active: true}, "PATCH"); await render(); },
         deleteEmployee: (b) => confirmAction("Delete employee", tr("Delete this employee permanently? Employees with pay run history must be archived instead."), async () => {
@@ -4484,6 +4485,30 @@
         if (data[mapping.role] !== mapping.account_code)
           await post(c.url(`/payroll/posting-mappings/${mapping.role}`), {account_code: data[mapping.role]}, "PUT");
       }
+      await saved(d);
+    });
+  }
+  async function paydaySettingsDialog(c) {
+    const settings = await api(c.url('/payroll/payday-settings'));
+    const latest = settings.rules.at(-1) || {};
+    const history = settings.rules.length ? `<ul>${settings.rules.map((r) => `<li>${esc(r.start_date)}: ${tr(r.rule)}${r.day ? ` ${r.day}` : ''}</li>`).join('')}</ul>` : `<p class="muted">${tr('No payday rules have been saved.')}</p>`;
+    const d = dialog('Payday settings', form(
+      `<div class="full-width"><h3>${tr('Palgaarvestuse algus')}</h3>${history}</div>` +
+      field('Palgaarvestuse algus', 'start_date', settings.payroll_start_date || '', 'date') +
+      field('Rule effective from', 'rule_start_date', latest.start_date || new Date().toISOString().slice(0, 10), 'date', 'required') +
+      select('Payday rule', 'rule', [['next_month_day', tr('Järgmisel kuul')], ['current_month_day', tr('Jooksval kuul')], ['next_month_first_working_day', tr('Järgmise kuu esimesel tööpäeval')]], latest.rule || 'next_month_day') +
+      field('Payday day', 'day', latest.day || '10', 'number', 'min="1" max="31"')
+    ));
+    const ruleSelect = d.querySelector('[name="rule"]'), dayInput = d.querySelector('[name="day"]');
+    const updateDay = () => { dayInput.disabled = ruleSelect.value === 'next_month_first_working_day'; dayInput.required = !dayInput.disabled; };
+    ruleSelect.addEventListener('change', updateDay); updateDay();
+    if (!canEditMappings()) {
+      d.querySelectorAll('input,select,button[type="submit"]').forEach((control) => control.disabled = true);
+    }
+    bindForm(d, async (data) => {
+      data.start_date = data.start_date || null;
+      data.day = data.rule === 'next_month_first_working_day' ? null : Number(data.day);
+      await post(c.url('/payroll/payday-settings'), data, 'PUT');
       await saved(d);
     });
   }

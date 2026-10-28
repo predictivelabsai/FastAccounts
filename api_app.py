@@ -50,6 +50,7 @@ from ledger import LedgerService, PostingLine
 from organisations import APPROVE_ROLES, WRITE_ROLES, AccessDenied, OrganisationService
 from payroll import PayrollConflict, PayrollService
 from payroll_tax_settings import EmployeeTaxSettingsService, TaxSettingConflict, TaxSettingValidationError
+from payroll_payday import PaydaySettingsService
 from employee_details import EmployeeDetailsError
 from tax import TaxService
 from tsd import TSDExportService
@@ -2245,6 +2246,13 @@ class PayrollMappingIn(BaseModel):
     account_code: str = Field(min_length=1)
 
 
+class PaydaySettingsIn(BaseModel):
+    start_date: str | None = None
+    rule_start_date: str
+    rule: Literal['next_month_day', 'current_month_day', 'next_month_first_working_day']
+    day: int | None = Field(default=None, ge=1, le=31)
+
+
 @api.exception_handler(PayrollConflict)
 async def payroll_conflict(_request: Request, error: PayrollConflict):
     return JSONResponse({'detail': str(error)}, status_code=409)
@@ -2308,6 +2316,19 @@ def delete_employee_tax_setting(organisation_id: str, employee_id: str, setting_
 def payroll_component_types(organisation_id: str, user: User = Depends(current_user)):
     _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
     return PayrollService().component_types(organisation_id)
+
+
+@api.get('/organisations/{organisation_id}/payroll/payday-settings')
+def payroll_payday_settings(organisation_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    return PaydaySettingsService(get_database()).get(organisation_id)
+
+
+@api.put('/organisations/{organisation_id}/payroll/payday-settings')
+def save_payroll_payday_settings(organisation_id: str, payload: PaydaySettingsIn,
+                                 user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES & {'owner', 'administrator'})
+    return PaydaySettingsService(get_database()).save(organisation_id, actor=user.email, **payload.model_dump())
 
 
 @api.post('/organisations/{organisation_id}/payroll/component-types', status_code=201)
