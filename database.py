@@ -234,6 +234,13 @@ class Database:
                         "accent_colour ~ '^#[0-9a-fA-F]{6}$'")
                 elif path.stem == "0037_employee_tax_settings":
                     script = script.split('-- SQLITE_TAX_HISTORY_IMMUTABILITY', 1)[0] + _POSTGRES_TAX_HISTORY_GUARD
+                elif path.stem == "0042_payroll_component_metadata":
+                    script = script.split('DROP TRIGGER guard_pay_item_components_update;', 1)[0]
+                    script += """
+DROP TRIGGER IF EXISTS guard_pay_item_components ON pay_item_components;
+UPDATE pay_item_components c SET is_wage=t.is_wage
+FROM pay_component_types t WHERE t.organisation_id=c.organisation_id AND t.id=c.type_id;
+""" + _postgres_payroll_component_triggers()
                 elif path.stem == "0035_payroll_income_line":
                     script = _POSTGRES_PAYROLL_0035
                 elif path.stem == "0034_payroll_demo_fixes":

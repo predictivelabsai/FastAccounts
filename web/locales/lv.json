@@ -1228,7 +1228,7 @@
     "People, payslips and postings for this client.": "People, payslips and postings for this client.",
     "Add employee": "Add employee",
     "Run payroll for month": "Run payroll for month",
-    "Employees": "Employees",
+    "Employees": "Darbinieki",
     "employees": "employees",
     "Gross salary": "Gross salary",
     "Pension %": "Pension %",
@@ -1969,7 +1969,6 @@
     "Mark paid": "Atzīmēt kā samaksātu",
     "Cancel payout": "Atcelt izmaksu",
     "Payout date": "Izmaksas datums",
-    "Employees": "Darbinieki",
     "No payouts for this run.": "Šim aprēķinam nav izmaksu.",
     "Add an active bank account first.": "Vispirms pievienojiet aktīvu bankas kontu.",
     "Pay run": "Algas aprēķins",
@@ -2209,7 +2208,9 @@
     "create_organisation": "Create organisation",
     "save": "Save",
     "cancel": "Cancel",
-    "confirm": "Confirm"
+    "confirm": "Confirm",
+    "Counts towards average and vacation pay": "Iekļaut vidējās izpeļņas un atvaļinājuma naudas aprēķinā",
+    "Active for new payment lines": "Aktīvs jaunām maksājumu rindām"
   },
   "status": {
     "Draft": "Draft",

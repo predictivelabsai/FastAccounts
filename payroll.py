@@ -444,7 +444,11 @@ class PayrollService:
             return [serialise(row) for row in tx.rows('SELECT * FROM pay_component_types WHERE organisation_id=? ORDER BY name,id', (organisation_id,))]
 
     def save_component_type(self, organisation_id, *, actor, type_id=None, **changes):
-        fields = ('name', 'direction', *FLAGS, 'liability_role')
+        if self.db.dialect == 'postgres':
+            metadata_ready = bool(self.db.one("SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='pay_component_types' AND column_name='is_wage'"))
+        else:
+            metadata_ready = 'is_wage' in {row['name'] for row in self.db.rows('PRAGMA table_info(pay_component_types)')}
+        fields = ('name', 'direction', *FLAGS, 'liability_role') + (('is_wage', 'active') if metadata_ready else ())
         if set(changes) - set(fields):
             raise ValueError('Unknown payment component field')
         with self.db.transaction() as tx:
@@ -454,7 +458,8 @@ class PayrollService:
                 if not data:
                     raise KeyError('Payment type not found')
             else:
-                data = dict(name='', direction='income', liability_role='PAYROLL_DEDUCTION', **{key: False for key in FLAGS})
+                data = dict(name='', direction='income', liability_role='PAYROLL_DEDUCTION',
+                            is_wage=True, active=True, **{key: False for key in FLAGS})
             data.update(changes)
             self._component_values(data)
             type_id = type_id or new_id()
@@ -477,6 +482,10 @@ class PayrollService:
         for key in FLAGS:
             if type(data.get(key)) not in (bool, int) or data[key] not in (0, 1):
                 raise ValueError('Payment levy flags must be booleans')
+            data[key] = int(data[key])
+        for key in ('is_wage', 'active'):
+            if type(data.get(key)) not in (bool, int) or data[key] not in (0, 1):
+                raise ValueError('Payment type metadata must be boolean')
             data[key] = int(data[key])
         # All flags remain editable snapshots. They affect income lines only;
         # deduction lines are explicitly net withholdings, never tax relief.
@@ -519,6 +528,8 @@ class PayrollService:
                 data = tx.one('SELECT * FROM pay_component_types WHERE organisation_id=? AND id=?', (organisation_id, line.get('type_id')))
                 if not data:
                     raise KeyError('Payment type not found')
+                data.setdefault('is_wage', True)
+                data.setdefault('active', True)
                 data.update(line)
                 self._component_values(data)
                 try:
@@ -527,8 +538,12 @@ class PayrollService:
                         raise ValueError('Enter a non-zero payment amount with at most two decimals')
                 except InvalidOperation as exc:
                     raise ValueError('Enter a non-zero payment amount with at most two decimals') from exc
-                fields = ('id', 'organisation_id', 'item_id', 'type_id', 'position', 'name', 'amount', 'direction', *FLAGS, 'liability_role')
-                values = (new_id(), organisation_id, item_id, data['id'], position, data['name'], db_number(amount), data['direction'], *(data[key] for key in FLAGS), data['liability_role'])
+                if tx.dialect == 'postgres':
+                    metadata_ready = bool(tx.one("SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='pay_item_components' AND column_name='is_wage'"))
+                else:
+                    metadata_ready = 'is_wage' in {row['name'] for row in tx.rows('PRAGMA table_info(pay_item_components)')}
+                fields = ('id', 'organisation_id', 'item_id', 'type_id', 'position', 'name', 'amount', 'direction', *FLAGS, 'liability_role') + (('is_wage',) if metadata_ready else ())
+                values = (new_id(), organisation_id, item_id, data['id'], position, data['name'], db_number(amount), data['direction'], *(data[key] for key in FLAGS), data['liability_role']) + ((data['is_wage'],) if metadata_ready else ())
                 tx.execute('INSERT INTO pay_item_components(' + ','.join(fields) + ') VALUES (' + ','.join('?' for _ in fields) + ')', values)
         lines = tx.rows('SELECT * FROM pay_item_components WHERE organisation_id=? AND item_id=? ORDER BY position', (organisation_id, item_id))
         context = tx.one('SELECT * FROM pay_item_context WHERE organisation_id=? AND item_id=?', (organisation_id, item_id))

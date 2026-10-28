@@ -4,6 +4,16 @@ Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as
 delivered.
 
+## 2026-10-28: Payroll absences series started
+
+- Added migration 0042 with editable wage eligibility and active status for
+  payment types. Existing component lines snapshot the wage flag during upgrade,
+  preserving the rule used for later average-pay calculations. Inactive types
+  remain available on stored history but are excluded from new line choices.
+- Documented the preset defaults and the governing Estonian leave and average-pay
+  sources in `payroll_rules.md`. Absence calculations and related workflows
+  remain in progress.
+
 ## 2026-10-28: Payroll calendar and payouts
 
 - Added the Estonian public-holiday calendar, Easter computation, working-day

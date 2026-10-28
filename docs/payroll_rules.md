@@ -483,6 +483,39 @@ any run they use employment start or 2026-01-01. An unchanged value is a no-op.
 A write conflicting with an approved source row fails with 409; use an explicit
 later period or add a dated election. Existing drafts retain their snapshot.
 
+## Wage component metadata and absence rules
+
+Migration 0042 adds `is_wage` and `active` to organisation payment types and
+freezes `is_wage` on each saved component line. `is_wage` controls inclusion in
+average-pay history; changing a type later does not rewrite approved components.
+New types default to wage and active. The seeded wage presets are base adjustment,
+contract, author, overtime, extra work, bonus, 13th salary, public-holiday work,
+night work, rest-day work, standby, substitution, commission, study-leave pay
+and average pay. Parental payments, annual leave pay, unused-leave compensation,
+employer sick benefit, severance, expense reimbursement and all deductions are
+non-wage by default. Bureau users can change the flag for their policy and source
+documents. Inactive types are unavailable on new payment lines; saved history
+remains valid.
+
+The Estonian Employment Contracts Act (Töölepingu seadus) § 54(3) excludes
+national and public holidays from basic leave days; § 55 sets the default basic
+leave entitlement at 28 calendar days; § 70(2) sets the vacation-pay deadline as
+the penultimate calendar working day before leave unless the parties agree
+otherwise. Average pay follows the Government Regulation “Keskmise töötasu
+maksmise tingimused ja kord” § 2: wage amounts earned in the six calendar months
+before the event month are used, with the regulation's short-service and no-wage
+rules to be applied by the average-pay service. Sources: [Employment Contracts
+Act](https://www.riigiteataja.ee/akt/123122024006) and [Average Pay
+Regulation](https://www.riigiteataja.ee/akt/13191217).
+
+### Payroll absence calculation parameters
+
+The absence and average-pay service uses the dated statutory rules and the
+organisation's explicitly selected absence-pay method. It does not infer tax or
+employment-law treatment solely from absence labels. Parameters without a
+verified rule are year-versioned and identified in
+`payroll_absences_validation.md` under “Needs accountant confirmation”.
+
 ## Employee contact and bank details
 
 The employee API and workbook include optional `phone`, `iban`,

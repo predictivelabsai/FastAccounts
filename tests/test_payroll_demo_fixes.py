@@ -29,6 +29,11 @@ def test_full_catalogue_defaults_and_descriptions(db, ee_org, uk_org):
     assert tuple(types['employer_sick_pay'][f] for f in FLAGS) == (1, 0, 0, 0, 0, 0)
     assert not any(types['expense_reimbursement'][f] for f in FLAGS)
     assert all(types[key][f] for key in ('severance', 'author', 'parental') for f in FLAGS)
+    wage_presets = {'base_adjustment', 'contract', 'author', 'overtime', 'extra_work', 'bonus',
+                    'thirteenth_salary', 'public_holiday', 'night_work', 'rest_day', 'standby',
+                    'substitution', 'commission', 'study_leave', 'average_pay'}
+    assert {key for key, value in types.items() if value['is_wage']} == wage_presets
+    assert all(value['active'] for value in types.values())
     with db.transaction() as tx:
         seed_types(tx, ee_org['id'])
     assert len(service.component_types(ee_org['id'])) == 27

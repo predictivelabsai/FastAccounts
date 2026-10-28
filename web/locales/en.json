@@ -1969,7 +1969,6 @@
     "Mark paid": "Mark paid",
     "Cancel payout": "Cancel payout",
     "Payout date": "Payout date",
-    "Employees": "Employees",
     "No payouts for this run.": "No payouts for this run.",
     "Add an active bank account first.": "Add an active bank account first.",
     "Pay run": "Pay run",
@@ -2209,7 +2208,9 @@
     "create_organisation": "Create organisation",
     "save": "Save",
     "cancel": "Cancel",
-    "confirm": "Confirm"
+    "confirm": "Confirm",
+    "Counts towards average and vacation pay": "Counts towards average and vacation pay",
+    "Active for new payment lines": "Active for new payment lines"
   },
   "status": {
     "Draft": "Draft",

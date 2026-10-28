@@ -114,11 +114,21 @@ ROLES = ('PAYROLL_SALARY', 'PAYROLL_SOCIAL', 'PAYROLL_UI', *(a[2] for a in ACCOU
 
 
 def seed_types(tx, organisation_id):
+    if tx.dialect == 'postgres':
+        metadata_ready = bool(tx.one("SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='pay_component_types' AND column_name='is_wage'"))
+    else:
+        metadata_ready = 'is_wage' in {row['name'] for row in tx.rows('PRAGMA table_info(pay_component_types)')}
     for key, name, direction, flags, role in PRESETS:
-        tx.execute('INSERT INTO pay_component_types(id,organisation_id,preset_key,name,direction,' +
-                   ','.join(FLAGS) + ',liability_role) VALUES (' + ','.join('?' for _ in range(12)) +
+        fields = ','.join(FLAGS) + ',liability_role' + (',is_wage,active' if metadata_ready else '')
+        values = (organisation_id + '-component-' + key, organisation_id, key, name, direction, *flags, role)
+        if metadata_ready:
+            values += (int(key not in {'bailiff', 'parental', 'annual_leave', 'unused_leave', 'employer_sick_pay',
+                                      'severance', 'expense_reimbursement', 'salary_advance', 'advance_recovery',
+                                      'alimony', 'union_fee', 'agreed_deduction'}), 1)
+        tx.execute('INSERT INTO pay_component_types(id,organisation_id,preset_key,name,direction,' + fields +
+                   ') VALUES (' + ','.join('?' for _ in values) +
                    ') ON CONFLICT(organisation_id,preset_key) DO NOTHING',
-                   (organisation_id + '-component-' + key, organisation_id, key, name, direction, *flags, role))
+                   values)
 
 
 def serialise(row):
@@ -126,6 +136,9 @@ def serialise(row):
         row['description'] = PRESET_DESCRIPTIONS.get(row['preset_key'], '')
     for key in FLAGS:
         row[key] = bool(row[key])
+    for key in ('is_wage', 'active'):
+        if key in row:
+            row[key] = bool(row[key])
     if 'amount' in row:
         row['amount'] = db_number(money(row['amount']))
     return row

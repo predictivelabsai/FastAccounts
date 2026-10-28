@@ -1969,7 +1969,6 @@
     "Mark paid": "Märgi makstuks",
     "Cancel payout": "Tühista väljamakse",
     "Payout date": "Väljamakse kuupäev",
-    "Employees": "Töötajad",
     "No payouts for this run.": "Selle palgaarvestuse väljamakseid pole.",
     "Add an active bank account first.": "Lisa esmalt aktiivne pangakonto.",
     "Pay run": "Palgaarvestus",
@@ -2209,7 +2208,9 @@
     "create_organisation": "Lisa ettevõte",
     "save": "Salvesta",
     "cancel": "Tühista",
-    "confirm": "Kinnita"
+    "confirm": "Kinnita",
+    "Counts towards average and vacation pay": "Arvestatakse keskmise tasu ja puhkusetasu hulka",
+    "Active for new payment lines": "Uutel makseridadel aktiivne"
   },
   "status": {
     "Draft": "Kavand",

@@ -1228,7 +1228,7 @@
     "People, payslips and postings for this client.": "People, payslips and postings for this client.",
     "Add employee": "Add employee",
     "Run payroll for month": "Run payroll for month",
-    "Employees": "Employees",
+    "Employees": "Darbuotojai",
     "employees": "employees",
     "Gross salary": "Gross salary",
     "Pension %": "Pension %",
@@ -1969,7 +1969,6 @@
     "Mark paid": "Pažymėti kaip sumokėtą",
     "Cancel payout": "Atšaukti išmoką",
     "Payout date": "Išmokos data",
-    "Employees": "Darbuotojai",
     "No payouts for this run.": "Šiam skaičiavimui išmokų nėra.",
     "Add an active bank account first.": "Pirmiausia pridėkite aktyvią banko sąskaitą.",
     "Pay run": "Darbo užmokesčio skaičiavimas",
@@ -2209,7 +2208,9 @@
     "create_organisation": "Create organisation",
     "save": "Save",
     "cancel": "Cancel",
-    "confirm": "Confirm"
+    "confirm": "Confirm",
+    "Counts towards average and vacation pay": "Įtraukti į vidutinio darbo užmokesčio ir atostoginių skaičiavimą",
+    "Active for new payment lines": "Aktyvus naujoms mokėjimo eilutėms"
   },
   "status": {
     "Draft": "Draft",

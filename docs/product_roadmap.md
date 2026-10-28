@@ -3,6 +3,13 @@
 **Research baseline:** 2026-08-10  
 **Status:** engineering pilot implemented; independent UK/EE accountant UAT and provider approvals pending
 
+## Payroll absences series (in progress)
+
+- Implemented migration 0042 for wage-eligibility and active payment-type
+  metadata, including a frozen wage flag on component history. Preset defaults
+  are documented in `payroll_rules.md`; absence register, calculations,
+  entitlement, import and liability work remains in progress.
+
 ## 2026-10-28: Payroll calendar and payouts
 
 - Added the Estonian working calendar with Riigipühad, Gregorian Easter

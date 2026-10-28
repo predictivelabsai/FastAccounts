@@ -2221,6 +2221,8 @@ class PayComponentIn(BaseModel):
     funded_pension: bool = False
     social_minimum: bool = False
     liability_role: Literal['PAYROLL_BAILIFF', 'PAYROLL_DEDUCTION'] = 'PAYROLL_DEDUCTION'
+    is_wage: bool = True
+    active: bool = True
 
 
 class PayComponentLine(BaseModel):

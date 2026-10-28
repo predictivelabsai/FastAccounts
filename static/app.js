@@ -4465,16 +4465,19 @@
   function bindPaymentTypeActions(c, types, target, modal = false) {
     const edit = (type) => {
       if (modal) closeDialog(target);
-      const values = type || {direction: "income", liability_role: "PAYROLL_DEDUCTION", ...Object.fromEntries(componentFlags.map(([key]) => [key, true]))};
+      const values = type || {direction: "income", liability_role: "PAYROLL_DEDUCTION", is_wage: true, active: true, ...Object.fromEntries(componentFlags.map(([key]) => [key, true]))};
       const editor = dialog(type ? "Edit payment type" : "Add payment type", form(
         field("Name", "name", values.name || "", "text", 'required maxlength="180"') +
         (values.description ? `<p class="full-width muted">${tr(values.description)}</p>` : "") +
         select("Direction", "direction", [["income", t("Income")], ["deduction", t("Deduction")]], values.direction) +
         select("Deduction liability", "liability_role", [["PAYROLL_DEDUCTION", t("Other deduction liability")], ["PAYROLL_BAILIFF", t("Bailiff withholding liability")]], values.liability_role) +
+        check("Counts towards average and vacation pay", "is_wage", values.is_wage) + check("Active for new payment lines", "active", values.active) +
         `<div class="full-width component-flags">${componentFlagFields(values)}</div><p class="full-width muted">${tr("Levy flags apply to income lines. Deduction lines reduce net pay.")}</p>` + `<p class="full-width muted">${tr("Defaults can be overridden on each draft payment line. Confirm tax treatment before approval.")}</p>`,
       ));
       bindForm(editor, async (data, f) => {
         componentFlags.forEach(([key]) => data[key] = f.elements[key].checked);
+        data.is_wage = f.elements.is_wage.checked;
+        data.active = f.elements.active.checked;
         await post(c.url(`/payroll/component-types${type ? `/${type.id}` : ""}`), data, type ? "PUT" : "POST");
         await saved(editor);
       });
@@ -4572,7 +4575,8 @@
       if (!types.length) { toast(t("Add a payment type first."), "info"); return; }
       const value = line || {...types[0], type_id: types[0].id};
       const el = document.createElement('fieldset'); el.className = 'payment-line';
-      el.innerHTML = `<legend>${tr("Payment line")}</legend><div class="form-grid">${select("Payment type", "type_id", types.map((x) => [x.id, t(x.name)]), value.type_id)}${field("Amount", "amount", value.amount || "", "number", 'required step="0.01"')}${select("Direction", "direction", [["income", t("Income")], ["deduction", t("Deduction")]], value.direction)}${field("Name", "name", value.name, "text", 'required maxlength="180"')}<div class="full-width component-flags">${componentFlagFields(value)}</div></div>${button("Remove payment line", "removePayment")}`;
+      const availableTypes = types.filter((x) => x.active || x.id === value.type_id);
+      el.innerHTML = `<legend>${tr("Payment line")}</legend><div class="form-grid">${select("Payment type", "type_id", availableTypes.map((x) => [x.id, t(x.name)]), value.type_id)}${field("Amount", "amount", value.amount || "", "number", 'required step="0.01"')}${select("Direction", "direction", [["income", t("Income")], ["deduction", t("Deduction")]], value.direction)}${field("Name", "name", value.name, "text", 'required maxlength="180"')}<div class="full-width component-flags">${componentFlagFields(value)}</div></div>${button("Remove payment line", "removePayment")}`;
       container.append(el);
       const direction = el.querySelector('[name="direction"]');
       const liability = document.createElement('div');
