@@ -425,6 +425,16 @@ is the single settlement-date boundary and currently returns calendar month end.
 The legacy `calculate_pay` call without a period retains its 2026 defaults.
 The January to March and April onwards minimum-wage values are unchanged.
 
+## Estonian working calendar
+
+`payroll_calendar` uses the Anonymous Gregorian computus for Good Friday,
+Easter Sunday and Pentecost Sunday. Working days are Monday to Friday excluding
+the Estonian public holidays listed in the module. Full-time norms use eight
+hours per working day, reduced by three hours for a working day immediately
+before 24 February, 23 June, 24 December or 1 January. For 2026, October is
+22 days / 176 hours; February is 19 / 149, June is 20 / 157, and December is
+21 / 162. These are calendar norms, before individual schedules or leave.
+
 ## Effective-dated employee tax elections
 
 Migration 0037 adds organisation-scoped `employee_tax_settings` histories for
