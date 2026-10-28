@@ -56,6 +56,8 @@ OBJECT_TYPES = {
     "salary_agreement": "employee",
     "salary_hours": "salary_hours",
     "vacation_balance": "vacation_balance",
+    "payroll_opening_leave": "payroll_opening_leave",
+    "historical_earnings": "historical_earnings",
     "journal": "journal",
     "employee": "employee",
     "employees": "employee",
@@ -85,6 +87,9 @@ class ImportService:
         self.APPLY_HANDLERS = {
             "employee": self._apply_employee,
             "salary_hours": self._apply_salary_hours,
+            "payroll_opening_leave": self._apply_payroll_opening_leave,
+            "historical_earnings": self._apply_historical_earnings,
+            "vacation_balance": self._apply_merit_vacation_balance,
             "contact": self._apply_contact,
             "purchase_invoice": self._apply_purchase_invoice,
             "sales_invoice": self._apply_sales_invoice,
@@ -119,6 +124,9 @@ class ImportService:
             csv_content = resolved_credentials.get("csv_content", "")
             if not isinstance(csv_content, str):
                 raise ValueError("CSV content must be text")
+            workbook_content = resolved_credentials.get("workbook_content", b"")
+            if not isinstance(workbook_content, bytes) or len(workbook_content) > 2_000_000:
+                raise ValueError("Payroll import file must be under 2 MB")
             if len(csv_content) > MAX_FILE_IMPORT_CHARS:
                 raise ValueError(
                     f"CSV content exceeds the {MAX_FILE_IMPORT_CHARS} character limit"
@@ -165,8 +173,10 @@ class ImportService:
         key, resolved_credentials, resolved_config = self._connection_material(
             organisation_id, provider, credentials, config
         )
-        if key == FILE_IMPORT_PROVIDER and object_type not in {"employee", "employees", "journal"}:
-            raise ValueError("File import supports employees and journals only")
+        if key == FILE_IMPORT_PROVIDER and object_type not in {
+            "employee", "employees", "journal", "payroll_opening_leave", "historical_earnings"
+        }:
+            raise ValueError("File import supports employees, journals and payroll history only")
         requested_type = object_type.strip().lower()
         canonical_type = OBJECT_TYPES.get(requested_type)
         if canonical_type is None:
@@ -402,6 +412,29 @@ class ImportService:
         canonical_type = OBJECT_TYPES.get(object_type, object_type)
         if canonical_type == "salary_hours":
             return self._salary_hours_review(tx, organisation_id, payload)
+        if canonical_type in {"payroll_opening_leave", "historical_earnings", "vacation_balance"}:
+            row_error = str(payload.get("import_error") or "") or None
+            if not row_error:
+                try:
+                    self._validate_payroll_import_payload(canonical_type, payload)
+                except ValueError as error:
+                    row_error = str(error)
+            if canonical_type == "vacation_balance" and not row_error:
+                row_error = str(payload.get("import_warning") or "") or None
+            personal_code = str(payload.get("personal_code") or payload.get("personal_id") or "").strip()
+            if canonical_type == "vacation_balance" and not personal_code and external_id:
+                personal_code = external_id.split(":", 1)[0]
+            if not personal_code:
+                return None, row_error or "Personal code is required to match an employee", None
+            matches = tx.rows(
+                "SELECT id,name FROM employees WHERE organisation_id=? AND personal_id=? ORDER BY id",
+                (organisation_id, personal_code),
+            )
+            if len(matches) == 1:
+                return matches[0]["id"], row_error, {"strategy": "personal_code", "personal_code": personal_code}
+            if len(matches) > 1:
+                return None, row_error or "Personal code matches more than one employee", None
+            return None, row_error or "No employee in this organisation matches the personal code", None
         if external_id:
             mapping = tx.one(
                 "SELECT local_id FROM external_mappings WHERE organisation_id=? AND provider=? "
@@ -519,7 +552,9 @@ class ImportService:
             record["match"] = json.loads(record["match_json"]) if record.get("match_json") else None
             if record["object_type"] == "journal":
                 record["journal_review"] = self._journal_review(self.db, organisation_id, record["external_payload"], record["provider"])
-            record["display_only"] = record["object_type"] == "vacation_balance"
+            record["display_only"] = (
+                record["object_type"] == "vacation_balance" and record["provider"] != "merit_palk"
+            )
         summary = self._sync_summary(organisation_id, sync_run_id) if sync_run_id else None
         return {"summary": summary, "records": records}
 
@@ -588,8 +623,11 @@ class ImportService:
         if key == "merit_palk" and sync["object_type"] == "gl_entry":
             object_type = "journal"
         if object_type == "vacation_balance":
-            raise ValueError("Display-only vacation balance snapshot; no payroll or ledger changes are applied")
-        handler = self.APPLY_HANDLERS.get(object_type)
+            if key != "merit_palk":
+                raise ValueError("Only a Merit Palk vacation snapshot can be applied as an opening balance")
+            handler = self._apply_merit_vacation_balance
+        else:
+            handler = self.APPLY_HANDLERS.get(object_type)
         if handler is None:
             raise ValueError(f"Staged {sync['object_type']} records cannot be applied")
         invalid = {value for value in decisions.values() if value not in {"apply", "reject"}}
@@ -979,6 +1017,190 @@ class ImportService:
             "outcome": outcome,
             "employee_id": employee["id"],
         }
+
+    def _payroll_import_employee(self, tx, organisation_id: str, row: dict, payload: dict) -> dict:
+        employee_id = row.get("matched_local_id") or row.get("matched_local_employee_id")
+        if employee_id:
+            employee = tx.one(
+                "SELECT id,personal_id FROM employees WHERE organisation_id=? AND id=?",
+                (organisation_id, employee_id),
+            )
+            if employee:
+                return employee
+        personal_code = str(payload.get("personal_code") or "").strip()
+        if not personal_code and row.get("provider") == "merit_palk":
+            personal_code = str(row.get("external_id") or "").split(":", 1)[0]
+        if not personal_code:
+            raise ValueError("Personal code is required to match an employee")
+        matches = tx.rows(
+            "SELECT id,personal_id FROM employees WHERE organisation_id=? AND personal_id=?",
+            (organisation_id, personal_code),
+        )
+        if len(matches) != 1:
+            raise ValueError("No unique employee in this organisation matches the personal code")
+        return matches[0]
+
+    @staticmethod
+    def _import_decimal(value: Any, label: str) -> Decimal:
+        try:
+            result = Decimal(str(value).strip().replace(" ", "").replace(",", "."))
+        except (InvalidOperation, ValueError, AttributeError) as error:
+            raise ValueError(f"{label} must be a decimal number") from error
+        if not result.is_finite() or result < 0:
+            raise ValueError(f"{label} must be a non-negative decimal number")
+        return result
+
+    def _validate_payroll_import_payload(self, object_type: str, payload: dict) -> None:
+        if object_type == "payroll_opening_leave":
+            for label in ("effective date", "cutover date"):
+                try:
+                    date.fromisoformat(str(payload.get(label.replace(" ", "_"), "")).strip())
+                except ValueError as error:
+                    raise ValueError(f"{label.title()} must use YYYY-MM-DD") from error
+            self._import_decimal(payload.get("days_per_year"), "Days per year")
+            self._import_decimal(payload.get("basic_unused_days"), "Basic unused days")
+            self._import_decimal(payload.get("extended_unused_days"), "Extended unused days")
+        elif object_type == "historical_earnings":
+            period = str(payload.get("earning_month") or "").strip()
+            try:
+                year, month = (int(value) for value in period.split("-", 1))
+                date(year, month, 1)
+            except (ValueError, TypeError) as error:
+                raise ValueError("Earning month must use YYYY-MM") from error
+            if len(period) != 7:
+                raise ValueError("Earning month must use YYYY-MM")
+            self._import_decimal(payload.get("wage_total"), "Wage total")
+            unpaid = self._import_decimal(payload.get("unpaid_absence_days"), "Unpaid absence days")
+            if unpaid != unpaid.to_integral_value():
+                raise ValueError("Unpaid absence calendar days must be a whole number")
+        elif object_type == "vacation_balance":
+            try:
+                date.fromisoformat(str(payload.get("date") or "").strip())
+            except ValueError as error:
+                raise ValueError("Merit Palk snapshot date must use YYYY-MM-DD") from error
+            self._import_decimal(payload.get("DaysUnused"), "Merit Palk unused days")
+
+    def _apply_payroll_opening_leave(self, organisation_id: str, sync: dict, row: dict, actor: str) -> dict:
+        payload = json.loads(row["external_payload_json"])
+        if payload.get("import_error"):
+            raise ValueError(str(payload["import_error"]))
+        employee_id = None
+        with self.db.transaction() as tx:
+            employee = self._payroll_import_employee(tx, organisation_id, row, payload)
+            employee_id = employee["id"]
+            try:
+                effective = date.fromisoformat(str(payload.get("effective_date", "")).strip()).isoformat()
+                cutover = date.fromisoformat(str(payload.get("cutover_date", "")).strip()).isoformat()
+            except ValueError as error:
+                raise ValueError("Effective date and cutover date must use YYYY-MM-DD") from error
+            entitlement = self._import_decimal(payload.get("days_per_year"), "Days per year")
+            basic = self._import_decimal(payload.get("basic_unused_days"), "Basic unused days")
+            extended = self._import_decimal(payload.get("extended_unused_days"), "Extended unused days")
+            source_key = str(payload.get("source_key") or "").strip()
+            if not source_key:
+                raise ValueError("Import source key is missing")
+            existing_entitlement = tx.one(
+                "SELECT days_per_year,effective_from FROM payroll_leave_entitlements "
+                "WHERE organisation_id=? AND employee_id=? AND source_key=?",
+                (organisation_id, employee_id, source_key),
+            )
+            existing_opening = tx.one(
+                "SELECT cutover_date,unused_days,extended_unused_days FROM payroll_leave_openings "
+                "WHERE organisation_id=? AND employee_id=? AND source_key=?",
+                (organisation_id, employee_id, source_key),
+            )
+            if (existing_entitlement and existing_opening
+                    and existing_entitlement["effective_from"] == effective
+                    and Decimal(str(existing_entitlement["days_per_year"])) == entitlement
+                    and existing_opening["cutover_date"] == cutover
+                    and Decimal(str(existing_opening["unused_days"])) == basic
+                    and Decimal(str(existing_opening["extended_unused_days"])) == extended):
+                return self._mark_applied(tx, organisation_id, sync, row, actor, employee_id, "unchanged")
+            now = utc_now()
+            tx.execute(
+                "INSERT INTO payroll_leave_entitlements(id,organisation_id,employee_id,effective_from,days_per_year,created_at,source_key) "
+                "VALUES (?,?,?,?,?,?,?) ON CONFLICT(organisation_id,employee_id,effective_from) DO UPDATE SET "
+                "days_per_year=excluded.days_per_year,source_key=excluded.source_key",
+                (new_id(), organisation_id, employee_id, effective, db_number(entitlement), now, source_key),
+            )
+            tx.execute(
+                "INSERT INTO payroll_leave_openings(organisation_id,employee_id,cutover_date,unused_days,extended_unused_days,source,reviewed_at,reviewed_by,source_key) "
+                "VALUES (?,?,?,?,?,'file_import',?,?,?) ON CONFLICT(organisation_id,employee_id,cutover_date) DO UPDATE SET "
+                "unused_days=excluded.unused_days,extended_unused_days=excluded.extended_unused_days,source=excluded.source,"
+                "reviewed_at=excluded.reviewed_at,reviewed_by=excluded.reviewed_by,source_key=excluded.source_key",
+                (organisation_id, employee_id, cutover, db_number(basic), db_number(extended), now, actor, source_key),
+            )
+            return self._mark_applied(tx, organisation_id, sync, row, actor, employee_id)
+
+    def _apply_historical_earnings(self, organisation_id: str, sync: dict, row: dict, actor: str) -> dict:
+        payload = json.loads(row["external_payload_json"])
+        if payload.get("import_error"):
+            raise ValueError(str(payload["import_error"]))
+        with self.db.transaction() as tx:
+            employee = self._payroll_import_employee(tx, organisation_id, row, payload)
+            period = str(payload.get("earning_month") or "").strip()
+            try:
+                year, month = (int(value) for value in period.split("-", 1))
+                date(year, month, 1)
+            except (ValueError, TypeError) as error:
+                raise ValueError("Earning month must use YYYY-MM") from error
+            if len(period) != 7:
+                raise ValueError("Earning month must use YYYY-MM")
+            wage = money(self._import_decimal(payload.get("wage_total"), "Wage total"))
+            unpaid = self._import_decimal(payload.get("unpaid_absence_days"), "Unpaid absence days")
+            if unpaid != unpaid.to_integral_value():
+                raise ValueError("Unpaid absence calendar days must be a whole number")
+            source_key = str(payload.get("source_key") or "").strip()
+            if not source_key:
+                raise ValueError("Import source key is missing")
+            existing = tx.one(
+                "SELECT employee_id,earning_month,wage_total,unpaid_absence_days FROM payroll_historical_earnings "
+                "WHERE organisation_id=? AND source_key=?", (organisation_id, source_key),
+            )
+            if existing:
+                same = (existing["employee_id"] == employee["id"] and existing["earning_month"] == period
+                        and money(existing["wage_total"]) == wage
+                        and Decimal(str(existing["unpaid_absence_days"])) == unpaid)
+                if not same:
+                    raise ValueError("This file row was already imported with different values")
+                return self._mark_applied(tx, organisation_id, sync, row, actor, employee["id"], "unchanged")
+            now = utc_now()
+            tx.execute(
+                "INSERT INTO payroll_historical_earnings(id,organisation_id,employee_id,earning_month,wage_total,"
+                "unpaid_absence_days,source_key,status,reviewed_at,reviewed_by,created_at) "
+                "VALUES (?,?,?,?,?,?,?,'Approved',?,?,?)",
+                (new_id(), organisation_id, employee["id"], period, db_number(wage), db_number(unpaid), source_key, now, actor, now),
+            )
+            return self._mark_applied(tx, organisation_id, sync, row, actor, employee["id"])
+
+    def _apply_merit_vacation_balance(self, organisation_id: str, sync: dict, row: dict, actor: str) -> dict:
+        payload = json.loads(row["external_payload_json"])
+        with self.db.transaction() as tx:
+            employee = self._payroll_import_employee(tx, organisation_id, row, payload)
+            try:
+                cutover = date.fromisoformat(str(payload.get("date") or "").strip()).isoformat()
+            except ValueError as error:
+                raise ValueError("Merit Palk snapshot date must use YYYY-MM-DD") from error
+            basic = self._import_decimal(payload.get("DaysUnused"), "Merit Palk unused days")
+            source_key = f"merit-palk:{row['external_id']}"
+            existing = tx.one(
+                "SELECT cutover_date,unused_days,extended_unused_days FROM payroll_leave_openings "
+                "WHERE organisation_id=? AND employee_id=? AND source_key=?",
+                (organisation_id, employee["id"], source_key),
+            )
+            if (existing and existing["cutover_date"] == cutover
+                    and Decimal(str(existing["unused_days"])) == basic
+                    and Decimal(str(existing["extended_unused_days"])) == Decimal(0)):
+                return self._mark_applied(tx, organisation_id, sync, row, actor, employee["id"], "unchanged")
+            now = utc_now()
+            tx.execute(
+                "INSERT INTO payroll_leave_openings(organisation_id,employee_id,cutover_date,unused_days,extended_unused_days,source,reviewed_at,reviewed_by,source_key) "
+                "VALUES (?,?,?,?,?,'merit_palk',?,?,?) ON CONFLICT(organisation_id,employee_id,cutover_date) DO UPDATE SET "
+                "unused_days=excluded.unused_days,extended_unused_days=excluded.extended_unused_days,source=excluded.source,"
+                "reviewed_at=excluded.reviewed_at,reviewed_by=excluded.reviewed_by,source_key=excluded.source_key",
+                (organisation_id, employee["id"], cutover, db_number(basic), "0", now, actor, source_key),
+            )
+            return self._mark_applied(tx, organisation_id, sync, row, actor, employee["id"])
 
     def _mapping_values(self, payload: Mapping[str, Any]) -> tuple[str | None, str]:
         payload_hash = self._text(payload, "payload_hash", "hash")

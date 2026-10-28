@@ -146,8 +146,10 @@ class PayrollAbsenceService:
                 item['components'] = tx.rows('SELECT direction,amount,is_wage FROM pay_item_components '
                                              'WHERE organisation_id=? AND item_id=?',
                                              (organisation_id, item['id']))
-            history = tx.rows("SELECT earning_month AS period,wage_total FROM payroll_historical_earnings "
-                              "WHERE organisation_id=? AND employee_id=? AND status='Approved'",
+            history = tx.rows("SELECT h.earning_month AS period,h.wage_total,h.unpaid_absence_days FROM payroll_historical_earnings h "
+                              "WHERE h.organisation_id=? AND h.employee_id=? AND h.status='Approved' "
+                              "AND NOT EXISTS (SELECT 1 FROM pay_runs r WHERE r.organisation_id=h.organisation_id "
+                              "AND r.period=h.earning_month AND r.status='Approved')",
                               (organisation_id, absence['employee_id']))
             absence_history = tx.rows('SELECT absence_type,start_date,end_date FROM payroll_absences '
                                       'WHERE organisation_id=? AND employee_id=? AND id<>?',
@@ -157,7 +159,8 @@ class PayrollAbsenceService:
                     'SELECT paid_salary FROM payroll_absence_type_settings WHERE organisation_id=? AND absence_type=?',
                     (organisation_id, 'permitted_absence'))) or prior['absence_type'] not in
                     ('permitted_absence', 'unpaid_leave', 'truancy'))
-            avg = calculate_average_pay(absence, leave_start, approved_items=run_rows,
+            payout_date = vacation_payout_date(leave_start)
+            avg = calculate_average_pay(absence, payout_date, approved_items=run_rows,
                                         historical_earnings=history, absences=absence_history)
             leave_days = self._counts(absence['absence_type'], absence['start_date'], absence['end_date'])['leave_days']
             work_days = sum(is_working_day(leave_start + timedelta(days=n))
@@ -169,7 +172,7 @@ class PayrollAbsenceService:
                                      leave_working_days=work_days, norm_working_days=norm,
                                      fixed_sum=fixed_amount)
             breakdown['average'] = avg.as_dict()
-            payout_date = vacation_payout_date(leave_start).isoformat()
+            payout_date = payout_date.isoformat()
             record_id = existing['id'] if existing else new_id()
             now = utc_now()
             tx.execute('INSERT INTO payroll_absence_pay(id,organisation_id,absence_id,employee_id,method,fixed_amount,gross,breakdown_json,status,payout_batch_id,payment_date,payment_month,created_at,updated_at) '

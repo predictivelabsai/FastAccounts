@@ -4495,13 +4495,14 @@
         const statusLabel = pay?.status ? ({pending: "Pending", in_payout: "In payout", paid: "Paid"}[pay.status] || pay.status) : "Not calculated";
         return `<div class="absence-pay"><strong>${tr("Vacation pay")}</strong><p>${tr("Status")}: ${tr(statusLabel)}${pay ? ` · ${esc(money(pay.gross, "EUR"))}` : ""}</p>${canWriteAbsences ? `<div class="absence-pay-controls">${select("Vacation pay method", `method-${absence.id}`, methods.map(([v,l]) => [v,tr(l)]), pay?.method || "average")}${field("Fixed amount", `fixed-${absence.id}`, pay?.fixed_amount || "", "number")}${button("Calculate vacation pay", "calculateAbsencePay", false, `data-id="${esc(absence.id)}"`)}</div>` : ""}<table><thead><tr><th>${tr("Calculation")}</th><th>${tr("Amount")}</th></tr></thead><tbody><tr><td>${tr("Six-month wages")}</td><td>${esc(money(average.wage_total || 0, "EUR"))}</td></tr><tr><td>${tr("Divisor days")}</td><td>${num(average.daily_denominator || 0)}</td></tr><tr><td>${tr("Daily rate")}</td><td>${esc(money(average.average_daily_pay || 0, "EUR"))}</td></tr><tr><td>${tr("Days")}</td><td>${num(breakdown.leave_days ?? absence.leave_days)}</td></tr><tr><td>${tr("Total")}</td><td>${esc(money(pay?.gross || 0, "EUR"))}</td></tr></tbody></table>${canWriteAbsences && pay?.status === "pending" ? button("Add to payout", "addAbsencePay", true, `data-id="${esc(absence.id)}"`) : ""}</div>`;
       };
-      const d = dialog("Absences", `<div class="section-head">${field("Month", "month", month, "month")} ${select("Absence type", "absence_type", [["", "All types"], ...absenceKinds.map(([v, label]) => [v, tr(label)])], kind)}</div>${canWriteAbsences ? `${button("Add absence", "addAbsence", true)} ${button("Collective annual leave", "collectiveLeave")} ${button("Absence pay settings", "absenceSettings")}` : ""}${rows.length ? table(["Employee", "Type", "Start date", "End date", "Calendar days", "Leave days", "Working days", "Vacation pay", "Actions"], rows.map((absence) => row([td(esc(absence.employee_name)), td(tr(absenceKinds.find(([key]) => key === absence.absence_type)?.[1] || "Other absence")), td(esc(absence.start_date)), td(esc(absence.end_date)), td(num(absence.calendar_days)), td(num(absence.leave_days)), td(num(absence.working_days)), td(payPanel(absence)), td(canWriteAbsences ? (absence.frozen ? tr("Used in approved payroll") : button("Edit", "editAbsence", false, `data-id="${esc(absence.id)}"`) + button("Delete", "deleteAbsence", false, `data-id="${esc(absence.id)}"`)) : "" )]))) : empty("No absences", "")}`);
+      const d = dialog("Absences", `<div class="section-head">${field("Month", "month", month, "month")} ${select("Absence type", "absence_type", [["", "All types"], ...absenceKinds.map(([v, label]) => [v, tr(label)])], kind)}</div>${canWriteAbsences ? `${button("Add absence", "addAbsence", true)} ${button("Collective annual leave", "collectiveLeave")} ${button("Absence pay settings", "absenceSettings")} ${button("Opening balances and historical earnings", "payrollHistoryImports")}` : ""}${rows.length ? table(["Employee", "Type", "Start date", "End date", "Calendar days", "Leave days", "Working days", "Vacation pay", "Actions"], rows.map((absence) => row([td(esc(absence.employee_name)), td(tr(absenceKinds.find(([key]) => key === absence.absence_type)?.[1] || "Other absence")), td(esc(absence.start_date)), td(esc(absence.end_date)), td(num(absence.calendar_days)), td(num(absence.leave_days)), td(num(absence.working_days)), td(payPanel(absence)), td(canWriteAbsences ? (absence.frozen ? tr("Used in approved payroll") : button("Edit", "editAbsence", false, `data-id="${esc(absence.id)}"`) + button("Delete", "deleteAbsence", false, `data-id="${esc(absence.id)}"`)) : "" )]))) : empty("No absences", "")}`);
       d.querySelector('[name="month"]').onchange = () => { const nextMonth = d.querySelector('[name="month"]').value; const nextKind = d.querySelector('[name="absence_type"]').value; closeDialog(d); renderList(nextMonth, nextKind); };
       d.querySelector('[name="absence_type"]').onchange = () => { const nextMonth = d.querySelector('[name="month"]').value; const nextKind = d.querySelector('[name="absence_type"]').value; closeDialog(d); renderList(nextMonth, nextKind); };
       bindActions(d, {
         addAbsence: () => absenceEditDialog(c, employees, null, () => renderList(month, kind)),
         collectiveLeave: () => collectiveLeaveDialog(c, employees, () => renderList(month, kind)),
         absenceSettings: () => absenceSettingsDialog(c, typeSettings, () => renderList(month, kind)),
+        payrollHistoryImports: () => payrollHistoryImportDialog(c),
         calculateAbsencePay: async (buttonEl) => {
           const id = buttonEl.dataset.id, method = d.querySelector(`[name="method-${CSS.escape(id)}"]`).value;
           const fixed = d.querySelector(`[name="fixed-${CSS.escape(id)}"]`).value;
@@ -4517,6 +4518,48 @@
       });
     };
     await renderList();
+  }
+  async function payrollHistoryImportDialog(c) {
+    document.querySelectorAll(".dialog").forEach(closeDialog);
+    const upload = (type, label, description) => `<form class="payroll-history-upload" data-upload-type="${type}"><h3>${tr(label)}</h3><p class="muted">${tr(description)}</p><label>${tr("CSV or XLSX file")}<input name="file" type="file" accept=".csv,.xlsx" required></label><button class="fs-btn fs-btn-outline" type="submit">${tr("Upload for review")}</button></form>`;
+    const d = dialog("Opening balances and historical earnings", `<div class="payroll-history-imports">${upload("payroll_opening_leave", "Leave entitlement and opening balance", "Upload employee personal code, days per year, effective date, cutover date, basic unused days and extended unused days.")}${upload("historical_earnings", "Historical earnings", "Upload employee personal code, YYYY-MM, wage total and unpaid absence calendar days.")}</div>`);
+    d.querySelectorAll("form[data-upload-type]").forEach((formEl) => {
+      formEl.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const file = formEl.elements.file.files[0];
+        if (!file) return;
+        const body = new FormData(); body.append("file", file);
+        try {
+          const summary = await api(c.url(`/payroll/history-imports/${formEl.dataset.uploadType}`), {method: "POST", body});
+          await payrollHistoryImportReview(c, summary.id);
+        } catch (error) { toast(error.message, "error"); }
+      });
+    });
+  }
+  async function payrollHistoryImportReview(c, syncId, outcome = null) {
+    const review = await api(c.url(`/payroll/history-imports/${encodeURIComponent(syncId)}`));
+    const records = review.records || [];
+    const body = records.length ? table(
+      ["File row", "Employee", "Imported values", "Review note", "Decision"],
+      records.map((record) => {
+        const payload = record.external_payload || {};
+        return row([
+          td(num(payload.file_row)),
+          td(record.matched_local_id ? esc(record.matched_local_id) : tr("No employee matched")),
+          td(esc(JSON.stringify(payload))),
+          td(esc(record.review_note || "")),
+          td(`<select name="decision-${esc(record.id)}"><option value="apply">${tr("Apply")}</option><option value="reject">${tr("Reject")}</option></select>`),
+        ]);
+      }),
+    ) : empty("No records were staged", "");
+    const d = dialog("Review payroll import", `${outcome ? integrationOutcomeSummary(outcome) : ""}<p class="muted">${tr("Review matched employees and row errors before applying.")}</p>${body}<button class="fs-btn fs-btn-ink" data-action="applyPayrollHistoryImport">${tr("Apply reviewed rows")}</button>`);
+    d.querySelector('[data-action="applyPayrollHistoryImport"]').onclick = async () => {
+      const decisions = Object.fromEntries(records.map((record) => [record.id, d.querySelector(`[name="decision-${CSS.escape(record.id)}"]`).value]));
+      try {
+        const result = await post(c.url(`/payroll/history-imports/${encodeURIComponent(syncId)}/apply`), {decisions});
+        await payrollHistoryImportReview(c, syncId, result);
+      } catch (error) { toast(error.message, "error"); }
+    };
   }
   async function addAbsencePayToPayout(c, absence, refresh) {
     if (!absence?.absence_pay || absence.absence_pay.status !== "pending") return;

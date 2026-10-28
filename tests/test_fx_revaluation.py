@@ -357,7 +357,7 @@ def test_migration_rerun_tenant_constraints_and_roles(db, ee_org, uk_org):
         tx.connection.executescript(sql)
     for org, code in [(ee_org, '6990'), (uk_org, '7900')]:
         assert db.one("SELECT code FROM accounts WHERE organisation_id=? AND system_role='FX_GAIN_LOSS'", (org['id'],))['code'] == code
-    assert '"0049_payroll_component_source"]' in (Path(__file__).resolve().parents[1] / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+    assert '"0050_payroll_history_import"]' in (Path(__file__).resolve().parents[1] / ".github/workflows/ci.yml").read_text(encoding="utf-8")
     data = setup(db, ee_org)
     doc = document(db, ee_org, data)
     import sqlite3

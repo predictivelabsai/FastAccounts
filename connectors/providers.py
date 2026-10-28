@@ -905,7 +905,7 @@ class MeritPalkProvider(HTTPProvider):
             if not isinstance(payload, dict) or "DaysUnused" not in payload:
                 raise ProviderError("Merit Palk returned an invalid vacation balance")
             records = [{"external_id": f"{code}:{day}", "name": code, "date": day, **payload,
-                        "import_warning": "Display-only vacation balance snapshot; no payroll or ledger changes are applied"}]
+                        "import_warning": "Review the unused days and snapshot date before applying this opening balance"}]
         return ConnectorResult(self.key, f"pull:{object_type}", True, True,
                                f"Pulled {len(records)} Merit Palk records", tuple(records))
 

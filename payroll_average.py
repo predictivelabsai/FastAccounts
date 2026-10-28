@@ -145,8 +145,14 @@ def calculate_average_pay(employee, event_date, *, approved_items=(), historical
             unpaid_dates.add(cursor)
             cursor += timedelta(days=1)
     excluded_dates = holidays | unpaid_dates
-    daily_denominator = max(0, (end - start).days + 1 - len(excluded_dates))
-    unpaid_absence_days = len(unpaid_dates - holidays)
+    imported_unpaid_days = sum(
+        (decimal(item.get('unpaid_absence_days') or 0) for item in historical_earnings
+         if _period_date(item.get('period') or item.get('earning_period')).strftime('%Y-%m') in included),
+        Decimal(0),
+    )
+    imported_unpaid_days = int(imported_unpaid_days)
+    daily_denominator = max(0, (end - start).days + 1 - len(excluded_dates) - imported_unpaid_days)
+    unpaid_absence_days = len(unpaid_dates - holidays) + imported_unpaid_days
     cursor = start
     available_working_days = 0
     while cursor <= end:

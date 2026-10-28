@@ -350,7 +350,7 @@ def test_migration_rerun_preserves_data(env):
         assert db.migrate() == ['0027_mfa']
     assert accounts.get(EMAIL)["totp_secret"] == secret
     assert db.rows("SELECT * FROM mfa_recovery_codes") == original
-    assert '"0049_payroll_component_source"]' in (ROOT / ".github/workflows/ci.yml").read_text()
+    assert '"0050_payroll_history_import"]' in (ROOT / ".github/workflows/ci.yml").read_text()
 
 
 @pytest.mark.parametrize("lang", ["en", "et", "lt", "lv"])

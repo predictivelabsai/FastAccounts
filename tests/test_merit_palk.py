@@ -274,14 +274,20 @@ def test_gl_apply_rechecks_period_and_accounts(palk, ee_org, db, change):
     assert db.scalar("SELECT COUNT(*) FROM posting_batches") == 0
 
 
-def test_vacation_display_only_and_salary_report_contract(palk, ee_org, db):
+def test_vacation_snapshot_applies_as_opening_balance_and_salary_report_contract(palk, ee_org, db):
+    PayrollService(db).save_employee(ee_org["id"], actor=ACTOR, name="Synthetic Merit employee",
+                                     personal_id="42", gross_salary="2400")
     options = dict(OPTIONS, personal_code="42", balance_date="2026-10-23")
     sync, rows = stage(palk, ee_org["id"], "vacation_balance", options)
-    assert rows[0]["display_only"] and rows[0]["external_payload"]["DaysUnused"] == "12.34"
-    assert "Display-only" in rows[0]["review_note"]
+    assert not rows[0]["display_only"] and rows[0]["external_payload"]["DaysUnused"] == "12.34"
+    assert rows[0]["matched_local_id"]
+    assert "Review the unused days" in rows[0]["external_payload"]["import_warning"]
     assert json.loads(palk[2][-1].content) == {"ContractCode": "42", "Date": "2026-10-23"}
-    with pytest.raises(ValueError, match="Display-only"):
-        apply(palk, ee_org["id"], sync, rows)
+    assert apply(palk, ee_org["id"], sync, rows)["applied"] == 1
+    opening = db.one("SELECT * FROM payroll_leave_openings WHERE organisation_id=?", (ee_org["id"],))
+    assert opening["cutover_date"] == "2026-10-23" and opening["unused_days"] == 12.34
+    assert opening["extended_unused_days"] == 0 and opening["source"] == "merit_palk"
+    assert apply(palk, ee_org["id"], sync, rows)["unchanged"] == 1
     _, salary_rows = stage(palk, ee_org["id"], "salary_hours")
     assert "unique local employee" in salary_rows[0]["review_note"]
     palk[1]["getsalaryreport"][0]["Month6"] = "202402"
@@ -555,6 +561,8 @@ def palk_api(palk, db, monkeypatch):
 def test_on_demand_api_roles_csrf_and_tenant_boundary(palk_api, palk, ee_org, uk_org, db):
     from api_app import api
     from api_app import require_csrf
+    PayrollService(db).save_employee(ee_org["id"], actor=ACTOR, name="Synthetic Merit employee",
+                                     personal_id="42", gross_salary="2400")
     client = palk_api
     base = f"/organisations/{ee_org['id']}/integrations/merit_palk"
     organisation = OrganisationService(db)
@@ -569,7 +577,8 @@ def test_on_demand_api_roles_csrf_and_tenant_boundary(palk_api, palk, ee_org, uk
             response = client.post(base + path, json=body, headers=headers)
             assert response.status_code == (200 if permitted else 403), response.text
     summary = client.post(base + "/sync", json={"object_type": "vacation_balance", "config": {"personal_code": "42"}}).json()
-    assert client.get(base + f"/sync/{summary['id']}").json()["records"][0]["display_only"]
+    vacation_record = client.get(base + f"/sync/{summary['id']}").json()["records"][0]
+    assert not vacation_record["display_only"] and vacation_record["matched_local_id"]
     assert client.get(f"/organisations/{uk_org['id']}/integrations/merit_palk/sync/{summary['id']}").status_code == 404
     for role in ("accountant", "viewer", "approver"):
         headers = {"X-Test-User": f"{role}@example.test"}
@@ -615,9 +624,11 @@ def test_services_contract_employee_is_editable_through_payroll_api(palk_api, pa
     assert response.json()["gross_salary"] is None
 
 
-def test_browser_configure_test_choose_month_review_and_display_only(palk_api, palk, ee_org, monkeypatch):
+def test_browser_configure_test_choose_month_review_and_apply_vacation_snapshot(palk_api, palk, ee_org, monkeypatch):
     playwright = pytest.importorskip("playwright.sync_api")
     from web_app import app
+    PayrollService(palk[0].db).save_employee(ee_org["id"], actor=ACTOR, name="Synthetic Merit employee",
+                                            personal_id="42", gross_salary="2400")
     monkeypatch.setenv("FASTACCOUNTS_DEFAULT_LANG", "en")
     html = TestClient(app).get("/auth/test").text
     root = Path(__file__).resolve().parents[1]
@@ -668,9 +679,13 @@ def test_browser_configure_test_choose_month_review_and_display_only(palk_api, p
         dialog.locator('[name="object_type"]').select_option("vacation_balance")
         dialog.locator('[name="personal_code"]').fill("42")
         dialog.locator('[type="submit"]').click()
-        playwright.expect(page.locator('#app-content')).to_contain_text("Display-only snapshot")
-        playwright.expect(page.locator('[data-decision]')).to_have_count(0)
-        playwright.expect(page.get_by_role("button", name="Apply decisions", exact=True)).to_be_disabled()
+        playwright.expect(page.locator('#app-content')).to_contain_text("Unused vacation days: 12.34")
+        playwright.expect(page.locator('[data-decision="apply"]')).to_have_count(1)
+        page.locator('[data-decision="apply"]').check()
+        page.get_by_role("button", name="Apply decisions", exact=True).click()
+        playwright.expect(page.locator('.outcome-summary')).to_be_visible()
+        opening = palk[0].db.one("SELECT * FROM payroll_leave_openings WHERE organisation_id=?", (ee_org["id"],))
+        assert opening["unused_days"] == 12.34 and opening["source"] == "merit_palk"
         page.get_by_text("View source record", exact=True).click()
         playwright.expect(page.locator('pre')).to_contain_text("DaysUnused")
         page.get_by_role("link", name="Back to integrations", exact=True).first.click()

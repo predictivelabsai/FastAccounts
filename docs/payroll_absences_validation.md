@@ -217,18 +217,61 @@ Command and result:
 - The absence-pay method selection route has role, tenant and CSRF coverage.
   The payout lifecycle and TSD reporting coverage are recorded in Unit 5b.
 
-## Unit 6: Leave and earnings storage foundation
+## Unit 6: Opening balances and historical earnings
 
-Migration 0045 adds tenant-scoped effective-dated entitlement rows, reviewed
-opening unused-day balances and reviewed historical monthly earnings. Historical
-rows have unique source keys for idempotency. The upload adapter, staging review
-and apply handlers, entitlement UI/API and reviewed Merit snapshot application
-have not yet been implemented, so this unit is incomplete.
+Migration 0045 supplies the tenant-scoped entitlement, opening-balance and
+historical-earning tables. Migration 0050 adds a separately stored extended
+opening balance and source keys for entitlement and opening imports. The file
+import connector reads CSV and XLSX with English and Estonian headers and stages
+rows through the existing import review flow. Personal codes are matched only
+inside the selected organisation. Rows with malformed values remain visible
+with a review note and fail individually when applied. Exact re-imports are
+unchanged, with no duplicate entitlement, opening balance or earning rows.
+
+The Absences dialog provides upload, review and apply flows for combined leave
+entitlement and opening days, plus historical monthly earnings. Opening days
+store basic and extended balances separately. Reviewed Merit Palk `DaysUnused`
+snapshots apply at the snapshot date as opening balances. The Merit response
+does not split basic and extended days, so the imported amount is stored as
+basic days and extended days are zero.
+
+Approved historical earnings supply wage totals and unpaid absence calendar-day
+counts for months without an approved FastAccounts payroll run. Average-pay
+selection for vacation pay uses the expected payout date. Thus a November leave
+paid on the last working day of October uses April to September earnings. The
+test covers an employee whose FastAccounts payroll begins in October, six
+imported months, unpaid days, and the November average daily pay.
+
+Individual commands and results, Python 3.12.14:
 
 ```powershell
-.tmp\venv312\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache312 --basetemp=.tmp\test-payroll-unit6b tests\test_migrations_and_tenancy.py::test_empty_migration_is_idempotent tests\test_migrations_and_tenancy.py::test_historical_migration_catalogue_does_not_affect_other_databases
-# 2 passed
+.tmp\venv312\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache312 --basetemp=.tmp\test-history-import tests\test_payroll_history_import.py
+# 5 passed
+.tmp\venv312\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache312 --basetemp=.tmp\test-history-average tests\test_payroll_average.py
+# 6 passed
+.tmp\venv312\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache312 --basetemp=.tmp\test-history-absences tests\test_payroll_absences.py
+# 10 passed
+.tmp\venv312\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache312 --basetemp=.tmp\test-history-merit tests\test_merit_palk.py
+# 49 passed
+.tmp\venv312\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache312 --basetemp=.tmp\test-history-import-pipeline tests\test_import_pipeline.py
+# 10 passed
+.tmp\venv312\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache312 --basetemp=.tmp\test-history-file-import tests\test_file_import.py
+# 12 passed
+.tmp\venv312\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache312 --basetemp=.tmp\test-history-migrations tests\test_migrations_and_tenancy.py
+# 16 passed
+.tmp\venv312\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache312 --basetemp=.tmp\test-history-public tests\test_public.py
+# 60 passed
 ```
+
+All `tests/test_payroll_*.py` files were run individually: 121 passed. The
+additional `tests/test_payroll.py` run passed 16 tests. `test_import_objects.py`
+passed 4 tests. The optional PostgreSQL suite skipped because no test server was
+configured. JavaScript syntax and all locale JSON files passed validation.
+
+Accountant confirmation is still required on treating the Merit Palk unused-day
+total as basic leave, on the payout-date average period, and on the statutory
+meaning of imported unpaid calendar-day counts. No live network calls or
+PostgreSQL execution were performed.
 ## Unit 8: Payslip and dashboard
 
 Payslips show absences frozen into the run, including date range and leave-day
@@ -255,13 +298,10 @@ day-based and hourly payroll, permitted paid absence, and schema migration.
 # 25 passed
 ```
 
-Outstanding requested work before the absence series can be considered
-complete: persist and pay generated vacation/sick/termination components through
-approved payroll and absence-pay payout batches; implement the reviewed
-CSV/XLSX historical import and apply the Merit vacation snapshot; connect leave
-entitlement/opening balances to annual accrual and expiry; add liability reports
-and optional mapped reserve journals; and display remaining leave balances.
-Migration 0045 storage alone does not make the import workflow available.
+Outstanding work before the absence series can be considered complete: connect
+leave entitlement and opening balances to annual accrual and expiry; add
+liability reports and optional mapped reserve journals; and display remaining
+leave balances. Payroll production UAT remains pending.
 PostgreSQL execution was not performed. The date-based and statutory parameters
 listed above still need Estonian accountant review.
 

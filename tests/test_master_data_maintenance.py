@@ -41,7 +41,7 @@ def test_migration_count_rerun_and_ci(sending):
             tx.execute("DELETE FROM schema_migrations WHERE version='0030_master_data_maintenance'")
         assert d["db"].migrate() == ["0030_master_data_maintenance"]
     assert d["db"].rows("SELECT name FROM pragma_table_info('contacts') WHERE name='active'")
-    assert '"0049_payroll_component_source"]' in (ROOT / ".github/workflows/ci.yml").read_text()
+    assert '"0050_payroll_history_import"]' in (ROOT / ".github/workflows/ci.yml").read_text()
 
 
 def test_analysis_finds_all_four_categories(sending):

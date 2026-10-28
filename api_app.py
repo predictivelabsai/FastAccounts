@@ -2429,6 +2429,45 @@ def payroll_absences(organisation_id: str, month: str | None = None, absence_typ
     return PayrollAbsenceService(get_database()).list(organisation_id, month=month, kind=absence_type)
 
 
+@api.post('/organisations/{organisation_id}/payroll/history-imports/{object_type}', status_code=201)
+async def upload_payroll_history_import(organisation_id: str, object_type: Literal['payroll_opening_leave', 'historical_earnings'],
+                                       file: UploadFile = File(...), user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    filename = (file.filename or '').strip()
+    if not filename.casefold().endswith(('.csv', '.xlsx')):
+        raise ValueError('Payroll import files must be CSV or XLSX')
+    content = await file.read(2_000_001)
+    if not content or len(content) > 2_000_000:
+        raise ValueError('Payroll import file must be non-empty and under 2 MB')
+    return ImportService(get_database()).run_sync(
+        organisation_id, 'file_import', object_type, actor=user.email,
+        credentials={'workbook_content': content}, config={'filename': filename},
+    )
+
+
+@api.get('/organisations/{organisation_id}/payroll/history-imports/{sync_run_id}')
+def payroll_history_import_review(organisation_id: str, sync_run_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    sync = get_database().one('SELECT provider,object_type FROM sync_runs WHERE organisation_id=? AND id=?',
+                              (organisation_id, sync_run_id))
+    if not sync or sync['provider'] != 'file_import' or sync['object_type'] not in {'payroll_opening_leave', 'historical_earnings'}:
+        raise KeyError('Payroll import run not found')
+    return ImportService(get_database()).get_staged(organisation_id, sync_run_id=sync_run_id)
+
+
+@api.post('/organisations/{organisation_id}/payroll/history-imports/{sync_run_id}/apply')
+def apply_payroll_history_import(organisation_id: str, sync_run_id: str, payload: IntegrationApplyIn,
+                                 user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    sync = get_database().one('SELECT provider FROM sync_runs WHERE organisation_id=? AND id=?',
+                              (organisation_id, sync_run_id))
+    if not sync or sync['provider'] != 'file_import':
+        raise KeyError('Import run not found')
+    return ImportService(get_database()).apply_staged(
+        organisation_id, 'file_import', sync_run_id, payload.decisions, actor=user.email,
+    )
+
+
 @api.get('/organisations/{organisation_id}/payroll/absence-pay/pending')
 def pending_payroll_absence_pay(organisation_id: str, user: User = Depends(current_user)):
     _require(organisation_id, user, APPROVE_ROLES | {'viewer'})

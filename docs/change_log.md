@@ -4,6 +4,24 @@ Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as
 delivered.
 
+## 2026-10-28: Payroll opening balances and historical earnings
+
+- Added migration 0050 for separate extended opening days and source keys on
+  imported entitlement and opening rows. CSV and XLSX imports reuse the existing
+  staging, review, apply and row-error flow, matching employee personal codes
+  within the organisation. Exact file re-imports are idempotent.
+- Added Absences-area upload, review and apply screens in en/et/lv/lt for
+  entitlement/opening balances and historical monthly earnings. The Estonian
+  labels include `Puhkuse algsaldo`, `Ajaloolised töötasud` and
+  `Puhkusepäevi aastas`.
+- Merit Palk vacation snapshots can now be reviewed and applied as opening
+  balances. Imported historic wages and unpaid calendar-day counts contribute
+  to average pay when the period has no approved FastAccounts run. Vacation
+  averages use the payout date to select the earning months.
+- The validation record lists individual payroll, staging import, Merit,
+  migration and public-page test results. Production UAT and accountant review
+  remain pending.
+
 ## 2026-10-28: Payroll absences series started
 
 - Added migration 0042 with editable wage eligibility and active status for

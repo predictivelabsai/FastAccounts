@@ -113,6 +113,14 @@ def test_payroll_absences_register_can_create_localised_leave(monkeypatch, db, e
         editor.get_by_role('button', name=labels['Save'], exact=True).click()
         playwright.expect(page.get_by_role('dialog')).to_contain_text(labels['Annual leave'])
         playwright.expect(page.get_by_role('dialog')).to_contain_text('Absence UI employee')
+        page.get_by_role('button', name=labels['Opening balances and historical earnings'], exact=True).click()
+        imports = page.get_by_role('dialog')
+        playwright.expect(imports).to_contain_text(labels['Leave entitlement and opening balance'])
+        playwright.expect(imports).to_contain_text(labels['Historical earnings'])
+        assert imports.locator('input[type="file"]').count() == 2
+        assert 'Days per year' in labels and 'Review payroll import' in labels
+        imports.locator('[data-close]').click()
+        page.get_by_role('button', name=labels['Absences'], exact=True).click()
         for key in ('Vacation pay', 'Average', 'Unchanged salary', 'Best of', 'Fixed sum',
                     'Sick benefit', 'Unused leave compensation', 'Add to payout', 'In payout',
                     'Not calculated', 'Calculation'):

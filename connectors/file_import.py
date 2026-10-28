@@ -12,6 +12,7 @@ from zipfile import ZipFile, BadZipFile
 from collections.abc import Mapping
 from decimal import Decimal, InvalidOperation
 from typing import Any
+from openpyxl.utils.exceptions import InvalidFileException
 
 from core_utils import money
 
@@ -39,7 +40,10 @@ class FileImportConnector:
     """Parse uploaded employee text or journal workbook bytes offline."""
 
     key = "file_import"
-    PULL_OBJECT_TYPES = ("employee", "employees", "journal")
+    PULL_OBJECT_TYPES = (
+        "employee", "employees", "journal", "payroll_opening_leave",
+        "historical_earnings",
+    )
 
     def __init__(self, csv_content: str | bytes, config: Mapping[str, Any] | None = None):
         self.csv_content = csv_content
@@ -56,6 +60,15 @@ class FileImportConnector:
 
     def pull(self, object_type: str, *, cursor: str | None = None) -> ConnectorResult:
         del cursor
+        if object_type in {"payroll_opening_leave", "historical_earnings"}:
+            records = tuple(parse_payroll_history_file(
+                self.csv_content, object_type, self.config.get("filename", "")
+            ))
+            return ConnectorResult(
+                self.key, f"pull:{object_type}", True, False,
+                f"Parsed {len(records)} {object_type.replace('_', ' ')} records",
+                records, None,
+            )
         if object_type == "journal":
             records = tuple(parse_journal_workbook(self.csv_content))
             return ConnectorResult(self.key, "pull:journal", True, False,
@@ -209,6 +222,101 @@ def _stable_external_id(record: Mapping[str, Any]) -> str:
         ).encode("utf-8")
     ).hexdigest()[:16]
     return f"file-{digest}"
+
+
+_PAYROLL_HEADERS = {
+    "personal_code": (
+        "personal code", "personal id", "isikukood", "isikukood ehk personal code",
+    ),
+    "days_per_year": (
+        "days per year", "annual leave entitlement", "puhkusepaevi aastas",
+        "puhkusepaevade arv aastas",
+    ),
+    "effective_date": ("effective date", "valid from", "kehtiv alates", "joustumise kuupaev"),
+    "cutover_date": ("cutover date", "balance date", "snapshot date", "saldo kuupaev"),
+    "basic_unused_days": (
+        "basic unused days", "unused basic leave days", "basic leave days",
+        "pohipuhkuse algsaldo", "pohipuhkuse paevad",
+    ),
+    "extended_unused_days": (
+        "extended unused days", "unused extended leave days", "extended leave days",
+        "lisapuhkuse algsaldo", "lisapuhkuse paevad",
+    ),
+    "earning_month": ("month", "earning month", "yyyy-mm", "kuu", "tootasu kuu"),
+    "wage_total": ("wage total", "gross wages", "wages", "tootasu kokku", "palga summa"),
+    "unpaid_absence_days": (
+        "unpaid absence calendar days", "unpaid absence days", "unpaid days",
+        "tasustamata puudumise kalendripaevi", "tasustamata puudumise paevad",
+    ),
+}
+_PAYROLL_HEADER_LOOKUP = {
+    re.sub(r"[^a-z0-9]", "", unicodedata.normalize("NFKD", alias.casefold()).encode("ascii", "ignore").decode()): field
+    for field, aliases in _PAYROLL_HEADERS.items() for alias in aliases
+}
+
+
+def parse_payroll_history_file(content: str | bytes, object_type: str, filename: str = "") -> list[dict[str, Any]]:
+    """Parse payroll opening-balance or historic-earnings CSV/XLSX rows offline."""
+    if not isinstance(content, (str, bytes)):
+        raise ValueError("Payroll import file must be CSV or XLSX")
+    raw = content.encode("utf-8") if isinstance(content, str) else content
+    if not raw or len(raw) > 2_000_000:
+        raise ValueError("Payroll import file must be non-empty and under 2 MB")
+    required = ({"personal_code", "days_per_year", "effective_date", "cutover_date",
+                 "basic_unused_days", "extended_unused_days"}
+                if object_type == "payroll_opening_leave" else
+                {"personal_code", "earning_month", "wage_total", "unpaid_absence_days"})
+    if object_type not in {"payroll_opening_leave", "historical_earnings"}:
+        raise ValueError("Unsupported payroll history import type")
+    rows: list[list[Any]]
+    try:
+        if raw.startswith(b"PK") or filename.casefold().endswith(".xlsx"):
+            from openpyxl import load_workbook
+            with ZipFile(io.BytesIO(raw)) as archive:
+                if sum(item.file_size for item in archive.infolist()) > 20_000_000:
+                    raise ValueError("Payroll workbook is too large when expanded")
+            book = load_workbook(io.BytesIO(raw), read_only=True, data_only=True)
+            try:
+                sheet = book.active
+                if sheet.max_row and sheet.max_row > 10000 or sheet.max_column and sheet.max_column > 200:
+                    raise ValueError("Payroll workbook exceeds the row or column limit")
+                rows = [[cell.value for cell in row] for row in sheet.iter_rows()]
+            finally:
+                book.close()
+        else:
+            text = raw.decode("utf-8-sig")
+            reader = csv.reader(io.StringIO(text, newline=""), delimiter=FileImportConnector._delimiter(text), strict=True)
+            rows = list(reader)
+    except ValueError:
+        raise
+    except (UnicodeDecodeError, csv.Error, BadZipFile, OSError, KeyError, InvalidFileException) as error:
+        raise ValueError("Payroll import file is malformed or unsupported") from error
+    if not rows or not any(value is not None and str(value).strip() for value in rows[0]):
+        raise ValueError("Payroll import header row is missing")
+    headers = [str(value or "").strip() for value in rows[0]]
+    canonical = [_PAYROLL_HEADER_LOOKUP.get(re.sub(
+        r"[^a-z0-9]", "", unicodedata.normalize("NFKD", name.casefold()).encode("ascii", "ignore").decode())) for name in headers]
+    if any(not name for name in headers):
+        raise ValueError("Payroll import header contains an empty column")
+    if len([name for name in canonical if name]) != len(set(name for name in canonical if name)):
+        raise ValueError("Payroll import contains duplicate recognised headers")
+    missing = sorted(required - set(canonical))
+    if missing:
+        raise ValueError("Payroll import is missing required columns: " + ", ".join(missing))
+    digest = hashlib.sha256(raw).hexdigest()
+    records = []
+    for row_number, values in enumerate(rows[1:], start=2):
+        if not any(value is not None and str(value).strip() for value in values):
+            continue
+        identity = f"{digest}:{row_number}"
+        record: dict[str, Any] = {"external_id": identity, "source_key": f"file:{identity}", "file_row": row_number}
+        if len(values) != len(headers):
+            record["import_error"] = f"Row {row_number} has {len(values)} values; expected {len(headers)}"
+        for name, value in zip(canonical, values):
+            if name and value is not None:
+                record[name] = value.isoformat() if isinstance(value, (date, datetime)) else str(value).strip()
+        records.append(record)
+    return records
 
 
 def _journal_header(value: Any) -> str | None:

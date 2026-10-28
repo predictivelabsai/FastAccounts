@@ -19,20 +19,23 @@
   three averages and a documented fallback breakdown. Unit 5 now includes
   persisted vacation pay, payout linkage, draft payroll sick-benefit and
   termination compensation components with stored calculation breakdowns, and
-  the translated Absences controls. Historical import and liability workflows
-  remain in progress. Migration 0045
-  adds effective-dated entitlement, reviewed opening-balance and reviewed
-  historical-earning tables. Import routes, UI and application logic remain
-  outstanding. Unit 7 now has pure calendar-day accrual, FIFO/expiry and
+  the translated Absences controls. Liability workflows remain in progress.
+  Unit 6 adds migration 0050 for separate basic and
+  extended opening days and import source keys, plus reviewed CSV/XLSX uploads
+  for entitlement/opening balances and historical monthly earnings. The payroll
+  Absences dialog provides upload, review and apply actions in en/et/lv/lt.
+  Reviewed Merit Palk vacation snapshots can be applied as opening balances.
+  Average-pay calculations use reviewed history for periods without approved
+  FastAccounts runs and use the vacation-pay payout date for the earning window.
+  Unit 7 now has pure calendar-day accrual, FIFO/expiry and
   employer-cost valuation functions with focused tests. Leave-lot persistence,
   organisation expiry settings, reports and reserve posting remain outstanding.
   Unit 8 adds run-snapshot absences to payslips and dashboard counts for annual
   leave and sick leave today, with labels in all four locales. Remaining leave
   balances and optional payslip balances remain outstanding.
-- Targeted payroll regression tests for the absence service, averages, absence
-  calculations, liability calculations and migration preservation pass. The
-  absence series remains in progress because historical import, persistent
-  liability workflows and reserve posting are outstanding.
+- Payroll history import, Merit application, average-pay, role/tenant/CSRF and
+  migration regression tests pass. The absence series remains in progress
+  because persistent liability workflows and reserve posting are outstanding.
 
 ## 2026-10-28: Payroll calendar and payouts
 

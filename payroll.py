@@ -254,8 +254,10 @@ class PayrollService:
             item['components'] = tx.rows('SELECT direction,amount,is_wage FROM pay_item_components '
                                          'WHERE organisation_id=? AND item_id=?',
                                          (organisation_id, item['id']))
-        history = tx.rows("SELECT earning_month AS period,wage_total FROM payroll_historical_earnings "
-                          "WHERE organisation_id=? AND employee_id=? AND status='Approved'",
+        history = tx.rows("SELECT h.earning_month AS period,h.wage_total,h.unpaid_absence_days FROM payroll_historical_earnings h "
+                          "WHERE h.organisation_id=? AND h.employee_id=? AND h.status='Approved' "
+                          "AND NOT EXISTS (SELECT 1 FROM pay_runs r WHERE r.organisation_id=h.organisation_id "
+                          "AND r.period=h.earning_month AND r.status='Approved')",
                           (organisation_id, employee['id']))
         components = []
         for absence in absences:
@@ -288,11 +290,11 @@ class PayrollService:
                         and absence['start_date'] <= end_date.isoformat()):
                     taken += Decimal(str(PayrollAbsenceService._counts(absence['absence_type'],
                         absence['start_date'], min(absence['end_date'], end_date.isoformat()))['leave_days']))
-            opening_row = tx.one('SELECT unused_days FROM payroll_leave_openings '
+            opening_row = tx.one('SELECT unused_days,extended_unused_days FROM payroll_leave_openings '
                                  'WHERE organisation_id=? AND employee_id=? AND cutover_date<=? AND reviewed_at IS NOT NULL '
                                  'ORDER BY cutover_date DESC LIMIT 1',
                                  (organisation_id, employee['id'], end_date.isoformat()))
-            opening = opening_row['unused_days'] if opening_row else 0
+            opening = (Decimal(str(opening_row['unused_days'])) + Decimal(str(opening_row['extended_unused_days']))) if opening_row else Decimal(0)
             remaining = max(Decimal(0), Decimal(str(opening)) + entitlement - taken)
             if remaining:
                 avg = calculate_average_pay(employee, end_date, approved_items=approved,
