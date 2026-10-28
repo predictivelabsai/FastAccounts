@@ -6,6 +6,19 @@ delivered.
 
 ## 2026-10-28: Payroll correction payouts and APA history
 
+- Completed payroll corrections Build 5. Migrations 0060 and 0062 enforce
+  organisation-safe run lineage; migration 0061 preserves payout-month TSD
+  calculation lines.
+- Later-month positive corrections recalculate tax against the selected payout
+  month and remaining exemption, post a balanced tax-liability adjustment, and
+  export as `R`. Negative corrections remain employee receivables and amend the
+  original declaration period as `M`.
+- Added correction and supplementary actions, original/corrected/difference
+  workpaper values, links between related runs, payout date selection and
+  accountant confirmation of receivable offsets. Added en/et/lv/lt copy.
+- All eight requested offline pytest files pass individually. Accountant UAT and
+  e-MTA acceptance remain external validation.
+
 - Added migrations 0057-0059 for tenant-scoped employee payroll receivables,
   salary payout offset proposals, correction net deltas, receivable account
   mappings and APA `R`/`M` operation plus cancellation history.
@@ -18,9 +31,8 @@ delivered.
   and legacy CSV, and changed APA payloads use `M`. Explicit cancellation uses
   `T`; future replacement lines use `R` and a fresh line number. A correction
   paid later uses its own payout date and transaction.
-- Backend test results are in `payroll_corrections_validation.md`. Payroll UI
-  controls and en/et/lv/lt strings remain outstanding; accountant UAT and e-MTA
-  acceptance are pending.
+- Full test commands and results are recorded in
+  `payroll_corrections_validation.md`.
 
 ## 2026-10-28: Payroll APA TSD exports and workpaper
 

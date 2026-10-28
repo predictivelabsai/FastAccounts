@@ -87,3 +87,10 @@ The requested files pass individually: `test_payroll_payouts.py` 7 passed,
 `test_payroll_corrections.py` 7 passed and `test_migrations_and_tenancy.py`
 17 passed. Full commands and APA/TSD results are listed in
 `payroll_corrections_validation.md`.
+
+Positive corrections paid in a later month recalculate employee net pay with
+the exemption remaining in the selected payment month. The service stores the
+tax breakdown against that payout and posts a balanced adjustment between
+salary payable, withholding liabilities and employer tax accounts. Payout dates
+are selectable in the payroll workspace. Proposed receivable offsets remain
+visible in the payout dialog and must be confirmed before payment.

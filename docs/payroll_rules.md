@@ -449,8 +449,12 @@ in the payment month frozen by its calculation; a different month needs a
 correction. Draft runs resolve again when created. For each employee and
 payment month, approved frozen items consume the applicable maximum or limited
 tax-free amount. Later runs in that payment month receive only the remaining
-exemption. This aggregation reads frozen approved item values and does not
-rewrite earlier calculations.
+exemption. This aggregation uses the selected salary payout date when one exists,
+otherwise the frozen settlement date, and does not rewrite earlier calculations.
+An approved positive correction paid in a later month is recalculated at payout
+creation against that month's remaining exemption. Its payout TSD snapshot and
+the corresponding liability adjustment are recorded separately. A negative
+correction is an employee receivable and amends the original declaration period.
 
 ## Effective-dated employee tax elections
 

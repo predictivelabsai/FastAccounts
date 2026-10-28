@@ -2221,16 +2221,16 @@ checks remain follow-ups. The paired change log records details.
   workpaper complete 4a. Resident payment classifications and upload format
   remain subject to accountant confirmation and EMTA validation.
 
-## Payroll corrections (backend implemented, 2026-10-28)
+## Payroll corrections (Build 5 complete, 2026-10-28)
 
-Migrations 0056-0059 support correction and supplementary runs, employee
-receivables, confirmed salary payout offsets and APA operation history. Positive
-correction deltas use ordinary salary payout batches; negative deltas post to an
-employee receivable and can be offset against a later salary payout after
-accountant confirmation. Same-month corrections update the original workpaper
-and use APA `M`; later-month payouts are separate `R` transactions. API,
-tenant/role/CSRF and requested offline acceptance tests are implemented.
-Payroll workspace controls and en/et/lv/lt strings remain outstanding, along
-with later-month correction tax recalculation when tax-free allowances apply,
-accountant UAT and e-MTA acceptance. See
-`payroll_corrections_validation.md` for design, limits and test results.
+Migrations 0056-0062 support correction and supplementary runs, tenant-safe run
+lineage, employee receivables, confirmed salary payout offsets, APA operation
+history and immutable payout-specific TSD snapshots. Positive later-month
+corrections are calculated with that payment month's remaining tax-free
+allowance and exported as separate `R` transactions. Negative corrections remain
+receivables and amend the original payment period with APA `M`. The payroll
+workspace exposes correction and supplementary actions, per-employee comparison,
+run navigation and offset confirmation, with en/et/lv/lt translations. Requested
+offline acceptance files pass individually. Remaining work is accountant UAT,
+e-MTA acceptance and external validation. See
+`payroll_corrections_validation.md` for commands, counts and commits.

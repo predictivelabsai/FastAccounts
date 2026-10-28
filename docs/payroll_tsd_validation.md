@@ -87,27 +87,20 @@ submission remains disabled.
 
 ## Correction and supplementary payout exports (2026-10-28)
 
-Correction workpapers use the approved frozen TSD deltas. When a correction is
-paid in the original payment month, its deltas update the original run's
-workpaper and legacy CSV. Changed APA content is emitted as operation `M`, a
-full replacement under the original line numbers. If an accountant cancels a
-transaction, operation `T` is retained as cancellation XML in history; a
-subsequent replacement must use `R` and fresh line numbers. A later-month
-correction is exported from its own paid payout as a separate `R` transaction
-dated in that payment month.
+When a correction is paid in the original payment month, its deltas update the
+original run's workpaper and legacy CSV. Changed APA content is emitted as
+operation `M`, a full replacement under the original line numbers. A negative
+later-month correction remains a receivable and is included in the original
+period's replacement. A positive later-month correction is recalculated using
+the payout month's remaining allowance; its immutable payout TSD snapshot is
+exported from its paid payout as a separate `R` transaction dated in that month.
+The later-month test verifies the allowance and income-tax values in the
+workpaper as well as the transaction identity and date.
 
-The transaction identity and date are tested for a later-month correction using
-an employee without a tax-free allowance. Correction TSD amounts are currently
-frozen at correction approval; recalculation of tax-free allowance when its
-payout date moves to another month remains open and can trigger the negative
-amount export block.
-
-The vendored developer guide section 4 and cancellation example define these
-operation rules. The requested offline test files pass individually: payroll
-corrections 7, payroll payouts 7, APA history 6, APA XML 6, TSD export 14 and
-migrations/tenancy 17. The payout and history files each report one existing
-fastcore deprecation warning. No live e-MTA or network tests were run. Payroll
-UI controls and en/et/lv/lt strings remain to be implemented.
+If an accountant cancels a transaction, operation `T` is retained as
+cancellation XML in history; a subsequent replacement must use `R` and fresh
+line numbers. The requested tests and remaining external checks are recorded in
+`payroll_corrections_validation.md`. No live e-MTA or network test was run.
 
 ## Scope 4b handoff (2026-10-28)
 

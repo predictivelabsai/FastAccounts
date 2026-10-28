@@ -113,29 +113,36 @@ commands, counts, commits and unresolved acceptance items here.
   - `pytest tests/test_payroll_corrections.py -q`: 5 passed.
   - `pytest tests/test_payroll_settlement.py -q`: 8 passed.
   - `pytest tests/test_migrations_and_tenancy.py -q`: 17 passed.
-- Remaining: payroll UI and en/et/lv/lt strings. The migration records
-  `original_run_id` without a composite foreign key, so tenant-safe lineage
-  depends on service checks. One tax calculation question also remains: correction
-  TSD deltas are frozen during approval, while the payout date is selected later.
-  The later-month APA test covers an employee without a tax-free allowance. A
-  later payout month with an allowance may require tax recalculation and can be
-  blocked by the offline negative-amount rule. Accountant review is needed before
-  claiming that case is supported. Accountant UAT and e-MTA acceptance remain
-  external validation work.
+- Follow-up commits: `0f34db7` adds SQLite and PostgreSQL tenant-lineage guards
+  for `original_run_id`; `58fde23` adds payroll correction UI actions and
+  translations; `65d74fc` recalculates later-month positive corrections, freezes
+  payout-specific TSD lines and posts balanced tax adjustments; `75e788b` adds
+  payout date selection and verifies the later-month APA workpaper values;
+  `0d5d8a2` prevents deletion or reassignment of a run with related runs.
+- Later-month positive correction payouts use the selected payment month and the
+  remaining employee exemption for that month. The run item keeps its immutable
+  approved values; the recalculated net delta, TSD snapshot and tax-liability
+  adjustment are associated with the payout. A negative correction creates an
+  employee receivable and remains an `M` amendment of the original period. It
+  does not create a negative payout.
+- Migrations 0060 and 0062 use SQLite triggers and PostgreSQL trigger
+  substitutions to reject cross-organisation original-run references and to
+  protect referenced original runs. Migration 0061 stores payout-specific TSD
+  rows with update/delete guards.
 
 ### Final requested test pass
 
 Each requested file was run individually with the repository venv:
 
-- `.venv\Scripts\python.exe -m pytest tests/test_payroll_corrections.py -q`: 7 passed.
+- `.venv\Scripts\python.exe -m pytest tests/test_payroll_corrections.py -q`: 9 passed.
 - `.venv\Scripts\python.exe -m pytest tests/test_payroll_payouts.py -q`: 7 passed, 1 existing fastcore deprecation warning.
 - `.venv\Scripts\python.exe -m pytest tests/test_tsd_apa_history.py -q`: 6 passed, 1 existing fastcore deprecation warning.
 - `.venv\Scripts\python.exe -m pytest tests/test_tsd_apa_xml.py -q`: 6 passed.
 - `.venv\Scripts\python.exe -m pytest tests/test_tsd_export.py -q`: 14 passed.
-- `.venv\Scripts\python.exe -m pytest tests/test_migrations_and_tenancy.py -q`: 17 passed.
+- `.venv\Scripts\python.exe -m pytest tests/test_workspace_payroll.py -q`: 17 passed, 1 existing fastcore deprecation warning.
+- `.venv\Scripts\python.exe -m pytest tests/test_i18n.py -q`: 18 passed, 1 existing fastcore deprecation warning.
+- `.venv\Scripts\python.exe -m pytest tests/test_migrations_and_tenancy.py -q`: 18 passed.
 
-Total: 57 passed and 2 existing deprecation warnings. No full suite or live
-network test was run. Implementation remaining: payroll UI and en/et/lv/lt
-strings. Open items: later-month tax recalculation for tax-free allowances,
-accountant UAT, e-MTA acceptance and a composite tenant foreign key for
-`original_run_id` in a future safe migration.
+Total: 95 passed and 4 existing deprecation warnings. No full suite, browser
+test, live network test or PostgreSQL integration run was performed. Build 5 is
+implemented; accountant UAT and e-MTA acceptance remain external validation.
