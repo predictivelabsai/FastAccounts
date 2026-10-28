@@ -84,3 +84,9 @@ PostgreSQL tests were used.
 Exact preset and legal classifications still require Estonian accountant
 confirmation. XML and CSV output remain unverified against e-MTA, and direct
 submission remains disabled.
+
+## Scope 4b handoff (2026-10-28)
+
+Vendored the official business example, cancellation example, feedback report XSD and four feedback report examples under `tests/fixtures/emta/`. Provenance and retrieval date are in that directory's README. The developer guide states that each XBRL GL file represents a single transaction (see local extract, sections 1 and 3); the target export must therefore use one file per payout transaction, not one file per organisation and payment month. The XBRL GL schema archive was not downloaded. Full XBRL GL schema validation remains pending.
+
+Scope 4b is not complete. The current `tsd.py` exporter still emits the review-only FastAccounts namespace and does not implement the official APA extension, cancellation, export history, feedback import, offline APA business rules or declaration panel controls. No rule codes are yet claimed as implemented. Next steps: map the vendored sample and local taxonomy field-by-field; add an additive tenant-scoped export/history/result migration and both explicit migration lists; implement service logic and routes; add structural and feedback tests; wire the en/et/lv/lt declaration panel; synchronise `tsd-export.md`, this validation record, roadmap and change log; then run the requested test files individually. Do not mark 4b complete until these pass. No live network calls were made.
