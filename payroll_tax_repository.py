@@ -1,4 +1,5 @@
 """Tenant-scoped persistence for employee tax elections."""
+import json
 
 
 def employee(tx, organisation_id, employee_id, *, lock=True):
@@ -56,4 +57,10 @@ def monthly_exemption_used(tx, organisation_id, employee_id, payment_month):
         paid_on = date.fromisoformat(row['settlement_date']) if row['settlement_date'] else settlement_date(row['period'])
         if start <= paid_on < next_month:
             used += decimal(row['tax_free_minimum'])
+    absence_rows = tx.rows("SELECT p.calculation_json FROM payroll_absence_pay p "
+                            "JOIN payroll_absence_payout_batches b ON b.organisation_id=p.organisation_id AND b.id=p.absence_payout_batch_id "
+                            "WHERE p.organisation_id=? AND p.employee_id=? AND p.status IN ('in_payout','paid') AND b.status IN ('Approved','Paid') "
+                            "AND substr(b.payout_date,1,7)=?", (organisation_id, employee_id, payment_month))
+    for row in absence_rows:
+        used += decimal(json.loads(row['calculation_json']).get('tax_free_minimum', '0'))
     return used

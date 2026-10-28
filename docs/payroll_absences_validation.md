@@ -168,18 +168,16 @@ Command and result:
   sickness-period continuation certificates before production use.
 - Confirm the unchanged-salary and best-of amounts for part-time employees and
   the statutory fixed-sum agreement conditions.
-- Absence-pay payout batches, payment-date tax calculations and exemption
-  aggregation, frozen tax values, GL posting and TSD inclusion are not yet
-  implemented. The existing payout model requires an approved pay run, while
-  TSD reads approved run items. A separate absence-pay liability and reporting
-  path is needed to avoid counting the gross twice.
+- Unit 5b below implements the vacation-pay payout, payment-date tax,
+  exemption aggregation, frozen values, GL postings and TSD inclusion. Sick
+  benefit and termination unused-leave amounts remain outside this path.
 - Sick benefit and termination unused-leave compensation are not yet wired as
   run components. The termination trigger and leave-balance source need
   implementation.
 - The absences tab does not yet expose the breakdown, method selection or
   payout action. Labels for this workflow are not yet added in en/et/lv/lt.
-- Role, tenant isolation and CSRF coverage for the new method-selection route,
-  and end-to-end payout/reporting tests remain outstanding.
+- The absence-pay method selection route has role, tenant and CSRF coverage.
+  The payout lifecycle and TSD reporting coverage are recorded in Unit 5b.
 
 ## Unit 6: Leave and earnings storage foundation
 
@@ -229,7 +227,50 @@ Migration 0045 storage alone does not make the import workflow available.
 PostgreSQL execution was not performed. The date-based and statutory parameters
 listed above still need Estonian accountant review.
 
-## Unit 5b: Absence-pay payout and tax integration design
+## Unit 5b: Absence-pay payout and tax integration
+
+Migration 0047 adds tenant-scoped absence-pay payout batches with Draft,
+Approved, Paid and Cancelled states. Pending vacation-pay records can be added
+to a new batch or an existing Draft batch. On addition, the service freezes a
+`calculate_pay` result for the payout-date month, using the employee's effective
+tax elections and the remaining exemption after approved payroll and other
+approved absence payments in that payment month. A payment defaults to the
+working day immediately before leave starts. Approval posts the gross expense,
+withholdings, employer taxes and net payable in a balanced ledger batch. Paid
+posts the net payable to bank. Cancellation releases records back to pending
+and reverses posted batches.
+
+TSD workpapers, CSV and XBRL GL exports include each absence payment as its own
+payment record for the payout month, with the frozen payout date and employee
+details. The salary-run payment-month calculation sees exemption already used
+by approved absence payouts. Tests cover an October salary paid on 10 November
+and vacation pay paid on 20 November sharing one EUR 700 exemption, balanced
+postings, TSD inclusion, cancellation, tenant scoping, roles and CSRF.
+
+Commands and results, Python 3.12.14:
+
+```powershell
+.tmp\venv312\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache312 --basetemp=.tmp\test-absence-pay-final6 tests\test_payroll_absence_pay.py
+# 7 passed
+.tmp\venv312\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache312 --basetemp=.tmp\test-payouts-final tests\test_payroll_payouts.py
+# 7 passed
+.tmp\venv312\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache312 --basetemp=.tmp\test-settlement-final tests\test_payroll_settlement.py
+# 8 passed
+.tmp\venv312\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache312 --basetemp=.tmp\test-tsd-final2 tests\test_tsd_export.py
+# 7 passed
+.tmp\venv312\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache312 --basetemp=.tmp\test-payroll-final2 tests\test_payroll.py
+# 16 passed
+.tmp\venv312\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache312 --basetemp=.tmp\test-migrations-final2 tests\test_migrations_and_tenancy.py
+# 16 passed
+```
+
+No live network calls or PostgreSQL execution were performed. Remaining Unit 5
+work is wiring employer sick benefit and termination unused-leave compensation
+as payroll components. The absence-pay UI and en/et/lv/lt labels are not part
+of Unit 5b. Statutory calculation assumptions remain subject to Estonian
+accountant confirmation.
+
+## Unit 5b design note (recorded before implementation)
 
 A pending vacation-pay snapshot becomes taxable payroll when it is added to an
 `absence_pay` payout batch. Batch creation freezes one payroll calculation per

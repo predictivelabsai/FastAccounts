@@ -11,6 +11,7 @@ from __future__ import annotations
 import calendar
 import csv
 import io
+import json
 from datetime import date, timedelta
 from decimal import Decimal
 from xml.etree import ElementTree as ET
@@ -212,15 +213,50 @@ class TSDExportService:
         for item in run['items']:
             item['components'] = tx.rows('SELECT * FROM pay_item_components WHERE organisation_id=? AND item_id=? ORDER BY position', (organisation_id, item['id']))
         records = [self._record(organisation, run, item) for item in run["items"]]
+        payment_month = run['payment_date'][:7]
+        absence_rows = tx.rows("SELECT p.*,b.payout_date FROM payroll_absence_pay p "
+                               "JOIN payroll_absence_payout_batches b ON b.organisation_id=p.organisation_id AND b.id=p.absence_payout_batch_id "
+                               "WHERE p.organisation_id=? AND p.status IN ('in_payout','paid') AND b.status IN ('Approved','Paid') AND substr(b.payout_date,1,7)=? "
+                               "ORDER BY p.employee_id,p.id", (organisation_id, payment_month))
+        for absence in absence_rows:
+            calc = json.loads(absence['calculation_json'])
+            if not (calc.get('employee_personal_id') or '').strip():
+                raise ValueError('TSD preparation requires a frozen personal ID for every absence payment record')
+            payment_date = date.fromisoformat(absence['payout_date'])
+            gross = money(calc['gross'])
+            pension = money(calc['funded_pension'])
+            ui_employee = money(calc['ui_employee'])
+            exemption = money(calc['tax_free_minimum'])
+            income_base = money(max(Decimal('0'), gross - pension - ui_employee - exemption))
+            records.append({
+                'declaration':'TSD','annex':TSD_ANNEX_MAPPING['EE_RESIDENT_PAYMENT'],
+                'payment_record_id':absence['id'],'pay_run_id':absence['absence_payout_batch_id'],
+                'payment_date':payment_date.isoformat(),'payment_month':payment_month,
+                'filing_deadline':_filing_deadline(payment_date).isoformat(),
+                'payer_registration_no':organisation['registration_no'].strip(),
+                'recipient_personal_id':(calc.get('employee_personal_id') or '').strip(),
+                'recipient_name':calc['employee_name'],'payment_classification':'EMPLOYMENT_SALARY',
+                'pay_basis':'monthly','currency':'EUR','gross_amount':gross,
+                'tax_free_minimum':exemption,'income_tax_base':income_base,
+                'income_tax':money(calc['income_tax']),
+                'employee_unemployment_insurance':ui_employee,
+                'employer_unemployment_insurance':money(calc['ui_employer']),
+                'funded_pension':pension,'social_tax_base':money(calc['social_tax_base']),
+                'social_tax':money(calc['social_tax']),'net_amount':money(calc['net']),
+                'employer_cost':money(calc['employer_cost']),
+            })
         totals = {
             field: money(sum((decimal(record[field]) for record in records), Decimal("0")))
             for field in TSD_AMOUNT_FIELDS
         }
-        if totals["gross_amount"] != money(run["total_gross"]):
+        absence_gross = sum((money(record['gross_amount']) for record in records[len(run['items']):]), Decimal(0))
+        absence_net = sum((money(record['net_amount']) for record in records[len(run['items']):]), Decimal(0))
+        absence_cost = sum((money(record['employer_cost']) for record in records[len(run['items']):]), Decimal(0))
+        if totals["gross_amount"] != money(run["total_gross"]) + absence_gross:
             raise ValueError("TSD gross total does not reconcile to the approved pay run")
-        if totals["net_amount"] != money(run["total_net"]):
+        if totals["net_amount"] != money(run["total_net"]) + absence_net:
             raise ValueError("TSD net total does not reconcile to the approved pay run")
-        if totals["employer_cost"] != money(run["total_employer_cost"]):
+        if totals["employer_cost"] != money(run["total_employer_cost"]) + absence_cost:
             raise ValueError("TSD employer-cost total does not reconcile to the approved pay run")
         return {
             "organisation_id": organisation_id,

@@ -53,6 +53,7 @@ from payroll_tax_settings import EmployeeTaxSettingsService, TaxSettingConflict,
 from payroll_payday import PaydaySettingsService
 from payroll_payouts import PayoutConflict, PayoutService
 from payroll_absences import AbsenceConflict, PayrollAbsenceService, ABSENCE_TYPES
+from payroll_absence_payouts import AbsencePayoutService
 from employee_details import EmployeeDetailsError
 from tax import TaxService
 from tsd import TSDExportService
@@ -2270,6 +2271,19 @@ class PayoutPaidIn(BaseModel):
     bank_account_id: str
 
 
+class AbsencePayoutCreateIn(BaseModel):
+    absence_pay_ids: list[str] = Field(min_length=1)
+    payout_date: str | None = None
+
+
+class AbsencePayoutAddIn(BaseModel):
+    absence_pay_ids: list[str] = Field(min_length=1)
+
+
+class AbsencePayoutPaidIn(BaseModel):
+    bank_account_id: str
+
+
 class PayrollAbsenceIn(BaseModel):
     model_config = {'extra': 'forbid'}
     employee_id: str
@@ -2413,6 +2427,54 @@ def payroll_absences(organisation_id: str, month: str | None = None, absence_typ
                      user: User = Depends(current_user)):
     _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
     return PayrollAbsenceService(get_database()).list(organisation_id, month=month, kind=absence_type)
+
+
+@api.get('/organisations/{organisation_id}/payroll/absence-pay/pending')
+def pending_payroll_absence_pay(organisation_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    return AbsencePayoutService(get_database()).pending(organisation_id)
+
+
+@api.post('/organisations/{organisation_id}/payroll/absence-payouts', status_code=201)
+def create_absence_pay_payout(organisation_id: str, payload: AbsencePayoutCreateIn,
+                              user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return AbsencePayoutService(get_database()).create(
+        organisation_id, payload.absence_pay_ids, payout_date=payload.payout_date, actor=user.email)
+
+
+@api.post('/organisations/{organisation_id}/payroll/absence-payouts/{payout_id}/records')
+def add_absence_pay_records(organisation_id: str, payout_id: str, payload: AbsencePayoutAddIn,
+                            user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return AbsencePayoutService(get_database()).add(
+        organisation_id, payout_id, payload.absence_pay_ids, actor=user.email)
+
+
+@api.get('/organisations/{organisation_id}/payroll/absence-payouts/{payout_id}')
+def get_absence_pay_payout(organisation_id: str, payout_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    return AbsencePayoutService(get_database()).get(organisation_id, payout_id)
+
+
+@api.post('/organisations/{organisation_id}/payroll/absence-payouts/{payout_id}/approve')
+def approve_absence_pay_payout(organisation_id: str, payout_id: str, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return AbsencePayoutService(get_database()).approve(organisation_id, payout_id, actor=user.email)
+
+
+@api.post('/organisations/{organisation_id}/payroll/absence-payouts/{payout_id}/paid')
+def mark_absence_pay_payout_paid(organisation_id: str, payout_id: str, payload: AbsencePayoutPaidIn,
+                                 user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return AbsencePayoutService(get_database()).paid(
+        organisation_id, payout_id, payload.bank_account_id, actor=user.email)
+
+
+@api.post('/organisations/{organisation_id}/payroll/absence-payouts/{payout_id}/cancel')
+def cancel_absence_pay_payout(organisation_id: str, payout_id: str, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return AbsencePayoutService(get_database()).cancel(organisation_id, payout_id, actor=user.email)
 
 
 @api.post('/organisations/{organisation_id}/payroll/absences', status_code=201)
