@@ -181,7 +181,7 @@ def test_sick_benefit_is_split_across_monthly_draft_runs_and_frozen_on_approval(
     assert november_component['breakdown']['qualifying_days'] == 3
     assert Decimal(october_component['amount']) + Decimal(november_component['amount']) > 0
     recalculated = payroll.update_item(ee_org['id'], october_run['id'], october['id'], actor=actor,
-        components=[{'type_id': october_component['type_id'], 'name': october_component['name'],
+        components=[{'type_id': october_component['type_id'], 'name': october_component['name'], 'is_generated': True,
             'amount': '999.00', 'direction': october_component['direction'],
             **{key: october_component[key] for key in
                 ('income_tax', 'social_tax', 'ui_employee', 'ui_employer', 'funded_pension', 'social_minimum')}}])
@@ -194,6 +194,37 @@ def test_sick_benefit_is_split_across_monthly_draft_runs_and_frozen_on_approval(
                             gross_salary='2500')
     frozen = payroll.runs(ee_org['id'])
     assert next(r for r in frozen if r['period'] == '2026-10')['items'][0]['components'][0]['breakdown']
+
+
+def test_manual_sick_pay_coexists_with_generated_benefit_and_survives_recalculation(db, ee_org):
+    from payroll import PayrollService
+    from payroll_absences import PayrollAbsenceService
+    actor = 'owner@example.test'
+    payroll = PayrollService(db)
+    employee = payroll.save_employee(ee_org['id'], actor=actor, name='Manual and generated sick pay',
+                                     gross_salary='2200', apply_tax_free_minimum=False)
+    PayrollAbsenceService(db).save(ee_org['id'], employee['id'], actor=actor,
+        absence_type='sick_leave', start_date='2026-10-05', end_date='2026-10-08')
+    run = payroll.create_run(ee_org['id'], period='2026-10', actor=actor)
+    item = run['items'][0]
+    sick_type = next(t for t in payroll.component_types(ee_org['id']) if t['preset_key'] == 'employer_sick_pay')
+    manual_amount = '100.00'
+    edited = payroll.update_item(ee_org['id'], run['id'], item['id'], actor=actor,
+        components=[{'type_id': sick_type['id'], 'name': sick_type['name'], 'amount': manual_amount,
+            'direction': sick_type['direction'], **{key: sick_type[key] for key in
+                ('income_tax', 'social_tax', 'ui_employee', 'ui_employer', 'funded_pension', 'social_minimum')}}])
+    components = edited['items'][0]['components']
+    generated = next(c for c in components if c['preset_key'] == 'employer_sick_pay' and c['is_generated'])
+    manual = next(c for c in components if c['preset_key'] == 'employer_sick_pay' and not c['is_generated'])
+    assert manual['amount'] == manual_amount
+    assert generated['breakdown']['amount'] == generated['amount']
+
+    recalculated = payroll.update_item(ee_org['id'], run['id'], item['id'], actor=actor, gross_salary='2300')
+    components_after = recalculated['items'][0]['components']
+    manual_after = next(c for c in components_after if c['id'] == manual['id'])
+    generated_after = next(c for c in components_after if c['is_generated'])
+    assert manual_after['amount'] == manual_amount
+    assert generated_after['breakdown'] == generated['breakdown']
 
 
 def test_termination_component_uses_opening_entitlement_and_taken_leave(db, ee_org):
@@ -221,7 +252,7 @@ def test_termination_component_uses_opening_entitlement_and_taken_leave(db, ee_o
     assert Decimal(comp['amount']) == Decimal(comp['breakdown']['average_daily_pay']) * 30
     assert comp['social_tax'] is True and comp['ui_employee'] is True
     edited = payroll.update_item(ee_org['id'], item['pay_run_id'], item['id'], actor=actor,
-        components=[{'type_id': comp['type_id'], 'name': comp['name'], 'amount': '999.00',
+        components=[{'type_id': comp['type_id'], 'name': comp['name'], 'is_generated': True, 'amount': '999.00',
             'direction': comp['direction'], **{key: comp[key] for key in
                 ('income_tax', 'social_tax', 'ui_employee', 'ui_employer', 'funded_pension', 'social_minimum')}}])
     overridden = next(c for c in edited['items'][0]['components'] if c['preset_key'] == 'unused_leave')

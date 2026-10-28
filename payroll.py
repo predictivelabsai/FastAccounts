@@ -314,11 +314,11 @@ class PayrollService:
                 continue
             fields = ('id','organisation_id','item_id','type_id','position','name','amount','direction',
                       'income_tax','social_tax','ui_employee','ui_employer','funded_pension','social_minimum',
-                      'liability_role','is_wage','breakdown_json')
+                      'liability_role','is_wage','breakdown_json','is_generated')
             values = (new_id(), organisation_id, item_id, ptype['id'], position, ptype['name'],
                 db_number(amount), ptype['direction'], ptype['income_tax'], ptype['social_tax'],
                 ptype['ui_employee'], ptype['ui_employer'], ptype['funded_pension'], ptype['social_minimum'],
-                ptype['liability_role'], ptype.get('is_wage', 0), json.dumps(breakdown, sort_keys=True))
+                ptype['liability_role'], ptype.get('is_wage', 0), json.dumps(breakdown, sort_keys=True), 1)
             tx.execute('INSERT INTO pay_item_components('+','.join(fields)+') VALUES ('+','.join('?' for _ in fields)+')', values)
 
     def pushes(self, organisation_id, run_id):
@@ -627,14 +627,20 @@ class PayrollService:
         if components is not None:
             if len(components) > 100:
                 raise ValueError('At most 100 payment lines are allowed per employee')
-            tx.execute('DELETE FROM pay_item_components WHERE organisation_id=? AND item_id=?', (organisation_id, item_id))
+            tx.execute('DELETE FROM pay_item_components WHERE organisation_id=? AND item_id=? AND is_generated=1',
+                       (organisation_id, item_id))
+            tx.execute('DELETE FROM pay_item_components WHERE organisation_id=? AND item_id=? AND is_generated=0', (organisation_id, item_id))
             for position, line in enumerate(components):
-                allowed = {'type_id', 'name', 'amount', 'direction', 'liability_role', *FLAGS}
+                allowed = {'type_id', 'name', 'amount', 'direction', 'liability_role', 'is_generated', *FLAGS}
                 if set(line) - allowed:
                     raise ValueError('Unknown payment component field')
                 data = tx.one('SELECT * FROM pay_component_types WHERE organisation_id=? AND id=?', (organisation_id, line.get('type_id')))
                 if not data:
                     raise KeyError('Payment type not found')
+                if line.get('is_generated'):
+                    if data.get('preset_key') == 'unused_leave':
+                        component_overrides['unused_leave'] = decimal(line['amount'])
+                    continue
                 data.setdefault('is_wage', True)
                 data.setdefault('active', True)
                 data.update(line)
@@ -656,9 +662,8 @@ class PayrollService:
                 fields = ('id', 'organisation_id', 'item_id', 'type_id', 'position', 'name', 'amount', 'direction', *FLAGS, 'liability_role') + (('is_wage',) if metadata_ready else ())
                 values = (new_id(), organisation_id, item_id, data['id'], position, data['name'], db_number(amount), data['direction'], *(data[key] for key in FLAGS), data['liability_role']) + ((data['is_wage'],) if metadata_ready else ())
                 tx.execute('INSERT INTO pay_item_components(' + ','.join(fields) + ') VALUES (' + ','.join('?' for _ in fields) + ')', values)
-        tx.execute("DELETE FROM pay_item_components WHERE organisation_id=? AND item_id=? AND type_id IN "
-                   "(SELECT id FROM pay_component_types WHERE organisation_id=? AND preset_key IN ('employer_sick_pay','unused_leave'))",
-                   (organisation_id, item_id, organisation_id))
+        tx.execute('DELETE FROM pay_item_components WHERE organisation_id=? AND item_id=? AND is_generated=1',
+                   (organisation_id, item_id))
         if tx.dialect == 'postgres':
             absence_schema_ready = bool(tx.one("SELECT 1 FROM information_schema.tables WHERE table_schema=current_schema() AND table_name='payroll_absence_run_items'"))
         else:
