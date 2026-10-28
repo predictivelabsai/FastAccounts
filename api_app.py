@@ -2197,6 +2197,16 @@ class PayRunIn(BaseModel):
     hours: dict[str, Decimal] | None = None
 
 
+class EmployeeTaxSettingIn(BaseModel):
+    model_config = {'extra': 'forbid'}
+    kind: Literal['tax_free', 'pension', 'unemployment']
+    start_date: str
+    mode: Literal['maximum', 'limited', 'none'] | None = None
+    amount: Decimal | None = Field(default=None, ge=0, max_digits=12, decimal_places=2)
+    rate: Decimal | None = None
+    applies: bool | None = None
+
+
 class PayComponentIn(BaseModel):
     model_config = {'extra': 'forbid'}
     name: str = Field(min_length=1, max_length=180)
@@ -2262,6 +2272,35 @@ def payroll_update_employee(organisation_id: str, employee_id: str, payload: Emp
 def payroll_delete_employee(organisation_id: str, employee_id: str, user: User = Depends(require_csrf)):
     _require(organisation_id, user, WRITE_ROLES)
     PayrollService().delete_employee(organisation_id, employee_id, actor=user.email)
+    return Response(status_code=204)
+
+
+@api.get('/organisations/{organisation_id}/employees/{employee_id}/tax-settings')
+def employee_tax_settings(organisation_id: str, employee_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    return EmployeeTaxSettingsService(get_database()).list(organisation_id, employee_id)
+
+
+@api.post('/organisations/{organisation_id}/employees/{employee_id}/tax-settings', status_code=201)
+def create_employee_tax_setting(organisation_id: str, employee_id: str, payload: EmployeeTaxSettingIn,
+                                user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return EmployeeTaxSettingsService(get_database()).save(organisation_id, employee_id, actor=user.email, **payload.model_dump())
+
+
+@api.put('/organisations/{organisation_id}/employees/{employee_id}/tax-settings/{setting_id}')
+def update_employee_tax_setting(organisation_id: str, employee_id: str, setting_id: str,
+                                payload: EmployeeTaxSettingIn, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return EmployeeTaxSettingsService(get_database()).save(organisation_id, employee_id, setting_id=setting_id,
+                                                           actor=user.email, **payload.model_dump())
+
+
+@api.delete('/organisations/{organisation_id}/employees/{employee_id}/tax-settings/{setting_id}', status_code=204)
+def delete_employee_tax_setting(organisation_id: str, employee_id: str, setting_id: str,
+                                user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    EmployeeTaxSettingsService(get_database()).delete(organisation_id, employee_id, setting_id, actor=user.email)
     return Response(status_code=204)
 
 

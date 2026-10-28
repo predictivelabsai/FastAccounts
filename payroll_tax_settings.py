@@ -138,6 +138,8 @@ class EmployeeTaxSettingsService:
             if not creating and field not in changes:
                 continue
             old = next((r for r in rows if r['kind'] == kind and r['start_date'] == start), None)
+            if old and kind == 'pension' and decimal(old['rate']) == decimal(values['rate']):
+                continue
             if old and all(old[k] == v or str(old[k]) == str(v) for k, v in values.items()):
                 continue
             self.save(organisation_id, employee['id'], actor=actor, kind=kind, start_date=start,

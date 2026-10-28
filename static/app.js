@@ -4177,8 +4177,10 @@
       });
     });
   }
-  function employeeDialog(employee) {
+  async function employeeDialog(employee) {
     const url = path("/employees") + (employee ? `/${employee.id}` : "");
+    const writable = ["owner", "administrator", "accountant"].includes(org?.role);
+    let histories = employee ? await api(url + "/tax-settings") : [];
     const e = employee || {
       active: true,
       apply_tax_free_minimum: true,
@@ -4187,7 +4189,7 @@
       fte: "1",
     };
     const d = dialog(
-      employee ? "Edit employee" : "Add employee",
+      employee ? (writable ? "Edit employee" : "Employee details") : "Add employee",
       form(
         field("Name", "name", e.name || "", "text", "required") +
           field("Email", "email", e.email || "", "email") +
@@ -4261,7 +4263,7 @@
             e.apply_tax_free_minimum,
           ) +
           check("Active", "active", e.active),
-      ),
+      ) + (employee ? `<section class="employee-tax-settings"><h3>${tr("Tax settings")}</h3><p class="muted">${tr("Changes apply to new pay runs using month-end settings.")}</p><div data-tax-histories></div><div data-tax-editor></div></section>` : ""),
     );
     const employeeForm = d.querySelector("form");
     const updateBasis = () => {
@@ -4295,6 +4297,77 @@
       await post(url, data, employee ? "PATCH" : "POST");
       await saved(d);
     });
+    if (!writable) {
+      employeeForm.querySelectorAll("input,select,[type=submit]").forEach((input) => { input.disabled = true; });
+      employeeForm.querySelector("[type=submit]").hidden = true;
+    }
+    if (!employee) return;
+    const labels = {tax_free: "Tax-free income application", pension: "Funded pension", unemployment: "Unemployment insurance contribution"};
+    const modes = {maximum: "Maximum", limited: "Limited amount", none: "Not applied"};
+    const panel = d.querySelector("[data-tax-histories]"), editor = d.querySelector("[data-tax-editor]");
+    const renderHistories = () => {
+      panel.innerHTML = Object.entries(labels).map(([kind, label]) => `<div class="tax-history"><h4>${tr(label)}</h4>${table(
+        ["Effective from", "Setting", "Actions"],
+        histories.filter((r) => r.kind === kind).map((r) => row([
+          td(esc(r.start_date)),
+          td(kind === "tax_free" ? `${tr(modes[r.mode])}${r.mode === "limited" ? ` (${esc(money(r.amount, "EUR"))})` : ""}` : kind === "pension" ? `${esc(r.rate)}%` : tr(r.applies ? "Yes" : "Not applied")),
+          td(r.frozen ? `<span class="muted">${tr("Used in approved payroll")}</span>` : writable ? button("Edit", "taxEdit", false, `data-id="${esc(r.id)}"`) + button("Delete", "taxDelete", false, `data-id="${esc(r.id)}"`) : ""),
+        ])),
+      )}${writable ? button("Add tax setting", "taxAdd", false, `data-kind="${kind}"`) : ""}</div>`).join("");
+    };
+    const refreshHistories = async () => {
+      histories = await api(url + "/tax-settings");
+      renderHistories();
+    };
+    const editSetting = (kind, existing) => {
+      const r = existing || {start_date: today(), mode: "maximum", rate: 2, applies: true};
+      editor.innerHTML = `<h4>${tr(labels[kind])}</h4>` + form(
+        field("Effective from", "start_date", r.start_date, "date", "required") +
+        (kind === "tax_free" ? select("Tax-free income application", "mode", Object.entries(modes).map(([v, l]) => [v, t(l)]), r.mode) + field("Monthly limit", "amount", r.amount ?? "", "number", 'min="0" step="0.01"') :
+          kind === "pension" ? select("Pension %", "rate", [0, 2, 4, 6].map((v) => [v, `${v}%`]), r.rate) : check("Employee unemployment insurance applies", "applies", r.applies)),
+        "Save tax setting",
+      );
+      const f = editor.querySelector("form"), cancel = f.querySelector("[data-action=cancel]");
+      cancel.dataset.action = "taxCancel";
+      cancel.onclick = () => { editor.innerHTML = ""; panel.querySelector("button")?.focus(); };
+      if (kind === "tax_free") {
+        const toggleLimit = () => {
+          const limited = f.elements.mode.value === "limited";
+          f.elements.amount.disabled = !limited;
+          f.elements.amount.required = limited;
+          f.elements.amount.closest("label").hidden = !limited;
+        };
+        f.elements.mode.onchange = toggleLimit;
+        toggleLimit();
+      }
+      bindForm(editor, async (data) => {
+        const payload = {kind, start_date: data.start_date};
+        if (kind === "tax_free") Object.assign(payload, {mode: data.mode, amount: data.mode === "limited" ? data.amount : null});
+        if (kind === "pension") payload.rate = data.rate;
+        if (kind === "unemployment") payload.applies = f.elements.applies.checked;
+        await post(url + "/tax-settings" + (existing ? `/${existing.id}` : ""), payload, existing ? "PUT" : "POST");
+        await refreshHistories();
+        editor.innerHTML = "";
+        panel.querySelector("button")?.focus();
+      });
+      f.elements.start_date.focus();
+    };
+    panel.onclick = async (event) => {
+      const b = event.target.closest("button[data-action]");
+      if (!b || !writable) return;
+      const r = histories.find((r) => r.id === b.dataset.id);
+      if (b.dataset.action === "taxAdd") return editSetting(b.dataset.kind);
+      if (b.dataset.action === "taxEdit") return editSetting(r.kind, r);
+      if (b.dataset.action === "taxDelete") {
+        b.disabled = true;
+        try {
+          await post(url + `/tax-settings/${r.id}`, undefined, "DELETE");
+          editor.innerHTML = "";
+          await refreshHistories();
+        } catch (error) { toast(error.message, "error"); b.disabled = false; }
+      }
+    };
+    renderHistories();
   }
   function payrollWizard(employees) {
     const url = path("/pay-runs"),

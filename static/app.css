@@ -939,6 +939,29 @@ td small {
   gap: 10px;
   margin-top: 18px;
 }
+.employee-tax-settings {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid var(--neutral-200);
+}
+.tax-history {
+  margin-top: 24px;
+}
+.tax-history h4 {
+  margin: 0 0 12px;
+}
+.employee-tax-settings [data-tax-editor]:not(:empty) {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--neutral-200);
+}
+@media (max-width: 600px) {
+  .tax-history table { min-width: 0; table-layout: fixed; }
+  .tax-history th, .tax-history td { padding: 10px 8px; white-space: normal; overflow-wrap: anywhere; }
+  .tax-history th:first-child { width: 27%; }
+  .tax-history th:nth-child(2) { width: 36%; }
+  .tax-history td .button { display: block; margin: 0 0 6px; max-width: 100%; }
+}
 .confirm-copy {
   font-size: 14px;
   color: var(--neutral-700);
