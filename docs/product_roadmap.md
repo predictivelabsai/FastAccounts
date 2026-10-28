@@ -2220,3 +2220,12 @@ checks remain follow-ups. The paired change log records details.
   implemented. Legacy Annex 1 CSV upload and the accountant XLSX/on-screen
   workpaper complete 4a. Resident payment classifications and upload format
   remain subject to accountant confirmation and EMTA validation.
+
+## Payroll corrections (in progress, 2026-10-28)
+
+Migration 0056 provides run-kind and original-run lineage columns and changes the
+period uniqueness rule to apply to regular runs only. This does not complete the
+correction workflow. Draft cloning/editing, delta-only balanced ledger posting,
+receivable tracking and offset, payment-month payout handling, corrected APA
+history, API/UI actions, locale strings and acceptance tests remain outstanding.
+See `payroll_corrections_validation.md` for the design and checkpoint details.

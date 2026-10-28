@@ -339,3 +339,28 @@ def test_fixed_asset_upgrade_preserves_custom_charts_and_postings(tmp_path, monk
         assert assigned[role]["code"] == ("9998" if role == "FIXED_ASSETS" and existing_role else str(code + 2))
     assert assigned["ACCUMULATED_DEPRECIATION"]["normal_balance"] == "Credit"
     assert db.rows("SELECT * FROM asset_groups") == []
+
+
+def test_payroll_run_kinds_keep_regular_period_unique_and_allow_related_runs(tmp_path):
+    from organisations import OrganisationService
+    from database import Database
+    from core_utils import new_id, utc_now
+
+    db = Database(path=str(tmp_path / "run-kinds.sqlite"))
+    db.migrate()
+    org = OrganisationService(db).create(name="Run kinds", country_code="EE",
+        entity_type="EE_OU", owner_email="owner@example.test")
+    regular_id, correction_id, supplementary_id = new_id(), new_id(), new_id()
+    now = utc_now()
+    with db.transaction() as tx:
+        for run_id, kind, original in ((regular_id, "regular", None),
+                                       (correction_id, "correction", regular_id),
+                                       (supplementary_id, "supplementary", regular_id)):
+            tx.execute("INSERT INTO pay_runs(id,organisation_id,period,total_gross,total_net,total_employer_cost,created_by,created_at,kind,original_run_id) VALUES (?,?,?,0,0,0,?,?,?,?)",
+                       (run_id, org["id"], "2026-10", "owner@example.test", now, kind, original))
+    with pytest.raises(Exception):
+        with db.transaction() as tx:
+            tx.execute("INSERT INTO pay_runs(id,organisation_id,period,total_gross,total_net,total_employer_cost,created_by,created_at) VALUES (?,?,?,0,0,0,?,?)",
+                       (new_id(), org["id"], "2026-10", "owner@example.test", now))
+    assert db.scalar("SELECT COUNT(*) FROM pay_runs WHERE organisation_id=? AND original_run_id=?",
+                     (org["id"], regular_id)) == 2

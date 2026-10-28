@@ -72,3 +72,21 @@ migration to both the explicit catalogue in `tests/test_migrations_and_tenancy.p
 and `.github/workflows/ci.yml`; other tests derive from the migration catalogue.
 Update payroll, TSD and payout documentation, the roadmap and change log. Record
 commands, counts, commits and unresolved acceptance items here.
+
+## 2026-10-28 implementation checkpoint
+
+- Branch created from `15be8ce`; design note committed as `7afc5fe`.
+- Migration 0056 and explicit migration-list updates committed as `170ac1b`.
+- Added a migration regression test for regular uniqueness and linked
+  correction/supplementary rows. `tests/test_migrations_and_tenancy.py`: 17
+  passed.
+- Remaining: correction/supplementary creation and cloning; employee/component
+  editing; delta computation across successive corrections; balanced delta-only
+  ledger posting and full reversal; receivables and visible offsets; payment-date
+  selection and additional payouts; APA `M` replacement / `T` cancellation / new
+  `R` identifiers for subsequent versions; TSD corrected line versions; API/UI
+  routes and en/et/lv/lt strings; tenant/role/CSRF and acceptance tests; targeted
+  runs of the requested payroll, payout, settlement and TSD test files.
+- The migration currently records `original_run_id` without a composite foreign
+  key. Tenant-safe service validation must be added before exposing these kinds
+  through API routes.

@@ -2276,3 +2276,16 @@ the entries below, plus one connector fix:
 ## 2026-10-28: Payroll APA TSD payment-type groundwork
 
 - Added migration 0052 for tenant component payment-type codes and preset backfill, plus an editor field with EMTA code labels and a resident rule extract. Implementation and validation are tracked in payroll_tsd_validation.md.
+
+## 2026-10-28: Payroll correction schema checkpoint
+
+Migration 0056 adds `kind` (`regular`, `correction`, `supplementary`) and
+`original_run_id` to pay runs, allows multiple non-regular runs per period, and
+keeps the regular-run unique index. The migration catalogue is explicit in the
+migration test and CI workflow. This is a schema checkpoint only. Creation,
+approval deltas, receivables, payout and APA correction behaviour, and UI actions
+remain incomplete. See `payroll_corrections_validation.md` before relying on these
+run kinds.
+
+Validation: `tests/test_migrations_and_tenancy.py`, 17 passed. Full requested
+payroll acceptance suite has not yet been run.
