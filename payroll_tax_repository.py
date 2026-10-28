@@ -37,3 +37,23 @@ def save(tx, row):
 def delete(tx, organisation_id, setting_id):
     tx.execute('DELETE FROM employee_tax_settings WHERE organisation_id=? AND id=?',
                (organisation_id, setting_id))
+
+
+def monthly_exemption_used(tx, organisation_id, employee_id, payment_month):
+    """Sum exemption frozen in approved items paid in the same calendar month."""
+    from datetime import date
+    from core_utils import decimal
+    from payroll_rules import settlement_date
+    year, month = map(int, payment_month.split('-'))
+    start = date(year, month, 1)
+    next_month = date(year + (month == 12), 1 if month == 12 else month + 1, 1)
+    rows = tx.rows("SELECT i.tax_free_minimum,r.period,r.settlement_date FROM pay_run_items i "
+                   "JOIN pay_runs r ON r.organisation_id=i.organisation_id AND r.id=i.pay_run_id "
+                   "WHERE i.organisation_id=? AND i.employee_id=? AND r.status='Approved'",
+                   (organisation_id, employee_id))
+    used = decimal('0')
+    for row in rows:
+        paid_on = date.fromisoformat(row['settlement_date']) if row['settlement_date'] else settlement_date(row['period'])
+        if start <= paid_on < next_month:
+            used += decimal(row['tax_free_minimum'])
+    return used

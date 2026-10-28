@@ -37,6 +37,12 @@ def payday(period: str, rule: str, day: int | None = None) -> date:
     return result
 
 
+def payday_for_period(tx, organisation_id: str, period: str) -> date | None:
+    row = tx.one('SELECT rule,day FROM organisation_payday_rules WHERE organisation_id=? AND start_date<=? ORDER BY start_date DESC LIMIT 1',
+                 (organisation_id, period + '-31'))
+    return payday(period, row['rule'], row['day']) if row else None
+
+
 class PaydaySettingsService:
     def __init__(self, db):
         self.db = db

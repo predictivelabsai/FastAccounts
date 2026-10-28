@@ -4,6 +4,7 @@ import pytest
 
 from payroll import PayrollService
 from payroll_payouts import PayoutConflict, PayoutService
+from payroll_payday import PaydaySettingsService
 
 ACTOR = 'owner@example.test'
 IBAN = 'EE382200221020145685'
@@ -54,3 +55,13 @@ def test_paid_payout_posts_balanced_bank_transfer_and_reversal_on_cancel(db, ee_
     cancelled = service.cancel(ee_org['id'], batch['id'], actor=ACTOR)
     assert cancelled['status'] == 'Cancelled' and cancelled['reversal_batch_id']
     assert db.one('SELECT status FROM posting_batches WHERE id=?', (paid['posted_batch_id'],))['status'] == 'Reversed'
+
+
+def test_salary_payout_cannot_move_an_approved_run_to_another_payment_month(db, ee_org, legacy_payroll):
+    PaydaySettingsService(db).save(ee_org['id'], start_date='2026-01-01', rule_start_date='2026-01-01',
+                                   rule='next_month_day', day=10, actor=ACTOR)
+    run = approved_run(db, ee_org, legacy_payroll)
+    with pytest.raises(PayoutConflict, match='correction'):
+        PayoutService(db).create(ee_org['id'], run['id'], actor=ACTOR, payout_date='2026-10-30')
+    valid = PayoutService(db).create(ee_org['id'], run['id'], actor=ACTOR, payout_date='2026-11-10')
+    assert valid['payout_date'] == '2026-11-10'

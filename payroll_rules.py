@@ -47,9 +47,27 @@ def rules_for(applies_on: date) -> PayrollRules:
         raise UnsupportedPayrollYear() from None
 
 
-def settlement_date(period: str) -> date:
-    """Month end until payroll supports actual payout dates."""
+def settlement_date(period: str, salary_payout_date: date | str | None = None,
+                   payday_rule_date: date | str | None = None) -> date:
+    """Resolve tax settlement date in priority order: salary payout, payday, month end."""
+    for value in (salary_payout_date, payday_rule_date):
+        if value is not None:
+            return value if isinstance(value, date) else date.fromisoformat(value)
     import calendar
     year, month = map(int, period.split('-'))
     return date(year, month, calendar.monthrange(year, month)[1])
+
+
+def remaining_monthly_exemption(application_mode: str, application_amount: Decimal | None,
+                                monthly_maximum: Decimal, already_used: Decimal) -> Decimal:
+    """Return this pay item's share of an employee's payment-month exemption."""
+    if application_mode == 'none':
+        return Decimal('0.00')
+    if application_mode == 'maximum':
+        applicable = monthly_maximum
+    elif application_mode == 'limited' and application_amount is not None:
+        applicable = min(application_amount, monthly_maximum)
+    else:
+        raise ValueError('Invalid tax-free application')
+    return max(Decimal('0.00'), applicable - already_used)
 

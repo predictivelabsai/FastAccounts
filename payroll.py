@@ -33,8 +33,10 @@ from core_utils import audit, db_number, decimal, four_dp, money, new_id, utc_no
 from database import Database, get_database
 from ledger import LedgerService, PostingLine
 from payroll_components import FLAGS, ROLES, serialise
-from payroll_rules import rules_for, settlement_date
+from payroll_rules import remaining_monthly_exemption, rules_for, settlement_date
 from payroll_tax_settings import EmployeeTaxSettingsService, resolve as resolve_tax_settings
+from payroll_tax_repository import monthly_exemption_used
+from payroll_payday import payday_for_period
 from employee_details import validate_details, birth_date_from_personal_code
 
 
@@ -129,9 +131,10 @@ def _fte(value) -> Decimal:
     return decimal(1 if value in (None, '') else value)
 
 
-def calculate_pay(employee: dict, *, period: str | None = None, hours=None, components=()) -> dict:
+def calculate_pay(employee: dict, *, period: str | None = None, hours=None, components=(),
+                  settlement_on: date | None = None, exemption_remaining: Decimal | None = None) -> dict:
     """Calculate one employee's month. Hourly gross = hourly rate x hours entered on the run."""
-    rules = rules_for(settlement_date(period or '2026-01'))
+    rules = rules_for(settlement_on or settlement_date(period or '2026-01'))
     basis = pay_basis(employee)
     board = basis == 'board_fee'
     if basis == 'hourly':
@@ -163,6 +166,8 @@ def calculate_pay(employee: dict, *, period: str | None = None, hours=None, comp
     mode = employee.get('tax_free_mode') or ('maximum' if employee['apply_tax_free_minimum'] else 'none')
     allowance = decimal(employee['tax_free_amount']) if mode == 'limited' else rules.basic_exemption
     exemption = money(min(allowance, rules.basic_exemption, max(Decimal('0'), taxable)) if mode != 'none' else 0)
+    if exemption_remaining is not None:
+        exemption = min(exemption, money(exemption_remaining))
     income_tax = money(max(Decimal('0'), taxable - exemption) * rules.income_tax_rate)
     exemption_reason = ('board_member' if board else 'income_line' if basis == 'income_line'
                         else (employee.get('social_tax_minimum_exemption') or None))
@@ -390,6 +395,16 @@ class PayrollService:
         run = tx.one('SELECT * FROM pay_runs WHERE organisation_id=? AND id=?', (organisation_id, run_id))
         if not run:
             raise KeyError('Pay run not found')
+        if 'settlement_date' in run:
+            payout = tx.one("SELECT payout_date FROM payroll_payout_batches WHERE organisation_id=? AND pay_run_id=? "
+                            "AND payout_type='salary' AND status!='Cancelled' ORDER BY payout_date,id LIMIT 1",
+                            (organisation_id, run_id))
+            payday_date = payday_for_period(tx, organisation_id, run['period'])
+            run['payment_date'] = settlement_date(run['period'],
+                salary_payout_date=payout['payout_date'] if payout else None,
+                payday_rule_date=run['settlement_date'] or payday_date).isoformat()
+        else:
+            run['payment_date'] = settlement_date(run['period']).isoformat()
         run['items'] = tx.rows('SELECT * FROM pay_run_items WHERE organisation_id=? AND pay_run_id=? ORDER BY employee_name,id', (organisation_id, run_id))
         for item in run['items']:
             item['components'] = [serialise(row) for row in tx.rows(
@@ -513,7 +528,15 @@ class PayrollService:
         context = tx.one('SELECT * FROM pay_item_context WHERE organisation_id=? AND item_id=?', (organisation_id, item_id))
         if not context:
             raise ValueError('Pay run calculation snapshot is missing')
-        amounts = calculate_pay(item | context, period=run['period'], hours=worked, components=lines)
+        has_settlement_date = 'settlement_date' in run
+        pay_date = date.fromisoformat(run['settlement_date']) if run.get('settlement_date') else settlement_date(run['period'])
+        used_exemption = (monthly_exemption_used(tx, organisation_id, item['employee_id'], pay_date.strftime('%Y-%m'))
+                          if has_settlement_date else Decimal('0'))
+        exemption_cap = remaining_monthly_exemption(
+            context.get('tax_free_mode') or ('maximum' if context.get('apply_tax_free_minimum') else 'none'),
+            context.get('tax_free_amount'), rules_for(pay_date).basic_exemption, used_exemption)
+        amounts = calculate_pay(item | context, period=run['period'], hours=worked, components=lines,
+                                settlement_on=pay_date, exemption_remaining=exemption_cap)
         if amounts['gross'] > Decimal('9999999999.99') or any(amounts[key] > Decimal('9999999999.99') for key in AMOUNTS if key != 'employer_cost'):
             raise ValueError('Payment totals exceed the supported amount')
         monthly_minimum, hourly_minimum = minimum_wage(run['period'])
@@ -586,13 +609,14 @@ class PayrollService:
     def create_run(self, organisation_id, *, period, actor, hours=None, tx=None):
         if not re.fullmatch(r'[0-9]{4}-(0[1-9]|1[0-2])', period):
             raise ValueError('Payroll periods must use YYYY-MM')
-        rules_for(settlement_date(period))
         if tx is None:
             with self.db.transaction() as owned_tx:
                 return self.create_run(organisation_id, period=period, actor=actor, hours=hours, tx=owned_tx)
         self._organisation(tx, organisation_id)
+        pay_date = settlement_date(period, payday_rule_date=payday_for_period(tx, organisation_id, period))
+        rules_for(pay_date)
         run_id = new_id()
-        result = tx.execute("INSERT INTO pay_runs(id,organisation_id,period,total_gross,total_net,total_employer_cost,created_by,created_at) VALUES (?,?,?,0,0,0,?,?) ON CONFLICT(organisation_id,period) DO NOTHING", (run_id, organisation_id, period, actor, utc_now()))
+        result = tx.execute("INSERT INTO pay_runs(id,organisation_id,period,total_gross,total_net,total_employer_cost,created_by,created_at,settlement_date) VALUES (?,?,?,0,0,0,?,?,?) ON CONFLICT(organisation_id,period) DO NOTHING", (run_id, organisation_id, period, actor, utc_now(), pay_date.isoformat()))
         if result.rowcount != 1:
             raise PayrollConflict(f'A pay run already exists for {period}')
         employees = [e for e in tx.rows('SELECT * FROM employees WHERE organisation_id=? AND active=1 ORDER BY id', (organisation_id,))
@@ -605,7 +629,7 @@ class PayrollService:
                    'board_member', 'funded_pension_percent', 'pay_basis', 'fte', 'hourly_rate', 'hours',
                    'minimum_wage', 'social_tax_minimum_exemption', *AMOUNTS)
         for employee in employees:
-            election = resolve_tax_settings(tx, organisation_id, employee, settlement_date(period))
+            election = resolve_tax_settings(tx, organisation_id, employee, pay_date)
             employee = employee | election
             basis, fte, worked, required = pay_basis(employee), _fte(employee.get('fte')), None, None
             if basis == 'monthly':
@@ -619,7 +643,12 @@ class PayrollService:
                 if decimal(employee['hourly_rate']) < hourly_minimum:
                     raise ValueError(f"{employee['name']}: hourly rate must be at least EUR {hourly_minimum:.2f}")
                 worked = self._hours(employee, hours)
-            amounts = calculate_pay(employee, period=period, hours=worked)
+            used_exemption = monthly_exemption_used(tx, organisation_id, employee['id'], pay_date.strftime('%Y-%m'))
+            exemption_cap = remaining_monthly_exemption(
+                election['tax_free_mode'], election.get('tax_free_amount'),
+                rules_for(pay_date).basic_exemption, used_exemption)
+            amounts = calculate_pay(employee, period=period, hours=worked, settlement_on=pay_date,
+                                    exemption_remaining=exemption_cap)
             item_id = new_id()
             values = (item_id, run_id, organisation_id, employee['id'], employee['name'], employee.get('personal_id'),
                       db_number(amounts['gross'] if basis in ('hourly', 'income_line') else money(employee['gross_salary'])),

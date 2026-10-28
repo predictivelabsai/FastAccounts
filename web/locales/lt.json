@@ -1973,6 +1973,7 @@
     "No payouts for this run.": "Šiam skaičiavimui išmokų nėra.",
     "Add an active bank account first.": "Pirmiausia pridėkite aktyvią banko sąskaitą.",
     "Pay run": "Darbo užmokesčio skaičiavimas",
+    "The payout month differs from the frozen payroll calculation month; a correction is required": "Išmokos mėnuo skiriasi nuo užfiksuoto darbo užmokesčio skaičiavimo mėnesio. Reikia pataisymo.",
     "Salary expense": "Darbo užmokesčio sąnaudos",
     "Social tax expense": "Socialinio mokesčio sąnaudos",
     "Employer unemployment expense": "Darbdavio nedarbo draudimo sąnaudos",

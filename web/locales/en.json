@@ -1973,6 +1973,7 @@
     "No payouts for this run.": "No payouts for this run.",
     "Add an active bank account first.": "Add an active bank account first.",
     "Pay run": "Pay run",
+    "The payout month differs from the frozen payroll calculation month; a correction is required": "The payout month differs from the frozen payroll calculation month. A correction is required.",
     "Salary expense": "Salary expense",
     "Social tax expense": "Social tax expense",
     "Employer unemployment expense": "Employer unemployment expense",

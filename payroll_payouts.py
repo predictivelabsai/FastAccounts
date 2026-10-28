@@ -5,7 +5,7 @@ from decimal import Decimal
 from core_utils import audit, db_number, decimal, money, new_id, utc_now
 from database import Database, get_database
 from ledger import LedgerService, PostingLine
-from payroll_payday import payday
+from payroll_payday import payday_for_period
 from payroll_rules import settlement_date
 
 PAYOUT_TYPES = {'salary', 'advance', 'absence_pay', 'bonus', 'withholding'}
@@ -24,9 +24,7 @@ class PayoutService:
         return run
 
     def _default_date(self, tx, organisation_id, period):
-        rows = tx.rows('SELECT rule,day FROM organisation_payday_rules WHERE organisation_id=? AND start_date<=? ORDER BY start_date DESC LIMIT 1',
-                       (organisation_id, period + '-31'))
-        return payday(period, rows[0]['rule'], rows[0]['day']) if rows else settlement_date(period)
+        return payday_for_period(tx, organisation_id, period) or settlement_date(period)
 
     def _outstanding(self, tx, organisation_id, run_id):
         items = tx.rows('SELECT i.employee_id,i.net,e.iban,e.bank_account_owner,e.name FROM pay_run_items i '
@@ -44,8 +42,12 @@ class PayoutService:
         if payout_type not in PAYOUT_TYPES:
             raise ValueError('Invalid payout type')
         with self.db.transaction() as tx:
+            tx.execute('UPDATE pay_runs SET settlement_date=settlement_date WHERE organisation_id=? AND id=?', (organisation_id, run_id))
             run = self._run(tx, organisation_id, run_id)
             chosen_date = date.fromisoformat(payout_date).isoformat() if payout_date else self._default_date(tx, organisation_id, run['period']).isoformat()
+            frozen_date = date.fromisoformat(run.get('settlement_date') or self._default_date(tx, organisation_id, run['period']).isoformat())
+            if payout_type == 'salary' and chosen_date[:7] != frozen_date.isoformat()[:7]:
+                raise PayoutConflict('The payout month differs from the frozen payroll calculation month; a correction is required')
             outstanding = self._outstanding(tx, organisation_id, run_id)
             requested = amounts if amounts is not None else {row['employee_id']: str(row['unpaid']) for row in outstanding if row['unpaid'] > 0}
             known = {row['employee_id']: row for row in outstanding}
@@ -76,6 +78,10 @@ class PayoutService:
             batch = self._batch(tx, organisation_id, batch_id)
             if batch['status'] != 'Draft':
                 raise PayoutConflict('Only draft payouts can be marked paid')
+            claimed = tx.execute("UPDATE payroll_payout_batches SET status='Paid' WHERE organisation_id=? AND id=? AND status='Draft'",
+                                 (organisation_id, batch_id))
+            if claimed.rowcount != 1:
+                raise PayoutConflict('Only draft payouts can be marked paid')
             bank = tx.one('SELECT * FROM bank_accounts WHERE organisation_id=? AND id=? AND active=1', (organisation_id, bank_account_id))
             if not bank:
                 raise KeyError('Bank account not found')
@@ -98,6 +104,10 @@ class PayoutService:
         with self.db.transaction() as tx:
             batch = self._batch(tx, organisation_id, batch_id)
             if batch['status'] == 'Cancelled':
+                raise PayoutConflict('Payout is already cancelled')
+            claimed = tx.execute("UPDATE payroll_payout_batches SET status='Cancelled' WHERE organisation_id=? AND id=? AND status!='Cancelled'",
+                                 (organisation_id, batch_id))
+            if claimed.rowcount != 1:
                 raise PayoutConflict('Payout is already cancelled')
             reversal_id = None
             if batch['status'] == 'Paid':

@@ -1973,6 +1973,7 @@
     "No payouts for this run.": "Selle palgaarvestuse väljamakseid pole.",
     "Add an active bank account first.": "Lisa esmalt aktiivne pangakonto.",
     "Pay run": "Palgaarvestus",
+    "The payout month differs from the frozen payroll calculation month; a correction is required": "Väljamakse kuu erineb palgaarvestuse külmutatud arvestuskuust. Vajalik on paranduskirje.",
     "Salary expense": "Palgakulu",
     "Social tax expense": "Sotsiaalmaksu kulu",
     "Employer unemployment expense": "Tööandja töötuskindlustusmakse kulu",

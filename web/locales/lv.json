@@ -1973,6 +1973,7 @@
     "No payouts for this run.": "Šim aprēķinam nav izmaksu.",
     "Add an active bank account first.": "Vispirms pievienojiet aktīvu bankas kontu.",
     "Pay run": "Algas aprēķins",
+    "The payout month differs from the frozen payroll calculation month; a correction is required": "Izmaksas mēnesis atšķiras no fiksētā algas aprēķina mēneša. Nepieciešams labojums.",
     "Salary expense": "Algu izdevumi",
     "Social tax expense": "Sociālā nodokļa izdevumi",
     "Employer unemployment expense": "Darba devēja bezdarba apdrošināšanas izdevumi",
