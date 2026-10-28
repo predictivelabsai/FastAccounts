@@ -177,3 +177,42 @@ employer amounts.
 X-tee client, SOAP client, e-MTA session, upload call, confirmation call, or
 status polling in this implementation.
 
+
+## APA TSD XBRL GL example mapping (4b step 1)
+
+Source: vendored `tests/fixtures/emta/APA_TSD_lahteandmed_ariuhingule_naide_XML_20251017.xml`, checked against taxonomy extract `APA_TSD_TAKSONOOMIA_20251017.txt` (general fields and EE0201001 columns) and developer guide `APA_TSD_juhend_arendajale_sh_kalkulaatorteenus_20260130.txt` (sections 1.3-1.4). The XML example deliberately covers conditional fields and several scenarios; conditional fields are emitted only when the frozen payout data supports them. Required means required for the supported resident cash-pay scenario, following the taxonomy's EE0201001 column and guide. Optional includes conditional and example-only fields.
+
+| Example XML path (namespace prefix) | Meaning in taxonomy / guide | Requirement | FastAccounts source for one payout |
+| --- | --- | --- | --- |
+| `xbrli:xbrl` | XBRL instance root | Mandatory | Constant document envelope |
+| `xbrll:schemaRef/@xlink:href`, `@xlink:arcrole`, `@xlink:type` | Reference to XBRL GL presentation taxonomy | Mandatory in example skeleton | Vendored example constants |
+| `xbrli:context/@id`; `xbrli:entity`; `xbrli:identifier/@scheme`; `xbrli:period/xbrli:instant` | Reporting entity and instant context | Mandatory | Organisation registry code; payout date |
+| `xbrli:unit/@id`; `xbrli:measure` | Currency and pure-number units | Mandatory in skeleton | EUR and count unit constants |
+| `gl-cor:accountingEntries/gl-cor:documentInfo/gl-cor:entriesType` | Entry transaction type; payroll uses `other` | Mandatory | Constant `other` |
+| `gl-cor:uniqueID` | Unique report identifier | Mandatory | Stable ID from organisation, payout ID and version |
+| `gl-cor:language` | Report language, ISO 639 code | Mandatory | Constant `iso639:et` |
+| `gl-cor:creationDate` | Report creation date | Mandatory | Frozen payout export date |
+| `gl-bus:creator` | Contact or creating unit | Optional | Omitted; no suitable frozen source |
+| `gl-cor:entriesComment` | Report purpose/comment | Optional | Constant APA TSD payment comment |
+| `gl-cor:periodCoveredStart`, `gl-cor:periodCoveredEnd` | Start and end of reporting period | Mandatory | Payout date for both (one transaction per file) |
+| `gl-bus:sourceApplication` | Accounting software name | Mandatory | Constant `FastAccounts` |
+| `gl-muc:defaultCurrency` | Report currency, `iso4217:eur` | Mandatory | Constant EUR |
+| `gl-cor:entityInformation/gl-bus:organizationIdentifiers/gl-bus:organizationIdentifier` | Reporting legal entity identifier | Mandatory | Tenant-scoped organisation registration number |
+| `gl-bus:organizationDescription` | Identifier type; example uses `ARIREGISTRIKOOD` | Mandatory | Constant `ARIREGISTRIKOOD` |
+| `gl-cor:entryHeader/gl-cor:entryNumber` | APA section identifier; payroll taxes section is `EE0201001` | Mandatory | Constant `EE0201001` |
+| `gl-cor:entryHeader/gl-cor:entryDetail/gl-cor:lineNumber` | Detail identity | Optional for periodic section; supplied in sample | Deterministic payout line index |
+| `gl-cor:lineNumberCounter` | Sequential detail number within section | Mandatory in example pattern | One-based detail index |
+| `gl-cor:account/gl-cor:accountSub/gl-cor:accountSubID` + `gl-cor:accountSubType` | Codelist code and codelist identifier | Mandatory; payment type and operation type | Frozen payment type (`VALJAMLIIK2023ap`) and `R` (`TOIMINGUTYYP2023ap`) |
+| `gl-cor:accountSub/gl-cor:segmentParentTuple/gl-cor:parentSubaccountCode` + `gl-cor:parentSubaccountType` | Related code pair for country/role composite codelists | Optional; sample's A1/foreign-work cases | Omitted for resident-only records until supported source exists |
+| `gl-cor:amount` | Gross payment amount, two decimal places | Mandatory | Frozen TSD line gross `Decimal` |
+| `gl-bus:allocationCode` | Access-control/allocation code | Optional | No source; omitted |
+| `gl-cor:identifierReference/gl-cor:identifierCode` | Payee personal or MTA non-resident identifier | Mandatory | Frozen employee personal ID |
+| `gl-cor:identifierDescription` | Identifier type codelist, `ISIKUKOOD` or `MRR_KOOD` | Mandatory with identifier | `ISIKUKOOD` for supported resident scope |
+| `gl-cor:documentDate` | Payment execution date | Mandatory | Salary or absence payout date |
+| `gl-bus:measurable/gl-bus:measurableID` + `gl-bus:measurableIDSchema` | Calculation event code and codelist (`TSD01`, `SYNDMUS2017ap`) | Mandatory for supported payroll detail | `TSD01`, `SYNDMUS2017ap` |
+| `gl-bus:measurableStartDateTime` | Date of calculation/payroll obligation | Conditional | Frozen calculation date when available; otherwise omitted |
+| `gl-bus:measurableDescription` + `gl-bus:measurableQuantity` | Measured tax base or exemption; descriptions use `MEASURABLEDESCRIPTION_enum` (e.g. `MVT_610`, `MVT_650`, `TSD_SMVM`) | Conditional, by applicable tax/base | Frozen exemption, social-tax base, and other supported bases as separate pairs |
+| `gl-cor:taxes/gl-cor:taxAmount` + `gl-cor:taxCode` | Tax amount and `TAXCODE_enum` code | Conditional, one pair per non-zero applicable levy | Frozen income tax (`TSD_KTM`), social tax (`TSD_SM`), employee pension (`TSD_KP`), employee unemployment (`TSD_TK`), employer unemployment (`TSD_TTK`) |
+| `gl-cor:taxes/gl-cor:taxPercentageRate` | Applicable tax rate | Conditional | Frozen rate only if stored; otherwise omitted |
+
+The example contains non-resident, foreign-work/A1 and other conditional variants. The supported exporter emits the resident fields above only. It must not infer country roles, allocation codes, tax-rate metadata, or calculation timestamps absent from the frozen payout snapshot. Each output file represents exactly one payout transaction, as specified by the developer guide's file examples and transaction-level upload model.
