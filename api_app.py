@@ -2443,6 +2443,12 @@ def create_absence_pay_payout(organisation_id: str, payload: AbsencePayoutCreate
         organisation_id, payload.absence_pay_ids, payout_date=payload.payout_date, actor=user.email)
 
 
+@api.get('/organisations/{organisation_id}/payroll/absence-payouts')
+def list_absence_pay_payouts(organisation_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    return AbsencePayoutService(get_database()).drafts(organisation_id)
+
+
 @api.post('/organisations/{organisation_id}/payroll/absence-payouts/{payout_id}/records')
 def add_absence_pay_records(organisation_id: str, payout_id: str, payload: AbsencePayoutAddIn,
                             user: User = Depends(require_csrf)):

@@ -4479,6 +4479,7 @@
   ];
   async function payrollAbsencesDialog(c, employees) {
     const base = c.url("/payroll/absences");
+    const canWriteAbsences = ["owner", "administrator", "accountant"].includes(org?.role);
     const monthNow = new Date().toISOString().slice(0, 7);
     const renderList = async (month = monthNow, kind = "") => {
       document.querySelectorAll(".dialog").forEach(closeDialog);
@@ -4486,13 +4487,28 @@
       if (month) query.set("month", month);
       if (kind) query.set("absence_type", kind);
       const [rows, typeSettings] = await Promise.all([api(base + (query.size ? `?${query}` : "")), api(c.url("/payroll/absence-types"))]);
-      const d = dialog("Absences", `<div class="section-head">${field("Month", "month", month, "month")} ${select("Absence type", "absence_type", [["", "All types"], ...absenceKinds.map(([v, label]) => [v, tr(label)])], kind)}</div>${button("Add absence", "addAbsence", true)} ${button("Collective annual leave", "collectiveLeave")} ${button("Absence pay settings", "absenceSettings")}${rows.length ? table(["Employee", "Type", "Start date", "End date", "Calendar days", "Leave days", "Working days", "Actions"], rows.map((absence) => row([td(esc(absence.employee_name)), td(tr(absenceKinds.find(([key]) => key === absence.absence_type)?.[1] || "Other absence")), td(esc(absence.start_date)), td(esc(absence.end_date)), td(num(absence.calendar_days)), td(num(absence.leave_days)), td(num(absence.working_days)), td(absence.frozen ? tr("Used in approved payroll") : button("Edit", "editAbsence", false, `data-id="${esc(absence.id)}"`) + button("Delete", "deleteAbsence", false, `data-id="${esc(absence.id)}"`))]))) : empty("No absences", "")}`);
+      const writableLeave = (absence) => ["annual_leave", "extended_leave", "study_leave"].includes(absence.absence_type);
+      const payPanel = (absence) => {
+        if (!writableLeave(absence)) return "";
+        const pay = absence.absence_pay, breakdown = pay?.breakdown || {}, average = breakdown.average || {};
+        const methods = [["average", "Average"], ["unchanged_salary", "Unchanged salary"], ["best_of", "Best of"], ["fixed_sum", "Fixed sum"]];
+        const statusLabel = pay?.status ? ({pending: "Pending", in_payout: "In payout", paid: "Paid"}[pay.status] || pay.status) : "Not calculated";
+        return `<div class="absence-pay"><strong>${tr("Vacation pay")}</strong><p>${tr("Status")}: ${tr(statusLabel)}${pay ? ` · ${esc(money(pay.gross, "EUR"))}` : ""}</p>${canWriteAbsences ? `<div class="absence-pay-controls">${select("Vacation pay method", `method-${absence.id}`, methods.map(([v,l]) => [v,tr(l)]), pay?.method || "average")}${field("Fixed amount", `fixed-${absence.id}`, pay?.fixed_amount || "", "number")}${button("Calculate vacation pay", "calculateAbsencePay", false, `data-id="${esc(absence.id)}"`)}</div>` : ""}<table><thead><tr><th>${tr("Calculation")}</th><th>${tr("Amount")}</th></tr></thead><tbody><tr><td>${tr("Six-month wages")}</td><td>${esc(money(average.wage_total || 0, "EUR"))}</td></tr><tr><td>${tr("Divisor days")}</td><td>${num(average.daily_denominator || 0)}</td></tr><tr><td>${tr("Daily rate")}</td><td>${esc(money(average.average_daily_pay || 0, "EUR"))}</td></tr><tr><td>${tr("Days")}</td><td>${num(breakdown.leave_days ?? absence.leave_days)}</td></tr><tr><td>${tr("Total")}</td><td>${esc(money(pay?.gross || 0, "EUR"))}</td></tr></tbody></table>${canWriteAbsences && pay?.status === "pending" ? button("Add to payout", "addAbsencePay", true, `data-id="${esc(absence.id)}"`) : ""}</div>`;
+      };
+      const d = dialog("Absences", `<div class="section-head">${field("Month", "month", month, "month")} ${select("Absence type", "absence_type", [["", "All types"], ...absenceKinds.map(([v, label]) => [v, tr(label)])], kind)}</div>${canWriteAbsences ? `${button("Add absence", "addAbsence", true)} ${button("Collective annual leave", "collectiveLeave")} ${button("Absence pay settings", "absenceSettings")}` : ""}${rows.length ? table(["Employee", "Type", "Start date", "End date", "Calendar days", "Leave days", "Working days", "Vacation pay", "Actions"], rows.map((absence) => row([td(esc(absence.employee_name)), td(tr(absenceKinds.find(([key]) => key === absence.absence_type)?.[1] || "Other absence")), td(esc(absence.start_date)), td(esc(absence.end_date)), td(num(absence.calendar_days)), td(num(absence.leave_days)), td(num(absence.working_days)), td(payPanel(absence)), td(canWriteAbsences ? (absence.frozen ? tr("Used in approved payroll") : button("Edit", "editAbsence", false, `data-id="${esc(absence.id)}"`) + button("Delete", "deleteAbsence", false, `data-id="${esc(absence.id)}"`)) : "" )]))) : empty("No absences", "")}`);
       d.querySelector('[name="month"]').onchange = () => { const nextMonth = d.querySelector('[name="month"]').value; const nextKind = d.querySelector('[name="absence_type"]').value; closeDialog(d); renderList(nextMonth, nextKind); };
       d.querySelector('[name="absence_type"]').onchange = () => { const nextMonth = d.querySelector('[name="month"]').value; const nextKind = d.querySelector('[name="absence_type"]').value; closeDialog(d); renderList(nextMonth, nextKind); };
       bindActions(d, {
         addAbsence: () => absenceEditDialog(c, employees, null, () => renderList(month, kind)),
         collectiveLeave: () => collectiveLeaveDialog(c, employees, () => renderList(month, kind)),
         absenceSettings: () => absenceSettingsDialog(c, typeSettings, () => renderList(month, kind)),
+        calculateAbsencePay: async (buttonEl) => {
+          const id = buttonEl.dataset.id, method = d.querySelector(`[name="method-${CSS.escape(id)}"]`).value;
+          const fixed = d.querySelector(`[name="fixed-${CSS.escape(id)}"]`).value;
+          await post(`${base}/${id}/pay`, {method, fixed_amount: method === "fixed_sum" ? fixed : null});
+          await renderList(month, kind);
+        },
+        addAbsencePay: async (buttonEl) => addAbsencePayToPayout(c, rows.find((x) => x.id === buttonEl.dataset.id), () => renderList(month, kind)),
         editAbsence: (buttonEl) => absenceEditDialog(c, employees, rows.find((row) => row.id === buttonEl.dataset.id), () => renderList(month, kind)),
         deleteAbsence: (buttonEl) => confirmAction("Delete absence", tr("Delete this absence?"), async () => {
           await post(`${base}/${buttonEl.dataset.id}`, undefined, "DELETE");
@@ -4501,6 +4517,23 @@
       });
     };
     await renderList();
+  }
+  async function addAbsencePayToPayout(c, absence, refresh) {
+    if (!absence?.absence_pay || absence.absence_pay.status !== "pending") return;
+    const payoutBase = c.url("/payroll/absence-payouts"), drafts = await api(payoutBase);
+    document.querySelectorAll(".dialog").forEach(closeDialog);
+    const d = dialog("Add to payout", form(
+      select("Draft payout", "payout_id", [["new", tr("Create a new draft payout")], ...drafts.map((x) => [x.id, `${x.payout_date} · ${x.id.slice(0, 8)}`])], "new") +
+      field("Payout date", "payout_date", absence.absence_pay.payment_date || absence.start_date, "date", "required"),
+      "Add to payout"));
+    bindForm(d, async (data) => {
+      if (data.payout_id === "new") {
+        await post(payoutBase, {absence_pay_ids: [absence.absence_pay.id], payout_date: data.payout_date});
+      } else {
+        await post(`${payoutBase}/${data.payout_id}/records`, {absence_pay_ids: [absence.absence_pay.id]});
+      }
+      closeDialog(d); await refresh();
+    });
   }
   function absenceEditDialog(c, employees, existing, refresh) {
     const employeeOptions = employees.filter((e) => e.active || e.id === existing?.employee_id).map((e) => [e.id, e.name]);

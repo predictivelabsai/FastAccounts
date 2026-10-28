@@ -25,6 +25,25 @@ def test_payroll_preset_names_descriptions_and_settings_in_all_locales():
     assert i18n.catalog('et')['nav']['payment_types'] == 'Makseliigid'
 
 
+def test_absence_pay_workspace_labels_exist_in_all_supported_locales():
+    labels = ('Vacation pay', 'Average', 'Unchanged salary', 'Best of', 'Fixed sum',
+              'Sick benefit', 'Unused leave compensation', 'Add to payout', 'In payout',
+              'Not calculated', 'Calculation')
+    for language in ('en', 'et', 'lv', 'lt'):
+        workspace = i18n.catalog(language)['workspace']
+        assert all(workspace.get(label, '').strip() for label in labels)
+    estonian = i18n.catalog('et')['workspace']
+    assert estonian['Vacation pay'] == 'Puhkusetasu'
+    assert estonian['Average'] == 'Keskmine töötasu'
+    assert estonian['Unchanged salary'] == 'Muutumatu tasu'
+    assert estonian['Best of'] == 'Parima valiku alusel'
+    assert estonian['Fixed sum'] == 'Fikseeritud summa'
+    assert estonian['Sick benefit'] == 'Haigushüvitis'
+    assert estonian['Unused leave compensation'] == 'Kasutamata puhkuse hüvitis'
+    assert estonian['Add to payout'] == 'Lisa väljamaksesse'
+    assert estonian['Calculation'] == 'Arvutuskäik'
+
+
 def test_workspace_literal_labels_and_table_headers_are_translated():
     source = (Path(__file__).resolve().parents[1] / "static/app.js").read_text(encoding="utf-8")
     literal = r'''(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')'''

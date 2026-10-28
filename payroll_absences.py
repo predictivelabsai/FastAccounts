@@ -15,6 +15,7 @@ ABSENCE_TYPES = (
     'alternative_service', 'other',
 )
 ANNUAL_TYPES = {'annual_leave', 'extended_leave'}
+VACATION_PAY_TYPES = ANNUAL_TYPES | {'study_leave'}
 
 
 class AbsenceConflict(ValueError):
@@ -130,8 +131,8 @@ class PayrollAbsenceService:
                              'WHERE a.organisation_id=? AND a.id=?', (organisation_id, absence_id))
             if not absence:
                 raise KeyError('Absence not found')
-            if absence['absence_type'] not in ANNUAL_TYPES:
-                raise ValueError('Vacation pay applies to annual and extended leave')
+            if absence['absence_type'] not in VACATION_PAY_TYPES:
+                raise ValueError('Vacation pay applies to annual, extended and study leave')
             existing = tx.one('SELECT * FROM payroll_absence_pay WHERE organisation_id=? AND absence_id=?',
                               (organisation_id, absence_id))
             if existing and existing['status'] != 'pending':

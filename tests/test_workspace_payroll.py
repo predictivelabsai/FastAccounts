@@ -113,6 +113,17 @@ def test_payroll_absences_register_can_create_localised_leave(monkeypatch, db, e
         editor.get_by_role('button', name=labels['Save'], exact=True).click()
         playwright.expect(page.get_by_role('dialog')).to_contain_text(labels['Annual leave'])
         playwright.expect(page.get_by_role('dialog')).to_contain_text('Absence UI employee')
+        for key in ('Vacation pay', 'Average', 'Unchanged salary', 'Best of', 'Fixed sum',
+                    'Sick benefit', 'Unused leave compensation', 'Add to payout', 'In payout',
+                    'Not calculated', 'Calculation'):
+            assert key in labels
+        playwright.expect(page.get_by_role('button', name=labels['Calculate vacation pay'])).to_be_visible()
+        page.get_by_role('button', name=labels['Calculate vacation pay']).click()
+        playwright.expect(page.get_by_role('dialog')).to_contain_text(labels['Six-month wages'])
+        page.get_by_role('button', name=labels['Add to payout']).click()
+        payout_dialog = page.get_by_role('dialog').last
+        payout_dialog.get_by_role('button', name=labels['Add to payout']).click()
+        playwright.expect(page.get_by_role('dialog')).to_contain_text(labels['In payout'])
         assert not errors
         browser.close()
 
@@ -241,7 +252,7 @@ def test_payroll_scope_and_single_error(monkeypatch, language):
         assert '/api/organisations/ee/employees' in calls
         assert '/api/organisations/ee/pay-runs' in calls
         page.evaluate("location.hash = 'overview'")
-        playwright.expect(page.locator('.kpi')).to_have_count(4)
+        playwright.expect(page.locator('.kpi')).to_have_count(6)
         fail = True
         nav.click()
         playwright.expect(page.locator('#toasts .toast')).to_have_count(1)
@@ -286,7 +297,7 @@ def test_estonian_demo_tax_names_and_unmatched_pill(db, monkeypatch):
         page.route('**/*', respond)
         page.goto('http://workspace.test/app')
         playwright.expect(page.locator('.user-card strong')).to_have_text('Demo Kasutaja')
-        playwright.expect(page.locator('.kpi')).to_have_count(4)
+        playwright.expect(page.locator('.kpi')).to_have_count(6)
         page.locator('#org-trigger').click()
         page.locator(f'[data-org="{ee["id"]}"]').click()
         page.locator('.app-nav[data-view="tax"]').click()

@@ -22,6 +22,10 @@ class AbsencePayoutService:
                             "WHERE p.organisation_id=? AND p.status='pending' ORDER BY p.payment_date,e.name,p.id",
                             (organisation_id,))
 
+    def drafts(self, organisation_id):
+        return self.db.rows("SELECT * FROM payroll_absence_payout_batches WHERE organisation_id=? "
+                            "AND status='Draft' ORDER BY payout_date,id", (organisation_id,))
+
     def create(self, organisation_id, absence_pay_ids, *, actor, payout_date=None):
         if not absence_pay_ids or len(set(absence_pay_ids)) != len(absence_pay_ids):
             raise ValueError('Select one or more distinct absence-pay records')

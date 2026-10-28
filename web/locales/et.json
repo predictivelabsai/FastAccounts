@@ -1464,7 +1464,7 @@
     "Quarterly": "Igas kvartalis",
     "Custom days": "Määratud päevade järel",
     "Every {days} days": "Iga {days} päeva järel",
-    "Days": "Päevade arv",
+    "Days": "Päevad",
     "Next run": "Järgmine arve",
     "End date": "Lõppkuupäev",
     "Auto-email": "Saada automaatselt e-postiga",
@@ -2228,7 +2228,28 @@
     "Delete this absence?": "Kas kustutada see puudumine?",
     "Absence pay settings": "Puudumise tasustamise seaded",
     "Continue salary during permitted absence": "Säilita puudumise ajal töötasu",
-    "Worked days / norm days": "Töötatud päevad / normpäevad"
+    "Worked days / norm days": "Töötatud päevad / normpäevad",
+    "Vacation pay": "Puhkusetasu",
+    "Average": "Keskmine töötasu",
+    "Unchanged salary": "Muutumatu tasu",
+    "Best of": "Parima valiku alusel",
+    "Fixed sum": "Fikseeritud summa",
+    "Fixed amount": "Fikseeritud summa",
+    "Calculate vacation pay": "Arvuta puhkusetasu",
+    "Add to payout": "Lisa väljamaksesse",
+    "Draft payout": "Mustandväljamakse",
+    "Create a new draft payout": "Loo uus väljamakse mustand",
+    "Six-month wages": "Kuue kuu töötasud",
+    "Divisor days": "Jagaja päevad",
+    "Daily rate": "Päevatasu",
+    "Calculation": "Arvutuskäik",
+    "Sick benefit": "Haigushüvitis",
+    "Unused leave compensation": "Kasutamata puhkuse hüvitis",
+    "Calculation breakdown": "Arvutuskäik",
+    "Vacation pay method": "Puhkusetasu arvutusmeetod",
+    "Unpaid": "Maksmata",
+    "Not calculated": "Arvutamata",
+    "In payout": "Väljamakses"
   },
   "views": {
     "overview": "Ülevaade",
@@ -2283,7 +2304,8 @@
     "Delete this absence?": "Kas kustutada see puudumine?",
     "Continue salary during absence": "Säilita puudumise ajal töötasu",
     "Continue salary during permitted absence": "Säilita puudumise ajal töötasu",
-    "Absence pay settings": "Puudumise tasustamise seaded"
+    "Absence pay settings": "Puudumise tasustamise seaded",
+    "Paid settings": "Tasustatud seaded"
   },
   "status": {
     "Draft": "Kavand",
