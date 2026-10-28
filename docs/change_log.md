@@ -42,6 +42,10 @@ delivered.
   idempotent source keys. This is the storage foundation only: staged import,
   review/apply routes and UI, plus Merit vacation-snapshot application, remain
   outstanding.
+- Added `payroll_leave_liability.py` pure functions for calendar-day entitlement
+  accrual, configurable expiry dates, FIFO consumption and liability valuation
+  including 2026 social tax and employer unemployment. Four tests pass. Persistent
+  leave lots, org settings, reports and immutable reserve journals remain open.
 
 ## 2026-10-28: Payroll calendar and payouts
 

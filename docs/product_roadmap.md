@@ -22,7 +22,9 @@
   payout linkage and payroll-run integration are outstanding. Migration 0045
   adds effective-dated entitlement, reviewed opening-balance and reviewed
   historical-earning tables. Import routes, UI and application logic remain
-  outstanding.
+  outstanding. Unit 7 now has pure calendar-day accrual, FIFO/expiry and
+  employer-cost valuation functions with focused tests. Leave-lot persistence,
+  organisation expiry settings, reports and reserve posting remain outstanding.
 
 ## 2026-10-28: Payroll calendar and payouts
 

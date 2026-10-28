@@ -82,6 +82,29 @@ Targeted command and result:
 # 2 passed
 ```
 
+## Unit 7: Liability calculation core
+
+`payroll_leave_liability.py` calculates entitlement pro rata by calendar day,
+supports both requested expiry-date policies and no expiry, consumes available
+leave FIFO, and values remaining days with average daily pay plus employer
+social tax and unemployment insurance. Four focused tests cover accrual, expiry,
+consumption and valuation. Persistent entitlement lots, organisation settings,
+employee reports, XLSX output, account mapping and balanced monthly reserve
+posting are not implemented.
+
+```powershell
+.tmp\venv312\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache312 --basetemp=.tmp\test-liability-core2 tests\test_payroll_leave_liability.py
+# 4 passed
+```
+
+### Needs accountant confirmation
+
+- Confirm whether entitlement precision is four decimal days and how rounding
+  occurs when a leave event consumes a fractional day.
+- Confirm the exact inclusive expiry boundary and FIFO ordering across basic,
+  extended and opening-balance lots. The pure functions currently treat a lot
+  as expired on its expiry date and order by accrual date.
+
 The fixture covers the 21/22 October example (EUR 2,200 becomes EUR 2,100),
 minimum-wage ratio, hourly pay unchanged, and approved-run absence protection.
 Employee-specific weekly schedules are not represented by this demo; an
