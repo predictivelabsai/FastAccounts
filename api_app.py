@@ -533,7 +533,12 @@ if origins:
 
 @api.exception_handler(ValueError)
 async def invalid_value(_request: Request, error: ValueError):
-    return JSONResponse({"detail": str(error)}, status_code=422)
+    from payroll_rules import UnsupportedPayrollYear
+    from web import i18n
+    detail = str(error)
+    if isinstance(error, UnsupportedPayrollYear):
+        detail = i18n.catalog(i18n.get_lang(_request.scope.get('session', {}), _request)).get('workspace', {}).get(detail, detail)
+    return JSONResponse({"detail": detail}, status_code=422)
 
 
 @api.exception_handler(KeyError)
@@ -2383,3 +2388,4 @@ def payroll_export_tsd_csv(organisation_id: str, run_id: str, preparation_id: st
     return Response(payload, media_type='text/csv', headers={
         'Content-Disposition': f'attachment; filename="tsd-{prepared["period"]}.csv"'
     })
+

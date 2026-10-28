@@ -1,0 +1,55 @@
+"""Verified, immutable payroll rules selected by settlement date.
+
+Only 2026 is configured. Sources and scope are recorded in docs/payroll_rules.md.
+"""
+from dataclasses import dataclass
+from datetime import date
+from decimal import Decimal
+
+
+class UnsupportedPayrollYear(ValueError):
+    """No verified payroll rules exist for the requested year."""
+
+    def __init__(self):
+        super().__init__('Payroll rules are not configured for this year')
+
+
+@dataclass(frozen=True)
+class PayrollRules:
+    year: int
+    income_tax_rate: Decimal
+    basic_exemption: Decimal
+    ui_employee_rate: Decimal
+    ui_employer_rate: Decimal
+    social_tax_rate: Decimal
+    social_tax_monthly_base: Decimal
+    minimum_wages: tuple[tuple[date, Decimal, Decimal], ...]
+
+    def minimum_wage(self, applies_on: date) -> tuple[Decimal, Decimal]:
+        if applies_on.year != self.year:
+            raise UnsupportedPayrollYear()
+        return next((monthly, hourly) for start, monthly, hourly in reversed(self.minimum_wages)
+                    if start <= applies_on)
+
+
+_RULES = {2026: PayrollRules(
+    2026, Decimal('0.22'), Decimal('700'), Decimal('0.016'), Decimal('0.008'),
+    Decimal('0.33'), Decimal('886'),
+    ((date(2026, 1, 1), Decimal('886'), Decimal('5.31')),
+     (date(2026, 4, 1), Decimal('946'), Decimal('5.67')))),
+}
+
+
+def rules_for(applies_on: date) -> PayrollRules:
+    try:
+        return _RULES[applies_on.year]
+    except KeyError:
+        raise UnsupportedPayrollYear() from None
+
+
+def settlement_date(period: str) -> date:
+    """Month end until payroll supports actual payout dates."""
+    import calendar
+    year, month = map(int, period.split('-'))
+    return date(year, month, calendar.monthrange(year, month)[1])
+

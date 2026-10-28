@@ -414,3 +414,12 @@ debits their original combined legacy liabilities. Both entries respect fiscal
 locks, tenant scope and atomic posting. Repeat settlement returns 409. Existing
 ledger reversals remain the correction mechanism; there is no payroll amendment
 or declaration-unsettling workflow. UK charts and books are unchanged.
+
+## Rule selection
+
+`payroll_rules.rules_for(date)` returns a frozen, year-specific rule set. Only
+verified 2026 values are configured. Unsupported years fail validation with a
+translated message; no other year inherits 2026 rates. `settlement_date(period)`
+is the single settlement-date boundary and currently returns calendar month end.
+The legacy `calculate_pay` call without a period retains its 2026 defaults.
+The January to March and April onwards minimum-wage values are unchanged.

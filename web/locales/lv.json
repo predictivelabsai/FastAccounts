@@ -2141,7 +2141,8 @@
     "Other lawfully agreed withholding from net pay. No change to tax bases.": "Cits tiesiski nolīgts ieturējums no neto samaksas. Nodokļu bāzes nemainās.",
     "Manage payroll payment types and their default levy flags.": "Pārvaldiet algas maksājumu veidus un to nodokļu noklusējuma iestatījumus.",
     "Author remuneration. Fully taxable default; accountant must confirm the contract and recipient treatment.": "Autora atlīdzība. Pēc noklusējuma pilnībā apliekama; grāmatvedim jāpārbauda līgums un saņēmēja nodokļi.",
-    "Employer parental-leave payment. Fully taxable default; confirm the payment basis and levies. Excludes state benefits.": "Darba devēja maksājums vecāku atvaļinājuma laikā. Pēc noklusējuma pilnībā apliekams; pārbaudiet maksājuma pamatu un nodokļus. Valsts pabalsti nav iekļauti."
+    "Employer parental-leave payment. Fully taxable default; confirm the payment basis and levies. Excludes state benefits.": "Darba devēja maksājums vecāku atvaļinājuma laikā. Pēc noklusējuma pilnībā apliekams; pārbaudiet maksājuma pamatu un nodokļus. Valsts pabalsti nav iekļauti.",
+    "Payroll rules are not configured for this year": "Šim gadam nav konfigurēti algas aprēķina noteikumi"
   },
   "views": {
     "overview": "Overview",

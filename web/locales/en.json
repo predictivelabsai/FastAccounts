@@ -2141,7 +2141,8 @@
     "Other lawfully agreed withholding from net pay. No change to tax bases.": "Other lawfully agreed withholding from net pay. No change to tax bases.",
     "Manage payroll payment types and their default levy flags.": "Manage payroll payment types and their default levy flags.",
     "Author remuneration. Fully taxable default; accountant must confirm the contract and recipient treatment.": "Author remuneration. Fully taxable default; accountant must confirm the contract and recipient treatment.",
-    "Employer parental-leave payment. Fully taxable default; confirm the payment basis and levies. Excludes state benefits.": "Employer parental-leave payment. Fully taxable default; confirm the payment basis and levies. Excludes state benefits."
+    "Employer parental-leave payment. Fully taxable default; confirm the payment basis and levies. Excludes state benefits.": "Employer parental-leave payment. Fully taxable default; confirm the payment basis and levies. Excludes state benefits.",
+    "Payroll rules are not configured for this year": "Payroll rules are not configured for this year"
   },
   "views": {
     "overview": "Overview",

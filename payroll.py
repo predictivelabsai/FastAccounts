@@ -33,6 +33,7 @@ from core_utils import audit, db_number, decimal, four_dp, money, new_id, utc_no
 from database import Database, get_database
 from ledger import LedgerService, PostingLine
 from payroll_components import FLAGS, ROLES, serialise
+from payroll_rules import rules_for, settlement_date
 
 
 class PayrollConflict(ValueError):
@@ -44,13 +45,6 @@ AMOUNTS = ('gross', 'funded_pension', 'ui_employee', 'tax_free_minimum',
            'social_tax_base', 'social_tax_minimum_topup')
 
 PAY_BASES = ('monthly', 'hourly', 'board_fee', 'income_line')
-INCOME_TAX_RATE = Decimal('0.22')
-BASIC_EXEMPTION = Decimal('700')
-SOCIAL_TAX_RATE = Decimal('0.33')
-# Sotsiaalmaksu kuumäär 2026 (riigieelarve; EMTA Sotsiaalmaks / Maksumäärad).
-SOCIAL_TAX_MONTHLY_BASE = Decimal('886')
-UI_EMPLOYEE_RATE = Decimal('0.016')
-UI_EMPLOYER_RATE = Decimal('0.008')
 MAX_MONTHLY_HOURS = Decimal('744')
 
 # Per-employee reasons the employer pays social tax on actual pay only.
@@ -95,7 +89,8 @@ SOCIAL_TAX_MINIMUM_EXEMPTION_LABELS = {
 
 def minimum_wage(period: str) -> tuple[Decimal, Decimal]:
     """Monthly and hourly minimum wage (Vabariigi Valitsuse määrus nr 36, 23.03.2026)."""
-    return (Decimal('886'), Decimal('5.31')) if period < '2026-04' else (Decimal('946'), Decimal('5.67'))
+    applies_on = settlement_date(period)
+    return rules_for(applies_on).minimum_wage(applies_on)
 
 
 def pay_basis(employee: dict) -> str:
@@ -134,6 +129,7 @@ def _fte(value) -> Decimal:
 
 def calculate_pay(employee: dict, *, period: str | None = None, hours=None, components=()) -> dict:
     """Calculate one employee's month. Hourly gross = hourly rate x hours entered on the run."""
+    rules = rules_for(settlement_date(period or '2026-01'))
     basis = pay_basis(employee)
     board = basis == 'board_fee'
     if basis == 'hourly':
@@ -159,26 +155,26 @@ def calculate_pay(employee: dict, *, period: str | None = None, hours=None, comp
     if gross < 0 or (gross == 0 and basis != 'income_line') or any(value < 0 for value in bases.values()):
         raise ValueError('Payment components must leave positive gross and non-negative tax bases')
     pension = money(bases['funded_pension'] * decimal(employee['funded_pension_percent']) / 100)
-    ui = money(bases['ui_employee'] * UI_EMPLOYEE_RATE)
+    ui = money(bases['ui_employee'] * rules.ui_employee_rate)
     taxable = bases['income_tax'] - pension - ui
     # Record the basic exemption actually used: it cannot exceed the taxable amount.
-    exemption = money(min(BASIC_EXEMPTION, max(Decimal('0'), taxable)) if employee['apply_tax_free_minimum'] else 0)
-    income_tax = money(max(Decimal('0'), taxable - exemption) * INCOME_TAX_RATE)
+    exemption = money(min(rules.basic_exemption, max(Decimal('0'), taxable)) if employee['apply_tax_free_minimum'] else 0)
+    income_tax = money(max(Decimal('0'), taxable - exemption) * rules.income_tax_rate)
     exemption_reason = ('board_member' if board else 'income_line' if basis == 'income_line'
                         else (employee.get('social_tax_minimum_exemption') or None))
     social_base = bases['social_tax']
     shortfall = Decimal(0)
     if exemption_reason is None:
-        minimum_base = SOCIAL_TAX_MONTHLY_BASE
+        minimum_base = rules.social_tax_monthly_base
         if period:
             days, days_in_month = employed_days(employee, period)
             if days < days_in_month:
-                minimum_base = money(SOCIAL_TAX_MONTHLY_BASE * days / days_in_month)
+                minimum_base = money(rules.social_tax_monthly_base * days / days_in_month)
         shortfall = max(Decimal(0), minimum_base - bases['social_minimum'])
         social_base += shortfall
-    social = money(social_base * SOCIAL_TAX_RATE)
-    topup = social - money(bases['social_tax'] * SOCIAL_TAX_RATE)
-    employer_ui = money(bases['ui_employer'] * UI_EMPLOYER_RATE)
+    social = money(social_base * rules.social_tax_rate)
+    topup = social - money(bases['social_tax'] * rules.social_tax_rate)
+    employer_ui = money(bases['ui_employer'] * rules.ui_employer_rate)
     withholding = pension + ui + income_tax + deductions
     if gross - withholding < 0:
         raise ValueError('Payment deductions cannot exceed net pay')
@@ -571,8 +567,9 @@ class PayrollService:
         return money(value)
 
     def create_run(self, organisation_id, *, period, actor, hours=None, tx=None):
-        if not re.fullmatch(r'2026-(0[1-9]|1[0-2])', period):
-            raise ValueError('Payroll demo supports monthly periods YYYY-MM in 2026 only')
+        if not re.fullmatch(r'[0-9]{4}-(0[1-9]|1[0-2])', period):
+            raise ValueError('Payroll periods must use YYYY-MM')
+        rules_for(settlement_date(period))
         if tx is None:
             with self.db.transaction() as owned_tx:
                 return self.create_run(organisation_id, period=period, actor=actor, hours=hours, tx=owned_tx)

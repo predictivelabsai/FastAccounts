@@ -2141,7 +2141,8 @@
     "Other lawfully agreed withholding from net pay. No change to tax bases.": "Kita teisėtai sutarta išskaita iš neto atlygio. Mokesčių bazės nesikeičia.",
     "Manage payroll payment types and their default levy flags.": "Tvarkykite darbo užmokesčio mokėjimų rūšis ir numatytąsias mokesčių nuostatas.",
     "Author remuneration. Fully taxable default; accountant must confirm the contract and recipient treatment.": "Autorinis atlygis. Pagal numatytąją nuostatą visiškai apmokestinamas; buhalteris turi patikrinti sutartį ir gavėjo mokesčius.",
-    "Employer parental-leave payment. Fully taxable default; confirm the payment basis and levies. Excludes state benefits.": "Darbdavio išmoka vaiko priežiūros atostogų metu. Pagal numatytąją nuostatą visiškai apmokestinama; patikrinkite išmokos pagrindą ir mokesčius. Valstybės išmokos neįtrauktos."
+    "Employer parental-leave payment. Fully taxable default; confirm the payment basis and levies. Excludes state benefits.": "Darbdavio išmoka vaiko priežiūros atostogų metu. Pagal numatytąją nuostatą visiškai apmokestinama; patikrinkite išmokos pagrindą ir mokesčius. Valstybės išmokos neįtrauktos.",
+    "Payroll rules are not configured for this year": "Šių metų darbo užmokesčio taisyklės nesukonfigūruotos"
   },
   "views": {
     "overview": "Overview",

@@ -2141,7 +2141,8 @@
     "Other lawfully agreed withholding from net pay. No change to tax bases.": "Muu seaduslikult kokkulepitud kinnipidamine netotasust. Maksubaasid ei muutu.",
     "Manage payroll payment types and their default levy flags.": "Hallake palga makseliike ja nende vaikimisi maksuseadeid.",
     "Author remuneration. Fully taxable default; accountant must confirm the contract and recipient treatment.": "Autori tasu. Vaikimisi täielikult maksustatav; raamatupidaja kontrollib lepingut ja saaja maksukäsitlust.",
-    "Employer parental-leave payment. Fully taxable default; confirm the payment basis and levies. Excludes state benefits.": "Tööandja makse vanemapuhkuse ajal. Vaikimisi täielikult maksustatav; kontrollige makse alust ja makse. Riiklikud hüvitised ei kuulu siia."
+    "Employer parental-leave payment. Fully taxable default; confirm the payment basis and levies. Excludes state benefits.": "Tööandja makse vanemapuhkuse ajal. Vaikimisi täielikult maksustatav; kontrollige makse alust ja makse. Riiklikud hüvitised ei kuulu siia.",
+    "Payroll rules are not configured for this year": "Selle aasta palgaarvestuse reeglid ei ole seadistatud"
   },
   "views": {
     "overview": "Ülevaade",
