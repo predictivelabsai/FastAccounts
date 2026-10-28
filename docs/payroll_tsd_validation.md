@@ -85,6 +85,24 @@ Exact preset and legal classifications still require Estonian accountant
 confirmation. XML and CSV output remain unverified against e-MTA, and direct
 submission remains disabled.
 
+## Correction and supplementary payout exports (2026-10-28)
+
+Correction workpapers use the approved frozen TSD deltas. When a correction is
+paid in the original payment month, its deltas update the original run's
+workpaper and legacy CSV. Changed APA content is emitted as operation `M`, a
+full replacement under the original line numbers. If an accountant cancels a
+transaction, operation `T` is retained as cancellation XML in history; a
+subsequent replacement must use `R` and fresh line numbers. A later-month
+correction is exported from its own paid payout as a separate `R` transaction
+dated in that payment month.
+
+The vendored developer guide section 4 and cancellation example define these
+operation rules. The requested offline test files pass individually: payroll
+corrections 7, payroll payouts 7, APA history 6, APA XML 6, TSD export 14 and
+migrations/tenancy 17. The payout and history files each report one existing
+fastcore deprecation warning. No live e-MTA or network tests were run. Payroll
+UI controls and en/et/lv/lt strings remain to be implemented.
+
 ## Scope 4b handoff (2026-10-28)
 
 Vendored the official business example, cancellation example, feedback report XSD and four feedback report examples under `tests/fixtures/emta/`. Provenance and retrieval date are in that directory's README. The developer guide states that each XBRL GL file represents a single transaction (see local extract, sections 1 and 3); the target export must therefore use one file per payout transaction, not one file per organisation and payment month. The XBRL GL schema archive was not downloaded. Full XBRL GL schema validation remains pending.

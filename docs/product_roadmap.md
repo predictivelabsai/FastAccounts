@@ -2221,11 +2221,15 @@ checks remain follow-ups. The paired change log records details.
   workpaper complete 4a. Resident payment classifications and upload format
   remain subject to accountant confirmation and EMTA validation.
 
-## Payroll corrections (in progress, 2026-10-28)
+## Payroll corrections (backend implemented, 2026-10-28)
 
-Migration 0056 provides run-kind and original-run lineage columns and changes the
-period uniqueness rule to apply to regular runs only. This does not complete the
-correction workflow. Draft cloning/editing, delta-only balanced ledger posting,
-receivable tracking and offset, payment-month payout handling, corrected APA
-history, API/UI actions, locale strings and acceptance tests remain outstanding.
-See `payroll_corrections_validation.md` for the design and checkpoint details.
+Migrations 0056-0059 support correction and supplementary runs, employee
+receivables, confirmed salary payout offsets and APA operation history. Positive
+correction deltas use ordinary salary payout batches; negative deltas post to an
+employee receivable and can be offset against a later salary payout after
+accountant confirmation. Same-month corrections update the original workpaper
+and use APA `M`; later-month payouts are separate `R` transactions. API,
+tenant/role/CSRF and requested offline acceptance tests are implemented.
+Payroll workspace controls and en/et/lv/lt strings remain outstanding, along
+with accountant UAT and e-MTA acceptance. See
+`payroll_corrections_validation.md` for design, limits and test results.

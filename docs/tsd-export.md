@@ -272,3 +272,20 @@ feedback report upload through the existing tenant, role and CSRF protected
 routes. It does not submit a declaration to e-MTA. Rules that depend on EMTA
 state outside the frozen payout snapshot remain out of scope; the validation
 log lists those codes and reasons.
+
+## Payroll correction versions
+
+For a same-month correction, the reviewed workpaper and legacy CSV add the
+approved correction's frozen TSD deltas to the original payment records. An
+APA re-export of changed content uses operation `M` and repeats the complete
+replacement details under the existing line number. The APA developer guide,
+section 4, says `T` cancels by line number alone and that a cancelled line number
+cannot be reused. Cancellation downloads are retained in history. A later
+replacement after cancellation uses `R` with a new line number.
+
+A correction paid in a later month stays attached to its own salary payout
+batch. Its APA export is a new `R` transaction for that payout and uses the
+actual payout date and payment month. It does not revise the original month's
+transaction. The operation and cancellation behavior follows the vendored
+developer guide and cancellation example listed in
+[`payroll_corrections_validation.md`](payroll_corrections_validation.md).

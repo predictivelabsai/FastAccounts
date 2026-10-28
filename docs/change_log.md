@@ -4,6 +4,24 @@ Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as
 delivered.
 
+## 2026-10-28: Payroll correction payouts and APA history
+
+- Added migrations 0057-0059 for tenant-scoped employee payroll receivables,
+  salary payout offset proposals, correction net deltas, receivable account
+  mappings and APA `R`/`M` operation plus cancellation history.
+- Approved negative correction net deltas post Dr employee receivable / Cr salary
+  payable. Salary payout creation proposes FIFO offsets; accountant confirmation
+  posts Dr salary payable / Cr employee receivable and reduces the positive bank
+  payout. Fully offset payouts create no bank line.
+- Positive correction deltas use normal payout batches and partial payout rules
+  applied to the delta. Same-month correction deltas feed the original workpaper
+  and legacy CSV, and changed APA payloads use `M`. Explicit cancellation uses
+  `T`; future replacement lines use `R` and a fresh line number. A correction
+  paid later uses its own payout date and transaction.
+- Backend test results are in `payroll_corrections_validation.md`. Payroll UI
+  controls and en/et/lv/lt strings remain outstanding; accountant UAT and e-MTA
+  acceptance are pending.
+
 ## 2026-10-28: Payroll APA TSD exports and workpaper
 
 - Added a separate resident Annex 1 legacy CSV upload from frozen TSD lines,

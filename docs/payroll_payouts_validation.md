@@ -70,3 +70,20 @@ All commands use the ignored repository `.tmp` directory for pytest data.
 Accountant UAT, verified payroll data against the migrating bureau's Merit Palk
 records, live bank acceptance of pain.001.001.03 and PostgreSQL migration tests
 remain outstanding. The test suite covers synthetic records only.
+
+## Payroll correction payout and receivable checkpoint (2026-10-28)
+
+Positive correction net deltas use the standard salary payout batch, with
+unpaid and partial amounts capped against the delta. Negative net deltas create
+an employee receivable and a balanced `PAYROLL_EMPLOYEE_RECEIVABLE` / salary
+payable posting. Open balances are available through the payroll receivables
+API. New salary payouts propose FIFO offsets for the same employee; an
+accountant confirms the proposals, which posts a balanced payable/receivable
+offset and reduces the bank line. Fully offset batches do not create a bank
+payment line. Reversing a paid payout also reverses its offset postings and
+reopens the receivable balance.
+
+The requested files pass individually: `test_payroll_payouts.py` 7 passed,
+`test_payroll_corrections.py` 7 passed and `test_migrations_and_tenancy.py`
+17 passed. Full commands and APA/TSD results are listed in
+`payroll_corrections_validation.md`.

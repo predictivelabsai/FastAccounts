@@ -83,6 +83,29 @@ commands, counts, commits and unresolved acceptance items here.
   pay, correction delta calculation against the last approved snapshot, balanced
   delta-only GL posting, immutable per-payment-type TSD delta lines, and
   organisation-scoped create routes protected by role and CSRF dependencies.
+- Follow-up commits: `82c746e` adds the receivable base schema, `b7e70f5` adds
+  offset/account and APA history schema, and `503b770` implements correction
+  payouts, offsets, workpaper changes and APA operation versioning.
+- Backend payout/history work adds migrations 0057-0059. Positive correction net
+  deltas use the ordinary payout batch with a correction run reference and
+  partial-payment caps against the net delta. Negative deltas create a tenant-
+  scoped employee receivable with a balanced debit to receivable and credit to
+  salary payable. Open receivables are listed; salary payout creation proposes
+  offsets in FIFO order, and an accountant confirms them before posting the
+  payable/receivable offset. Offset confirmation reduces the bank line and an
+  offset-only payout creates no bank line.
+- A same-month correction updates the affected transaction with APA operation
+  `M`, carrying a full replacement under the existing line number. The guide's
+  section 4 cancellation example uses `T` with only the existing line number and
+  operation code. Cancelling a version is recorded with its XML; the line number
+  is retired, so any later replacement uses `R` and a fresh line number. A paid
+  correction in a later month exports under its own payout ID and actual payout
+  date as a new `R` transaction. This follows the vendored cancellation example
+  at `tests/fixtures/emta/APA_TSD_lahteandmed_ariuhingule_naide_tuhistamine_XML_20251017.xml`.
+- Same-month corrected deltas feed the original workpaper and legacy CSV. A
+  later-month correction remains a separate workpaper transaction. APA history
+  retains `R`/`M` operation values, immutable payloads, cancellation XML, actor
+  and tenant data.
 - Correction tests cover salary increases and decreases, successive corrections,
   full reversal, supplementary exemption sharing, tenant boundaries and route
   authorisation/CSRF dependency. Targeted results:
@@ -90,8 +113,23 @@ commands, counts, commits and unresolved acceptance items here.
   - `pytest tests/test_payroll_corrections.py -q`: 5 passed.
   - `pytest tests/test_payroll_settlement.py -q`: 8 passed.
   - `pytest tests/test_migrations_and_tenancy.py -q`: 17 passed.
-- Remaining: negative net receivables and visible offsets; additional payouts and
-  correction payment-date handling; TSD/APA declaration versioning including
-  replacement `M`, cancellation `T` and later `R` line identifiers; payroll UI
-  and en/et/lv/lt strings. The migration records `original_run_id` without a
-  composite foreign key, so tenant-safe lineage depends on the service checks.
+- Remaining: payroll UI and en/et/lv/lt strings. The migration records
+  `original_run_id` without a composite foreign key, so tenant-safe lineage
+  depends on service checks. Accountant UAT and e-MTA acceptance remain external
+  validation work.
+
+### Final requested test pass
+
+Each requested file was run individually with the repository venv:
+
+- `.venv\Scripts\python.exe -m pytest tests/test_payroll_corrections.py -q`: 7 passed.
+- `.venv\Scripts\python.exe -m pytest tests/test_payroll_payouts.py -q`: 7 passed, 1 existing fastcore deprecation warning.
+- `.venv\Scripts\python.exe -m pytest tests/test_tsd_apa_history.py -q`: 6 passed, 1 existing fastcore deprecation warning.
+- `.venv\Scripts\python.exe -m pytest tests/test_tsd_apa_xml.py -q`: 6 passed.
+- `.venv\Scripts\python.exe -m pytest tests/test_tsd_export.py -q`: 14 passed.
+- `.venv\Scripts\python.exe -m pytest tests/test_migrations_and_tenancy.py -q`: 17 passed.
+
+Total: 57 passed and 2 existing deprecation warnings. No full suite or live
+network test was run. Implementation remaining: payroll UI and en/et/lv/lt
+strings. Open validation items: accountant UAT, e-MTA acceptance and adding a
+composite tenant foreign key for `original_run_id` in a future safe migration.
