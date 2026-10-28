@@ -54,7 +54,8 @@ def transaction_id(organisation_id: str, payout_id: str, version: int = 1) -> st
     return "FA-" + sha256(raw).hexdigest()[:32]
 
 
-def generate_apa_xml(organisation: dict, payout: dict, records: list[dict], *, version: int = 1) -> bytes:
+def generate_apa_xml(organisation: dict, payout: dict, records: list[dict], *, version: int = 1,
+                     operation: str = "R") -> bytes:
     """Generate one APA transaction file from frozen, tenant-scoped payout rows."""
     if not records:
         raise ValueError("A payout export requires at least one frozen payment record")
@@ -99,10 +100,11 @@ def generate_apa_xml(organisation: dict, payout: dict, records: list[dict], *, v
     _element(header, GL_COR, "entryNumber", "EE0201001", contextRef="now")
     for index, record in enumerate(records, start=1):
         detail = ET.SubElement(header, _tag(GL_COR, "entryDetail"))
-        _element(detail, GL_COR, "lineNumber", f"{payout['id']}-{index}", contextRef="now")
+        line_id = f"{payout['id']}-{index}" if operation == "M" or version == 1 else f"{payout['id']}-v{version}-{index}"
+        _element(detail, GL_COR, "lineNumber", line_id, contextRef="now")
         _element(detail, GL_COR, "lineNumberCounter", index, contextRef="now", unitRef="NotUsed")
         account = ET.SubElement(detail, _tag(GL_COR, "account"))
-        for code, codelist in ((str(record["tsd_payment_type"]), "VALJAMLIIK2023ap"), ("R", "TOIMINGUTYYP2023ap")):
+        for code, codelist in ((str(record["tsd_payment_type"]), "VALJAMLIIK2023ap"), (operation, "TOIMINGUTYYP2023ap")):
             sub = ET.SubElement(account, _tag(GL_COR, "accountSub"))
             _element(sub, GL_COR, "accountSubID", code, contextRef="now")
             _element(sub, GL_COR, "accountSubType", codelist, contextRef="now")

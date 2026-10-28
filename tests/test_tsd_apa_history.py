@@ -29,6 +29,9 @@ def test_export_history_hash_idempotency_correction_and_cancellation(db, ee_org)
     changed = {**RECORD,"gross_amount":Decimal("125.00")}
     second, second_xml = service.export_version(ee_org["id"], payout, [changed], actor="owner@example.test")
     assert second["version"] == 2 and second["transaction_id"] == transaction_id(ee_org["id"], payout["id"], 2)
+    assert second["operation"] == "M"
+    operation_ids = ET.fromstring(second_xml).findall(".//{http://www.xbrl.org/int/gl/cor/2015-03-25}accountSubID")
+    assert [node.text for node in operation_ids][-1] == "M"
     assert second_xml != first
     ns = {"cor":"http://www.xbrl.org/int/gl/cor/2015-03-25"}
     cancellation = service.cancellation(ee_org["id"], second["id"], actor="owner@example.test")
@@ -47,6 +50,13 @@ def test_export_history_hash_idempotency_correction_and_cancellation(db, ee_org)
     with pytest.raises(ValueError,match="already cancelled"):
         service.cancellation(ee_org["id"], second["id"], actor="owner@example.test")
     assert db.one("SELECT status FROM tsd_apa_exports WHERE organisation_id=? AND id=?",(ee_org["id"],second["id"]))["status"] == "Cancelled"
+    assert db.scalar("SELECT COUNT(*) FROM tsd_apa_export_cancellations WHERE organisation_id=? AND export_id=?",
+                     (ee_org["id"], second["id"])) == 1
+    third, third_xml = service.export_version(ee_org["id"], payout,
+        [{**changed, "gross_amount": Decimal("130.00")}], actor="owner@example.test")
+    assert third["version"] == 3 and third["operation"] == "R"
+    root = ET.fromstring(third_xml)
+    assert root.findtext(".//{http://www.xbrl.org/int/gl/cor/2015-03-25}lineNumber") == f"{payout['id']}-v3-1"
 
 
 @pytest.mark.parametrize(("fixture","status"),[

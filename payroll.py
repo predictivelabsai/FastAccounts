@@ -760,7 +760,8 @@ class PayrollService:
         with self.db.transaction() as tx:
             self._organisation(tx, organisation_id)
             account = tx.one('SELECT * FROM accounts WHERE organisation_id=? AND code=? AND active=1', (organisation_id, account_code))
-            expected = 'Expense' if role in ('PAYROLL_SALARY', 'PAYROLL_SOCIAL', 'PAYROLL_UI', 'PAYROLL_VACATION_RESERVE_EXPENSE') else 'Liability'
+            expected = ('Expense' if role in ('PAYROLL_SALARY', 'PAYROLL_SOCIAL', 'PAYROLL_UI', 'PAYROLL_VACATION_RESERVE_EXPENSE')
+                        else 'Asset' if role == 'PAYROLL_EMPLOYEE_RECEIVABLE' else 'Liability')
             if not account or account['account_type'] != expected:
                 raise ValueError('Choose an active account of the required payroll account type')
             provider, now = 'payroll:' + role.lower(), utc_now()
@@ -781,7 +782,8 @@ class PayrollService:
             account = tx.one('SELECT * FROM accounts WHERE organisation_id=? AND system_role=? AND active=1', (organisation_id, role))
         if not account:
             raise ValueError('A payroll posting account is missing or inactive')
-        expected = 'Expense' if role in ('PAYROLL_SALARY', 'PAYROLL_SOCIAL', 'PAYROLL_UI', 'PAYROLL_VACATION_RESERVE_EXPENSE') else 'Liability'
+        expected = ('Expense' if role in ('PAYROLL_SALARY', 'PAYROLL_SOCIAL', 'PAYROLL_UI', 'PAYROLL_VACATION_RESERVE_EXPENSE')
+                    else 'Asset' if role == 'PAYROLL_EMPLOYEE_RECEIVABLE' else 'Liability')
         if account['account_type'] != expected:
             raise ValueError('Choose an active account of the required payroll account type')
         return account
@@ -1005,6 +1007,30 @@ class PayrollService:
                     raise PayrollConflict('Correction employees must match the original pay run')
                 deltas = {key: sum((decimal(item[key]) - decimal(baseline[item['employee_id']][key])
                                     for item in run['items']), Decimal(0)) for key in AMOUNTS}
+                payable = self._posting_account(tx, organisation_id, 'PAYROLL_SALARY_PAYABLE')
+                receivable = self._posting_account(tx, organisation_id, 'PAYROLL_EMPLOYEE_RECEIVABLE')
+                for item in run['items']:
+                    net_delta = money(decimal(item['net']) - decimal(baseline[item['employee_id']]['net']))
+                    tx.execute('UPDATE pay_run_items SET payout_net_delta=? WHERE organisation_id=? AND id=?',
+                               (db_number(net_delta), organisation_id, item['id']))
+                    if net_delta < 0:
+                        amount = abs(net_delta)
+                        receivable_id = new_id()
+                        posting = LedgerService(self.db).post(
+                            organisation_id=organisation_id, voucher_type='payroll_employee_receivable',
+                            voucher_id=receivable_id, voucher_code='PR-' + receivable_id[:12],
+                            posting_date=f"{run['period']}-{calendar.monthrange(*map(int, run['period'].split('-')))[1]}",
+                            lines=[PostingLine(receivable['id'], debit=amount, memo='Payroll correction receivable',
+                                               source_line_type='payroll_employee_receivable', source_line_id=receivable_id),
+                                   PostingLine(payable['id'], credit=amount, memo='Payroll correction receivable',
+                                               source_line_type='payroll_employee_receivable', source_line_id=receivable_id)],
+                            actor=actor, currency='EUR', tx=tx)
+                        tx.execute("INSERT INTO payroll_employee_receivables(id,organisation_id,employee_id,source_run_id,amount,remaining_amount,posted_batch_id,created_at,created_by) "
+                                   "VALUES (?,?,?,?,?,?,?,?,?)",
+                                   (receivable_id, organisation_id, item['employee_id'], run_id, db_number(amount),
+                                    db_number(amount), posting['id'], utc_now(), actor))
+                        audit(tx, organisation_id, actor, 'payroll.employee_receivable.created',
+                              'payroll_employee_receivable', receivable_id, {'posting_batch_id': posting['id']})
                 if any(money(item['gross']) < 0 for item in run['items']):
                     raise ValueError('Correction gross pay cannot be negative')
             if not correction and any(money(item['gross']) <= 0 and not (item['pay_basis'] == 'monthly' and item.get('worked_days') == 0)

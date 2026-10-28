@@ -1,4 +1,5 @@
 from decimal import Decimal
+import pytest
 
 from ledger import LedgerService
 from organisations import OrganisationService
@@ -9,7 +10,7 @@ ACTOR = 'owner@example.test'
 
 def _approved(service, org):
     employee = service.save_employee(org['id'], actor=ACTOR, name='Correction employee',
-                                    gross_salary='2000')
+                                    gross_salary='2000', personal_id='49001010018')
     run = service.create_run(org['id'], period='2026-10', actor=ACTOR)
     return employee, service.approve(org['id'], run['id'], actor=ACTOR)
 
@@ -56,6 +57,81 @@ def test_correction_can_fully_reverse_original(db, ee_org):
         (Decimal(line['credit']) for line in lines), Decimal(0))
 
 
+def test_positive_correction_delta_is_paid_as_separate_salary_payout(db, ee_org):
+    from payroll_payouts import PayoutConflict, PayoutService
+
+    service = PayrollService(db)
+    _, original = _approved(service, ee_org)
+    correction = service.create_correction(ee_org['id'], original['id'], actor=ACTOR)
+    corrected = service.update_item(ee_org['id'], correction['id'], correction['items'][0]['id'],
+                                    actor=ACTOR, gross_salary='2500')
+    approved = service.approve(ee_org['id'], correction['id'], actor=ACTOR)
+    delta = Decimal(str(approved['items'][0]['net'])) - Decimal(str(original['items'][0]['net']))
+    half_delta = (delta / 2).quantize(Decimal('0.01'))
+    payout = PayoutService(db).create(ee_org['id'], approved['id'], actor=ACTOR, payout_date='2026-11-20',
+                                      amounts={approved['items'][0]['employee_id']: str(half_delta)})
+    assert payout['pay_run_id'] == approved['id']
+    assert payout['payout_date'] == '2026-11-20'
+    assert Decimal(str(payout['lines'][0]['amount'])) == half_delta
+    assert delta > 0
+    with pytest.raises(PayoutConflict, match='exceeds'):
+        PayoutService(db).create(ee_org['id'], approved['id'], actor=ACTOR,
+                                 amounts={approved['items'][0]['employee_id']: str(delta)})
+
+
+def test_negative_correction_creates_receivable_and_next_payout_offsets_it(db, ee_org):
+    from payroll_payouts import PayoutService
+
+    service = PayrollService(db)
+    employee, original = _approved(service, ee_org)
+    correction = service.create_correction(ee_org['id'], original['id'], actor=ACTOR)
+    service.update_item(ee_org['id'], correction['id'], correction['items'][0]['id'],
+                        actor=ACTOR, gross_salary='1800')
+    approved = service.approve(ee_org['id'], correction['id'], actor=ACTOR)
+    receivable = PayoutService(db).open_receivables(ee_org['id'])
+    assert len(receivable) == 1 and receivable[0]['employee_id'] == employee['id']
+    assert Decimal(receivable[0]['remaining_amount']) == Decimal(receivable[0]['amount'])
+    from tsd import TSDExportService
+    with db.transaction() as tx:
+        workpaper = TSDExportService(db)._workpaper(tx, ee_org['id'], original['id'])
+    assert workpaper['totals']['gross_amount'] == Decimal('1800.00')
+    gl = db.rows('SELECT a.system_role,g.debit,g.credit FROM gl_entries g JOIN accounts a '
+                 'ON a.organisation_id=g.organisation_id AND a.id=g.account_id WHERE g.organisation_id=? '
+                 'AND g.posting_batch_id=(SELECT id FROM posting_batches WHERE organisation_id=? AND voucher_id=?)',
+                 (ee_org['id'], ee_org['id'], receivable[0]['id']))
+    assert [(row['system_role'], Decimal(row['debit']), Decimal(row['credit'])) for row in gl] == [
+        ('PAYROLL_EMPLOYEE_RECEIVABLE', Decimal(receivable[0]['amount']), Decimal(0)),
+        ('PAYROLL_SALARY_PAYABLE', Decimal(0), Decimal(receivable[0]['amount']))]
+
+    next_run = service.approve(ee_org['id'], service.create_run(ee_org['id'], period='2026-11', actor=ACTOR)['id'], actor=ACTOR)
+    payout_service = PayoutService(db)
+    payout = payout_service.create(ee_org['id'], next_run['id'], actor=ACTOR)
+    proposed = payout['offsets']
+    assert proposed and proposed[0]['status'] == 'Proposed'
+    before = Decimal(str(payout['lines'][0]['amount']))
+    paid_amount = Decimal(str(proposed[0]['amount']))
+    confirmed = payout_service.confirm_offsets(ee_org['id'], payout['id'], actor=ACTOR)
+    assert Decimal(str(confirmed['lines'][0]['amount'])) == max(Decimal(0), before - paid_amount)
+    assert payout_service.open_receivables(ee_org['id']) == []
+    assert all(Decimal(line['amount']) >= 0 for line in confirmed['lines'])
+    bank_ledger = db.one("SELECT id FROM accounts WHERE organisation_id=? AND account_type='Asset' AND active=1 ORDER BY code LIMIT 1",
+                         (ee_org['id'],))
+    with db.transaction() as tx:
+        tx.execute("UPDATE employees SET iban='EE382200221020145685',bank_account_owner=? WHERE organisation_id=? AND id=?",
+                   (employee['name'], ee_org['id'], employee['id']))
+        tx.execute("INSERT INTO bank_accounts(id,organisation_id,ledger_account_id,name,currency,iban_masked,iban,bic) "
+                   "VALUES ('correction-bank',?,?,?,'EUR','********5685','EE382200221020145685','HABAEE2X')",
+                   (ee_org['id'], bank_ledger['id'], 'Correction bank'))
+    paid = payout_service.mark_paid(ee_org['id'], payout['id'], 'correction-bank', actor=ACTOR)
+    if paid['posted_batch_id']:
+        bank_lines = db.rows("SELECT g.debit,g.credit FROM gl_entries g JOIN bank_accounts b "
+                             "ON b.organisation_id=g.organisation_id AND b.ledger_account_id=g.account_id "
+                             "WHERE g.organisation_id=? AND g.posting_batch_id=?",
+                             (ee_org['id'], paid['posted_batch_id']))
+        assert all(Decimal(line['debit']) >= 0 and Decimal(line['credit']) >= 0 for line in bank_lines)
+    assert approved['status'] == 'Approved'
+
+
 def test_supplementary_starts_empty_and_shares_monthly_exemption(db, ee_org):
     service = PayrollService(db)
     employee = service.save_employee(ee_org['id'], actor=ACTOR, name='Supplementary employee',
@@ -73,6 +149,11 @@ def test_supplementary_starts_empty_and_shares_monthly_exemption(db, ee_org):
                                   components=[{'type_id': component_type['id'], 'amount': '100'}])
     assert Decimal(updated['items'][0]['gross']) == Decimal('100.00')
     assert Decimal(updated['items'][0]['tax_free_minimum']) == 0
+    approved = service.approve(ee_org['id'], supplementary['id'], actor=ACTOR)
+    from payroll_payouts import PayoutService
+    payout = PayoutService(db).create(ee_org['id'], approved['id'], actor=ACTOR)
+    assert payout['pay_run_id'] == supplementary['id']
+    assert Decimal(str(payout['lines'][0]['amount'])) == Decimal(str(approved['items'][0]['net']))
 
 
 def test_correction_draft_is_unique_and_tenant_scoped(db, ee_org):
@@ -113,7 +194,12 @@ def test_creation_routes_are_role_tenant_and_csrf_protected(db, ee_org, monkeypa
     assert client.post(root + '/supplementary', headers=owner,
                        json={'employee_ids': [employee['id']]}).status_code == 201
     assert client.post(root + '/corrections', headers={'X-Test-User': 'intruder@example.test'}).status_code == 403
+    receivables_url = f"/organisations/{ee_org['id']}/payroll/receivables"
+    assert client.get(receivables_url).status_code == 401
+    assert client.get(receivables_url, headers=owner).status_code == 200
+    assert client.get(receivables_url, headers={'X-Test-User': 'intruder@example.test'}).status_code == 403
     for path in (f"/organisations/{{organisation_id}}/pay-runs/{{run_id}}/corrections",
-                 f"/organisations/{{organisation_id}}/pay-runs/{{run_id}}/supplementary"):
+                 f"/organisations/{{organisation_id}}/pay-runs/{{run_id}}/supplementary",
+                 "/organisations/{organisation_id}/payroll/payouts/{payout_id}/confirm-offsets"):
         route = next(route for route in api.routes if getattr(route, 'path', None) == path)
         assert any(dependency.call is require_csrf for dependency in route.dependant.dependencies)

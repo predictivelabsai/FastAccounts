@@ -23,7 +23,7 @@ from database import Database, get_database
 from payroll_calendar import is_working_day
 from payroll_payday import payday_for_period
 from payroll_rules import settlement_date
-from payroll_tsd_breakdown import calculate_tsd_breakdown, _allocate
+from payroll_tsd_breakdown import calculate_tsd_breakdown, _allocate, LINE_FIELDS
 from tsd_apa_xml import generate_apa_xml
 
 
@@ -228,11 +228,44 @@ class TSDExportService:
         for item in run['items']:
             item['components'] = tx.rows('SELECT * FROM pay_item_components WHERE organisation_id=? AND item_id=? ORDER BY position', (organisation_id, item['id']))
         records, warnings = [], []
+        same_month_corrections = tx.rows(
+            "SELECT DISTINCT r.id FROM pay_runs r JOIN payroll_payout_batches b "
+            "ON b.organisation_id=r.organisation_id AND b.pay_run_id=r.id "
+            "WHERE r.organisation_id=? AND r.original_run_id=? AND r.kind='correction' "
+            "AND r.status='Approved' AND b.status='Paid' AND substr(b.payout_date,1,7)=? "
+            "UNION SELECT r.id FROM pay_runs r WHERE r.organisation_id=? AND r.original_run_id=? "
+            "AND r.kind='correction' AND r.status='Approved' AND substr(r.settlement_date,1,7)=? "
+            "AND NOT EXISTS (SELECT 1 FROM payroll_payout_batches b WHERE b.organisation_id=r.organisation_id AND b.pay_run_id=r.id) "
+            "AND EXISTS (SELECT 1 FROM pay_run_items i WHERE i.organisation_id=r.organisation_id AND i.pay_run_id=r.id AND i.payout_net_delta<0)",
+            (organisation_id, run_id, run['payment_date'][:7], organisation_id, run_id, run['payment_date'][:7])) if run.get('kind', 'regular') == 'regular' else []
         for item in run["items"]:
+            if run.get('kind') == 'correction' and decimal(item.get('payout_net_delta') or 0) <= 0:
+                continue
             components = tx.rows('SELECT * FROM pay_item_components WHERE organisation_id=? AND item_id=? ORDER BY position',
                                  (organisation_id, item['id']))
             frozen_lines = tx.rows("SELECT * FROM pay_item_tsd_lines WHERE organisation_id=? AND source_kind='pay_run_item' AND source_id=? ORDER BY payment_type",
                                    (organisation_id, item['id']))
+            correction_lines = []
+            for correction in same_month_corrections:
+                correction_item = tx.one("SELECT i.id FROM pay_run_items i WHERE i.organisation_id=? AND i.pay_run_id=? AND i.employee_id=?",
+                                         (organisation_id, correction['id'], item['employee_id']))
+                if correction_item:
+                    correction_lines.extend(tx.rows("SELECT * FROM pay_item_tsd_lines WHERE organisation_id=? "
+                                                    "AND source_kind='pay_run_item' AND source_id=? ORDER BY payment_type",
+                                                    (organisation_id, correction_item['id'])))
+            if correction_lines and frozen_lines:
+                by_type = {int(line['payment_type']): dict(line) for line in frozen_lines}
+                for delta in correction_lines:
+                    code = int(delta['payment_type'])
+                    merged = by_type.get(code)
+                    if merged is None:
+                        merged = dict(delta)
+                        merged['id'] = f"{item['id']}:run:{code}"
+                        by_type[code] = merged
+                    else:
+                        for field in LINE_FIELDS[1:]:
+                            merged[field] = money(decimal(merged[field]) + decimal(delta[field]))
+                frozen_lines = [by_type[code] for code in sorted(by_type)]
             if not frozen_lines:
                 context = tx.one('SELECT * FROM pay_item_context WHERE organisation_id=? AND item_id=?',
                                  (organisation_id, item['id']))
@@ -247,7 +280,14 @@ class TSDExportService:
                     warnings.append('Legacy run: per-type split unavailable')
                     records.append(self._record(organisation, run, item))
                     continue
-            nets = _allocate(item['net'], {line['payment_type']: line['amount'] for line in frozen_lines})
+            corrected_net = money(decimal(item.get('payout_net_delta') if run.get('kind') == 'correction' else item['net']) + sum((decimal(row['payout_net_delta']) for row in tx.rows(
+                "SELECT i.payout_net_delta FROM pay_run_items i JOIN pay_runs r "
+                "ON r.organisation_id=i.organisation_id AND r.id=i.pay_run_id "
+                "WHERE i.organisation_id=? AND r.id IN (" + ",".join("?" for _ in same_month_corrections) + ") "
+                "AND i.employee_id=?", (organisation_id, *[row['id'] for row in same_month_corrections], item['employee_id'])
+            ) if row['payout_net_delta'] is not None), Decimal(0))) if same_month_corrections else money(
+                item.get('payout_net_delta') if run.get('kind') == 'correction' else item['net'])
+            nets = _allocate(corrected_net, {line['payment_type']: line['amount'] for line in frozen_lines})
             for line in frozen_lines:
                 line['net_amount'] = nets[line['payment_type']]
                 records.append(self._record(organisation, run, item, line))
@@ -297,18 +337,18 @@ class TSDExportService:
         absence_gross = sum((money(record['gross_amount']) for record in records[pay_run_record_count:]), Decimal(0))
         absence_net = sum((money(record['net_amount']) for record in records[pay_run_record_count:]), Decimal(0))
         absence_cost = sum((money(record['employer_cost']) for record in records[pay_run_record_count:]), Decimal(0))
-        if totals["gross_amount"] != money(run["total_gross"]) + absence_gross:
+        if not same_month_corrections and run.get('kind', 'regular') != 'correction' and totals["gross_amount"] != money(run["total_gross"]) + absence_gross:
             raise ValueError("TSD gross total does not reconcile to the approved pay run")
-        if totals["net_amount"] != money(run["total_net"]) + absence_net:
+        if not same_month_corrections and run.get('kind', 'regular') != 'correction' and totals["net_amount"] != money(run["total_net"]) + absence_net:
             raise ValueError("TSD net total does not reconcile to the approved pay run")
-        if totals["employer_cost"] != money(run["total_employer_cost"]) + absence_cost:
+        if not same_month_corrections and run.get('kind', 'regular') != 'correction' and totals["employer_cost"] != money(run["total_employer_cost"]) + absence_cost:
             raise ValueError("TSD employer-cost total does not reconcile to the approved pay run")
         return {
             "organisation_id": organisation_id,
             "pay_run_id": run_id,
             "period": run["period"],
-            "payment_date": records[0]["payment_date"],
-            "filing_deadline": records[0]["filing_deadline"],
+            "payment_date": records[0]["payment_date"] if records else run["payment_date"],
+            "filing_deadline": records[0]["filing_deadline"] if records else _filing_deadline(date.fromisoformat(run["payment_date"])).isoformat(),
             "records": records,
             "totals": totals,
             "summary_totals": {

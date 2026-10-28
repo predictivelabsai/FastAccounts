@@ -128,6 +128,92 @@ def test_apa_routes_require_role_and_tenant_and_zip_one_file_per_payout(db, ee_o
     assert client.get(tenant_url, headers={"X-Test-User": "owner@example.test"}).status_code == 403
 
 
+def test_same_month_correction_versions_original_apa_transaction_and_cancels_superseded_line(db, ee_org):
+    from payroll import PayrollService
+    from payroll_payouts import PayoutService
+    from tsd import TSDExportService
+    from test_tsd_export import _approved_run
+    from tsd_apa_history import APAHistoryService
+
+    run = _approved_run(db, ee_org)
+    employee = db.one("SELECT id FROM employees WHERE organisation_id=? AND name='Ada Arvutaja'", (ee_org['id'],))
+    with db.transaction() as tx:
+        items = tx.rows("SELECT id,employee_id FROM pay_run_items WHERE organisation_id=? AND pay_run_id=?", (ee_org['id'], run['id']))
+        for item in items:
+            personal_id = '49001010012' if item['employee_id'] == employee['id'] else '38002020021'
+            tx.execute("UPDATE pay_run_items SET employee_personal_id=? WHERE organisation_id=? AND id=?",
+                       (personal_id, ee_org['id'], item['id']))
+        bank = tx.one("SELECT id FROM accounts WHERE organisation_id=? AND account_type='Asset' AND active=1 ORDER BY code LIMIT 1",
+                      (ee_org['id'],))
+        tx.execute("INSERT INTO bank_accounts(id,organisation_id,ledger_account_id,name,currency,iban_masked,iban,bic) "
+                   "VALUES ('same-month-bank',?,?,?,'EUR','********5685','EE382200221020145685','HABAEE2X')",
+                   (ee_org['id'], bank['id'], 'Same month bank'))
+    payouts = PayoutService(db)
+    original_payout = payouts.create(ee_org['id'], run['id'], actor='owner@example.test',
+                                     amounts={item['employee_id']: str(item['net']) for item in run['items']})
+    payouts.mark_paid(ee_org['id'], original_payout['id'], 'same-month-bank', actor='owner@example.test')
+    tsd = TSDExportService(db)
+    prep = tsd.prepare(ee_org['id'], run['id'], actor='owner@example.test')
+    tsd.review(ee_org['id'], prep['id'], actor='owner@example.test')
+    first = tsd.export_apa_payout(ee_org['id'], prep['id'], original_payout['id'], actor='owner@example.test')
+
+    payroll = PayrollService(db)
+    correction = payroll.create_correction(ee_org['id'], run['id'], actor='owner@example.test')
+    target = next(item for item in correction['items'] if item['employee_id'] == employee['id'])
+    payroll.update_item(ee_org['id'], correction['id'], target['id'], actor='owner@example.test', gross_salary='2500')
+    correction = payroll.approve(ee_org['id'], correction['id'], actor='owner@example.test')
+    correction_payout = payouts.create(ee_org['id'], correction['id'], actor='owner@example.test', payout_date='2026-10-30')
+    payouts.mark_paid(ee_org['id'], correction_payout['id'], 'same-month-bank', actor='owner@example.test')
+    second = tsd.export_apa_payout(ee_org['id'], prep['id'], original_payout['id'], actor='owner@example.test')
+    history = db.rows("SELECT version,operation,file_sha256 FROM tsd_apa_exports WHERE organisation_id=? AND payout_id=? ORDER BY version",
+                      (ee_org['id'], original_payout['id']))
+    assert history[0]['operation'] == 'R' and history[1]['version'] == 2 and history[1]['operation'] == 'M'
+    assert first != second
+    current_export = db.one("SELECT id FROM tsd_apa_exports WHERE organisation_id=? AND payout_id=? ORDER BY version DESC LIMIT 1",
+                            (ee_org['id'], original_payout['id']))
+    cancellation = APAHistoryService(db).cancellation(ee_org['id'], current_export['id'], actor='owner@example.test')
+    assert ET.fromstring(cancellation).findtext('.//{http://www.xbrl.org/int/gl/cor/2015-03-25}accountSubID') == 'T'
+    assert db.scalar("SELECT COUNT(*) FROM tsd_apa_export_cancellations WHERE organisation_id=? AND export_id=?",
+                     (ee_org['id'], current_export['id'])) == 1
+
+
+def test_later_month_correction_exports_as_new_apa_transaction(db, ee_org):
+    from payroll import PayrollService
+    from payroll_payouts import PayoutService
+    from tsd import TSDExportService
+    payroll = PayrollService(db)
+    employee = payroll.save_employee(ee_org['id'], actor='owner@example.test', name='Later correction employee',
+                                     personal_id='49001010012', gross_salary='2000', apply_tax_free_minimum=False)
+    run = payroll.approve(ee_org['id'], payroll.create_run(ee_org['id'], period='2026-10', actor='owner@example.test')['id'],
+                          actor='owner@example.test')
+    with db.transaction() as tx:
+        bank = tx.one("SELECT id FROM accounts WHERE organisation_id=? AND account_type='Asset' AND active=1 ORDER BY code LIMIT 1",
+                      (ee_org['id'],))
+        tx.execute("INSERT INTO bank_accounts(id,organisation_id,ledger_account_id,name,currency,iban_masked,iban,bic) "
+                   "VALUES ('later-month-bank',?,?,?,'EUR','********5685','EE382200221020145685','HABAEE2X')",
+                   (ee_org['id'], bank['id'], 'Later month bank'))
+    payouts = PayoutService(db)
+    original = payouts.create(ee_org['id'], run['id'], actor='owner@example.test',
+                              amounts={item['employee_id']: str(item['net']) for item in run['items']})
+    payouts.mark_paid(ee_org['id'], original['id'], 'later-month-bank', actor='owner@example.test')
+    correction = payroll.create_correction(ee_org['id'], run['id'], actor='owner@example.test')
+    target = next(item for item in correction['items'] if item['employee_id'] == employee['id'])
+    payroll.update_item(ee_org['id'], correction['id'], target['id'], actor='owner@example.test', gross_salary='2500')
+    correction = payroll.approve(ee_org['id'], correction['id'], actor='owner@example.test')
+    correction_payout = payouts.create(ee_org['id'], correction['id'], actor='owner@example.test', payout_date='2026-11-20')
+    payouts.mark_paid(ee_org['id'], correction_payout['id'], 'later-month-bank', actor='owner@example.test')
+    tsd = TSDExportService(db)
+    prep = tsd.prepare(ee_org['id'], correction['id'], actor='owner@example.test')
+    tsd.review(ee_org['id'], prep['id'], actor='owner@example.test')
+    payload = tsd.export_apa_payout(ee_org['id'], prep['id'], correction_payout['id'], actor='owner@example.test')
+    root = ET.fromstring(payload)
+    ns = {'cor': 'http://www.xbrl.org/int/gl/cor/2015-03-25'}
+    assert root.findtext('.//cor:account/cor:accountSub[2]/cor:accountSubID', namespaces=ns) == 'R'
+    assert root.findtext('.//cor:entryDetail/cor:documentDate', namespaces=ns) == '2026-11-20'
+    line_number = root.findtext('.//cor:entryDetail/cor:lineNumber', namespaces=ns)
+    assert line_number.startswith(correction_payout['id']) and line_number != f"{original['id']}-1"
+
+
 def test_apa_export_contains_one_paid_absence_payout(db, ee_org):
     from payroll import PayrollService
     from payroll_absences import PayrollAbsenceService

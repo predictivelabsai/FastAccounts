@@ -2606,6 +2606,12 @@ def payroll_payout_summary(organisation_id: str, run_id: str | None = None, user
     return PayoutService(get_database()).summary(organisation_id, run_id=run_id)
 
 
+@api.get('/organisations/{organisation_id}/payroll/receivables')
+def payroll_open_receivables(organisation_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    return PayoutService(get_database()).open_receivables(organisation_id)
+
+
 @api.get('/organisations/{organisation_id}/payroll/payouts/{payout_id}')
 def payroll_payout(organisation_id: str, payout_id: str, user: User = Depends(current_user)):
     _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
@@ -2624,6 +2630,12 @@ def mark_payroll_payout_paid(organisation_id: str, payout_id: str, payload: Payo
                              user: User = Depends(require_csrf)):
     _require(organisation_id, user, WRITE_ROLES)
     return PayoutService(get_database()).mark_paid(organisation_id, payout_id, payload.bank_account_id, actor=user.email)
+
+
+@api.post('/organisations/{organisation_id}/payroll/payouts/{payout_id}/confirm-offsets')
+def confirm_payroll_payout_offsets(organisation_id: str, payout_id: str, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return PayoutService(get_database()).confirm_offsets(organisation_id, payout_id, actor=user.email)
 
 
 @api.post('/organisations/{organisation_id}/payroll/payouts/{payout_id}/cancel')
