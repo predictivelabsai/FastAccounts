@@ -50,6 +50,7 @@ from ledger import LedgerService, PostingLine
 from organisations import APPROVE_ROLES, WRITE_ROLES, AccessDenied, OrganisationService
 from payroll import PayrollConflict, PayrollService
 from payroll_tax_settings import EmployeeTaxSettingsService, TaxSettingConflict, TaxSettingValidationError
+from employee_details import EmployeeDetailsError
 from tax import TaxService
 from tsd import TSDExportService
 from payment_orders import PaymentOrderService
@@ -537,7 +538,7 @@ async def invalid_value(_request: Request, error: ValueError):
     from payroll_rules import UnsupportedPayrollYear
     from web import i18n
     detail = str(error)
-    if isinstance(error, (UnsupportedPayrollYear, TaxSettingValidationError)):
+    if isinstance(error, (UnsupportedPayrollYear, TaxSettingValidationError, EmployeeDetailsError)):
         detail = i18n.catalog(i18n.get_lang(_request.scope.get('session', {}), _request)).get('workspace', {}).get(detail, detail)
     return JSONResponse({"detail": detail}, status_code=422)
 
@@ -2144,6 +2145,11 @@ PayBasis = Literal['monthly', 'hourly', 'board_fee', 'income_line']
 
 
 class EmployeeIn(BaseModel):
+    phone: str | None = Field(default=None, max_length=50)
+    iban: str | None = Field(default=None, max_length=80)
+    bank_account_owner: str | None = Field(default=None, max_length=180)
+    address: str | None = Field(default=None, max_length=2000)
+    date_of_birth: str | None = None
     name: str = Field(min_length=1, max_length=180)
     email: str | None = None
     personal_id: str | None = None
@@ -2163,6 +2169,11 @@ class EmployeeIn(BaseModel):
 
 
 class EmployeePatch(BaseModel):
+    phone: str | None = Field(default=None, max_length=50)
+    iban: str | None = Field(default=None, max_length=80)
+    bank_account_owner: str | None = Field(default=None, max_length=180)
+    address: str | None = Field(default=None, max_length=2000)
+    date_of_birth: str | None = None
     name: str | None = Field(default=None, min_length=1, max_length=180)
     email: str | None = None
     personal_id: str | None = None

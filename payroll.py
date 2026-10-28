@@ -35,6 +35,7 @@ from ledger import LedgerService, PostingLine
 from payroll_components import FLAGS, ROLES, serialise
 from payroll_rules import rules_for, settlement_date
 from payroll_tax_settings import EmployeeTaxSettingsService, resolve as resolve_tax_settings
+from employee_details import validate_details, birth_date_from_personal_code
 
 
 class PayrollConflict(ValueError):
@@ -278,7 +279,7 @@ class PayrollService:
             raise ValueError('Employment dates must be YYYY-MM-DD and the end cannot precede the start')
         data['employment_start_date'] = start.isoformat() if start else None
         data['employment_end_date'] = end.isoformat() if end else None
-        return data
+        return validate_details(data)
 
     def employees(self, organisation_id):
         with self.db.transaction() as tx:
@@ -288,6 +289,7 @@ class PayrollService:
 
     @staticmethod
     def _serialize_employee(row):
+        row['date_of_birth'] = row.get('date_of_birth') or birth_date_from_personal_code(row.get('personal_id'))
         row['gross_salary'] = None if row.get('gross_salary') is None else db_number(money(row['gross_salary']))
         row['funded_pension_percent'] = db_number(money(row['funded_pension_percent']))
         row['hourly_rate'] = _rate(row.get('hourly_rate'))
@@ -317,7 +319,8 @@ class PayrollService:
             rules_for(settlement_date(period))
         fields = ('name', 'email', 'personal_id', 'gross_salary', 'funded_pension_percent',
                   'apply_tax_free_minimum', 'board_member', 'active', 'pay_basis', 'fte', 'hourly_rate',
-                  'social_tax_minimum_exemption', 'employment_start_date', 'employment_end_date')
+                  'social_tax_minimum_exemption', 'employment_start_date', 'employment_end_date',
+                  'phone', 'iban', 'bank_account_owner', 'address', 'date_of_birth')
         if set(changes) - set(fields):
             raise ValueError('Unknown employee field')
         # Keep the legacy board_member flag and the pay basis in step when only one is sent.

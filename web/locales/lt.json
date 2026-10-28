@@ -2142,7 +2142,13 @@
     "Manage payroll payment types and their default levy flags.": "Tvarkykite darbo užmokesčio mokėjimų rūšis ir numatytąsias mokesčių nuostatas.",
     "Author remuneration. Fully taxable default; accountant must confirm the contract and recipient treatment.": "Autorinis atlygis. Pagal numatytąją nuostatą visiškai apmokestinamas; buhalteris turi patikrinti sutartį ir gavėjo mokesčius.",
     "Employer parental-leave payment. Fully taxable default; confirm the payment basis and levies. Excludes state benefits.": "Darbdavio išmoka vaiko priežiūros atostogų metu. Pagal numatytąją nuostatą visiškai apmokestinama; patikrinkite išmokos pagrindą ir mokesčius. Valstybės išmokos neįtrauktos.",
-    "Payroll rules are not configured for this year": "Šių metų darbo užmokesčio taisyklės nesukonfigūruotos"
+    "Payroll rules are not configured for this year": "Šių metų darbo užmokesčio taisyklės nesukonfigūruotos",
+    "Date of birth": "Gimimo data",
+    "Bank account owner": "Banko sąskaitos savininkas",
+    "Phone": "Telefonas",
+    "Employee contact details exceed the allowed length": "Darbuotojo kontaktiniai duomenys viršija leistiną ilgį",
+    "Enter an IBAN with a valid ISO 13616 checksum": "Įveskite IBAN su galiojančia ISO 13616 kontroline suma",
+    "Date of birth must be a valid date in YYYY-MM-DD format": "Gimimo data turi būti galiojanti data MMMM-MM-DD formatu"
   },
   "views": {
     "overview": "Overview",

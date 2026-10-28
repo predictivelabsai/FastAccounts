@@ -4192,6 +4192,11 @@
         field("Name", "name", e.name || "", "text", "required") +
           field("Email", "email", e.email || "", "email") +
           field("Personal ID", "personal_id", e.personal_id || "") +
+          field("Phone", "phone", e.phone || "", "tel", 'maxlength="50"') +
+          field("Date of birth", "date_of_birth", e.date_of_birth || "", "date") +
+          field("Address", "address", e.address || "", "text", 'maxlength="2000"') +
+          field("IBAN", "iban", e.iban || "", "text", 'maxlength="80"') +
+          field("Bank account owner", "bank_account_owner", e.bank_account_owner || "", "text", 'maxlength="180"') +
           select(
             "Pay basis",
             "pay_basis",

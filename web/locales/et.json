@@ -2142,7 +2142,13 @@
     "Manage payroll payment types and their default levy flags.": "Hallake palga makseliike ja nende vaikimisi maksuseadeid.",
     "Author remuneration. Fully taxable default; accountant must confirm the contract and recipient treatment.": "Autori tasu. Vaikimisi täielikult maksustatav; raamatupidaja kontrollib lepingut ja saaja maksukäsitlust.",
     "Employer parental-leave payment. Fully taxable default; confirm the payment basis and levies. Excludes state benefits.": "Tööandja makse vanemapuhkuse ajal. Vaikimisi täielikult maksustatav; kontrollige makse alust ja makse. Riiklikud hüvitised ei kuulu siia.",
-    "Payroll rules are not configured for this year": "Selle aasta palgaarvestuse reeglid ei ole seadistatud"
+    "Payroll rules are not configured for this year": "Selle aasta palgaarvestuse reeglid ei ole seadistatud",
+    "Date of birth": "Sünnikuupäev",
+    "Bank account owner": "Pangakonto omanik",
+    "Phone": "Telefon",
+    "Employee contact details exceed the allowed length": "Töötaja kontaktandmed ületavad lubatud pikkuse",
+    "Enter an IBAN with a valid ISO 13616 checksum": "Sisestage kehtiva ISO 13616 kontrollsummaga IBAN",
+    "Date of birth must be a valid date in YYYY-MM-DD format": "Sünnikuupäev peab olema kehtiv kuupäev vormingus AAAA-KK-PP"
   },
   "views": {
     "overview": "Ülevaade",

@@ -202,7 +202,7 @@ def employees_workbook(organisation: dict, employees: list[dict]) -> bytes:
     _header_row(sheet, (
         "Name", "Personal ID", "Email", "Country code", "Pay basis", "Gross salary",
         "Hourly rate", "Funded pension percent", "FTE", "Employment start date",
-        "Employment end date",
+        "Employment end date", "Phone", "IBAN", "Bank account owner", "Address", "Date of birth",
     ))
     for employee in employees:
         row = sheet.max_row + 1
@@ -213,6 +213,8 @@ def employees_workbook(organisation: dict, employees: list[dict]) -> bytes:
             _from_decimal(employee.get("hourly_rate")),
             _from_decimal(employee.get("funded_pension_percent")), _from_decimal(employee.get("fte")),
             employee.get("employment_start_date"), employee.get("employment_end_date"),
+            employee.get("phone"), employee.get("iban"), employee.get("bank_account_owner"),
+            employee.get("address"), employee.get("date_of_birth"),
         )
         for column, value in enumerate(values, 1):
             _put(sheet, row, column, value)

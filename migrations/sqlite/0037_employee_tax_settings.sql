@@ -27,6 +27,12 @@ ALTER TABLE pay_item_context ADD COLUMN unemployment_applies INTEGER;
 ALTER TABLE pay_item_context ADD COLUMN tax_free_setting_id TEXT;
 ALTER TABLE pay_item_context ADD COLUMN pension_setting_id TEXT;
 ALTER TABLE pay_item_context ADD COLUMN unemployment_setting_id TEXT;
+-- Optional contact/payment details do not alter ledger or historical pay items.
+ALTER TABLE employees ADD COLUMN phone TEXT;
+ALTER TABLE employees ADD COLUMN iban TEXT;
+ALTER TABLE employees ADD COLUMN bank_account_owner TEXT;
+ALTER TABLE employees ADD COLUMN address TEXT;
+ALTER TABLE employees ADD COLUMN date_of_birth TEXT;
 -- SQLITE_TAX_HISTORY_IMMUTABILITY
 CREATE TRIGGER guard_employee_tax_settings_update BEFORE UPDATE ON employee_tax_settings WHEN EXISTS (SELECT 1 FROM pay_item_context c JOIN pay_run_items i ON i.organisation_id=c.organisation_id AND i.id=c.item_id JOIN pay_runs r ON r.organisation_id=i.organisation_id AND r.id=i.pay_run_id WHERE c.organisation_id=OLD.organisation_id AND r.status='Approved' AND (c.tax_free_setting_id=OLD.id OR c.pension_setting_id=OLD.id OR c.unemployment_setting_id=OLD.id)) BEGIN SELECT RAISE(ABORT,'approved payroll tax settings are immutable'); END;
 CREATE TRIGGER guard_employee_tax_settings_delete BEFORE DELETE ON employee_tax_settings WHEN EXISTS (SELECT 1 FROM pay_item_context c JOIN pay_run_items i ON i.organisation_id=c.organisation_id AND i.id=c.item_id JOIN pay_runs r ON r.organisation_id=i.organisation_id AND r.id=i.pay_run_id WHERE c.organisation_id=OLD.organisation_id AND r.status='Approved' AND (c.tax_free_setting_id=OLD.id OR c.pension_setting_id=OLD.id OR c.unemployment_setting_id=OLD.id)) BEGIN SELECT RAISE(ABORT,'approved payroll tax settings are immutable'); END;

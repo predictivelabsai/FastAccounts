@@ -2142,7 +2142,13 @@
     "Manage payroll payment types and their default levy flags.": "Manage payroll payment types and their default levy flags.",
     "Author remuneration. Fully taxable default; accountant must confirm the contract and recipient treatment.": "Author remuneration. Fully taxable default; accountant must confirm the contract and recipient treatment.",
     "Employer parental-leave payment. Fully taxable default; confirm the payment basis and levies. Excludes state benefits.": "Employer parental-leave payment. Fully taxable default; confirm the payment basis and levies. Excludes state benefits.",
-    "Payroll rules are not configured for this year": "Payroll rules are not configured for this year"
+    "Payroll rules are not configured for this year": "Payroll rules are not configured for this year",
+    "Date of birth": "Date of birth",
+    "Bank account owner": "Bank account owner",
+    "Phone": "Phone",
+    "Employee contact details exceed the allowed length": "Employee contact details exceed the allowed length",
+    "Enter an IBAN with a valid ISO 13616 checksum": "Enter an IBAN with a valid ISO 13616 checksum",
+    "Date of birth must be a valid date in YYYY-MM-DD format": "Date of birth must be a valid date in YYYY-MM-DD format"
   },
   "views": {
     "overview": "Overview",

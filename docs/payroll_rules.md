@@ -454,3 +454,13 @@ starting on day 1. Without it, writes use the latest existing run month; before
 any run they use employment start or 2026-01-01. An unchanged value is a no-op.
 A write conflicting with an approved source row fails with 409; use an explicit
 later period or add a dated election. Existing drafts retain their snapshot.
+
+## Employee contact and bank details
+
+The employee API and workbook include optional `phone`, `iban`,
+`bank_account_owner`, `address` and `date_of_birth`. IBAN input is normalised to
+uppercase without whitespace and must pass ISO 13616 mod-97 checksum validation.
+Date of birth is derived from a recognisable Estonian personal code when absent;
+a supplied valid YYYY-MM-DD date takes precedence. Existing personal codes are
+also derived on read when there is no stored date. These employee-master details
+use the existing organisation and audit boundary and do not change posted pay.
