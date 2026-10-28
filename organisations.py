@@ -46,6 +46,7 @@ EE_ACCOUNTS = tuple((code, name, 'Liability', 'Credit', role) for code, name, ro
     ('6130', 'Tööandja töötuskindlustusmakse kulu', 'Expense', 'Debit', 'PAYROLL_UI'),
     ('6140', 'Puhkusereservi kulu', 'Expense', 'Debit', 'PAYROLL_VACATION_RESERVE_EXPENSE'),
     ('2260', 'Puhkusereservi kohustus', 'Liability', 'Credit', 'PAYROLL_VACATION_RESERVE_LIABILITY'),
+    ('2270', 'Nõuded töötajate vastu', 'Asset', 'Debit', 'PAYROLL_EMPLOYEE_RECEIVABLE'),
     ('2210', 'Palgavõlg töötajatele', 'Liability', 'Credit', 'PAYROLL_NET'),
     ('2220', 'Kinnipeetud tulumaksu võlg', 'Liability', 'Credit', 'PAYROLL_INCOME_TAX'),
     ('2230', 'Pensioni- ja töötuskindlustusmaksete võlg', 'Liability', 'Credit', 'PAYROLL_WITHHOLDING'),
