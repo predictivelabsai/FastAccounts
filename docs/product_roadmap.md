@@ -28,6 +28,10 @@
   Unit 8 adds run-snapshot absences to payslips and dashboard counts for annual
   leave and sick leave today, with labels in all four locales. Remaining leave
   balances and optional payslip balances remain outstanding.
+- Targeted payroll regression tests for the absence service, averages, absence
+  calculations, liability calculations and migration preservation pass. The
+  absence series is still in progress because payment integration, historical
+  import, persistent liability workflows and reserve posting are outstanding.
 
 ## 2026-10-28: Payroll calendar and payouts
 

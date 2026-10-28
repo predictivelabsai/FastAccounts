@@ -50,6 +50,10 @@ delivered.
   snapshots; the overview adds employees currently on annual leave and sick
   leave KPIs. Dashboard labels are translated in en/et/lv/lt. Remaining leave
   balances are not yet calculated in the payslip.
+- Added the final focused regression record to `payroll_absences_validation.md`.
+  It records the passing 25-test core run and clearly lists outstanding payout,
+  import, persisted-liability, reserve-posting and remaining-balance work. The
+  series remains in progress pending those implementations and accountant UAT.
 
 ## 2026-10-28: Payroll calendar and payouts
 

@@ -196,3 +196,24 @@ node --check static\app.js
 .tmp\venv312\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache312 --basetemp=.tmp\test-payroll-unit8 tests\test_payroll.py::test_workflow_snapshot_balance_pdf_and_delete tests\test_workspace_payroll.py::test_payroll_absences_register_can_create_localised_leave
 # 5 passed; JavaScript syntax and locale JSON checks passed
 ```
+
+## Unit 9: Regression and delivery record
+
+The final core regression command below passed. Earlier targeted commands
+covered the four-language absence register browser flow, payslip PDF rendering,
+day-based and hourly payroll, permitted paid absence, and schema migration.
+
+```powershell
+.tmp\venv312\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache312 --basetemp=.tmp\test-payroll-absence-final tests\test_payroll_absences.py tests\test_payroll_average.py tests\test_payroll_absence_pay.py tests\test_payroll_leave_liability.py tests\test_migrations_and_tenancy.py::test_empty_migration_is_idempotent tests\test_migrations_and_tenancy.py::test_historical_migration_catalogue_does_not_affect_other_databases
+# 25 passed
+```
+
+Outstanding requested work before the absence series can be considered
+complete: persist and pay generated vacation/sick/termination components through
+approved payroll and absence-pay payout batches; implement the reviewed
+CSV/XLSX historical import and apply the Merit vacation snapshot; connect leave
+entitlement/opening balances to annual accrual and expiry; add liability reports
+and optional mapped reserve journals; and display remaining leave balances.
+Migration 0045 storage alone does not make the import workflow available.
+PostgreSQL execution was not performed. The date-based and statutory parameters
+listed above still need Estonian accountant review.
