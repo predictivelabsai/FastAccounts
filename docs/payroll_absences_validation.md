@@ -120,3 +120,29 @@ Command and result:
   `wage_paid` status, including employer-paid sick leave and paid annual leave.
 - Confirm the treatment of TLS § 19 unpaid absence, the 2024 sick-leave day
   exclusions and TLS § 37 reduced-pay periods for the applicable event type.
+
+## Unit 5: Absence-pay calculation rules
+
+`payroll_absence_pay.py` implements Decimal calculations for average,
+unchanged-salary, best-of and fixed-sum vacation pay, employer sick benefit,
+unused leave compensation and the default payout date. `EE-SICK-2026-v1` uses
+days 2–5 at 70%, day 1 unpaid and Tervisekassa from day 6. The payout date is
+the previous payroll-calendar working day. Tests cover all methods, the sick
+period and termination compensation.
+
+Command and result:
+
+```powershell
+.tmp\venv312\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache312 --basetemp=.tmp\test-absence-pay-unit5 tests\test_payroll_absence_pay.py
+# 4 passed
+```
+
+### Needs accountant confirmation
+
+- Confirm `EE-SICK-2026-v1` rate, covered sickness days and interaction with
+  sickness-period continuation certificates before production use.
+- Confirm the unchanged-salary and best-of amounts for part-time employees and
+  the statutory fixed-sum agreement conditions.
+- Absence save, pending-pay persistence, payout-batch linkage, tax-month
+  aggregation, run-component integration and termination trigger remain to be
+  implemented. The pure calculations do not claim this workflow is complete.

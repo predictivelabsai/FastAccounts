@@ -32,6 +32,16 @@ class PayrollRules:
                     if start <= applies_on)
 
 
+@dataclass(frozen=True)
+class SickBenefitRules:
+    year: int
+    employer_day_start: int
+    employer_day_end: int
+    rate: Decimal
+    health_fund_day_start: int
+    unpaid_day_count: int
+
+
 _RULES = {2026: PayrollRules(
     2026, Decimal('0.22'), Decimal('700'), Decimal('0.016'), Decimal('0.008'),
     Decimal('0.33'), Decimal('886'),
@@ -39,10 +49,22 @@ _RULES = {2026: PayrollRules(
      (date(2026, 4, 1), Decimal('946'), Decimal('5.67')))),
 }
 
+_SICK_BENEFIT_RULES = {
+    2026: SickBenefitRules(2026, 2, 5, Decimal('0.70'), 6, 1),
+}
+
 
 def rules_for(applies_on: date) -> PayrollRules:
     try:
         return _RULES[applies_on.year]
+    except KeyError:
+        raise UnsupportedPayrollYear() from None
+
+
+def sick_benefit_rules_for(year: int) -> SickBenefitRules:
+    """Return the reviewed, year-specific employer sick benefit defaults."""
+    try:
+        return _SICK_BENEFIT_RULES[year]
     except KeyError:
         raise UnsupportedPayrollYear() from None
 

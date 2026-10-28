@@ -4,8 +4,8 @@ This is the agreed 2026 accounting-bureau demo specification. Production
 accountant UAT is pending. Only EUR Estonian books and 2026 periods are accepted.
 Monthly calculations cover monthly salaries (full- or part-time), hourly pay,
 board-member fees, income-line services-contract pay and the social tax minimum
-obligation. They exclude automatic
-leave and sickness calculations, benefits, non-resident calculations, direct TSD
+obligation. Absence pay calculations are described below. The demo excludes
+non-resident calculations, direct TSD
 submission and payment execution. Bureau-entered payment components can represent
 additional remuneration and net deductions. Reviewed resident-only TSD manual-upload
 files are documented in
@@ -547,6 +547,23 @@ organisation's explicitly selected absence-pay method. It does not infer tax or
 employment-law treatment solely from absence labels. Parameters without a
 verified rule are year-versioned and identified in
 `payroll_absences_validation.md` under “Needs accountant confirmation”.
+
+For annual, extended and study leave, the pure absence-pay calculator supports
+`average`, `unchanged_salary`, `best_of` and `fixed_sum`. Average uses the
+versioned average-pay engine. Unchanged salary prorates agreed monthly salary by
+leave working days over norm working days. `best_of` selects the higher amount;
+fixed sum requires an explicit amount. The calculation returns both candidate
+amounts and the selected method for review. The current implementation exposes
+these calculations as a pure service; it does not yet create pending absence-pay
+records on saving an absence or attach them to a payout batch.
+
+`EE-SICK-2026-v1` configures employer-paid sick benefit at 70% of average daily
+pay for sickness days 2 through 5, with day 1 unpaid and Tervisekassa from day
+6. This is an explicit 2026 parameter pending accountant confirmation. The
+calculator returns qualifying days and the rule version. Vacation payout date
+defaults to the previous working day, using the Estonian payroll calendar.
+Unused leave compensation is remaining leave days multiplied by average daily
+pay; employee termination workflows do not yet offer this automatically.
 
 ## Employee contact and bank details
 
