@@ -1,0 +1,62 @@
+<xbrli:xbrl xmlns:xbrli="http://www.xbrl.org/2003/instance"
+    xmlns:xlink="http://www.w3.org/1999/xlink"
+    xmlns:xbrll="http://www.xbrl.org/2003/linkbase" 
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:gl-usk="http://www.xbrl.org/int/gl/usk/2015-03-25"
+    xmlns:gl-cor="http://www.xbrl.org/int/gl/cor/2015-03-25"
+    xmlns:gl-ext="http://www.xbrl.org/int/gl/ext/2015-03-25"
+    xmlns:iso639="http://www.xbrl.org/2005/iso639"
+    xmlns:iso4217="http://www.xbrl.org/2003/iso4217"
+    xmlns:gl-plt="http://www.xbrl.org/int/gl/plt/2015-03-25"
+    xmlns:gl-bus="http://www.xbrl.org/int/gl/bus/2015-03-25"
+    xmlns:gl-muc="http://www.xbrl.org/int/gl/muc/2015-03-25"
+    xsi:schemaLocation="http://www.xbrl.org/int/gl/plt/2015-03-25 https://www.xbrl.org/taxonomy/int/gl/2015-03-25/plt/case-c-b-m-u-t/gl-plt-all-2015-03-25.xsd">
+    <xbrll:schemaRef xlink:href="../plt/case-c-b-m-e/gl-plt-2015-03-25.xsd" xlink:arcrole="http://www.w3.org/1999/xlink/properties/linkbase" xlink:type="simple"/>
+    <xbrli:context id="now">
+        <xbrli:entity>
+            <xbrli:identifier scheme="http://www.ariregister.rik.ee">10235688</xbrli:identifier>
+        </xbrli:entity>
+        <xbrli:period>
+            <xbrli:instant>2026-10-20</xbrli:instant>
+        </xbrli:period>
+    </xbrli:context>
+    <xbrli:unit id="eur">
+        <xbrli:measure>iso4217:EUR</xbrli:measure>
+    </xbrli:unit>
+    <xbrli:unit id="NotUsed">
+        <xbrli:measure>pure</xbrli:measure>
+    </xbrli:unit>
+    <gl-cor:accountingEntries>
+        <gl-cor:documentInfo>
+            <gl-cor:entriesType contextRef="now">other</gl-cor:entriesType>
+            <gl-cor:uniqueID contextRef="now">10235688-2026-10-20T09:35:41:544</gl-cor:uniqueID>
+            <gl-cor:language contextRef="now">iso639:et</gl-cor:language>
+            <gl-cor:creationDate contextRef="now">2026-10-20</gl-cor:creationDate>
+            <gl-bus:creator contextRef="now">Kasutaja X</gl-bus:creator>
+            <gl-cor:entriesComment contextRef="now">Andmepõhise aruandluse väljamaksete andmed MTA-le</gl-cor:entriesComment>
+            <gl-cor:periodCoveredStart contextRef="now">2026-09-01</gl-cor:periodCoveredStart>
+            <gl-cor:periodCoveredEnd contextRef="now">2026-09-30</gl-cor:periodCoveredEnd>
+            <gl-bus:sourceApplication contextRef="now">Raamatupidamistarkvara XY</gl-bus:sourceApplication>
+            <gl-muc:defaultCurrency contextRef="now">iso4217:eur</gl-muc:defaultCurrency>
+        </gl-cor:documentInfo>
+        <gl-cor:entityInformation>
+            <gl-bus:organizationIdentifiers>
+                <gl-bus:organizationIdentifier contextRef="now">10235688</gl-bus:organizationIdentifier>
+                <gl-bus:organizationDescription contextRef="now">ARIREGISTRIKOOD</gl-bus:organizationDescription>
+            </gl-bus:organizationIdentifiers>
+        </gl-cor:entityInformation>
+        <gl-cor:entryHeader>
+            <gl-cor:entryNumber contextRef="now">EE0201001</gl-cor:entryNumber>
+            <gl-cor:entryDetail>
+                <gl-cor:lineNumber contextRef="now">Tehing_2111</gl-cor:lineNumber>
+                <gl-cor:lineNumberCounter contextRef="now" unitRef="NotUsed">1</gl-cor:lineNumberCounter>
+                <gl-cor:account>
+                    <gl-cor:accountSub>
+                        <gl-cor:accountSubID contextRef="now">T</gl-cor:accountSubID>
+                        <gl-cor:accountSubType contextRef="now">TOIMINGUTYYP2023ap</gl-cor:accountSubType>
+                    </gl-cor:accountSub>
+                </gl-cor:account>
+            </gl-cor:entryDetail>
+        </gl-cor:entryHeader>
+    </gl-cor:accountingEntries>
+</xbrli:xbrl>
