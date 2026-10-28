@@ -119,7 +119,7 @@ def test_integration_catalogue_exposes_registry_fields(integration_api, monkeypa
     assert catalogue["smartaccounts"]["pull_object_types"] == list(SmartAccountsProvider.PULL_OBJECT_TYPES)
     assert catalogue["merit_palk"]["pull_object_types"] == list(MeritPalkProvider.PULL_OBJECT_TYPES)
     assert catalogue["merit_palk"]["registry_status"] == documented
-    assert catalogue["file_import"]["pull_object_types"] == ["employee", "employees", "journal"]
+    assert catalogue["file_import"]["pull_object_types"] == ["employee", "employees", "journal", "payroll_opening_leave", "historical_earnings"]
     for provider in ("fasthr", "personio", "bamboohr"):
         assert catalogue[provider]["pull_object_types"] == ["employee"]
     for provider in ("hmrc", "emta", "quickbooks", "xero", "open_banking", "hibob"):
