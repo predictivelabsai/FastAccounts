@@ -180,6 +180,14 @@ def test_sick_benefit_is_split_across_monthly_draft_runs_and_frozen_on_approval(
     november_component = next(c for c in november['components'] if c['preset_key'] == 'employer_sick_pay')
     assert november_component['breakdown']['qualifying_days'] == 3
     assert Decimal(october_component['amount']) + Decimal(november_component['amount']) > 0
+    recalculated = payroll.update_item(ee_org['id'], october_run['id'], october['id'], actor=actor,
+        components=[{'type_id': october_component['type_id'], 'name': october_component['name'],
+            'amount': '999.00', 'direction': october_component['direction'],
+            **{key: october_component[key] for key in
+                ('income_tax', 'social_tax', 'ui_employee', 'ui_employer', 'funded_pension', 'social_minimum')}}])
+    sick_after_recalc = next(c for c in recalculated['items'][0]['components']
+                             if c['preset_key'] == 'employer_sick_pay')
+    assert sick_after_recalc['amount'] == october_component['amount']
     payroll.approve(ee_org['id'], october_run['id'], actor=actor)
     with pytest.raises(PayrollConflict, match='draft'):
         payroll.update_item(ee_org['id'], october_run['id'], october['id'], actor=actor,
