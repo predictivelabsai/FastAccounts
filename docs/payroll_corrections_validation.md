@@ -77,8 +77,8 @@ commands, counts, commits and unresolved acceptance items here.
 
 - Design and migration commits: `7afc5fe`, `170ac1b`.
 - Service/API commit: `7788af3` adds tenant-safe correction cloning, one-draft
-  validation, support for correction zero values, and compatibility with the
-  partial regular-period unique index.
+  validation, frozen absence lineage, support for correction zero values, and
+  compatibility with the partial regular-period unique index.
 - Approval/API/test commit: `f239f91` adds supplementary runs with zero starting
   pay, correction delta calculation against the last approved snapshot, balanced
   delta-only GL posting, immutable per-payment-type TSD delta lines, and

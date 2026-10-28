@@ -923,6 +923,11 @@ class PayrollService:
                         if 'id' in copied:
                             copied['id'] = new_id()
                         self._insert_copied_row(tx, table, copied)
+                for absence in tx.rows('SELECT * FROM payroll_absence_run_items WHERE organisation_id=? AND pay_run_id=? AND employee_id=?',
+                                       (organisation_id, original_run_id, source['employee_id'])):
+                    copied = dict(absence)
+                    copied.update(id=new_id(), pay_run_id=run_id)
+                    self._insert_copied_row(tx, 'payroll_absence_run_items', copied)
             tx.execute('UPDATE pay_runs SET total_gross=?,total_net=?,total_employer_cost=? WHERE organisation_id=? AND id=?',
                        (original['total_gross'], original['total_net'], original['total_employer_cost'], organisation_id, run_id))
             audit(tx, organisation_id, actor, 'payroll.correction.drafted', 'pay_run', run_id,
