@@ -5,6 +5,13 @@
 > been uploaded to or accepted by e-MTA. Accountant review and manual upload
 > are required. Direct submission is disabled.
 
+The earlier `export.xbrl.xml` endpoint is a deprecated FastAccounts review
+envelope and is retained for existing review workflows. APA TSD downloads use
+the official example's XBRL GL namespaces and codelist fields. APA XML is
+downloaded per paid payout transaction; the payment-month ZIP contains one XML
+file for each paid payout. Both routes require an accountant-reviewed TSD
+preparation. Neither output is submitted to e-MTA.
+
 ## Scope and regulatory direction
 
 The implementation follows the direction recorded in
@@ -116,6 +123,10 @@ Before serialization, the sum of `gross_amount`, `net_amount`, and
 stops the export.
 
 ## XBRL GL envelope mapping
+
+This table documents the earlier review-only FastAccounts envelope. It is not
+the APA export format. The APA example mapping and source-field decisions are
+documented in [APA TSD XBRL GL example mapping](#apa-tsd-xbrl-gl-example-mapping-4b-step-1).
 
 | XBRL GL element | Value |
 | --- | --- |

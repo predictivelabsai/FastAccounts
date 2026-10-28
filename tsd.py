@@ -13,6 +13,7 @@ import csv
 import io
 import json
 from io import BytesIO
+from zipfile import ZIP_DEFLATED, ZipFile
 from datetime import date, timedelta
 from decimal import Decimal
 from xml.etree import ElementTree as ET
@@ -23,6 +24,7 @@ from payroll_calendar import is_working_day
 from payroll_payday import payday_for_period
 from payroll_rules import settlement_date
 from payroll_tsd_breakdown import calculate_tsd_breakdown, _allocate
+from tsd_apa_xml import generate_apa_xml
 
 
 XBRLI_NS = "http://www.xbrl.org/2003/instance"
@@ -479,6 +481,102 @@ class TSDExportService:
         payload = ET.tostring(root, encoding="utf-8", xml_declaration=True)
         self._record_export(preparation, workpaper, actor=actor, format_name="xbrl-gl-xml")
         return payload
+
+    def _apa_payouts(self, organisation_id: str, preparation_id: str) -> list[tuple[dict, bytes]]:
+        preparation, workpaper = self._reviewed_workpaper(organisation_id, preparation_id)
+        run_id = preparation["cursor_before"]
+        with self.db.transaction() as tx:
+            organisation = self._organisation(tx, organisation_id, require_registration=True)
+            batches = tx.rows("SELECT * FROM payroll_payout_batches WHERE organisation_id=? AND pay_run_id=? "
+                              "AND status='Paid' ORDER BY payout_date,id", (organisation_id, run_id))
+            result = []
+            for payout in batches:
+                lines = tx.rows("SELECT l.amount,i.employee_personal_id FROM payroll_payout_lines l "
+                                "JOIN pay_run_items i ON i.organisation_id=l.organisation_id AND i.pay_run_id=? "
+                                "AND i.employee_id=l.employee_id WHERE l.organisation_id=? AND l.payout_batch_id=?",
+                                (run_id, organisation_id, payout["id"]))
+                records = []
+                for line in lines:
+                    person = [row for row in workpaper["records"]
+                              if row["recipient_personal_id"] == line["employee_personal_id"]]
+                    if not person:
+                        continue
+                    paid_net = money(line["amount"])
+                    full_net = sum((money(row["net_amount"]) for row in person), Decimal("0"))
+                    if full_net <= 0:
+                        continue
+                    ratio = paid_net / full_net
+                    for row in person:
+                        scaled = dict(row)
+                        scaled["payment_date"] = payout["payout_date"]
+                        scaled["payment_month"] = payout["payout_date"][:7]
+                        for field in TSD_AMOUNT_FIELDS:
+                            scaled[field] = money(money(row[field]) * ratio)
+                        records.append(scaled)
+                if records:
+                    result.append((payout, generate_apa_xml(organisation, payout, records)))
+            absence_batches = tx.rows("SELECT * FROM payroll_absence_payout_batches WHERE organisation_id=? "
+                                      "AND status='Paid' AND substr(payout_date,1,7)=substr((SELECT settlement_date FROM pay_runs "
+                                      "WHERE organisation_id=? AND id=?),1,7) ORDER BY payout_date,id",
+                                      (organisation_id, organisation_id, run_id))
+            for payout in absence_batches:
+                records = [dict(row) for row in workpaper["records"] if row["pay_run_id"] == payout["id"]]
+                if records:
+                    result.append((payout, generate_apa_xml(organisation, payout, records)))
+        if not result:
+            raise ValueError("No paid payout transactions are available for APA export")
+        return result
+
+    def _audit_apa_exports(self, organisation_id: str, exports: list[tuple[dict, bytes]], *, actor: str) -> None:
+        with self.db.transaction() as tx:
+            for payout, _ in exports:
+                audit(tx, organisation_id, actor, "payroll.tsd.exported", "payout", payout["id"],
+                      {"payout_id": payout["id"], "format": "apa-xbrl-gl-xml"})
+
+    def export_apa_payout(self, organisation_id: str, preparation_id: str, payout_id: str, *, actor: str) -> bytes:
+        exports = self._apa_payouts(organisation_id, preparation_id)
+        for payout, payload in exports:
+            if payout["id"] == payout_id:
+                self._audit_apa_exports(organisation_id, [(payout, payload)], actor=actor)
+                return payload
+        raise KeyError("Paid payout not found in this reviewed TSD preparation")
+
+    def export_apa_month_zip(self, organisation_id: str, payment_month: str, *, actor: str) -> bytes:
+        if len(payment_month) != 7 or payment_month[4] != "-":
+            raise ValueError("Payment month must use YYYY-MM")
+        with self.db.transaction() as tx:
+            self._organisation(tx, organisation_id, require_registration=True)
+            preparations = tx.rows("SELECT id,cursor_before FROM sync_runs WHERE organisation_id=? AND provider='emta' "
+                                   "AND direction='export' AND object_type='tsd' AND status='Completed' "
+                                   "ORDER BY created_at,id", (organisation_id,))
+            paid_salary_runs = {row["pay_run_id"] for row in tx.rows(
+                "SELECT DISTINCT pay_run_id FROM payroll_payout_batches WHERE organisation_id=? AND status='Paid' "
+                "AND substr(payout_date,1,7)=?", (organisation_id, payment_month))}
+            candidate_runs = set(paid_salary_runs)
+            if tx.one("SELECT id FROM payroll_absence_payout_batches WHERE organisation_id=? AND status='Paid' "
+                      "AND substr(payout_date,1,7)=? LIMIT 1", (organisation_id, payment_month)):
+                candidate_runs.update(row["id"] for row in tx.rows(
+                    "SELECT id FROM pay_runs WHERE organisation_id=? AND status='Approved' AND substr(settlement_date,1,7)=?",
+                    (organisation_id, payment_month)))
+            reviewed_runs = {row["cursor_before"] for row in preparations}
+            if not paid_salary_runs.issubset(reviewed_runs):
+                raise ValueError("Every paid salary payout in the month requires a reviewed TSD preparation")
+            runs = [row for row in preparations if row["cursor_before"] in candidate_runs]
+            if not runs:
+                raise ValueError("No reviewed TSD preparation exists for paid payouts in this month")
+        exports_by_id = {}
+        for prep in runs:
+            for payout, payload in self._apa_payouts(organisation_id, prep["id"]):
+                if payout["payout_date"][:7] == payment_month:
+                    exports_by_id[payout["id"]] = (payout, payload)
+        if not exports_by_id:
+            raise ValueError("No paid payout transactions are available for APA export in this month")
+        output = BytesIO()
+        with ZipFile(output, "w", ZIP_DEFLATED) as archive:
+            for payout, payload in sorted(exports_by_id.values(), key=lambda pair: (pair[0]["payout_date"], pair[0]["id"])):
+                archive.writestr(f"tsd-{payout['payout_date']}-{payout['id']}.xml", payload)
+        self._audit_apa_exports(organisation_id, list(exports_by_id.values()), actor=actor)
+        return output.getvalue()
 
     def export_csv(self, organisation_id: str, preparation_id: str, *, actor: str) -> bytes:
         preparation, workpaper = self._reviewed_workpaper(organisation_id, preparation_id)

@@ -2803,6 +2803,30 @@ def payroll_export_tsd_xbrl(organisation_id: str, run_id: str, preparation_id: s
     })
 
 
+@api.get('/organisations/{organisation_id}/pay-runs/{run_id}/tsd/{preparation_id}/payouts/{payout_id}/apa.xml')
+def payroll_export_tsd_apa_payout(organisation_id: str, run_id: str, preparation_id: str,
+                                  payout_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, WRITE_ROLES)
+    service = TSDExportService()
+    prepared = service.get(organisation_id, preparation_id)
+    if prepared['pay_run_id'] != run_id:
+        raise KeyError('TSD preparation not found')
+    payload = service.export_apa_payout(organisation_id, preparation_id, payout_id, actor=user.email)
+    return Response(payload, media_type='application/xml', headers={
+        'Content-Disposition': f'attachment; filename="tsd-{payout_id}.xml"'
+    })
+
+
+@api.get('/organisations/{organisation_id}/payroll/tsd-apa/{payment_month}.zip')
+def payroll_export_tsd_apa_month_zip(organisation_id: str, payment_month: str,
+                                     user: User = Depends(current_user)):
+    _require(organisation_id, user, WRITE_ROLES)
+    payload = TSDExportService().export_apa_month_zip(organisation_id, payment_month, actor=user.email)
+    return Response(payload, media_type='application/zip', headers={
+        'Content-Disposition': f'attachment; filename="tsd-{payment_month}-payouts.zip"'
+    })
+
+
 @api.get('/organisations/{organisation_id}/pay-runs/{run_id}/tsd/{preparation_id}/export.csv')
 def payroll_export_tsd_csv(organisation_id: str, run_id: str, preparation_id: str,
                            user: User = Depends(current_user)):

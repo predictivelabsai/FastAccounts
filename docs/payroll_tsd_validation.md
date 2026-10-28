@@ -89,4 +89,20 @@ submission remains disabled.
 
 Vendored the official business example, cancellation example, feedback report XSD and four feedback report examples under `tests/fixtures/emta/`. Provenance and retrieval date are in that directory's README. The developer guide states that each XBRL GL file represents a single transaction (see local extract, sections 1 and 3); the target export must therefore use one file per payout transaction, not one file per organisation and payment month. The XBRL GL schema archive was not downloaded. Full XBRL GL schema validation remains pending.
 
-Scope 4b is not complete. The current `tsd.py` exporter still emits the review-only FastAccounts namespace and does not implement the official APA extension, cancellation, export history, feedback import, offline APA business rules or declaration panel controls. No rule codes are yet claimed as implemented. Next steps: map the vendored sample and local taxonomy field-by-field; add an additive tenant-scoped export/history/result migration and both explicit migration lists; implement service logic and routes; add structural and feedback tests; wire the en/et/lv/lt declaration panel; synchronise `tsd-export.md`, this validation record, roadmap and change log; then run the requested test files individually. Do not mark 4b complete until these pass. No live network calls were made.
+## Scope 4b step 1 status
+
+Step 1 is complete and committed: the business example's XBRL GL fields have
+been mapped to their taxonomy meaning, required or conditional status, and
+FastAccounts source in `docs/tsd-export.md`.
+
+The APA XML generator and payout download routes are implemented for salary
+payouts and absence-pay payouts. Each generated document represents one paid
+payout and uses the vendored example's namespace set and codelist-coded
+elements. A reviewed payment-month ZIP gathers one file per paid payout across
+the organisation. The former review-only XBRL endpoint remains available and is
+marked deprecated in `docs/tsd-export.md`.
+
+Remaining 4b work includes export history/version persistence, cancellation,
+feedback import, offline APA business-rule validation, and declaration panel
+controls. Full XBRL GL schema validation and live e-MTA acceptance remain
+pending. No live network calls were made.
