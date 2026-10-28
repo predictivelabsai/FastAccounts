@@ -508,6 +508,19 @@ rules to be applied by the average-pay service. Sources: [Employment Contracts
 Act](https://www.riigiteataja.ee/akt/123122024006) and [Average Pay
 Regulation](https://www.riigiteataja.ee/akt/13191217).
 
+`payroll_average.py` version `EE-AVG-2026-v1` consumes approved frozen item
+snapshots and reviewed historical earnings. It sums monthly/hourly base pay and
+only income components whose frozen `is_wage` flag is true. The calendar-day
+denominator subtracts public holidays and the union of dates explicitly marked
+as absences with `wage_paid=false`. The working-day variant subtracts unpaid
+absence working days; the hourly variant divides summed wage earnings by recorded
+worked hours. When there is no non-zero wage history, the documented fallback
+projects the current agreed monthly salary over six full months, or the current
+hourly rate over the six calendar norm-hour totals. The returned breakdown lists
+the source months, totals, excluded days, denominators, averages and fallback
+description. Its window follows the requested six-full-month rule; short-service
+and specific statutory exclusions need accountant review before production use.
+
 The absence register stores inclusive start and end dates, a document reference
 and a comment for each organisation-scoped employee record. Calendar days count
 both endpoints. Annual and extended leave days exclude public holidays, while

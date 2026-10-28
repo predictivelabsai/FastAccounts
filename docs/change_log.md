@@ -26,6 +26,12 @@ delivered.
   hourly pay remains based on entered hours. The run breakdown and payslip show
   worked/norm days. See the validation record for test commands and the
   employee-specific work-schedule assumption.
+- Added `payroll_average.py` with versioned six-month wage-only daily,
+  working-day and hourly averages. The pure calculation returns a detailed
+  source and denominator breakdown, requires explicit absence wage-paid status,
+  accepts reviewed historical earnings, and describes its agreed-salary
+  fallback. Short-service, stable-salary and schedule-specific legal cases are
+  listed for accountant confirmation in `payroll_absences_validation.md`.
 
 ## 2026-10-28: Payroll calendar and payouts
 

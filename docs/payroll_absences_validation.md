@@ -87,3 +87,36 @@ minimum-wage ratio, hourly pay unchanged, and approved-run absence protection.
 Employee-specific weekly schedules are not represented by this demo; an
 accountant must confirm that the standard calendar/FTE assumption is suitable
 for the bureau's part-time cases.
+
+## Unit 4: Average-pay engine
+
+`payroll_average.py` is a pure Decimal module. `EE-AVG-2026-v1` selects the six
+full calendar months before the event month, includes only approved frozen run
+items and reviewed historical earnings in those earning periods, and sums base
+monthly/hourly wages with component lines whose frozen `is_wage` is true. The
+calendar-day denominator removes public holidays and unpaid absence dates as a
+union. Working-day and hourly variants use available payroll-calendar workdays
+and recorded worked hours. If no non-zero wage history exists, the breakdown
+records a fallback using the current agreed monthly salary projected over six
+months, or the current hourly rate over six standard norm-hour totals.
+
+Command and result:
+
+```powershell
+.tmp\venv312\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache312 --basetemp=.tmp\test-average-unit4-final2 tests\\test_payroll_average.py
+# 6 passed
+```
+
+### Needs accountant confirmation
+
+- Confirm the working-day and hourly variants. The hourly version currently
+  divides the selected wage total by recorded worked hours; the regulation's
+  average-hour method can depend on the agreed daily schedule.
+- Confirm the six-month current-salary fallback against the regulation's
+  unchanged-salary vacation-pay rule, short-service calculation and first
+  pay-date case. These are distinct statutory cases and are not silently
+  inferred by this pure engine.
+- Confirm that every absence passed to this module has the correct explicit
+  `wage_paid` status, including employer-paid sick leave and paid annual leave.
+- Confirm the treatment of TLS § 19 unpaid absence, the 2024 sick-leave day
+  exclusions and TLS § 37 reduced-pay periods for the applicable event type.

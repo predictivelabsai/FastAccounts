@@ -14,8 +14,10 @@
   payroll workspace dialog. Unit tests and four-language browser flow pass.
   Unit 3 adds frozen worked/norm day counts, monthly salary and minimum-wage
   proration by interrupted working days, with hourly payroll unchanged and the
-  ratio shown on the run and payslip. Average pay, leave pay, historical import
-  and liability work remains in progress.
+  ratio shown on the run and payslip. Unit 4 adds the pure, Decimal average-pay
+  engine with approved wages, historical earnings, explicit absence exclusions,
+  three averages and a documented fallback breakdown. Absence pay, historical
+  import and liability work remains in progress.
 
 ## 2026-10-28: Payroll calendar and payouts
 
