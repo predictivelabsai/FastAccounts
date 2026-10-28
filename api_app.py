@@ -2814,3 +2814,31 @@ def payroll_export_tsd_csv(organisation_id: str, run_id: str, preparation_id: st
     return Response(payload, media_type='text/csv', headers={
         'Content-Disposition': f'attachment; filename="tsd-{prepared["period"]}.csv"'
     })
+
+
+@api.get('/organisations/{organisation_id}/pay-runs/{run_id}/tsd/{preparation_id}/export-annex1.csv')
+def payroll_export_tsd_annex1_csv(organisation_id: str, run_id: str, preparation_id: str,
+                                  user: User = Depends(current_user)):
+    _require(organisation_id, user, WRITE_ROLES)
+    service = TSDExportService()
+    prepared = service.get(organisation_id, preparation_id)
+    if prepared['pay_run_id'] != run_id:
+        raise KeyError('TSD preparation not found')
+    payload = service.export_legacy_annex1_csv(organisation_id, preparation_id, actor=user.email)
+    return Response(payload, media_type='text/csv; charset=utf-8', headers={
+        'Content-Disposition': f'attachment; filename="tsd-annex1-{prepared["period"]}.csv"'
+    })
+
+
+@api.get('/organisations/{organisation_id}/pay-runs/{run_id}/tsd/{preparation_id}/workpaper.xlsx')
+def payroll_tsd_workpaper_xlsx(organisation_id: str, run_id: str, preparation_id: str,
+                               user: User = Depends(current_user)):
+    _require(organisation_id, user, WRITE_ROLES)
+    service = TSDExportService()
+    prepared = service.get(organisation_id, preparation_id)
+    if prepared['pay_run_id'] != run_id:
+        raise KeyError('TSD preparation not found')
+    payload = service.workpaper_xlsx(organisation_id, preparation_id)
+    return Response(payload, media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', headers={
+        'Content-Disposition': f'attachment; filename="tsd-workpaper-{prepared["period"]}.xlsx"'
+    })

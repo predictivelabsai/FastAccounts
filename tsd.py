@@ -12,6 +12,7 @@ import calendar
 import csv
 import io
 import json
+from io import BytesIO
 from datetime import date, timedelta
 from decimal import Decimal
 from xml.etree import ElementTree as ET
@@ -85,6 +86,7 @@ TSD_AMOUNT_FIELDS = (
 )
 
 CSV_TRANSITION_END = date(2027, 12, 31)
+LEGACY_A1_FIELDS = ("1000", "1010", "1020", "1030", "1040", "1050", "1060", "1070", "1080", "1090", "1100", "1110", "1120", "1130", "1140", "1150", "1160", "1170")
 
 
 def _tag(namespace: str, name: str) -> str:
@@ -176,7 +178,7 @@ class TSDExportService:
         gross = money(line["amount"] if line else item["gross"])
         excluded_income = sum((money(line['amount']) for line in item.get('components', [])
                                if line['direction'] == 'income' and not line['income_tax']), Decimal(0))
-        income_tax_base = money(line["taxable_amount"] + exemption if line else
+        income_tax_base = money(decimal(line["taxable_amount"]) + exemption if line else
             max(Decimal("0"), gross - excluded_income - pension - employee_ui - exemption))
         net = money(line["net_amount"] if line and "net_amount" in line else item["net"])
         employer_cost = money(line["employer_cost"] if line and "employer_cost" in line
@@ -248,6 +250,7 @@ class TSDExportService:
                 line['net_amount'] = nets[line['payment_type']]
                 records.append(self._record(organisation, run, item, line))
         payment_month = run['payment_date'][:7]
+        pay_run_record_count = len(records)
         absence_rows = tx.rows("SELECT p.*,b.payout_date FROM payroll_absence_pay p "
                                "JOIN payroll_absence_payout_batches b ON b.organisation_id=p.organisation_id AND b.id=p.absence_payout_batch_id "
                                "WHERE p.organisation_id=? AND p.status IN ('in_payout','paid') AND b.status IN ('Approved','Paid') AND substr(b.payout_date,1,7)=? "
@@ -277,7 +280,7 @@ class TSDExportService:
                 'recipient_name':calc['employee_name'],'payment_classification':{10:'EMPLOYMENT_SALARY',17:'CONTRACTOR_FEE',21:'BOARD_MEMBER_FEE',24:'EMPLOYER_SICK_BENEFIT'}.get(line['payment_type'],'OTHER_PAYMENT'),
                 'tsd_payment_type':line['payment_type'],
                 'pay_basis':'monthly','currency':'EUR','gross_amount':money(line['amount']),
-                'tax_free_minimum':line['exemption_610'],'income_tax_base':money(line['taxable_amount']+line['exemption_610']),
+                'tax_free_minimum':line['exemption_610'],'income_tax_base':money(decimal(line['taxable_amount'])+decimal(line['exemption_610'])),
                 'income_tax':money(line['income_tax']),
                 'employee_unemployment_insurance':money(line['ui_employee']),
                 'employer_unemployment_insurance':money(line['ui_employer']),
@@ -289,9 +292,9 @@ class TSDExportService:
             field: money(sum((decimal(record[field]) for record in records), Decimal("0")))
             for field in TSD_AMOUNT_FIELDS
         }
-        absence_gross = sum((money(record['gross_amount']) for record in records[len(run['items']):]), Decimal(0))
-        absence_net = sum((money(record['net_amount']) for record in records[len(run['items']):]), Decimal(0))
-        absence_cost = sum((money(record['employer_cost']) for record in records[len(run['items']):]), Decimal(0))
+        absence_gross = sum((money(record['gross_amount']) for record in records[pay_run_record_count:]), Decimal(0))
+        absence_net = sum((money(record['net_amount']) for record in records[pay_run_record_count:]), Decimal(0))
+        absence_cost = sum((money(record['employer_cost']) for record in records[pay_run_record_count:]), Decimal(0))
         if totals["gross_amount"] != money(run["total_gross"]) + absence_gross:
             raise ValueError("TSD gross total does not reconcile to the approved pay run")
         if totals["net_amount"] != money(run["total_net"]) + absence_net:
@@ -306,6 +309,10 @@ class TSDExportService:
             "filing_deadline": records[0]["filing_deadline"],
             "records": records,
             "totals": totals,
+            "summary_totals": {
+                "total_ui": totals["employee_unemployment_insurance"] + totals["employer_unemployment_insurance"],
+                "total_payable": sum((totals[field] for field in ("income_tax", "social_tax", "employee_unemployment_insurance", "employer_unemployment_insurance", "funded_pension")), Decimal("0")),
+            },
             "warnings": [
                 "NOT live-verified against e-MTA; accountant review and manual upload are required",
                 "Current payroll calculations are resident-only, so payment records map to TSD Annex 1",
@@ -323,6 +330,9 @@ class TSDExportService:
         ]
         result["totals"] = {
             key: db_number(value) for key, value in workpaper["totals"].items()
+        }
+        result["summary_totals"] = {
+            key: db_number(value) for key, value in workpaper["summary_totals"].items()
         }
         return result
 
@@ -484,3 +494,86 @@ class TSDExportService:
             })
         self._record_export(preparation, workpaper, actor=actor, format_name="csv")
         return output.getvalue().encode("utf-8-sig")
+
+    @staticmethod
+    def _legacy_a1_row(record: dict) -> dict:
+        payment_type = int(record["tsd_payment_type"])
+        social_types = {10, 11, 13, 14, 15, 17, 18, 19, 21, 22, 25, 26, 28, 29, 30, 33, 34, 41, 42, 43}
+        ui_types = {10, 11, 14, 17, 18, 19, 25, 26, 52}
+        tax_exempt_types = {11, 14, 18, 19, 22, 26, 30, 34}
+        code_1060 = record["gross_amount"] if payment_type in social_types else Decimal("0")
+        code_1120 = record["gross_amount"] if payment_type in ui_types else Decimal("0")
+        return {
+            "1000": record["recipient_personal_id"], "1010": record["recipient_name"],
+            "1020": payment_type, "1030": record["gross_amount"], "1040": "", "1050": "",
+            "1060": code_1060, "1070": Decimal("0"), "1080": Decimal("0"),
+            "1090": max(Decimal("0"), record["social_tax_base"] - code_1060),
+            "1100": record["social_tax"], "1110": record["funded_pension"],
+            "1120": code_1120, "1130": record["employee_unemployment_insurance"],
+            "1140": record["employer_unemployment_insurance"],
+            "1150": 610 if record["tax_free_minimum"] else "",
+            "1160": record["tax_free_minimum"],
+            "1170": Decimal("0") if payment_type in tax_exempt_types else record["income_tax"],
+        }
+
+    def export_legacy_annex1_csv(self, organisation_id: str, preparation_id: str, *, actor: str) -> bytes:
+        preparation, workpaper = self._reviewed_workpaper(organisation_id, preparation_id)
+        if date.fromisoformat(workpaper["payment_date"]) > CSV_TRANSITION_END:
+            raise ValueError("Legacy Annex 1 CSV upload is available only through December 2027")
+        output = io.StringIO(newline="")
+        writer = csv.DictWriter(output, fieldnames=LEGACY_A1_FIELDS, delimiter=";", lineterminator="\r\n")
+        writer.writeheader()
+        for record in workpaper["records"]:
+            writer.writerow({key: format(value, ".2f") if isinstance(value, Decimal) else value
+                             for key, value in self._legacy_a1_row(record).items()})
+        self._record_export(preparation, workpaper, actor=actor, format_name="legacy-annex1-csv")
+        return output.getvalue().encode("utf-8")
+
+    def workpaper_xlsx(self, organisation_id: str, preparation_id: str) -> bytes:
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, PatternFill
+
+        _, workpaper = self._reviewed_workpaper(organisation_id, preparation_id)
+        book = Workbook()
+        detail = book.active
+        detail.title = "Payments"
+        headers = ["Recipient", "Personal code", "Payment type", "Payment month", "Gross", "Income tax withheld", "Social tax", "Employee UI", "Employer UI", "II pillar", "Total payable"]
+        detail.append(headers)
+        for record in workpaper["records"]:
+            detail.append([record["recipient_name"], record["recipient_personal_id"], record["tsd_payment_type"], record["payment_month"], record["gross_amount"], record["income_tax"], record["social_tax"], record["employee_unemployment_insurance"], record["employer_unemployment_insurance"], record["funded_pension"], sum((decimal(record[k]) for k in ("income_tax", "social_tax", "employee_unemployment_insurance", "employer_unemployment_insurance", "funded_pension")), Decimal("0"))])
+        for sheet_name, key in (("By payment type", "tsd_payment_type"), ("By recipient", "recipient_personal_id")):
+            sheet = book.create_sheet(sheet_name)
+            sheet.append([key, *headers[4:]])
+            groups = {}
+            for record in workpaper["records"]:
+                group_key = record[key]
+                bucket = groups.setdefault(group_key, [Decimal("0")] * 7)
+                for index, field in enumerate(("gross_amount", "income_tax", "social_tax", "employee_unemployment_insurance", "employer_unemployment_insurance", "funded_pension")):
+                    bucket[index] += record[field]
+                bucket[6] += sum((record[k] for k in ("income_tax", "social_tax", "employee_unemployment_insurance", "employer_unemployment_insurance", "funded_pension")), Decimal("0"))
+            for group_key, values in groups.items():
+                sheet.append([group_key, *values])
+        summary = book.create_sheet("Summary", 0)
+        summary.append(["TSD workpaper", workpaper["records"][0]["payment_month"]])
+        summary.append(["Record count", len(workpaper["records"])])
+        for label, field in (("Income tax withheld", "income_tax"), ("Social tax", "social_tax"),
+                             ("Employee UI", "employee_unemployment_insurance"),
+                             ("Employer UI", "employer_unemployment_insurance"),
+                             ("II pillar", "funded_pension")):
+            summary.append([label, workpaper["totals"][field]])
+        payable = sum((workpaper["totals"][field] for field in ("income_tax", "social_tax", "employee_unemployment_insurance", "employer_unemployment_insurance", "funded_pension")), Decimal("0"))
+        summary.append(["Total payable", payable])
+        summary.append(["Validation messages", ""])
+        for warning in workpaper["warnings"]:
+            summary.append([warning])
+        for sheet in book.worksheets:
+            sheet.freeze_panes = "A2"
+            sheet.auto_filter.ref = sheet.dimensions
+            for cell in sheet[1]:
+                cell.font = Font(name="Arial", bold=True, color="FFFFFF")
+                cell.fill = PatternFill("solid", fgColor="17365D")
+            for column in sheet.columns:
+                sheet.column_dimensions[column[0].column_letter].width = min(32, max(12, max(len(str(cell.value or "")) for cell in column) + 2))
+        output = BytesIO()
+        book.save(output)
+        return output.getvalue()

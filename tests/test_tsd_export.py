@@ -107,6 +107,89 @@ def test_transitional_csv_has_declared_fields_and_reconciles(db, ee_org):
     assert sync["status"] == "Completed" and sync["write_count"] == 2
 
 
+def test_legacy_annex1_csv_golden_fields_and_format(db, ee_org):
+    service, _, preparation = _reviewed_preparation(db, ee_org)
+    payload = service.export_legacy_annex1_csv(ee_org['id'], preparation['id'], actor=ACTOR)
+    assert payload.decode('utf-8') == (
+        '1000;1010;1020;1030;1040;1050;1060;1070;1080;1090;1100;1110;1120;1130;1140;1150;1160;1170\r\n'
+        '49001010018;Ada Arvutaja;10;2000.00;;;2000.00;0.00;0.00;0.00;660.00;40.00;2000.00;32.00;16.00;610;700.00;270.16\r\n'
+        '38002020029;Bert Juhatuse liige;21;500.00;;;500.00;0.00;0.00;0.00;165.00;0.00;0.00;0.00;0.00;;0.00;110.00\r\n'
+    )
+    assert not payload.startswith(b'\xef\xbb\xbf')
+    rows = list(csv.DictReader(io.StringIO(payload.decode('utf-8')), delimiter=';'))
+    assert tuple(rows[0]) == ('1000','1010','1020','1030','1040','1050','1060','1070','1080','1090','1100','1110','1120','1130','1140','1150','1160','1170')
+    assert len(rows) == 2
+    assert rows[0]['1000'] == '49001010018' and rows[0]['1010'] == 'Ada Arvutaja'
+    assert rows[0]['1020'] == '10' and rows[0]['1030'].endswith('.00')
+    assert rows[0]['1040'] == rows[0]['1050'] == ''
+    assert rows[1]['1020'] == '21' and rows[1]['1120'] == '0.00'
+    assert all(len(row['1030'].rsplit('.', 1)[1]) == 2 for row in rows)
+
+
+def test_legacy_annex1_csv_mixed_payment_type_golden(db, ee_org):
+    payroll = PayrollService(db)
+    payroll.save_employee(ee_org['id'], actor=ACTOR, name='Mixed CSV recipient',
+                          personal_id='49001010018', gross_salary='2000', apply_tax_free_minimum=True)
+    types = {row['preset_key']: row for row in payroll.component_types(ee_org['id'])}
+    flags = dict(income_tax=True, social_tax=True, ui_employee=True, ui_employer=True,
+                 funded_pension=True, social_minimum=False)
+    board = payroll.save_component_type(ee_org['id'], actor=ACTOR, name='Board fee',
+        direction='income', tsd_payment_type=21, **(flags | {'ui_employee': False,
+        'ui_employer': False, 'social_minimum': False}))
+    vacation = payroll.save_component_type(ee_org['id'], actor=ACTOR, name='Vacation pay',
+        direction='income', tsd_payment_type=10, **flags)
+    run = payroll.create_run(ee_org['id'], period='2026-10', actor=ACTOR)
+    payroll.update_item(ee_org['id'], run['id'], run['items'][0]['id'], actor=ACTOR, components=[
+        {'type_id': types['bonus']['id'], 'amount': '100'},
+        {'type_id': vacation['id'], 'amount': '100'},
+        {'type_id': board['id'], 'amount': '300'},
+        {'type_id': types['contract']['id'], 'amount': '400'},
+        {'type_id': types['employer_sick_pay']['id'], 'amount': '100'},
+    ])
+    approved = payroll.approve(ee_org['id'], run['id'], actor=ACTOR)
+    service = TSDExportService(db)
+    preparation = service.prepare(ee_org['id'], approved['id'], actor=ACTOR)
+    workpaper = service.get(ee_org['id'], preparation['id'])
+    for field in TSD_AMOUNT_FIELDS:
+        assert sum((Decimal(record[field]) for record in workpaper['records']), Decimal('0')) == Decimal(workpaper['totals'][field])
+    from ledger import LedgerService
+    gl = LedgerService(db).profit_and_loss(ee_org['id'], start='2026-10-01', end='2026-10-31')
+    assert Decimal(str(gl['expenses'])) == Decimal(workpaper['totals']['employer_cost'])
+    service.review(ee_org['id'], preparation['id'], actor=ACTOR)
+    payload = service.export_legacy_annex1_csv(ee_org['id'], preparation['id'], actor=ACTOR)
+    assert payload.decode('utf-8') == (
+        '1000;1010;1020;1030;1040;1050;1060;1070;1080;1090;1100;1110;1120;1130;1140;1150;1160;1170\r\n'
+        '49001010018;Mixed CSV recipient;10;2200.00;;;2200.00;0.00;0.00;0.00;726.00;44.00;2200.00;35.20;17.60;610;700.00;312.58\r\n'
+        '49001010018;Mixed CSV recipient;17;400.00;;;400.00;0.00;0.00;0.00;132.00;8.00;400.00;6.40;3.20;;0.00;84.83\r\n'
+        '49001010018;Mixed CSV recipient;21;300.00;;;300.00;0.00;0.00;0.00;99.00;6.00;0.00;0.00;0.00;;0.00;64.68\r\n'
+        '49001010018;Mixed CSV recipient;24;100.00;;;0.00;0.00;0.00;0.00;0.00;0.00;0.00;0.00;0.00;;0.00;22.00\r\n'
+    )
+
+
+def test_legacy_annex1_csv_refuses_payment_month_after_transition(db, ee_org):
+    payroll = PayrollService(db)
+    payroll.save_employee(ee_org['id'], actor=ACTOR, name='Future recipient', personal_id='49001010018', gross_salary='2000')
+    run = payroll.create_run(ee_org['id'], period='2026-10', actor=ACTOR)
+    approved = payroll.approve(ee_org['id'], run['id'], actor=ACTOR)
+    with db.transaction() as tx:
+        tx.execute("UPDATE pay_runs SET settlement_date='2028-01-05' WHERE organisation_id=? AND id=?", (ee_org['id'], approved['id']))
+    service = TSDExportService(db)
+    preparation = service.prepare(ee_org['id'], approved['id'], actor=ACTOR)
+    service.review(ee_org['id'], preparation['id'], actor=ACTOR)
+    with pytest.raises(ValueError, match='December 2027'):
+        service.export_legacy_annex1_csv(ee_org['id'], preparation['id'], actor=ACTOR)
+
+
+def test_workpaper_xlsx_has_three_views(db, ee_org):
+    from openpyxl import load_workbook
+    service, _, preparation = _reviewed_preparation(db, ee_org)
+    book = load_workbook(io.BytesIO(service.workpaper_xlsx(ee_org['id'], preparation['id'])), data_only=True)
+    assert book.sheetnames == ['Summary', 'Payments', 'By payment type', 'By recipient']
+    assert book['Summary']['B2'].value == len(preparation['records'])
+    assert book['Summary']['A8'].value == 'Total payable'
+    assert book['Payments'].max_row == 3
+
+
 def test_tsd_scope_confirmation_and_tenant_gates(db, ee_org, uk_org):
     service = TSDExportService(db)
     with pytest.raises(ValueError, match="Estonian"):
@@ -140,10 +223,15 @@ def test_tsd_api_review_gate_and_file_downloads(db, ee_org, monkeypatch):
     assert reviewed.status_code == 200, reviewed.text
     xml = client.get(base + f"/{preparation_id}/export.xbrl.xml", headers=headers)
     csv_response = client.get(base + f"/{preparation_id}/export.csv", headers=headers)
+    legacy = client.get(base + f"/{preparation_id}/export-annex1.csv", headers=headers)
+    workpaper = client.get(base + f"/{preparation_id}/workpaper.xlsx", headers=headers)
     assert xml.status_code == 200 and xml.content.startswith(b"<?xml")
     assert xml.headers["content-disposition"].endswith('tsd-2026-10.xbrl.xml"')
     assert csv_response.status_code == 200
     assert csv_response.content.startswith(b"\xef\xbb\xbfdeclaration,")
+    assert legacy.status_code == 200 and legacy.content.startswith(b'1000;1010;1020;')
+    assert workpaper.status_code == 200 and workpaper.content.startswith(b'PK')
+    assert client.get(base + f'/{preparation_id}/workpaper.xlsx', headers={'X-Test-User': 'intruder@example.test'}).status_code == 403
 
 
 def test_tsd_provider_is_export_only():
