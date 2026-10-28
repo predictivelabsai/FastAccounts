@@ -128,6 +128,9 @@ class PayoutService:
             frozen_date = date.fromisoformat(run.get('settlement_date') or self._default_date(tx, organisation_id, run['period']).isoformat())
             if payout_type == 'salary' and run.get('kind', 'regular') == 'regular' and chosen_date[:7] != frozen_date.isoformat()[:7]:
                 raise PayoutConflict('The payout month differs from the frozen payroll calculation month; a correction is required')
+            if payout_type == 'withholding':
+                return self._create_withholding(tx, organisation_id, run, chosen_date, actor,
+                                                amounts=amounts, bank_account_id=bank_account_id)
             payout_tsd = self._recalculate_later_correction(tx, organisation_id, run, chosen_date) if payout_type == 'salary' else {}
             outstanding = self._outstanding(tx, organisation_id, run_id)
             requested = amounts if amounts is not None else {row['employee_id']: str(row['unpaid']) for row in outstanding if row['unpaid'] > 0}
@@ -198,6 +201,64 @@ class PayoutService:
                   {'pay_run_id': run_id, 'payout_date': chosen_date})
             return self.get(organisation_id, batch_id, tx=tx)
 
+    def _create_withholding(self, tx, organisation_id, run, chosen_date, actor, *, amounts=None, bank_account_id=None):
+        rows = tx.rows('SELECT l.recipient_id,r.name recipient_name,r.iban,r.reference_number,r.default_description,'
+            'e.name employee_name,l.amount,l.description,a.payment_description '
+            'FROM payroll_withholding_run_lines l JOIN payroll_withholding_recipients r '
+            'ON r.organisation_id=l.organisation_id AND r.id=l.recipient_id '
+            'JOIN employees e ON e.organisation_id=l.organisation_id AND e.id=l.employee_id '
+            'LEFT JOIN payroll_withholding_agreements a ON a.organisation_id=l.organisation_id AND a.id=l.agreement_id '
+            'WHERE l.organisation_id=? AND l.pay_run_id=? AND l.amount>0 '
+            'ORDER BY r.name,e.name,l.id', (organisation_id, run['id']))
+        recipients = {}
+        for row in rows:
+            entry = recipients.setdefault(row['recipient_id'], row | {'amount_total': Decimal('0.00'), 'references': []})
+            entry['amount_total'] = money(entry['amount_total'] + decimal(row['amount']))
+            detail = row['payment_description'] or row['description'] or row['default_description']
+            reference = f"{row['employee_name']}: {detail}" if detail else row['employee_name']
+            if reference not in entry['references']:
+                entry['references'].append(reference)
+        if not recipients:
+            raise ValueError('No withholding amounts are available for payout')
+        paid = tx.rows("SELECT l.recipient_id,SUM(l.amount) amount FROM payroll_withholding_payout_lines l "
+            "JOIN payroll_withholding_payout_batches w ON w.organisation_id=l.organisation_id AND w.id=l.withholding_payout_id "
+            "JOIN payroll_payout_batches b ON b.organisation_id=w.organisation_id AND b.id=w.payout_batch_id "
+            "WHERE w.organisation_id=? AND w.pay_run_id=? AND b.status!='Cancelled' GROUP BY l.recipient_id",
+            (organisation_id, run['id']))
+        paid_by_recipient = {row['recipient_id']: money(row['amount']) for row in paid}
+        requested = amounts if amounts is not None else {
+            recipient_id: str(money(data['amount_total'] - paid_by_recipient.get(recipient_id, Decimal('0.00'))))
+            for recipient_id, data in recipients.items()
+            if data['amount_total'] > paid_by_recipient.get(recipient_id, Decimal('0.00'))}
+        if not requested:
+            raise ValueError('No unpaid withholding remains for this run')
+        bank_id = bank_account_id
+        if bank_id and not tx.one('SELECT id FROM bank_accounts WHERE organisation_id=? AND id=? AND active=1', (organisation_id, bank_id)):
+            raise KeyError('Bank account not found')
+        batch_id, now = new_id(), utc_now()
+        tx.execute('INSERT INTO payroll_payout_batches(id,organisation_id,pay_run_id,payout_type,payout_date,bank_account_id,created_at) VALUES (?,?,?,?,?,?,?)',
+                   (batch_id, organisation_id, run['id'], 'withholding', chosen_date, bank_id, now))
+        withholding_id = new_id()
+        tx.execute("INSERT INTO payroll_withholding_payout_batches(id,organisation_id,pay_run_id,payout_batch_id,status,created_at) VALUES (?,?,?,?,'Draft',?)",
+                   (withholding_id, organisation_id, run['id'], batch_id, now))
+        for recipient_id, raw_amount in requested.items():
+            recipient = recipients.get(recipient_id)
+            if not recipient:
+                raise KeyError('Recipient not found in pay run')
+            amount = money(raw_amount)
+            outstanding = money(recipient['amount_total'] - paid_by_recipient.get(recipient_id, Decimal('0.00')))
+            if amount <= 0:
+                raise ValueError('Payout amounts must be positive')
+            if amount > outstanding:
+                raise PayoutConflict('Payout exceeds the recipient unpaid withholding amount')
+            description = '; '.join(recipient['references'])
+            tx.execute('INSERT INTO payroll_withholding_payout_lines(id,organisation_id,withholding_payout_id,recipient_id,amount,iban,description,employee_references) VALUES (?,?,?,?,?,?,?,?)',
+                (new_id(), organisation_id, withholding_id, recipient_id, db_number(amount), recipient['iban'],
+                 description[:140], __import__('json').dumps(recipient['references'], ensure_ascii=False)))
+        audit(tx, organisation_id, actor, 'payroll.payout.created', 'payroll_payout_batch', batch_id,
+              {'pay_run_id': run['id'], 'payout_date': chosen_date, 'payout_type': 'withholding'})
+        return self.get(organisation_id, batch_id, tx=tx)
+
     def mark_paid(self, organisation_id, batch_id, bank_account_id, *, actor):
         with self.db.transaction() as tx:
             batch = self._batch(tx, organisation_id, batch_id)
@@ -208,6 +269,8 @@ class PayoutService:
             if claimed.rowcount != 1:
                 raise PayoutConflict('Only draft payouts can be marked paid')
             positive_lines = [line for line in batch['lines'] if money(line['amount']) > 0]
+            if batch['payout_type'] == 'withholding':
+                return self._mark_withholding_paid(tx, organisation_id, batch, bank_account_id, actor)
             if not positive_lines:
                 tx.execute("UPDATE payroll_payout_batches SET paid_at=?,paid_by=? WHERE organisation_id=? AND id=?",
                            (utc_now(), actor, organisation_id, batch_id))
@@ -233,6 +296,55 @@ class PayoutService:
                        (bank_account_id, paid_at, actor, posting['id'], organisation_id, batch_id))
             audit(tx, organisation_id, actor, 'payroll.payout.paid', 'payroll_payout_batch', batch_id, {'posted_batch_id': posting['id']})
             return self.get(organisation_id, batch_id, tx=tx)
+
+    def _mark_withholding_paid(self, tx, organisation_id, batch, bank_account_id, actor):
+        bank = tx.one('SELECT * FROM bank_accounts WHERE organisation_id=? AND id=? AND active=1', (organisation_id, bank_account_id))
+        if not bank:
+            raise KeyError('Bank account not found')
+        frozen = {row['role']: row['account_id'] for row in tx.rows(
+            'SELECT role,account_id FROM pay_run_posting_accounts WHERE organisation_id=? AND pay_run_id=?',
+            (organisation_id, batch['pay_run_id']))}
+        lines = batch['withholding_lines']
+        if not lines:
+            raise ValueError('Withholding payout has no payment lines')
+        total = sum((money(line['amount']) for line in lines), Decimal('0.00'))
+        by_role = {}
+        for row in tx.rows('SELECT component_type,amount FROM payroll_withholding_run_lines WHERE organisation_id=? AND pay_run_id=?',
+                           (organisation_id, batch['pay_run_id'])):
+            role = 'PAYROLL_BAILIFF' if row['component_type'] in ('alimony', 'bailiff') else 'PAYROLL_DEDUCTION'
+            by_role[role] = money(by_role.get(role, Decimal('0.00')) + decimal(row['amount']))
+        # A payout can be partial, so allocate each role in proportion to its remaining liability.
+        liability_total = sum(by_role.values(), Decimal('0.00'))
+        remaining = total
+        posting_lines = []
+        roles = [role for role in ('PAYROLL_BAILIFF', 'PAYROLL_DEDUCTION') if by_role.get(role)]
+        for index, role in enumerate(roles):
+            liability = by_role.get(role, Decimal('0.00'))
+            if not liability:
+                continue
+            debit = remaining if index == len(roles) - 1 else min(remaining, money(total * liability / liability_total))
+            debit = min(debit, remaining)
+            account_id = frozen.get(role)
+            if not account_id:
+                from payroll import PayrollService
+                account = PayrollService._posting_account(tx, organisation_id, role)
+                account_id = account['id'] if account else None
+            if not account_id:
+                raise ValueError(f'The {role} account is missing')
+            posting_lines.append(PostingLine(account_id, debit=debit, memo='Payroll withholding payout ' + batch['payout_date'],
+                source_line_type='payroll_payout', source_line_id=batch['id']))
+            remaining = money(remaining - debit)
+        posting_lines.append(PostingLine(bank['ledger_account_id'], credit=total, memo='Payroll withholding payout ' + batch['payout_date'],
+            source_line_type='payroll_payout', source_line_id=batch['id']))
+        posting = LedgerService(self.db).post(organisation_id=organisation_id, voucher_type='payroll_withholding_payout',
+            voucher_id=batch['id'], voucher_code='PAY-WH-' + batch['id'][:12], posting_date=batch['payout_date'],
+            lines=posting_lines, actor=actor, currency='EUR', tx=tx)
+        tx.execute("UPDATE payroll_payout_batches SET status='Paid',bank_account_id=?,paid_at=?,paid_by=?,posted_batch_id=? WHERE organisation_id=? AND id=?",
+                   (bank_account_id, utc_now(), actor, posting['id'], organisation_id, batch['id']))
+        tx.execute("UPDATE payroll_withholding_payout_batches SET status='Paid' WHERE organisation_id=? AND payout_batch_id=?",
+                   (organisation_id, batch['id']))
+        audit(tx, organisation_id, actor, 'payroll.payout.paid', 'payroll_payout_batch', batch['id'], {'posted_batch_id': posting['id']})
+        return self.get(organisation_id, batch['id'], tx=tx)
 
     def cancel(self, organisation_id, batch_id, *, actor):
         with self.db.transaction() as tx:
@@ -262,6 +374,9 @@ class PayoutService:
                                (organisation_id, offset['id']))
             tx.execute("UPDATE payroll_payout_batches SET status='Cancelled',reversal_batch_id=? WHERE organisation_id=? AND id=?",
                        (reversal_id, organisation_id, batch_id))
+            if batch['payout_type'] == 'withholding':
+                tx.execute("UPDATE payroll_withholding_payout_batches SET status='Cancelled' WHERE organisation_id=? AND payout_batch_id=?",
+                           (organisation_id, batch_id))
             audit(tx, organisation_id, actor, 'payroll.payout.cancelled', 'payroll_payout_batch', batch_id,
                   {'reversal_batch_id': reversal_id})
             return self.get(organisation_id, batch_id, tx=tx)
@@ -332,6 +447,10 @@ class PayoutService:
             raise KeyError('Payout not found')
         batch['lines'] = tx.rows('SELECT * FROM payroll_payout_lines WHERE organisation_id=? AND payout_batch_id=? ORDER BY employee_id', (organisation_id, batch_id))
         batch['offsets'] = tx.rows('SELECT * FROM payroll_receivable_offsets WHERE organisation_id=? AND payout_batch_id=? ORDER BY created_at,id', (organisation_id, batch_id))
+        batch['withholding_lines'] = tx.rows('SELECT l.*,r.name recipient_name,r.reference_number FROM payroll_withholding_payout_lines l '
+            'JOIN payroll_withholding_payout_batches w ON w.organisation_id=l.organisation_id AND w.id=l.withholding_payout_id '
+            'JOIN payroll_withholding_recipients r ON r.organisation_id=l.organisation_id AND r.id=l.recipient_id '
+            'WHERE w.organisation_id=? AND w.payout_batch_id=? ORDER BY r.name,l.id', (organisation_id, batch_id))
         return batch
 
     def get(self, organisation_id, batch_id, *, tx=None):

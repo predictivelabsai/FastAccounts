@@ -217,18 +217,25 @@ class PaymentOrderService:
                 raise ValueError('Choose an active debtor bank account with a valid IBAN')
             run = tx.one('SELECT period FROM pay_runs WHERE organisation_id=? AND id=?',
                          (organisation_id, batch['pay_run_id']))
-            lines = tx.rows('SELECT l.*,e.name employee_name FROM payroll_payout_lines l '
-                            'JOIN employees e ON e.organisation_id=l.organisation_id AND e.id=l.employee_id '
-                            'WHERE l.organisation_id=? AND l.payout_batch_id=? ORDER BY l.employee_id,l.id',
-                            (organisation_id, payout_id))
-        invalid = [f"{line['account_owner'] or line['employee_name']} ({'missing' if not line['iban'] else 'invalid'} IBAN)"
+            if batch['payout_type'] == 'withholding':
+                lines = tx.rows('SELECT l.*,r.name recipient_name FROM payroll_withholding_payout_lines l '
+                    'JOIN payroll_withholding_payout_batches w ON w.organisation_id=l.organisation_id AND w.id=l.withholding_payout_id '
+                    'JOIN payroll_withholding_recipients r ON r.organisation_id=l.organisation_id AND r.id=l.recipient_id '
+                    'WHERE w.organisation_id=? AND w.payout_batch_id=? ORDER BY r.name,l.id', (organisation_id, payout_id))
+                remittance = None
+            else:
+                lines = tx.rows('SELECT l.*,e.name employee_name FROM payroll_payout_lines l '
+                                'JOIN employees e ON e.organisation_id=l.organisation_id AND e.id=l.employee_id '
+                                'WHERE l.organisation_id=? AND l.payout_batch_id=? ORDER BY l.employee_id,l.id',
+                                (organisation_id, payout_id))
+                remittance = self._salary_remittance(run['period'], org.get('language') or 'en')
+        invalid = [f"{line.get('account_owner') or line.get('recipient_name') or line.get('employee_name')} ({'missing' if not line['iban'] else 'invalid'} IBAN)"
                    for line in lines if not self._valid_iban(line['iban'])]
         if invalid:
-            raise ValueError('Missing or invalid employee IBANs: ' + ', '.join(invalid))
+            raise ValueError('Missing or invalid recipient IBANs: ' + ', '.join(invalid))
         if not lines:
             raise ValueError('Payroll payout has no payment lines')
         total = sum((money(line['amount']) for line in lines), Decimal('0'))
-        remittance = self._salary_remittance(run['period'], org.get('language') or 'en')
         ET.register_namespace('', PAIN_NS)
         root = ET.Element(f'{{{PAIN_NS}}}Document')
         initiation = _element(root, 'CstmrCdtTrfInitn')
@@ -255,7 +262,7 @@ class PaymentOrderService:
             transfer = _element(info, 'CdtTrfTxInf')
             _element(_element(transfer, 'PmtId'), 'EndToEndId', line['id'].replace('-', '')[:35])
             _element(_element(transfer, 'Amt'), 'InstdAmt', f"{money(line['amount']):.2f}", Ccy='EUR')
-            _element(_element(transfer, 'Cdtr'), 'Nm', line['account_owner'] or line['employee_name'])
+            _element(_element(transfer, 'Cdtr'), 'Nm', line.get('account_owner') or line.get('recipient_name') or line.get('employee_name'))
             _element(_element(_element(transfer, 'CdtrAcct'), 'Id'), 'IBAN', re.sub(r'\s+', '', line['iban']).upper())
-            _element(_element(transfer, 'RmtInf'), 'Ustrd', remittance)
+            _element(_element(transfer, 'RmtInf'), 'Ustrd', (line.get('description') or remittance)[:140])
         return ET.tostring(root, encoding='utf-8', xml_declaration=True)
