@@ -115,9 +115,37 @@ def test_component_catalogue_upgrade_preserves_defaults_and_posted_payroll(tmp_p
 
 def test_empty_migration_is_idempotent(tmp_path):
     db = Database(path=str(tmp_path / "empty.sqlite"))
-    assert db.migrate() == ["0001_accounting_core", "0002_integrations", "0003_operations", "0004_document_immutability", "0005_payroll", "0006_payroll_part_time_hourly", "0007_automation", "0008_import_staging", "0009_local_accounts", "0010_tsd_export", "0011_account_mappings", "0012_external_gl", "0013_sync_review", "0014_sync_push", "0015_payment_orders", "0016_bank_feed_schedules", "0017_prepayments", "0018_fixed_assets", "0019_master_data_import", "0020_quotes", "0021_periodisation", "0022_payment_links", "0023_analytical_objects", "0024_reminder_rules", "0025_fx_realised", "0026_fx_revaluations", "0027_mfa", "0028_document_settings", "0029_copilot", "0030_master_data_maintenance", "0031_master_data_groups", "0032_copilot_access", "0033_copilot_settings", "0034_payroll_demo_fixes", "0035_payroll_income_line", "0036_payroll_component_catalogue", "0037_employee_tax_settings", "0038_payroll_payday_rules", "0039_payroll_payouts", "0040_payroll_settlement_dates", "0041_payroll_sepa_details", "0042_payroll_component_metadata", "0043_payroll_absences", "0044_payroll_absence_day_freeze", "0045_payroll_history", "0046_payroll_absence_pay", "0047_payroll_absence_payouts", "0048_payroll_component_breakdown", "0049_payroll_component_source", "0050_payroll_history_import", "0051_payroll_leave_liability", "0052_payroll_tsd_payment_types", "0053_payroll_tsd_base_snapshot", "0054_payroll_tsd_lines", "0055_tsd_apa_history", "0056_payroll_corrections", "0057_payroll_employee_receivables", "0058_payroll_receivable_offset_accounts", "0059_tsd_apa_operation_history", "0060_payroll_run_lineage_tenancy", "0061_payroll_payout_tsd_lines", "0062_payroll_run_lineage_parent_guard", "0063_payroll_pay_type_methods", "0064_payroll_withholdings", "0065_payroll_reports_delivery", "0066_payroll_palk_unmapped"]
+    assert db.migrate() == ["0001_accounting_core", "0002_integrations", "0003_operations", "0004_document_immutability", "0005_payroll", "0006_payroll_part_time_hourly", "0007_automation", "0008_import_staging", "0009_local_accounts", "0010_tsd_export", "0011_account_mappings", "0012_external_gl", "0013_sync_review", "0014_sync_push", "0015_payment_orders", "0016_bank_feed_schedules", "0017_prepayments", "0018_fixed_assets", "0019_master_data_import", "0020_quotes", "0021_periodisation", "0022_payment_links", "0023_analytical_objects", "0024_reminder_rules", "0025_fx_realised", "0026_fx_revaluations", "0027_mfa", "0028_document_settings", "0029_copilot", "0030_master_data_maintenance", "0031_master_data_groups", "0032_copilot_access", "0033_copilot_settings", "0034_payroll_demo_fixes", "0035_payroll_income_line", "0036_payroll_component_catalogue", "0037_employee_tax_settings", "0038_payroll_payday_rules", "0039_payroll_payouts", "0040_payroll_settlement_dates", "0041_payroll_sepa_details", "0042_payroll_component_metadata", "0043_payroll_absences", "0044_payroll_absence_day_freeze", "0045_payroll_history", "0046_payroll_absence_pay", "0047_payroll_absence_payouts", "0048_payroll_component_breakdown", "0049_payroll_component_source", "0050_payroll_history_import", "0051_payroll_leave_liability", "0052_payroll_tsd_payment_types", "0053_payroll_tsd_base_snapshot", "0054_payroll_tsd_lines", "0055_tsd_apa_history", "0056_payroll_corrections", "0057_payroll_employee_receivables", "0058_payroll_receivable_offset_accounts", "0059_tsd_apa_operation_history", "0060_payroll_run_lineage_tenancy", "0061_payroll_payout_tsd_lines", "0062_payroll_run_lineage_parent_guard", "0063_payroll_pay_type_methods", "0064_payroll_withholdings", "0065_payroll_reports_delivery", "0066_payroll_palk_unmapped", "0067_payroll_contracts"]
     assert db.migrate() == []
     assert db.scalar("SELECT COUNT(*) FROM schema_migrations") == len(catalogue())
+
+
+def test_contract_migration_backfills_pay_bases_and_preserves_employees(tmp_path, legacy_payroll):
+    from database import MIGRATIONS
+    db = Database(path=str(tmp_path / 'contracts-backfill.sqlite'))
+    old = tmp_path / 'contracts-old' / 'sqlite'
+    old.mkdir(parents=True)
+    from shutil import copyfile
+    for path in (MIGRATIONS / 'sqlite').glob('*.sql'):
+        if path.stem < '0067':
+            copyfile(path, old / path.name)
+    db.migrate(migrations=old.parent)
+    org = OrganisationService(db).create(name='Contract backfill', country_code='EE', entity_type='EE_OU',
+                                         owner_email='owner@example.test')
+    legacy_payroll(db, org['id'], name='Monthly', gross='2000')
+    with db.transaction() as tx:
+        tx.execute("INSERT INTO employees(id,organisation_id,name,gross_salary,board_member,pay_basis,funded_pension_percent,created_at) VALUES ('board',?,'Board',500,1,'board_fee',0,'2026-01-01')", (org['id'],))
+        tx.execute("INSERT INTO employees(id,organisation_id,name,gross_salary,board_member,pay_basis,funded_pension_percent,created_at) VALUES ('service',?,'Service',NULL,0,'income_line',2,'2026-01-01')", (org['id'],))
+    before = db.rows('SELECT id,organisation_id,name,pay_basis,gross_salary,hourly_rate FROM employees ORDER BY id')
+    assert db.migrate() == ['0067_payroll_contracts']
+    after = db.rows('SELECT id,organisation_id,name,pay_basis,gross_salary,hourly_rate FROM employees ORDER BY id')
+    assert after == before
+    contracts = {r['employee_id']: r for r in db.rows('SELECT * FROM payroll_contracts WHERE organisation_id=?', (org['id'],))}
+    assert {key: contracts[key]['contract_type'] for key in ('legacy-employee', 'board', 'service')} == {
+        'legacy-employee': 'employment', 'board': 'board_member', 'service': 'services'}
+    agreements = db.rows('SELECT contract_id,base_pay_type,rate FROM payroll_salary_agreements WHERE organisation_id=?', (org['id'],))
+    assert len(agreements) == 3
+    assert db.rows('PRAGMA foreign_key_check') == []
     assert db.scalar(
         "SELECT COUNT(*) FROM sqlite_master WHERE type='table' "
         "AND name IN ('account_mappings','external_gl_entries')"
@@ -159,7 +187,7 @@ def test_historical_migration_catalogue_does_not_affect_other_databases(tmp_path
         current_setup = pool.submit(current.migrate)
         assert old_setup.result() == sorted(versions)
         latest = current_setup.result()
-    assert latest[-1] == '0066_payroll_palk_unmapped'
+    assert latest[-1] == '0067_payroll_contracts'
     assert legacy.scalar('SELECT COUNT(*) FROM schema_migrations') == 5
     assert current.scalar('SELECT COUNT(*) FROM schema_migrations') == len(catalogue())
     assert legacy.migrate() == latest[5:]
