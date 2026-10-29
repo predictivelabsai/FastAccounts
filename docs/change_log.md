@@ -4,16 +4,21 @@ Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as
 delivered.
 
-## 2026-10-28: Payroll withholdings (Build 7 in progress)
+## 2026-10-29: Payroll withholdings (Build 7 complete)
 
 - Added migration 0064 for tenant-scoped withholding recipients, agreements,
   run-line snapshots and payout records. Added Decimal method/cap helpers and
   recipient/agreement services with IBAN validation and audit entries.
 - Added role-checked, CSRF-protected recipient and agreement API endpoints and a
   period report query.
-- Run generation, third-pillar TSD records, payout posting and SEPA, XLSX,
-  workspace UI, translations and remaining acceptance tests are still open.
-  Do not mark Build 7 complete. See `payroll_withholdings_validation.md`.
+- Draft runs generate capped, net-limited withholding lines and expose reduced
+  garnishment warnings. Recipient payouts post the liability and support SEPA
+  pain.001 download. Added period reports with Excel export.
+- Added recipient/agreement management, payout actions, run previews and report
+  exports to the workspace, with en/et/lv/lt labels and browser coverage.
+  Focused workspace, locale, payout, report, integration and migration suites
+  pass. Accountant confirmation remains open for garnishment exceptions and
+  third-pillar TSD treatment. See `payroll_withholdings_validation.md`.
 
 ## 2026-10-28: Payroll pay-type methods (Build 6 complete)
 

@@ -535,7 +535,7 @@ class PayrollService:
             item['board_member'] = bool(item['board_member'])
             item['withholdings'] = [dict(row) for row in tx.rows(
                 'SELECT * FROM payroll_withholding_run_lines WHERE organisation_id=? AND pay_run_item_id=? ORDER BY id',
-                (organisation_id, item['id']))]
+                (organisation_id, item['id']))] if tx.table_exists('payroll_withholding_run_lines') else []
             for line in item['withholdings']:
                 line['amount'] = db_number(money(line['amount']))
             item['withholding_warnings'] = [line['description'] for line in item['withholdings']
@@ -839,8 +839,9 @@ class PayrollService:
             required = money(decimal(item.get('minimum_wage') or hourly_minimum) * worked)
         if amounts['gross'] < required and not is_adjustable:
             raise ValueError('Payment components must preserve the minimum wage')
-        tx.execute('DELETE FROM payroll_withholding_run_lines WHERE organisation_id=? AND pay_run_id=? AND pay_run_item_id=? AND generated=1',
-                   (organisation_id, run_id, item_id))
+        if tx.table_exists('payroll_withholding_run_lines'):
+            tx.execute('DELETE FROM payroll_withholding_run_lines WHERE organisation_id=? AND pay_run_id=? AND pay_run_item_id=? AND generated=1',
+                       (organisation_id, run_id, item_id))
         withholding_minimum, _ = minimum_wage(run['period'])
         withholding = PayrollWithholdingService.generate_for_item(
             tx, organisation_id, run, item, gross=amounts['gross'], net=amounts['net'],
@@ -1108,8 +1109,11 @@ class PayrollService:
             run = self._run(tx, organisation_id, run_id)
             if claimed.rowcount != 1:
                 raise PayrollConflict('Pay run is already approved')
-            for line in tx.rows('SELECT agreement_id,amount FROM payroll_withholding_run_lines WHERE organisation_id=? AND pay_run_id=? AND generated=1',
-                                (organisation_id, run_id)):
+            withholding_lines = tx.rows(
+                'SELECT agreement_id,amount FROM payroll_withholding_run_lines WHERE organisation_id=? AND pay_run_id=? AND generated=1',
+                (organisation_id, run_id)
+            ) if tx.table_exists('payroll_withholding_run_lines') else []
+            for line in withholding_lines:
                 tx.execute('UPDATE payroll_withholding_agreements SET withheld_to_date=withheld_to_date+?,updated_at=? '
                            'WHERE organisation_id=? AND id=?',
                            (line['amount'], utc_now(), organisation_id, line['agreement_id']))
@@ -1322,7 +1326,8 @@ class PayrollService:
             if claimed.rowcount != 1:
                 raise PayrollConflict('Only draft pay runs can be deleted')
             tx.execute('DELETE FROM payroll_absence_run_items WHERE organisation_id=? AND pay_run_id=?', (organisation_id, run_id))
-            tx.execute('DELETE FROM payroll_withholding_run_lines WHERE organisation_id=? AND pay_run_id=?', (organisation_id, run_id))
+            if tx.table_exists('payroll_withholding_run_lines'):
+                tx.execute('DELETE FROM payroll_withholding_run_lines WHERE organisation_id=? AND pay_run_id=?', (organisation_id, run_id))
             for table in ('pay_item_components', 'pay_item_context'):
                 tx.execute(f'DELETE FROM {table} WHERE organisation_id=? AND item_id IN (SELECT id FROM pay_run_items WHERE organisation_id=? AND pay_run_id=?)', (organisation_id, organisation_id, run_id))
             tx.execute('DELETE FROM pay_run_items WHERE organisation_id=? AND pay_run_id=?', (organisation_id, run_id))

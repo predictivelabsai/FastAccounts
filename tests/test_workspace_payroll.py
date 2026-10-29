@@ -23,12 +23,15 @@ def test_settings_payment_types_create_edit_and_payroll_reuse(monkeypatch, db, e
         html = client.get('/auth/test?email=' + actor).text
         browser = runtime.chromium.launch()
         page = browser.new_page(viewport={'width': 375, 'height': 844})
+        page.set_default_timeout(15000)
         page.on('pageerror', lambda error: errors.append(str(error)))
 
         def respond(route):
-            path = urlsplit(route.request.url).path
+            parsed = urlsplit(route.request.url)
+            path = parsed.path
             if path.startswith('/api/'):
-                response = client.request(route.request.method, path, content=route.request.post_data,
+                target = path + ('?' + parsed.query if parsed.query else '')
+                response = client.request(route.request.method, target, content=route.request.post_data,
                     headers={'X-Test-User': actor, 'Content-Type': 'application/json'})
                 return route.fulfill(status=response.status_code, body=response.content,
                     content_type=response.headers.get('content-type', 'application/json'))
@@ -63,7 +66,18 @@ def test_settings_payment_types_create_edit_and_payroll_reuse(monkeypatch, db, e
         assert next(t for t in types if t['name'] == 'Synthetic edited category')['preset_key'] is None
         page.evaluate("location.hash = 'payroll'")
         page.get_by_role('button', name=labels['Payment types'], exact=True).click()
-        playwright.expect(page.get_by_role('dialog')).to_contain_text('Synthetic edited category')
+        payment_types_dialog = page.get_by_role('dialog')
+        playwright.expect(payment_types_dialog).to_contain_text('Synthetic edited category')
+        payment_types_dialog.get_by_role('button', name=labels['Close']).click()
+        page.get_by_role('button', name=labels['Withholdings'], exact=True).click()
+        assert not errors, errors
+        withholding_dialog = page.get_by_role('dialog', name=labels['Withholdings'])
+        playwright.expect(withholding_dialog).to_contain_text(labels['Withholding recipients'])
+        playwright.expect(withholding_dialog).to_contain_text(labels['Withholding agreements'])
+        playwright.expect(withholding_dialog).to_contain_text(labels['Withholding report'])
+        playwright.expect(withholding_dialog).to_contain_text(labels['Withholding payouts report'])
+        playwright.expect(withholding_dialog.get_by_role('button', name=labels['Add recipient'], exact=True)).to_be_visible()
+        playwright.expect(withholding_dialog.get_by_role('button', name=labels['Add agreement'], exact=True)).to_be_visible()
         assert not errors
         browser.close()
 
@@ -86,6 +100,7 @@ def test_payroll_absences_register_can_create_localised_leave(monkeypatch, db, e
         html = client.get('/auth/test?email=' + actor).text
         browser = runtime.chromium.launch()
         page = browser.new_page(viewport={'width': 900, 'height': 900})
+        page.set_default_timeout(15000)
         page.on('pageerror', lambda error: errors.append(str(error)))
 
         def respond(route):
@@ -153,6 +168,7 @@ def test_payslip_accessible_names_include_employee(monkeypatch, language):
     with playwright.sync_playwright() as runtime:
         browser = runtime.chromium.launch()
         page = browser.new_page(viewport={'width': 375, 'height': 844})
+        page.set_default_timeout(15000)
 
         def respond(route):
             path = urlsplit(route.request.url).path
@@ -353,6 +369,7 @@ def test_bureau_employee_lifecycle_draft_components_and_declarations(db, ee_org,
         html = client.get('/auth/test?email=' + actor).text
         browser = runtime.chromium.launch()
         page = browser.new_page(viewport={'width': 375, 'height': 844})
+        page.set_default_timeout(15000)
         page.on('pageerror', lambda error: errors.append(str(error)))
 
         def respond(route):

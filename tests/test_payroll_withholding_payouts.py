@@ -107,3 +107,31 @@ def test_withholding_pain001_uses_recipient_iban_and_references(db, ee_org):
     assert root.findtext('.//p:CdtTrfTxInf/p:Cdtr/p:Nm', namespaces=ns) == 'Court office'
     assert root.findtext('.//p:CdtTrfTxInf/p:CdtrAcct/p:Id/p:IBAN', namespaces=ns) == IBAN
     assert root.findtext('.//p:CdtTrfTxInf/p:RmtInf/p:Ustrd', namespaces=ns) == 'First employee: Enforcement order; Second employee: Enforcement order'
+
+
+def test_withholding_payout_route_checks_csrf_role_and_tenant(db, ee_org, monkeypatch):
+    from fastapi.testclient import TestClient
+    from api_app import User, api, current_user
+    from organisations import OrganisationService
+    from web_app import app
+
+    monkeypatch.setenv('FASTACCOUNTS_DB', db.path)
+    monkeypatch.setenv('DB_URL', '')
+    run, _ = approved_run(db, ee_org)
+    other = OrganisationService(db).create(name='Other synthetic payroll', country_code='EE',
+        entity_type='EE_OU', owner_email='other@example.test')
+    api.dependency_overrides[current_user] = lambda: User(email=ACTOR)
+    client = TestClient(app)
+    try:
+        base = f"/api/organisations/{ee_org['id']}"
+        token = client.get('/api/csrf').json()['csrf_token']
+        path = f"{base}/pay-runs/{run['id']}/payouts"
+        assert client.post(path, json={'payout_type': 'withholding'}).status_code == 403
+        created = client.post(path, json={'payout_type': 'withholding'}, headers={'X-CSRF-Token': token})
+        assert created.status_code == 201, created.text
+        assert client.get(f"/api/organisations/{other['id']}/payroll/payouts/{created.json()['id']}").status_code == 403
+        with db.transaction() as tx:
+            tx.execute("UPDATE memberships SET role='viewer' WHERE organisation_id=? AND email=?", (ee_org['id'], ACTOR))
+        assert client.post(path, json={'payout_type': 'withholding'}, headers={'X-CSRF-Token': token}).status_code == 403
+    finally:
+        api.dependency_overrides.clear()

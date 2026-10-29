@@ -75,7 +75,27 @@ recipient and agreement services.
 - No migration was needed: the run-line schema already carries the generated
   flag, agreement link, amount and description used by this integration.
 
-Remaining scope is recipient payouts + SEPA, reports and UI/locales.
+## Build 7 completion (2026-10-29)
 
-No full test run, live network operation or PostgreSQL migration run was done.
-The full suite running in the separate worktree was not inspected or changed.
+- Added recipient and agreement CRUD in the payroll workspace, including
+  withheld-to-date and cap values, period reports and Excel exports.
+- Draft pay-run rows show generated withholding lines and reduced-to-limit
+  warnings. The payout dialog can create a recipient payout, mark it paid,
+  cancel it and download SEPA pain.001 files.
+- Added en/et/lv/lt labels and browser coverage for the Withholdings tab. The
+  browser request mock now preserves query strings, which the period report
+  endpoints require. Dialog loading feedback appears while report data loads.
+- Pay-run reads tolerate pre-0064 databases that do not yet have the new run
+  lines table; this preserves historical migration backfill test coverage.
+- Requested focused suites passed individually: workspace payroll (17), i18n
+  (19), withholding methods (7), withholding integration (6), withholding
+  payouts (5), withholding reports (2), salary payouts (7), and migrations and
+  tenancy (18). One existing fastcore deprecation warning appeared in the
+  workspace, i18n and payout suites.
+
+Build 7 implementation is complete. Accountant confirmation remains for
+order-specific garnishment exceptions, dependants and partial months; the 2026
+protected-income estimates; and third-pillar TSD treatment. Third-pillar entries
+remain net withholdings and do not change TSD lines pending that confirmation.
+No live network or production accounting data was used. PostgreSQL migration
+execution remains unverified in this environment.

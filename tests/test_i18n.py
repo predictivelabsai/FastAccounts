@@ -44,6 +44,29 @@ def test_absence_pay_workspace_labels_exist_in_all_supported_locales():
     assert estonian['Calculation'] == 'Arvutuskäik'
 
 
+def test_payroll_withholding_workspace_labels_exist_in_all_supported_locales():
+    labels = ('Withholdings', 'Withholding recipients', 'Withholding agreements', 'Cap',
+              'Withheld amount', 'Payment description', 'Alimony', 'Bailiff', 'Union fee',
+              'Third pillar contribution', 'Withholding report', 'Withholding payouts report',
+              'Withholding type', 'Withheld amount / cap', 'Create withholding payout')
+    for language in ('en', 'et', 'lv', 'lt'):
+        workspace = i18n.catalog(language)['workspace']
+        assert all(workspace.get(label, '').strip() for label in labels)
+    estonian = i18n.catalog('et')['workspace']
+    assert estonian['Withholdings'] == 'Kinnipidamised'
+    assert estonian['Withholding recipients'] == 'Kinnipidamiste saajad'
+    assert estonian['Withholding agreements'] == 'Kinnipidamiste kokkulepped'
+    assert estonian['Cap'] == 'Piirsumma'
+    assert estonian['Withheld amount'] == 'Kinnipeetud summa'
+    assert estonian['Payment description'] == 'Makse selgitus'
+    assert estonian['Alimony'] == 'Elatis'
+    assert estonian['Bailiff'] == 'Kohtutäitur'
+    assert estonian['Union fee'] == 'Ametiühingumaks'
+    assert estonian['Third pillar contribution'] == 'III samba sissemakse'
+    assert estonian['Withholding report'] == 'Kinnipidamiste aruanne'
+    assert estonian['Withholding payouts report'] == 'Kinnipidamiste väljamaksete aruanne'
+
+
 def test_tsd_workpaper_labels_exist_in_all_locales():
     labels = ('Income tax withheld', 'Social tax', 'UI', 'II pillar', 'Total payable',
               'Record count', 'Payment month', 'List', 'Group by payment type',

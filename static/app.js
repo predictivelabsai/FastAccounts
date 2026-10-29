@@ -2239,7 +2239,7 @@
             t("Payroll"),
             t("People, payslips and postings for this client."),
             button("Add employee", "employee") + button("Payout summary", "payoutSummary") +
-              button("Absences", "absences") + button("Leave liability", "leaveLiability") +
+            button("Withholdings", "withholdings") + button("Absences", "absences") + button("Leave liability", "leaveLiability") +
               (['owner','administrator'].includes(org?.role) ? button("Leave settings", "leaveSettings") : "") +
               button("Payment types", "paymentTypes") + button("Payroll accounts", "payrollAccounts") + button("Payday settings", "paydaySettings") +
               button("Run payroll for month", "run", true),
@@ -2312,6 +2312,7 @@
         leaveSettings: () => payrollLeaveSettingsDialog(c),
         payrollAccounts: () => payrollAccountsDialog(c),
         paydaySettings: () => paydaySettingsDialog(c),
+        withholdings: () => payrollWithholdingsDialog(c, employees || []),
         managePayouts: (b) => payrollPayoutsDialog(c, runs.find((run) => run.id === b.dataset.id), bankAccounts || []),
         createCorrection: async (b) => { await post(c.url(`/pay-runs/${b.dataset.id}/corrections`), {}); await render(); },
         createSupplementary: async (b) => {
@@ -4700,7 +4701,7 @@
     if (!run) return;
     const refresh = async () => api(c.url('/payroll/payouts') + `?run_id=${encodeURIComponent(run.id)}`);
     const renderBatches = (batches) => batches.length ? table(['Payout date', 'Status', 'Employees', 'Actions'], batches.map((batch) => row([
-      td(esc(batch.payout_date)), td(pill(batch.status)), td(num(batch.lines.length)),
+      td(esc(batch.payout_date)), td(pill(batch.status)), td(num(batch.payout_type === 'withholding' ? batch.withholding_lines.length : batch.lines.length)),
       td((batch.status === 'Draft' && batch.offsets?.some((offset) => offset.status === 'Proposed') ? button('Confirm offsets', 'confirmPayoutOffsets', false, `data-id="${batch.id}"`) : '') + (batch.status === 'Draft' && !batch.offsets?.some((offset) => offset.status === 'Proposed') ? button('Mark paid', 'payPayout', false, `data-id="${batch.id}"`) : '') + (batch.status !== 'Cancelled' ? button('Cancel payout', 'cancelPayout', false, `data-id="${batch.id}"`) : '') + (['Draft','Paid'].includes(batch.status) ? link('Download SEPA file', `/api${c.url(`/payroll/payouts/${batch.id}/pain001.xml`)}`) : '')),
     ]))) : `<p class="muted">${tr('No payouts for this run.')}</p>`;
     const renderOffsets = (batches) => {
@@ -4714,12 +4715,16 @@
     ])));
     const refreshSummary = async () => (await api(c.url('/payroll/payouts/summary') + `?run_id=${encodeURIComponent(run.id)}`))[0];
     const employeeSummary = renderEmployeeSummary(await refreshSummary());
-    const d = dialog('Payroll payouts', `<p>${tr('Pay run')} ${esc(run.period)}</p><div data-payout-summary>${employeeSummary}</div><div data-payout-list>${renderBatches(batches)}${renderOffsets(batches)}</div>${field('Payout date','payout_date',run.payment_date,'date','required')}${button('Create salary payout', 'createPayout', true)}<div data-payout-bank>${bankOptions.length ? select('Bank account', 'bank_account_id', bankOptions, bankOptions[0][0]) : `<p class="notice">${tr('Add an active bank account first.')}</p>`}</div>`);
+    const d = dialog('Payroll payouts', `<p>${tr('Pay run')} ${esc(run.period)}</p><div data-payout-summary>${employeeSummary}</div><div data-payout-list>${renderBatches(batches)}${renderOffsets(batches)}</div>${field('Payout date','payout_date',run.payment_date,'date','required')}${button('Create salary payout', 'createPayout', true)} ${button('Create withholding payout', 'createWithholdingPayout')}<div data-payout-bank>${bankOptions.length ? select('Bank account', 'bank_account_id', bankOptions, bankOptions[0][0]) : `<p class="notice">${tr('Add an active bank account first.')}</p>`}</div>`);
     d.querySelector('[data-action="createPayout"]').onclick = async () => {
       await post(c.url(`/pay-runs/${run.id}/payouts`), {payout_type: 'salary', payout_date: d.querySelector('[name="payout_date"]').value, bank_account_id: d.querySelector('[name="bank_account_id"]')?.value || null});
       batches = await refresh(); d.querySelector('[data-payout-list]').innerHTML = renderBatches(batches) + renderOffsets(batches);
       d.querySelector('[data-payout-summary]').innerHTML = renderEmployeeSummary(await refreshSummary());
       bindPayoutActions();
+    };
+    d.querySelector('[data-action="createWithholdingPayout"]').onclick = async () => {
+      await post(c.url(`/pay-runs/${run.id}/payouts`), {payout_type: 'withholding', payout_date: d.querySelector('[name="payout_date"]').value, bank_account_id: d.querySelector('[name="bank_account_id"]')?.value || null});
+      batches = await refresh(); d.querySelector('[data-payout-list]').innerHTML = renderBatches(batches) + renderOffsets(batches); bindPayoutActions();
     };
     const bindPayoutActions = () => {
       d.querySelectorAll('[data-action="confirmPayoutOffsets"]').forEach((buttonEl) => buttonEl.onclick = async () => {
@@ -4773,6 +4778,112 @@
       await post(c.url('/payroll/payday-settings'), data, 'PUT');
       await saved(d);
     });
+  }
+  async function payrollWithholdingsDialog(c, employees) {
+    const canWrite = ['owner', 'administrator', 'accountant'].includes(org?.role);
+    const types = [['alimony', 'Alimony'], ['bailiff', 'Bailiff'], ['union_fee', 'Union fee'],
+      ['agreed_deduction', 'Agreed deduction'], ['third_pillar', 'Third pillar contribution']];
+    const methods = [['fixed_sum', 'Fixed sum'], ['percent_of_gross', 'Percentage of gross'],
+      ['sum_x_qty', 'Sum times quantity'], ['third_pillar_net', 'Third pillar net']];
+    let d;
+    const render = async () => {
+      if (d) closeDialog(d);
+      d = dialog('Withholdings', `<p class="muted">${tr('Loading withholdings…')}</p>`);
+      const [recipients, agreements] = await Promise.all([
+        api(c.url('/payroll/withholding-recipients')),
+        api(c.url('/payroll/withholding-agreements')),
+      ]);
+      const period = new Date().toISOString().slice(0, 7);
+      const report = await api(c.url(`/payroll/withholdings?start=${period}&end=${period}`));
+      const payoutReport = await api(c.url(`/payroll/withholding-payouts?start=${period}&end=${period}`));
+      const recipientRows = recipients.map((item) => row([
+        td(`<strong>${esc(item.name)}</strong><small>${esc(item.registry_code)} · ${esc(item.iban)}</small>`),
+        td(esc(item.reference_number || '')),
+        td(pill(item.active ? 'Active' : 'Archived')),
+        td(canWrite && item.active ? button('Edit', 'editRecipient', false, `data-id="${esc(item.id)}"`) + button('Archive', 'archiveRecipient', false, `data-id="${esc(item.id)}"`) : ''),
+      ]));
+      const agreementRows = agreements.map((item) => row([
+        td(`<strong>${esc(item.employee_name)}</strong><small>${esc(item.recipient_name)}</small>`),
+        td(tr(types.find(([key]) => key === item.component_type)?.[1] || item.component_type)),
+        td(`${esc(item.withheld_to_date || '0.00')} / ${item.total_cap == null ? tr('No cap') : esc(item.total_cap)}`, 'numeric'),
+        td(pill(item.active ? 'Active' : 'Archived')),
+        td(canWrite && item.active ? button('Edit', 'editAgreement', false, `data-id="${esc(item.id)}"`) + button('Archive', 'archiveAgreement', false, `data-id="${esc(item.id)}"`) : ''),
+      ]));
+      const reportRows = (report.rows || []).map((item) => row([
+        td(esc(item.employee_name)), td(esc(item.recipient_name)),
+        td(tr(types.find(([key]) => key === item.component_type)?.[1] || item.component_type)), cash(item.amount, 'EUR'),
+      ]));
+      const payoutRows = (payoutReport.rows || []).map((item) => row([
+        td(esc(item.period)), td(esc(item.payout_date)), td(esc(item.recipient_name)),
+        td(pill(item.status)), cash(item.amount, 'EUR'),
+      ]));
+      const query = `start=${period}&end=${period}`;
+      closeDialog(d);
+      d = dialog('Withholdings', `<section class="section"><div class="section-head"><h3>${tr('Withholding recipients')}</h3>${canWrite ? button('Add recipient', 'addRecipient', true) : ''}</div>${table(['Recipient', 'Reference number', 'Status', 'Actions'], recipientRows)}</section>
+        <section class="section"><div class="section-head"><h3>${tr('Withholding agreements')}</h3>${canWrite ? button('Add agreement', 'addAgreement', true) : ''}</div>${table(['Employee and recipient', 'Withholding type', 'Withheld amount / cap', 'Status', 'Actions'], agreementRows)}</section>
+        <section class="section"><div class="section-head"><h3>${tr('Withholding report')}</h3><span>${field('Start period', 'withholding_start', period, 'month')} ${field('End period', 'withholding_end', period, 'month')}</span></div><div data-withholding-report>${table(['Employee', 'Recipient', 'Withholding type', 'Amount'], reportRows)}<p><strong>${tr('Total')}: ${esc(money(report.total, 'EUR'))}</strong></p><a class="button" data-withholding-xlsx href="/api${c.url(`/payroll/withholdings.xlsx?${query}`)}">${tr('Export Excel')}</a></div></section>
+        <section class="section"><h3>${tr('Withholding payouts report')}</h3><div data-withholding-payout-report>${table(['Period', 'Payout date', 'Recipient', 'Status', 'Amount'], payoutRows)}<p><strong>${tr('Total')}: ${esc(money(payoutReport.total, 'EUR'))}</strong></p><a class="button" data-withholding-payout-xlsx href="/api${c.url(`/payroll/withholding-payouts.xlsx?${query}`)}">${tr('Export Excel')}</a></div></section>`);
+      const refreshReports = async () => {
+        const start = d.querySelector('[name="withholding_start"]').value;
+        const end = d.querySelector('[name="withholding_end"]').value;
+        const search = `start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
+        const [withholdings, payouts] = await Promise.all([
+          api(c.url(`/payroll/withholdings?${search}`)), api(c.url(`/payroll/withholding-payouts?${search}`)),
+        ]);
+        d.querySelector('[data-withholding-report]').innerHTML = `${table(['Employee', 'Recipient', 'Withholding type', 'Amount'], (withholdings.rows || []).map((item) => row([td(esc(item.employee_name)), td(esc(item.recipient_name)), td(tr(types.find(([key]) => key === item.component_type)?.[1] || item.component_type)), cash(item.amount, 'EUR')])))}<p><strong>${tr('Total')}: ${esc(money(withholdings.total, 'EUR'))}</strong></p><a class="button" href="/api${c.url(`/payroll/withholdings.xlsx?${search}`)}">${tr('Export Excel')}</a>`;
+        d.querySelector('[data-withholding-payout-report]').innerHTML = `${table(['Period', 'Payout date', 'Recipient', 'Status', 'Amount'], (payouts.rows || []).map((item) => row([td(esc(item.period)), td(esc(item.payout_date)), td(esc(item.recipient_name)), td(pill(item.status)), cash(item.amount, 'EUR')])))}<p><strong>${tr('Total')}: ${esc(money(payouts.total, 'EUR'))}</strong></p><a class="button" href="/api${c.url(`/payroll/withholding-payouts.xlsx?${search}`)}">${tr('Export Excel')}</a>`;
+      };
+      d.querySelectorAll('[name="withholding_start"],[name="withholding_end"]').forEach((input) => input.onchange = refreshReports);
+      bindActions(d, {
+        addRecipient: () => recipientForm(),
+        editRecipient: (buttonEl) => recipientForm(recipients.find((item) => item.id === buttonEl.dataset.id)),
+        archiveRecipient: (buttonEl) => confirmAction('Archive recipient', tr('Archive this withholding recipient?'), async () => {
+          await post(c.url(`/payroll/withholding-recipients/${buttonEl.dataset.id}`), undefined, 'DELETE'); await render();
+        }),
+        addAgreement: () => agreementForm(),
+        editAgreement: (buttonEl) => agreementForm(agreements.find((item) => item.id === buttonEl.dataset.id)),
+        archiveAgreement: (buttonEl) => confirmAction('Archive agreement', tr('Archive this withholding agreement?'), async () => {
+          await post(c.url(`/payroll/withholding-agreements/${buttonEl.dataset.id}`), undefined, 'DELETE'); await render();
+        }),
+      });
+      function recipientForm(existing) {
+        const editor = dialog('Withholding recipients', form(
+          field('Name', 'name', existing?.name || '', 'text', 'required maxlength="180"') +
+          field('Registry code', 'registry_code', existing?.registry_code || '', 'text', 'required maxlength="40"') +
+          field('IBAN', 'iban', existing?.iban || '', 'text', 'required maxlength="34"') +
+          field('Reference number', 'reference_number', existing?.reference_number || '', 'text', 'maxlength="100"') +
+          field('Payment description', 'default_description', existing?.default_description || '', 'text', 'maxlength="140"'), 'Save recipient'));
+        bindForm(editor, async (data) => {
+          data.reference_number = data.reference_number || null;
+          await post(c.url(`/payroll/withholding-recipients${existing ? `/${existing.id}` : ''}`), data, existing ? 'PUT' : 'POST');
+          closeDialog(editor); await render();
+        });
+      }
+      function agreementForm(existing) {
+        const activeEmployees = employees.filter((item) => item.active);
+        const activeRecipients = recipients.filter((item) => item.active);
+        const editor = dialog('Withholding agreements', form(
+          select('Employee', 'employee_id', activeEmployees.map((item) => [item.id, item.name]), existing?.employee_id) +
+          select('Withholding recipients', 'recipient_id', activeRecipients.map((item) => [item.id, item.name]), existing?.recipient_id) +
+          select('Withholding type', 'component_type', types.map(([key, label]) => [key, tr(label)]), existing?.component_type || 'agreed_deduction') +
+          select('Method', 'method', methods.map(([key, label]) => [key, tr(label)]), existing?.method || 'fixed_sum') +
+          field('Start date', 'start_date', existing?.start_date || new Date().toISOString().slice(0, 10), 'date', 'required') +
+          field('End date', 'end_date', existing?.end_date || '', 'date') +
+          field('Monthly amount', 'monthly_amount', existing?.monthly_amount || '', 'number', 'min="0" step="0.01"') +
+          field('Percentage', 'percentage', existing?.percentage || '', 'number', 'min="0" max="100" step="0.0001"') +
+          field('Quantity', 'quantity', existing?.quantity || '', 'number', 'min="0" step="0.0001"') +
+          field('Rate', 'rate', existing?.rate || '', 'number', 'min="0" step="0.0001"') +
+          field('Cap', 'total_cap', existing?.total_cap || '', 'number', 'min="0" step="0.01"') +
+          field('Payment description', 'payment_description', existing?.payment_description || '', 'text', 'maxlength="140"'), 'Save agreement'));
+        bindForm(editor, async (data) => {
+          data.end_date = data.end_date || null;
+          for (const key of ['monthly_amount', 'percentage', 'quantity', 'rate', 'total_cap']) data[key] = data[key] === '' ? null : Number(data[key]);
+          await post(c.url(`/payroll/withholding-agreements${existing ? `/${existing.id}` : ''}`), data, existing ? 'PUT' : 'POST');
+          closeDialog(editor); await render();
+        });
+      }
+    };
+    await render();
   }
   function payrollItemDialog(c, run, item, types) {
     const d = dialog("Edit draft pay", form(
@@ -4961,7 +5072,7 @@
       items.map((x, i) =>
         row([
           td(
-            `${esc(x.employee_name || x.name || x.employee?.name)}${hoursNote(x)}${partTime(x)}${componentSummary(x)}`,
+            `${esc(x.employee_name || x.name || x.employee?.name)}${hoursNote(x)}${partTime(x)}${componentSummary(x)}${x.withholdings?.length ? `<small>${tr('Withholdings')}: ${x.withholdings.map((line) => `${esc(line.description)} (${esc(money(line.amount, 'EUR'))})`).join('; ')}</small>` : ''}${x.withholding_warnings?.length ? `<small class="declaration-overdue">${x.withholding_warnings.map((warning) => esc(warning)).join('; ')}</small>` : ''}`,
           ),
           cash(x.gross ?? x.gross_salary, "EUR"),
           cash(x.income_tax, "EUR"),

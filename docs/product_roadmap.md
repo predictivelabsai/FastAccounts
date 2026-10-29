@@ -2221,14 +2221,16 @@ checks remain follow-ups. The paired change log records details.
   workpaper complete 4a. Resident payment classifications and upload format
   remain subject to accountant confirmation and EMTA validation.
 
-## Payroll withholdings (Build 7 in progress, 2026-10-28)
+## Payroll withholdings (Build 7 complete, 2026-10-29)
 
-Migration 0064 and tenant-scoped recipient/agreement CRUD are implemented, with
-Decimal rule helpers, a report query and role/CSRF-protected CRUD endpoints.
-Draft run integration, confirmed garnishment parameters, III pillar TSD
-calculation, payout posting/SEPA, XLSX, workspace UI and full locale/test
-coverage remain outstanding. Do not treat this build as complete. See
-`payroll_withholdings_validation.md` for the checkpoint and remaining work.
+Migration 0064, tenant-scoped recipient/agreement CRUD, Decimal withholding
+calculations, draft run generation and reduction warnings are implemented.
+Recipient payouts post against payroll liabilities and produce SEPA pain.001
+files; period reports have Excel exports. The workspace includes recipient and
+agreement management, payout actions, reports and en/et/lv/lt labels. Focused
+workspace, locale, payout, report, integration and migration tests pass.
+Accountant confirmation remains for garnishment exceptions and third-pillar TSD
+treatment. See `payroll_withholdings_validation.md` for validation details.
 
 ## Payroll pay-type methods (Build 6 complete, 2026-10-28)
 

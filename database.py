@@ -99,6 +99,15 @@ class Transaction:
             return row[0]
         return next(iter(row.values()))
 
+    def table_exists(self, name: str) -> bool:
+        """Check a table in the active schema for legacy migration reads."""
+        query = (
+            "SELECT 1 FROM pg_tables WHERE schemaname=current_schema() AND tablename=?"
+            if self.dialect == 'postgres' else
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?"
+        )
+        return self.one(query, (name,)) is not None
+
 
 class Database:
     def __init__(self, *, url: str = "", path: str = "", schema: str = "fast_accounts"):

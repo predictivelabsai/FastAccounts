@@ -166,6 +166,8 @@ class PayrollWithholdingService:
     @staticmethod
     def generate_for_item(tx, organisation_id, run, item, *, gross, net, minimum_wage):
         """Freeze active agreement deductions for a draft item and return total."""
+        if not tx.table_exists('payroll_withholding_agreements'):
+            return Decimal('0.00')
         period_start = run['period'] + '-01'
         period_end = run['period'] + '-31'
         agreements = tx.rows('SELECT a.*,r.name recipient_name FROM payroll_withholding_agreements a '
