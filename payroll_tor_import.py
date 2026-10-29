@@ -25,6 +25,13 @@ TYPES = {
     'services': 'services', 'toovotuleping': 'services', 'vooleping': 'services',
     'other': 'other', 'muu': 'other', 'none': 'none', 'lepingpuudub': 'none',
 }
+PARSE_ERRORS = {
+    'Personal code and name are required',
+    'Start Date must use YYYY-MM-DD',
+    'End Date must use YYYY-MM-DD',
+    'Unsupported contract type',
+    'Workload must be greater than 0 and at most 1, or a percentage',
+}
 
 
 def _key(value):
@@ -142,7 +149,9 @@ class TORImportService:
                     result['outcomes'].append({'row_id': row['id'], 'outcome': 'unchanged',
                                                'contract_id': row['applied_contract_id']})
                     continue
-                errors = json.loads(row['errors'])
+                # Retry transient match and employee conflicts after the tenant
+                # fixes source data. Keep only errors that originate in the CSV.
+                errors = [error for error in json.loads(row['errors']) if error in PARSE_ERRORS]
                 matches = tx.rows('SELECT * FROM employees WHERE organisation_id=? AND personal_id=? ORDER BY id',
                                   (organisation_id, row['personal_id'])) if row['personal_id'] else []
                 if len(matches) > 1:

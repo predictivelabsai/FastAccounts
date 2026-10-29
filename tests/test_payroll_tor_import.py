@@ -77,7 +77,7 @@ def test_tor_duplicate_personal_code_is_visible_and_blocks_apply(db, ee_org):
 
     payroll = PayrollService(db)
     payroll.save_employee(ee_org['id'], actor='owner@example.test', name='First', personal_id='49001010018', gross_salary='1800')
-    payroll.save_employee(ee_org['id'], actor='owner@example.test', name='Second', personal_id='49001010018', gross_salary='1900')
+    second_employee = payroll.save_employee(ee_org['id'], actor='owner@example.test', name='Second', personal_id='49001010018', gross_salary='1900')
     service = TORImportService(db)
     content = b'Personal code,Name,Start date,Contract type\n49001010018,Mari Tamm,2026-02-01,employment\n'
     staged = service.stage(ee_org['id'], content, actor='owner@example.test')
@@ -87,6 +87,10 @@ def test_tor_duplicate_personal_code_is_visible_and_blocks_apply(db, ee_org):
     refreshed = service.get(ee_org['id'], staged['id'])
     assert refreshed['status'] == 'review'
     assert refreshed['rows'][0]['errors'] == ['Personal code matches more than one employee']
+    payroll.delete_employee(ee_org['id'], second_employee['id'], actor='owner@example.test')
+    retried = service.apply(ee_org['id'], staged['id'], actor='owner@example.test')
+    assert retried['updated'] == 1 and retried['failed'] == 0
+    assert service.get(ee_org['id'], staged['id'])['status'] == 'applied'
 
 
 def test_tor_api_requires_write_role_for_apply(db, ee_org, monkeypatch):
