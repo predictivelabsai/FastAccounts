@@ -22,21 +22,11 @@ yet represented on GL entries, so the analytical posting split is outstanding.
 
 ## Validation commands and outcomes
 
-Every attempted pytest command used the requested PowerShell `Start-Job` wrapper,
-a 300-second timeout, and `-q -p no:cacheprovider -x`. The `test_payroll.py`
-timeout from the previous session must not be repeated.
+All commands used the required PowerShell `Start-Job` wrapper with a 600-second timeout, `-q -p no:cacheprovider -x`, and ran individually.
 
-- `tests/test_payroll_dimensions.py`: earlier checkpoint had 2 passed. New
-  acceptance coverage was added for employee/contract validation and frozen
-  report tenant scope. The latest invocation returned no captured pytest output,
-  so the new coverage is not counted as passed.
-- `tests/test_migrations_and_tenancy.py`: the prior checkpoint had 20 passed
-  before migration 0070. Subsequent runs found old-schema compatibility defects
-  in employee approval and component edits. Fixes were committed; the latest
-  invocation returned no captured output. It needs a surfaced process result
-  before it can be counted as passing.
-- `tests/test_payroll.py`: timed out in the previous session and must not be run
-  again.
+- `tests/test_migrations_and_tenancy.py`: initial run exposed the CI catalogue line-format defect after 11 passed; after correcting the explicit CI list, 20 passed in 170.02s.
+- `tests/test_payroll_dimensions.py`: initial run exposed a report-format expectation mismatch after 3 passed; after correcting the expected two-decimal amount, 4 passed in 36.53s.
+- `tests/test_payroll.py`: 16 passed in 156.11s with one upstream `asyncio.iscoroutinefunction` deprecation warning.
 
 ## Completed implementation checkpoints
 
@@ -55,15 +45,7 @@ timeout from the previous session must not be repeated.
 
 ## Remaining work
 
-- Split salary and employer-levy ledger postings by frozen dimensions through
-  the analytical-object mechanism, preserve balanced totals, and leave payout
-  postings unchanged.
-- Verify the dimension cost report and finish period grouping and XLSX output.
-- Add reviewed CSV/XLSX imports for departments, positions, cost centres and
-  projects.
-- Add the bureau overview, read-only organisation membership matrix, and
-  grouped payroll settings page with owner/admin protections.
-- Complete UI flows and tests for imports, overview tenant isolation, matrix
-  access, settings grouping, report output and frozen ledger dimensions.
-- Run the requested test files individually, except `tests/test_payroll.py`
-  which must remain unrun due to its recorded timeout. Record the exact results.
+- Split salary and employer levy ledger postings by frozen department, cost centre and project dimensions through the analytical-object mechanism, preserve balanced totals, and leave payout postings unchanged.
+- Add reviewed CSV/XLSX imports for departments, positions (with position group), cost centres and projects.
+- Add the bureau overview, read-only organisation membership matrix, and grouped payroll settings page with owner/admin protections and required UI/locales.
+- Run each touched test file individually with the required timeout wrapper and record exact outcomes.

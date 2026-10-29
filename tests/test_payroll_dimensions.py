@@ -68,5 +68,5 @@ def test_approved_payroll_dimension_costs_use_frozen_tenant_scoped_values(db, ee
     report = PayrollReportsService(db).dimension_costs(ee_org['id'], '2026-10', '2026-10')
     assert len(report) == 1
     assert report[0]['dimension_id'] == department['id']
-    assert report[0]['gross'] == '2000'
+    assert report[0]['gross'] == '2000.00'
     assert PayrollReportsService(db).dimension_costs('other-tenant', '2026-10', '2026-10') == []
