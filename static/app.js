@@ -162,6 +162,8 @@
     menu: "M4 7h16 M4 12h16 M4 17h16",
     external: "M13.5 4H20v6.5 M20 4l-9 9 M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5",
     shield: "M12 3.5 19 6v5.5c0 4.5-3 7.6-7 9-4-1.4-7-4.5-7-9V6z M9 12l2 2 4-4",
+    "bureau-overview": "M3 20h18 M5 20V8l7-4 7 4v12 M9 20v-6h6v6 M8 9h.01 M12 9h.01 M16 9h.01",
+    "bureau-memberships": "M4 5h16v14H4z M4 10h16 M10 5v14 M15 5v14 M6.5 7.5h.01 M12.5 12.5h.01 M17.5 16.5h.01",
     check: "M5 12.5l4.5 4.5L19 7.5",
     "chevron-down": "M6 9l6 6 6-6",
   };
@@ -175,6 +177,7 @@
     periods: "calendar", "payment-types": "pay-types",
     maintenance: "wrench",
     groups: "team",
+    "bureau-overview": "bureau-overview", "bureau-memberships": "bureau-memberships",
   };
   const icon = (name = "document") =>
     `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${ICONS[name] || ICONS.document}"/></svg>`;

@@ -37,7 +37,7 @@ def test_migration_count_rerun_and_ci(sending):
         with d["db"].transaction() as tx:
             tx.execute("DELETE FROM schema_migrations WHERE version='0031_master_data_groups'")
         assert d["db"].migrate() == ["0031_master_data_groups"]
-    assert f'"{catalogue()[-1]}"]' in (ROOT / ".github/workflows/ci.yml").read_text()
+    assert f"'{catalogue()[-1]}'" in (ROOT / ".github/workflows/ci.yml").read_text()
 
 
 def test_group_crud_membership_and_filter(sending):

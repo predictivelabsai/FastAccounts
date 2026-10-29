@@ -106,7 +106,9 @@ def test_nav_and_locale_keys(language):
 
     catalog = i18n.catalog(language)
     en_catalog = i18n.catalog("en")
-    assert list(catalog)[-1] == "periods"
+    sections = ["periods", "payroll_corrections", "payroll_contracts", "payroll_dimensions_bureau"]
+    start = list(catalog).index("periods")
+    assert list(catalog)[start:start + len(sections)] == sections
     assert set(catalog["periods"]["workspace"]) == set(en_catalog["periods"]["workspace"]), language
     if language == "en":
         assert catalog["nav"]["periods"] == "Fiscal periods"

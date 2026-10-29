@@ -428,4 +428,4 @@ def test_migration_role_seeding_and_wiring(tmp_path, monkeypatch, country, prefe
     with db.transaction() as tx:
         tx.execute(sql[sql.index('WITH RECURSIVE'):])
     assert db.scalar("SELECT COUNT(*) FROM accounts WHERE organisation_id=? AND system_role='FX_GAIN_LOSS'", (org['id'],)) == 1
-    assert f'"{catalogue()[-1]}"]' in (Path(__file__).resolve().parents[1] / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+    assert f"'{catalogue()[-1]}'" in (Path(__file__).resolve().parents[1] / ".github/workflows/ci.yml").read_text(encoding="utf-8")
