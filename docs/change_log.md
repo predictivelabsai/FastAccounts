@@ -4,6 +4,19 @@ Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as
 delivered.
 
+## 2026-10-29: Payroll contracts and TÖR import foundation (Build 9 in progress)
+
+- Added migration 0067 with tenant-scoped employee contracts, dated salary
+  agreements, position history and idempotent TÖR CSV staging. Existing salary
+  fields are backfilled without rewriting employee or payroll records.
+- Added contract history services and role/CSRF-protected contract and salary
+  agreement APIs. Added review staging for UTF-8 e-MTA TÖR CSV files with
+  English and Estonian header aliases, assumptions and row errors.
+- Build 9 remains incomplete. Payroll run integration, effective agreement
+  selection and proration, concurrent contract TSD lines, advances, Merit
+  mapping, TÖR apply actions and workspace UI are outstanding. See
+  `payroll_contracts_validation.md`.
+
 ## 2026-10-29: Payroll withholdings (Build 7 complete)
 
 - Added migration 0064 for tenant-scoped withholding recipients, agreements,

@@ -2272,3 +2272,14 @@ Follow-ups: confirm the next-working-day PALK due-date interpretation against th
 Statistics Estonia reporting calendar and accounting-bureau wording. The general
 overview currently has no deadline feed; adding PALK dates there is deferred to a
 dashboard follow-up. Production UAT remains external.
+
+## Payroll contracts and TÖR import (Build 9 in progress, 2026-10-29)
+
+Migration 0067 and the initial tenant-scoped contract, dated salary-agreement,
+position-history and TÖR CSV staging services are present. Contract list/create
+and agreement-add API routes have payroll role and CSRF checks. Existing
+employees receive a backfilled contract and agreement without changing their
+legacy rows. This is a foundation checkpoint only. Contract-driven run
+calculation, multiple contract items/TSD lines, advances, Merit review mapping,
+TÖR apply actions and employee/payroll workspace UI remain open. See
+`payroll_contracts_validation.md` for test results and remaining work.
