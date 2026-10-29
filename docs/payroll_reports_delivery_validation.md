@@ -61,3 +61,4 @@ transport. No Postmark requests were made.
 - `bfc000c` Add payroll report calculations and workbook export
 
 - `e459031` Build payroll reports and delivery flows
+- `9d8678d` Add selected payslip PDF download link
