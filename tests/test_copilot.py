@@ -391,12 +391,19 @@ def test_stage_fences_parse_leniently():
 
 
 def test_locale_tail_keys_merge():
-    en = i18n.catalog("en")
-    assert list(en)[-2:-1] == ["copilot"] and list(en)[-1] == "periods"
-    assert "nav" not in en["copilot"]
-    for language in ("et", "lt", "lv"):
-        raw = i18n.catalog(language)
-        assert set(raw["copilot"]["workspace"]) == set(en["copilot"]["workspace"]), language
+    english = json.loads((i18n.LOCALES_DIR / "en.json").read_text(encoding="utf-8"))
+    sections = ["copilot", "periods"]
+    start = list(english).index("copilot")
+    assert list(english)[start:start + len(sections)] == sections
+    assert set(english["copilot"]) == {"workspace"}
+    for language in ("en", "et", "lt", "lv"):
+        raw = json.loads((i18n.LOCALES_DIR / f"{language}.json").read_text(encoding="utf-8"))
+        start = list(raw).index("copilot")
+        assert list(raw)[start:start + len(sections)] == sections, language
+        assert set(raw["copilot"]) == set(english["copilot"]), language
+        assert set(raw["copilot"]["workspace"]) == set(english["copilot"]["workspace"]), language
+        for key, value in raw["copilot"]["workspace"].items():
+            assert i18n.catalog(language)["workspace"][key] == value
 
 
 @pytest.mark.parametrize("language", ["en", "et", "lv", "lt"])

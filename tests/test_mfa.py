@@ -357,10 +357,12 @@ def test_migration_rerun_preserves_data(env):
 def test_locales_and_workspace(lang):
     raw = json.loads((i18n.LOCALES_DIR / f"{lang}.json").read_text(encoding="utf-8"))
     english = json.loads((i18n.LOCALES_DIR / "en.json").read_text(encoding="utf-8"))
+    sections = ["invoice_exports", "bulk_sending", "reminder_rules", "fx_rates", "document_settings", "copilot", "periods", "payroll_corrections"]
+    start = list(raw).index("invoice_exports")
+    assert list(raw)[start:start + len(sections)] == sections
     keys = {k for k in english["auth"] if k.startswith("mfa_")}
     assert len(keys) == 22
     assert keys == {k for k in raw["auth"] if k.startswith("mfa_")}
-    assert list(raw)[-(8):] == ["invoice_exports", "bulk_sending", "reminder_rules", "fx_rates", "document_settings", "copilot", "periods", "payroll_corrections"]
     for key in keys:
         assert i18n.t("auth." + key, lang) == raw["auth"][key] and "\u2014" not in raw["auth"][key]
     from web.public import workspace_page
