@@ -2250,6 +2250,11 @@ class PayrollAgreementIn(BaseModel):
     account_override: str | None = Field(default=None, max_length=30)
 
 
+class TORImportApplyIn(BaseModel):
+    model_config = {'extra': 'forbid'}
+    row_ids: list[str] | None = None
+
+
 class PaySupplementaryIn(BaseModel):
     model_config = {'extra': 'forbid'}
     employee_ids: list[str] = Field(min_length=1, max_length=500)
@@ -2503,6 +2508,14 @@ async def payroll_stage_tor_import(organisation_id: str, file: UploadFile = File
 def payroll_get_tor_import(organisation_id: str, import_id: str, user: User = Depends(current_user)):
     _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
     return TORImportService(get_database()).get(organisation_id, import_id)
+
+
+@api.post('/organisations/{organisation_id}/payroll/tor-imports/{import_id}/apply')
+def payroll_apply_tor_import(organisation_id: str, import_id: str, payload: TORImportApplyIn,
+                             user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return TORImportService(get_database()).apply(organisation_id, import_id, actor=user.email,
+                                                   row_ids=payload.row_ids)
 
 
 @api.delete('/organisations/{organisation_id}/employees/{employee_id}', status_code=204)
