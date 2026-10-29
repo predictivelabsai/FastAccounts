@@ -67,6 +67,28 @@ def test_payroll_withholding_workspace_labels_exist_in_all_supported_locales():
     assert estonian['Withholding payouts report'] == 'Kinnipidamiste väljamaksete aruanne'
 
 
+def test_payroll_contracts_and_tor_workspace_labels_exist_in_all_locales():
+    labels = ('Contracts', 'Employment contract', 'Board member contract', 'Services contract',
+              'Other contract', 'No contract', 'Salary agreement history', 'Position history',
+              'Monthly advance', 'Workplace address', 'TÖR import from file', 'Add contract',
+              'Edit contract', 'Add salary agreement', 'Add position', 'Payday override')
+    for language in ('en', 'et', 'lv', 'lt'):
+        workspace = i18n.catalog(language)['workspace']
+        assert all(workspace.get(label, '').strip() for label in labels)
+    estonian = i18n.catalog('et')['workspace']
+    assert estonian['Contracts'] == 'Lepingud'
+    assert estonian['Employment contract'] == 'Tööleping'
+    assert estonian['Board member contract'] == 'Juhatuse liikme leping'
+    assert estonian['Services contract'] == 'Töövõtuleping'
+    assert estonian['Other contract'] == 'Muu leping'
+    assert estonian['No contract'] == 'Leping puudub'
+    assert estonian['Salary agreement history'] == 'Palgakokkulepe'
+    assert estonian['Position history'] == 'Ametikoha ajalugu'
+    assert estonian['Monthly advance'] == 'Igakuine avanss'
+    assert estonian['Workplace address'] == 'Töökoha aadress'
+    assert estonian['TÖR import from file'] == 'TÖR import failist'
+
+
 def test_tsd_workpaper_labels_exist_in_all_locales():
     labels = ('Income tax withheld', 'Social tax', 'UI', 'II pillar', 'Total payable',
               'Record count', 'Payment month', 'List', 'Group by payment type',

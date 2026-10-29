@@ -2239,7 +2239,7 @@
             t("Payroll"),
             t("People, payslips and postings for this client."),
             button("Add employee", "employee") + button("Payout summary", "payoutSummary") +
-            button("Reports", "payrollReports") + button("Withholdings", "withholdings") + button("Absences", "absences") + button("Leave liability", "leaveLiability") +
+            button("Reports", "payrollReports") + button("Withholdings", "withholdings") + button("Absences", "absences") + button("Leave liability", "leaveLiability") + button("TÖR import from file", "torImport") +
               (['owner','administrator'].includes(org?.role) ? button("Leave settings", "leaveSettings") : "") +
               button("Payment types", "paymentTypes") + button("Payroll accounts", "payrollAccounts") + button("Payday settings", "paydaySettings") +
               button("Run payroll for month", "run", true),
@@ -2309,6 +2309,7 @@
         paymentTypes: () => paymentTypesDialog(c, componentTypes || []),
         absences: () => payrollAbsencesDialog(c, employees || []),
         leaveLiability: () => payrollLeaveLiabilityDialog(c),
+        torImport: () => payrollTORImportDialog(c),
         leaveSettings: () => payrollLeaveSettingsDialog(c),
         payrollAccounts: () => payrollAccountsDialog(c),
         paydaySettings: () => paydaySettingsDialog(c),
@@ -4337,6 +4338,8 @@
       employeeForm.querySelector("[type=submit]").hidden = true;
     }
     if (!employee) return;
+    d.querySelector('.dialog-card').insertAdjacentHTML('beforeend', `<section class="employee-tax-settings"><h3>${tr('Contracts')}</h3><p class="muted">${tr('Manage contract and dated pay history for this employee.')}</p><button type="button" class="fs-btn fs-btn-outline" data-action="openContracts">${tr('View contracts')}</button></section>`);
+    d.querySelector('[data-action="openContracts"]').onclick = () => employeeContractsDialog(employee, writable);
     const labels = {tax_free: "Tax-free income application", pension: "Funded pension", unemployment: "Unemployment insurance contribution"};
     const modes = {maximum: "Maximum", limited: "Limited amount", none: "Not applied"};
     const panel = d.querySelector("[data-tax-histories]"), editor = d.querySelector("[data-tax-editor]");
@@ -4403,6 +4406,100 @@
       }
     };
     renderHistories();
+  }
+  async function employeeContractsDialog(employee, writable) {
+    const base = path(`/employees/${employee.id}/contracts`);
+    let contracts = await api(base);
+    const contractTypes = [['employment','Employment contract'],['board_member','Board member contract'],['services','Services contract'],['other','Other contract'],['none','No contract']];
+    let currentDialog = null;
+    const render = () => {
+      if (currentDialog) closeDialog(currentDialog);
+      const content = contracts.length ? contracts.map((contract) => `<section class="employee-tax-settings"><div class="section-head"><h3>${tr(contractTypes.find(([value]) => value === contract.contract_type)?.[1] || 'Other contract')}</h3>${writable ? button('Edit contract', 'editContract', false, `data-id="${esc(contract.id)}"`) : ''}</div><p>${esc(contract.start_date)}${contract.end_date ? ` – ${esc(contract.end_date)}` : ''}${contract.document_name ? ` · ${esc(contract.document_name)}` : ''}</p><p>${tr('Payday override')}: ${esc(contract.payday_rule ? `${tr(contract.payday_rule)}${contract.payday_day ? ` ${contract.payday_day}` : ''}` : tr('Organisation default'))} · ${tr('Monthly advance')}: ${esc(money(contract.monthly_net_advance, 'EUR'))}</p>${contract.workplace_address ? `<p>${tr('Workplace address')}: ${esc(contract.workplace_address)}</p>` : ''}<h4>${tr('Salary agreement history')}</h4>${contract.agreements.length ? table(['Effective from','Pay type','Rate','FTE'], contract.agreements.map((item) => row([td(esc(item.start_date)),td(tr(item.base_pay_type)),cash(item.rate,'EUR'),td(esc(item.fte))]))) : `<p class="muted">${tr('No salary agreements yet.')}</p>`}${writable ? button('Add salary agreement', 'addAgreement', false, `data-id="${esc(contract.id)}"`) : ''}<h4>${tr('Position history')}</h4>${contract.positions.length ? table(['Effective from','Position','Occupation code'], contract.positions.map((item) => row([td(esc(item.start_date)),td(esc(item.position)),td(esc(item.occupation_code || ''))]))) : `<p class="muted">${tr('No position history yet.')}</p>`}${writable ? button('Add position', 'addPosition', false, `data-id="${esc(contract.id)}"`) : ''}</section>`).join('') : empty('No contracts yet', writable ? button('Add contract','newContract') : '');
+      const d = dialog('Contracts', `${content}${writable && contracts.length ? button('Add contract','newContract') : ''}`);
+      currentDialog = d;
+      bindActions(d, {
+        newContract: () => contractEditDialog(employee, null, refresh),
+        editContract: (b) => contractEditDialog(employee, contracts.find((item) => item.id === b.dataset.id), refresh),
+        addAgreement: (b) => agreementEditDialog(b.dataset.id, refresh),
+        addPosition: (b) => positionEditDialog(b.dataset.id, refresh),
+      });
+    };
+    const refresh = async () => { contracts = await api(base); render(); };
+    render();
+  }
+  function contractEditDialog(employee, contract, refresh) {
+    const creating = !contract;
+    const contractTypeOptions = [['employment','Employment contract'],['board_member','Board member contract'],['services','Services contract'],['other','Other contract'],['none','No contract']];
+    const d = dialog(creating ? 'Add contract' : 'Edit contract', form(
+      select('Contract type','contract_type',contractTypeOptions.map(([value,label]) => [value,tr(label)]),contract?.contract_type || 'employment') +
+      field('Start date','start_date',contract?.start_date || today(),'date','required') +
+      field('End date','end_date',contract?.end_date || '','date') +
+      field('Document name','document_name',contract?.document_name || '', 'text','maxlength="180"') +
+      field('Workplace address','workplace_address',contract?.workplace_address || '', 'text','maxlength="2000"') +
+      field('Monthly advance','monthly_net_advance',contract?.monthly_net_advance || '0','number','min="0" step="0.01"') +
+      select('Payday override','payday_rule',[['','Organisation default'],['next_month_day','Next month, day'],['current_month_day','Current month, day'],['next_month_first_working_day','Next month, first working day']].map(([value,label]) => [value,tr(label)]),contract?.payday_rule || '') +
+      field('Payday day','payday_day',contract?.payday_day || '','number','min="1" max="31" step="1"') +
+      (creating ? `<h3 class="full-width">${tr('Initial salary agreement')}</h3>` +
+        select('Pay type','base_pay_type',[['monthly','Monthly'],['monthly_day_based','Monthly, day-based'],['hourly','Hourly'],['contract_sum','Contract sum'],['contract_sum_x_qty','Contract sum x quantity']].map(([value,label]) => [value,tr(label)]),'monthly') +
+        field('Rate','rate','','number','min="0" step="0.01"') + field('FTE','fte','1','number','min="0.0001" max="1" step="0.0001"') +
+        field('Position','position','','text','maxlength="180"') + field('Position start date','position_start_date',today(),'date') : '')
+    ));
+    const formEl = d.querySelector('form');
+    formEl.elements.payday_rule.addEventListener('change', () => { formEl.elements.payday_day.disabled = !['next_month_day','current_month_day'].includes(formEl.elements.payday_rule.value); });
+    formEl.elements.payday_rule.dispatchEvent(new Event('change'));
+    bindForm(d, async (data) => {
+      data.end_date = data.end_date || null;
+      data.document_name = data.document_name || null;
+      data.workplace_address = data.workplace_address || null;
+      data.payday_rule = data.payday_rule || null;
+      data.payday_day = data.payday_day ? Number(data.payday_day) : null;
+      data.monthly_net_advance = data.monthly_net_advance || '0';
+      if (creating) {
+        const agreement = data.rate ? {start_date:data.start_date,base_pay_type:data.base_pay_type,rate:data.rate,fte:data.fte || '1'} : null;
+        const position = data.position ? {position:data.position,occupation_code:null} : null;
+        for (const key of ['base_pay_type','rate','fte','position','position_start_date']) delete data[key];
+        data.agreement = agreement; data.position = position;
+        await post(path(`/employees/${employee.id}/contracts`), data);
+      } else {
+        for (const key of ['base_pay_type','rate','fte','position','position_start_date']) delete data[key];
+        await post(path(`/payroll/contracts/${contract.id}`), data, 'PATCH');
+      }
+      closeDialog(d); await refresh();
+    });
+  }
+  function agreementEditDialog(contractId, refresh) {
+    const d = dialog('Add salary agreement', form(
+      field('Effective from','start_date',today(),'date','required') +
+      select('Pay type','base_pay_type',[['monthly','Monthly'],['monthly_day_based','Monthly, day-based'],['hourly','Hourly'],['contract_sum','Contract sum'],['contract_sum_x_qty','Contract sum x quantity']].map(([value,label]) => [value,tr(label)]),'monthly') +
+      field('Rate','rate','','number','required min="0" step="0.01"') + field('Hours per day','hours_per_day','8','number','min="0.01" max="24" step="0.01"') +
+      field('FTE','fte','1','number','min="0.0001" max="1" step="0.0001"') + check('Full time','is_full_time',true) + check('Automatic working time','automatic_working_time',true)
+    ));
+    bindForm(d, async (data, formEl) => {
+      data.is_full_time = formEl.elements.is_full_time.checked; data.automatic_working_time = formEl.elements.automatic_working_time.checked;
+      await post(path(`/payroll/contracts/${contractId}/agreements`), data); closeDialog(d); await refresh();
+    });
+  }
+  function positionEditDialog(contractId, refresh) {
+    const d = dialog('Add position', form(field('Effective from','start_date',today(),'date','required') + field('Position','position','','text','required maxlength="180"') + field('Occupation code','occupation_code','','text','maxlength="30"')));
+    bindForm(d, async (data) => { data.occupation_code = data.occupation_code || null; await post(path(`/payroll/contracts/${contractId}/positions`),data); closeDialog(d); await refresh(); });
+  }
+  async function payrollTORImportDialog(c) {
+    const d = dialog('TÖR import from file', `<p class="muted">${tr('Upload an UTF-8 TÖR CSV. Review row errors and employee matches before applying.')}</p><form><label>${tr('CSV or TSV file')}<input name="file" type="file" accept=".csv,text/csv" required></label><button class="fs-btn fs-btn-outline" type="submit">${tr('Upload for review')}</button></form><div data-tor-review></div>`);
+    d.querySelector('form').addEventListener('submit', async (event) => {
+      event.preventDefault(); const file = event.currentTarget.elements.file.files[0]; if (!file) return;
+      const body = new FormData(); body.append('file',file);
+      try { const batch = await api(c.url('/payroll/tor-imports'),{method:'POST',body}); await renderTORReview(c,d,batch.id); }
+      catch(error) { toast(error.message,'error'); }
+    });
+  }
+  async function renderTORReview(c, dialogEl, importId) {
+    const review = await api(c.url(`/payroll/tor-imports/${importId}`));
+    const rows = review.rows.map((item) => row([td(item.row_number),td(esc(item.source_name || '')),td(esc(item.personal_id || '')),td(esc(item.contract_type || '')),td(esc(item.matched_employee_name || (item.match_conflict ? tr(item.match_conflict) : tr('New employee')))),td(esc([...item.errors,...(item.match_conflict ? [item.match_conflict] : [])].join('; ')))]));
+    dialogEl.querySelector('[data-tor-review]').innerHTML = `<h3>${tr('Review TÖR rows')}</h3><p>${tr('Status')}: ${tr(review.status)} · ${num(review.rows.length)} ${tr('Rows')}</p>${table(['File row','Employee','Personal code','Contract type','Match','Errors'],rows)}<button type="button" class="fs-btn fs-btn-ink" data-action="applyTOR">${tr('Apply reviewed rows')}</button>`;
+    dialogEl.querySelector('[data-action="applyTOR"]').onclick = async () => {
+      try { const result = await post(c.url(`/payroll/tor-imports/${importId}/apply`),{}); toast(`${num(result.applied + result.updated)} ${tr('rows applied')} · ${num(result.failed)} ${tr('failed')}`); await renderTORReview(c,dialogEl,importId); }
+      catch(error) { toast(error.message,'error'); }
+    };
   }
   function payrollWizard(employees) {
     const url = path("/pay-runs"),

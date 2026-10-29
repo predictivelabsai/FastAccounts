@@ -89,6 +89,62 @@ class PayrollContractService:
             result = tx.one('SELECT * FROM payroll_salary_agreements WHERE organisation_id=? AND id=?', (organisation_id, agreement_id))
         return result
 
+    def update(self, organisation_id, contract_id, *, actor, **changes):
+        allowed = {'contract_type', 'start_date', 'end_date', 'document_name', 'workplace_address',
+                   'monthly_net_advance', 'payday_rule', 'payday_day'}
+        if set(changes) - allowed:
+            raise ValueError('Unknown contract field')
+        with self.db.transaction() as tx:
+            current = tx.one('SELECT * FROM payroll_contracts WHERE organisation_id=? AND id=?',
+                             (organisation_id, contract_id))
+            if not current:
+                raise ValueError('Contract not found')
+            values = dict(current)
+            values.update(changes)
+            values['start_date'] = _date(values['start_date'], 'Contract start date')
+            values['end_date'] = _date(values['end_date'], 'Contract end date') if values.get('end_date') else None
+            if values['end_date'] and values['end_date'] < values['start_date']:
+                raise ValueError('Contract end date cannot precede start date')
+            if values['contract_type'] not in CONTRACT_TYPES:
+                raise ValueError('Invalid contract type')
+            if values['payday_rule'] is not None and values['payday_rule'] not in PAYDAY_RULES:
+                raise ValueError('Invalid payday rule')
+            if values['payday_rule'] == 'next_month_first_working_day' and values['payday_day'] is not None:
+                raise ValueError('Payday rule and day do not match')
+            if values['payday_rule'] in {'next_month_day', 'current_month_day'} and values['payday_day'] is None:
+                raise ValueError('Payday rule and day do not match')
+            if values['payday_day'] is not None and (type(values['payday_day']) is not int or not 1 <= values['payday_day'] <= 31):
+                raise ValueError('Payday day must be between 1 and 31')
+            values['monthly_net_advance'] = _amount(values['monthly_net_advance'], 'Monthly net advance')
+            tx.execute('UPDATE payroll_contracts SET contract_type=?,start_date=?,end_date=?,document_name=?,workplace_address=?,monthly_net_advance=?,payday_rule=?,payday_day=? WHERE organisation_id=? AND id=?',
+                       tuple(values[key] for key in ('contract_type', 'start_date', 'end_date', 'document_name',
+                                                      'workplace_address', 'monthly_net_advance', 'payday_rule', 'payday_day')) +
+                       (organisation_id, contract_id))
+            audit(tx, organisation_id, actor, 'payroll.contract.updated', 'payroll_contract', contract_id)
+        return next(item for item in self.list(organisation_id, current['employee_id']) if item['id'] == contract_id)
+
+    def add_position(self, organisation_id, contract_id, *, start_date, position, actor, occupation_code=None):
+        start_date = _date(start_date, 'Position start date')
+        if not isinstance(position, str) or not position.strip() or len(position.strip()) > 180:
+            raise ValueError('Position must contain 1 to 180 characters')
+        position_id = new_id()
+        with self.db.transaction() as tx:
+            if not tx.one('SELECT id FROM payroll_contracts WHERE organisation_id=? AND id=?',
+                          (organisation_id, contract_id)):
+                raise ValueError('Contract not found')
+            existing = tx.one('SELECT * FROM payroll_contract_positions WHERE organisation_id=? AND contract_id=? AND start_date=?',
+                              (organisation_id, contract_id, start_date))
+            if existing:
+                tx.execute('UPDATE payroll_contract_positions SET position=?,occupation_code=? WHERE organisation_id=? AND id=?',
+                           (position.strip(), occupation_code, organisation_id, existing['id']))
+                position_id = existing['id']
+            else:
+                tx.execute('INSERT INTO payroll_contract_positions(id,organisation_id,contract_id,start_date,position,occupation_code) VALUES (?,?,?,?,?,?)',
+                           (position_id, organisation_id, contract_id, start_date, position.strip(), occupation_code))
+            audit(tx, organisation_id, actor, 'payroll.contract_position.saved', 'payroll_contract_position', position_id)
+            return tx.one('SELECT * FROM payroll_contract_positions WHERE organisation_id=? AND id=?',
+                          (organisation_id, position_id))
+
     @staticmethod
     def _agreement(data, start_date):
         base_pay_type = data.get('base_pay_type')

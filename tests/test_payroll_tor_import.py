@@ -36,6 +36,7 @@ def test_tor_apply_creates_employee_contract_and_position_idempotently(db, ee_or
     employee = db.one('SELECT * FROM employees WHERE organisation_id=? AND personal_id=?',
                        (ee_org['id'], '49001010018'))
     assert employee['name'] == 'Mari Tamm' and employee['gross_salary'] is None
+    assert employee['fte'] == 0.5
     contract = db.one('SELECT * FROM payroll_contracts WHERE organisation_id=? AND employee_id=?',
                       (ee_org['id'], employee['id']))
     assert contract['contract_type'] == 'employment' and contract['workplace_address'] == 'Tallinn'
@@ -61,6 +62,14 @@ def test_tor_apply_matches_existing_employee_and_updates_contract(db, ee_org):
     saved = db.one('SELECT * FROM employees WHERE organisation_id=? AND id=?', (ee_org['id'], employee['id']))
     assert saved['name'] == 'Mari Tamm' and saved['gross_salary'] == 1800
     assert db.scalar('SELECT COUNT(*) FROM employees WHERE organisation_id=?', (ee_org['id'],)) == 1
+    follow_up = b'Personal code,Name,Start date,End date,Contract type,Workplace address\n49001010018,Mari Tamm,2026-02-01,2026-12-31,employment,Tartu\n'
+    second = service.stage(ee_org['id'], follow_up, actor='owner@example.test')
+    assert service.apply(ee_org['id'], second['id'], actor='owner@example.test')['updated'] == 1
+    contract = db.one('SELECT * FROM payroll_contracts WHERE organisation_id=? AND employee_id=?',
+                      (ee_org['id'], employee['id']))
+    assert contract['end_date'] == '2026-12-31' and contract['workplace_address'] == 'Tartu'
+    assert db.scalar('SELECT COUNT(*) FROM payroll_contracts WHERE organisation_id=? AND employee_id=?',
+                     (ee_org['id'], employee['id'])) == 1
 
 
 def test_tor_duplicate_personal_code_is_visible_and_blocks_apply(db, ee_org):
@@ -78,3 +87,22 @@ def test_tor_duplicate_personal_code_is_visible_and_blocks_apply(db, ee_org):
     refreshed = service.get(ee_org['id'], staged['id'])
     assert refreshed['status'] == 'review'
     assert refreshed['rows'][0]['errors'] == ['Personal code matches more than one employee']
+
+
+def test_tor_api_requires_write_role_for_apply(db, ee_org, monkeypatch):
+    from fastapi.testclient import TestClient
+    from api_app import api
+
+    monkeypatch.setenv('FASTACCOUNTS_DB', db.path)
+    monkeypatch.setenv('DB_URL', '')
+    client = TestClient(api)
+    root = f"/organisations/{ee_org['id']}/payroll/tor-imports"
+    owner = {'X-Test-User':'owner@example.test'}
+    content = b'Personal code,Name,Start date,Contract type\n49001010018,Mari Tamm,2026-01-01,employment\n'
+    staged = client.post(root, headers=owner, files={'file':('tor.csv',content,'text/csv')})
+    assert staged.status_code == 201
+    import_id = staged.json()['id']
+    assert client.post(f'{root}/{import_id}/apply', json={}).status_code == 401
+    assert client.post(f'{root}/{import_id}/apply', headers={'X-Test-User':'viewer@example.test'}, json={}).status_code == 403
+    applied = client.post(f'{root}/{import_id}/apply', headers=owner, json={})
+    assert applied.status_code == 200 and applied.json()['applied'] == 1

@@ -38,6 +38,24 @@ def test_contract_validation_rejects_bad_fte_and_foreign_employee(db, ee_org):
     assert PayrollService(db).employees(ee_org['id']) == []
 
 
+def test_contract_update_and_dated_position_history(db, ee_org, legacy_payroll):
+    legacy_payroll(db, ee_org['id'], name='Contract edit', gross='2000')
+    service = PayrollContractService(db)
+    contract = service.create(ee_org['id'], 'legacy-employee', contract_type='employment',
+                              start_date='2026-01-01', actor='owner@example.test')
+    updated = service.update(ee_org['id'], contract['id'], actor='owner@example.test',
+                              workplace_address='Tallinn office', monthly_net_advance='125.50',
+                              payday_rule='current_month_day', payday_day=25)
+    assert updated['workplace_address'] == 'Tallinn office'
+    assert Decimal(str(updated['monthly_net_advance'])) == Decimal('125.50')
+    assert updated['payday_rule'] == 'current_month_day' and updated['payday_day'] == 25
+    position = service.add_position(ee_org['id'], contract['id'], start_date='2026-08-01',
+                                    position='Senior accountant', occupation_code='3313', actor='owner@example.test')
+    assert position['start_date'] == '2026-08-01'
+    assert service.add_position(ee_org['id'], contract['id'], start_date='2026-08-01',
+                                position='Finance lead', actor='owner@example.test')['id'] == position['id']
+
+
 def test_run_uses_salary_agreement_effective_in_period(db, ee_org, legacy_payroll):
     legacy_payroll(db, ee_org['id'], name='Agreement selector', gross='2000')
     contracts = PayrollContractService(db)
@@ -147,3 +165,10 @@ def test_contract_api_enforces_tenant_roles_and_csrf(db, ee_org, monkeypatch):
     assert created.json()['contract_type'] == 'employment'
     assert client.get(root + f"/employees/{employee['id']}/contracts", headers={'X-Test-User': 'outsider@example.test'}).status_code == 403
     assert client.post(root + f"/employees/{employee['id']}/contracts", headers={'X-Test-User': 'viewer@example.test'}, json=payload).status_code == 403
+    contract_id = created.json()['id']
+    assert client.patch(root + f"/payroll/contracts/{contract_id}", headers=headers,
+                        json={'monthly_net_advance': '80.25'}).status_code == 200
+    position = client.post(root + f"/payroll/contracts/{contract_id}/positions", headers=headers,
+                           json={'start_date':'2026-09-01','position':'Accountant'})
+    assert position.status_code == 201
+    assert client.patch(root + f"/payroll/contracts/{contract_id}", json={'monthly_net_advance':'90'}).status_code == 401

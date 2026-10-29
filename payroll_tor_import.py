@@ -167,7 +167,7 @@ class TORImportService:
                         employee = self.payroll.save_employee(
                             organisation_id, actor=actor, tx=tx, name=row['source_name'],
                             personal_id=row['personal_id'], pay_basis='income_line',
-                            employment_start_date=row['start_date'],
+                            fte=row['fte'] or '1', employment_start_date=row['start_date'],
                         )
                         employee_id = employee['id']
                     existing_contract = tx.one(

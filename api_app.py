@@ -2255,6 +2255,25 @@ class TORImportApplyIn(BaseModel):
     row_ids: list[str] | None = None
 
 
+class PayrollContractPatchIn(BaseModel):
+    model_config = {'extra': 'forbid'}
+    contract_type: Literal['employment', 'board_member', 'services', 'other', 'none'] | None = None
+    start_date: str | None = None
+    end_date: str | None = None
+    document_name: str | None = Field(default=None, max_length=180)
+    workplace_address: str | None = Field(default=None, max_length=2000)
+    monthly_net_advance: Decimal | None = Field(default=None, ge=0, max_digits=12, decimal_places=2)
+    payday_rule: Literal['next_month_day', 'current_month_day', 'next_month_first_working_day'] | None = None
+    payday_day: int | None = Field(default=None, ge=1, le=31)
+
+
+class PayrollPositionIn(BaseModel):
+    model_config = {'extra': 'forbid'}
+    start_date: str
+    position: str = Field(min_length=1, max_length=180)
+    occupation_code: str | None = Field(default=None, max_length=30)
+
+
 class PaySupplementaryIn(BaseModel):
     model_config = {'extra': 'forbid'}
     employee_ids: list[str] = Field(min_length=1, max_length=500)
@@ -2492,6 +2511,23 @@ def payroll_create_salary_agreement(organisation_id: str, contract_id: str, payl
     start_date = data.pop('start_date')
     return PayrollContractService(get_database()).add_agreement(
         organisation_id, contract_id, start_date=start_date, actor=user.email, **data)
+
+
+@api.patch('/organisations/{organisation_id}/payroll/contracts/{contract_id}')
+def payroll_update_contract(organisation_id: str, contract_id: str, payload: PayrollContractPatchIn,
+                            user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return PayrollContractService(get_database()).update(
+        organisation_id, contract_id, actor=user.email, **payload.model_dump(exclude_unset=True))
+
+
+@api.post('/organisations/{organisation_id}/payroll/contracts/{contract_id}/positions', status_code=201)
+def payroll_save_contract_position(organisation_id: str, contract_id: str, payload: PayrollPositionIn,
+                                   user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    data = payload.model_dump()
+    return PayrollContractService(get_database()).add_position(
+        organisation_id, contract_id, actor=user.email, **data)
 
 
 @api.post('/organisations/{organisation_id}/payroll/tor-imports', status_code=201)

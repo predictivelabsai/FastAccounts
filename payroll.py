@@ -1022,9 +1022,9 @@ class PayrollService:
                                                        (hours or {}).get(employee['id']))
             contract_mode = bool(contract_lines)
             has_contracts = (bool(tx.one(
-                'SELECT c.id FROM payroll_contracts c JOIN payroll_salary_agreements a '
+                'SELECT c.id FROM payroll_contracts c LEFT JOIN payroll_salary_agreements a '
                 'ON a.organisation_id=c.organisation_id AND a.contract_id=c.id '
-                'WHERE c.organisation_id=? AND c.employee_id=? LIMIT 1',
+                "WHERE c.organisation_id=? AND c.employee_id=? AND (a.id IS NOT NULL OR c.contract_type<>'services') LIMIT 1",
                 (organisation_id, employee['id'])))
                              if tx.table_exists('payroll_contracts') else False)
             if not contract_mode and (has_contracts or employed_days(employee, period)[0] == 0):

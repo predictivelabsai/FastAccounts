@@ -153,6 +153,87 @@ def test_payroll_absences_register_can_create_localised_leave(monkeypatch, db, e
         browser.close()
 
 
+@pytest.mark.parametrize('language', ['en', 'et', 'lv', 'lt'])
+def test_contract_card_and_tor_import_are_localised(monkeypatch, db, ee_org, language):
+    from urllib.parse import urlsplit
+    from web import i18n
+    from web_app import app
+    from payroll import PayrollService
+    playwright = pytest.importorskip('playwright.sync_api')
+    monkeypatch.setenv('FASTACCOUNTS_DEFAULT_LANG', language)
+    monkeypatch.setenv('FASTACCOUNTS_DB', db.path)
+    monkeypatch.setenv('DB_URL', '')
+    actor = 'owner@example.test'
+    employee = PayrollService(db).save_employee(ee_org['id'], actor=actor, name='Contract UI employee',
+                                                personal_id='49001010018', gross_salary='2000')
+    labels = i18n.catalog(language)['workspace']
+    root = Path(__file__).resolve().parents[1]
+    errors = []
+    with TestClient(app) as client, playwright.sync_playwright() as runtime:
+        html = client.get('/auth/test?email=' + actor).text
+        browser = runtime.chromium.launch()
+        page = browser.new_page(viewport={'width': 390, 'height': 844})
+        page.set_default_timeout(15000)
+        page.on('pageerror', lambda error: errors.append(str(error)))
+
+        def respond(route):
+            parsed = urlsplit(route.request.url)
+            path = parsed.path
+            if path.startswith('/api/'):
+                target = path + ('?' + parsed.query if parsed.query else '')
+                response = client.request(route.request.method, target, content=route.request.post_data,
+                    headers={'X-Test-User': actor, 'Content-Type': route.request.headers.get('content-type', 'application/json')})
+                return route.fulfill(status=response.status_code, body=response.content,
+                    content_type=response.headers.get('content-type', 'application/json'))
+            if path == '/app':
+                return route.fulfill(body=html, content_type='text/html')
+            if path.startswith('/static/') and (root / path.lstrip('/')).is_file():
+                return route.fulfill(path=str(root / path.lstrip('/')))
+            return route.fulfill(status=404)
+
+        page.route('**/*', respond)
+        page.goto('http://workspace.test/app#payroll')
+        page.get_by_role('button', name=labels['TÖR import from file'], exact=True).click()
+        upload = page.get_by_role('dialog').last
+        upload.locator('input[type=file]').set_input_files({'name':'tor.csv','mimeType':'text/csv',
+            'buffer':b'Personal code,Name,Start date,Contract type,Position\n49001010019,Mari New,2026-01-01,employment,Accountant\n'})
+        upload.get_by_role('button', name=labels['Upload for review'], exact=True).click()
+        playwright.expect(upload).to_contain_text('Mari New')
+        upload.get_by_role('button', name=labels['Apply reviewed rows'], exact=True).click()
+        playwright.expect(upload).to_contain_text('applied')
+        upload.locator('[data-close]').click()
+        page.locator('#app-content [data-action="edit"]').first.click()
+        employee_dialog = page.get_by_role('dialog').last
+        employee_dialog.get_by_role('button', name=labels['View contracts'], exact=True).click()
+        contracts_dialog = page.get_by_role('dialog').last
+        playwright.expect(contracts_dialog).to_contain_text(labels['No contracts yet'])
+        contracts_dialog.get_by_role('button', name=labels['Add contract'], exact=True).click()
+        contract_editor = page.get_by_role('dialog').last
+        contract_editor.locator('[name=contract_type]').select_option('employment')
+        contract_editor.locator('[name=start_date]').fill('2026-01-01')
+        contract_editor.locator('[name=rate]').fill('2200')
+        contract_editor.locator('[name=position]').fill('Accountant')
+        contract_editor.get_by_role('button', name=labels['Save'], exact=True).click()
+        contracts_dialog = page.get_by_role('dialog').last
+        playwright.expect(contracts_dialog).to_contain_text(labels['Salary agreement history'])
+        contracts_dialog.get_by_role('button', name=labels['Edit contract'], exact=True).click()
+        contract_editor = page.get_by_role('dialog').last
+        contract_editor.locator('[name=monthly_net_advance]').fill('100')
+        contract_editor.get_by_role('button', name=labels['Save'], exact=True).click()
+        contracts_dialog = page.get_by_role('dialog').last
+        playwright.expect(contracts_dialog).to_contain_text('100')
+        contracts_dialog.get_by_role('button', name=labels['Add salary agreement'], exact=True).click()
+        agreement_editor = page.get_by_role('dialog').last
+        agreement_editor.locator('[name=start_date]').fill('2027-01-01')
+        agreement_editor.locator('[name=rate]').fill('2600')
+        agreement_editor.get_by_role('button', name=labels['Save'], exact=True).click()
+        contracts_dialog = page.get_by_role('dialog').last
+        playwright.expect(contracts_dialog).to_contain_text('2027-01-01')
+        assert db.scalar('SELECT COUNT(*) FROM payroll_tor_imports WHERE organisation_id=?', (ee_org['id'],)) == 1
+        assert not errors, errors
+        browser.close()
+
+
 @pytest.mark.parametrize('language', ['en', 'et', 'lt', 'lv'])
 def test_payslip_accessible_names_include_employee(monkeypatch, language):
     playwright = pytest.importorskip('playwright.sync_api')
