@@ -14,20 +14,24 @@ def test_reports_use_frozen_tenant_scoped_payroll(db, ee_org):
     bonus = payroll.save_component_type(ee_org['id'], actor=ACTOR, name='Performance bonus', palk_row=6,
         direction='income', income_tax=True, social_tax=True, ui_employee=True, ui_employer=True,
         funded_pension=True, social_minimum=True)
+    unassigned = payroll.save_component_type(ee_org['id'], actor=ACTOR, name='Unassigned allowance',
+        palk_designation=None, direction='income', income_tax=True, social_tax=True, ui_employee=True,
+        ui_employer=True, funded_pension=True, social_minimum=True)
     item = next(item for item in run['items'] if item['employee_name'] == 'Full time')
     payroll.update_item(ee_org['id'], run['id'], item['id'], actor=ACTOR,
-        components=[{'type_id': bonus['id'], 'amount': '100'}])
+        components=[{'type_id': bonus['id'], 'amount': '100'},
+                    {'type_id': unassigned['id'], 'amount': '37.25'}])
     payroll.approve(ee_org['id'], run['id'], actor=ACTOR)
     reports = PayrollReportsService(db)
 
     annual = reports.annual_summary(ee_org['id'], 2026)
     assert {item['employee_name'] for item in annual} == {'Full time', 'Part time'}
     full_year = next(item for item in annual if item['employee_name'] == 'Full time')
-    assert full_year['gross_total'] == '2100.00'
+    assert full_year['gross_total'] == '2137.25'
     assert full_year['months']['2026-04']['types']['Base pay'] == '2000.00'
     assert full_year['months']['2026-04']['types']['Performance bonus'] == '100.00'
     average = reports.average_pay(ee_org['id'], '2026-04', 6)
-    assert next(item for item in average if item['employee_name'] == 'Full time')['average_monthly_gross'] == '350.00'
+    assert next(item for item in average if item['employee_name'] == 'Full time')['average_monthly_gross'] == '356.21'
 
     palk = reports.statistics_palk(ee_org['id'], '2026-04')
     assert palk['due_date'] == '2026-05-18'
@@ -37,6 +41,9 @@ def test_reports_use_frozen_tenant_scoped_payroll(db, ee_org):
     assert Decimal(palk['rows']['3']['part_time']) > 0
     assert palk['rows']['5'] == {'full_time': '2000.00', 'part_time': '500.00'}
     assert palk['rows']['6']['full_time'] == '100.00'
+    assert palk['rows']['5']['full_time'] == '2000.00'
+    assert palk['warning'] is True
+    assert palk['unmapped_types'] == [{'name': 'Unassigned allowance', 'amount': '37.25'}]
 
     headcount = reports.yearly_headcount(ee_org['id'], 2026)
     assert headcount['average_headcount'] == '2'

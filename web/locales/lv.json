@@ -2411,7 +2411,9 @@
     "Report": "Pārskats",
     "Average period": "Vidējās algas periods",
     "PALK report due date": "PALK pārskata termiņš",
-    "Download selected PDF": "Lejupielādēt atlasītos algas aprēķinus PDF formātā"
+    "Download selected PDF": "Lejupielādēt atlasītos algas aprēķinus PDF formātā",
+    "Unmapped": "Nav piešķirts",
+    "PALK unmapped warning": "Šajā periodā izmantoti maksājumu veidi bez Igaunijas Statistikas pārvaldes ziņojuma rindas:"
   },
   "views": {
     "overview": "Overview",

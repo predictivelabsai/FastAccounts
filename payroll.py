@@ -579,7 +579,7 @@ class PayrollService:
         else:
             methods_ready = 'calculation_method' in {row['name'] for row in self.db.rows('PRAGMA table_info(pay_component_types)')}
         if methods_ready:
-            fields += ('calculation_method', 'default_rate', 'default_percentage', 'default_coefficient', 'palk_row')
+            fields += ('calculation_method', 'default_rate', 'default_percentage', 'default_coefficient', 'palk_row', 'palk_designation')
         if set(changes) - set(fields):
             raise ValueError('Unknown payment component field')
         with self.db.transaction() as tx:
@@ -591,9 +591,11 @@ class PayrollService:
             else:
                 data = dict(name='', direction='income', liability_role='PAYROLL_DEDUCTION', tsd_payment_type=10,
                             calculation_method='fixed_sum', default_rate=None, default_percentage=None,
-                            default_coefficient=None, palk_row=5,
+                            default_coefficient=None, palk_row=5, palk_designation=5,
                             is_wage=True, active=True, **{key: False for key in FLAGS})
             data.update(changes)
+            if 'palk_row' in changes and 'palk_designation' not in changes:
+                data['palk_designation'] = changes['palk_row']
             self._component_values(data)
             type_id = type_id or new_id()
             tx.execute('INSERT INTO pay_component_types(id,organisation_id,' + ','.join(fields) + ') VALUES (' +
@@ -626,6 +628,10 @@ class PayrollService:
             raise ValueError('Choose a supported calculation method')
         if 'palk_row' in data and (type(data['palk_row']) is not int or data['palk_row'] not in PALK_ROWS):
             raise ValueError('Choose a supported PALK row')
+        if 'palk_designation' in data and data['palk_designation'] is not None and (type(data['palk_designation']) is not int or data['palk_designation'] not in PALK_ROWS):
+            raise ValueError('Choose a supported PALK row')
+        if 'palk_designation' not in data:
+            data['palk_designation'] = data.get('palk_row', 5)
         for key in ('default_rate', 'default_percentage', 'default_coefficient'):
             if key in data and data[key] is not None:
                 value = decimal(data[key])
@@ -790,8 +796,8 @@ class PayrollService:
                 else:
                     has_tsd = 'tsd_payment_type' in {row['name'] for row in tx.rows('PRAGMA table_info(pay_item_components)')}
                 methods_ready = ('calculation_method' in component_columns)
-                fields = ('id', 'organisation_id', 'item_id', 'type_id', 'position', 'name', 'amount', 'direction', *FLAGS, 'liability_role') + (('is_wage',) if metadata_ready else ()) + (('tsd_payment_type',) if has_tsd else ()) + (('calculation_method', 'quantity', 'rate', 'coefficient', 'percentage', 'net_target', 'palk_row') if methods_ready else ())
-                values = (new_id(), organisation_id, item_id, data['id'], position, data['name'], db_number(amount), data['direction'], *(data[key] for key in FLAGS), data['liability_role']) + ((data['is_wage'],) if metadata_ready else ()) + ((data.get('tsd_payment_type', 10),) if has_tsd else ()) + ((method, data.get('quantity'), data.get('rate', data.get('default_rate')), data.get('coefficient', data.get('default_coefficient')), data.get('percentage', data.get('default_percentage')), data.get('net_target'), data.get('palk_row', 5)) if methods_ready else ())
+                fields = ('id', 'organisation_id', 'item_id', 'type_id', 'position', 'name', 'amount', 'direction', *FLAGS, 'liability_role') + (('is_wage',) if metadata_ready else ()) + (('tsd_payment_type',) if has_tsd else ()) + (('calculation_method', 'quantity', 'rate', 'coefficient', 'percentage', 'net_target', 'palk_row', 'palk_designation') if methods_ready else ())
+                values = (new_id(), organisation_id, item_id, data['id'], position, data['name'], db_number(amount), data['direction'], *(data[key] for key in FLAGS), data['liability_role']) + ((data['is_wage'],) if metadata_ready else ()) + ((data.get('tsd_payment_type', 10),) if has_tsd else ()) + ((method, data.get('quantity'), data.get('rate', data.get('default_rate')), data.get('coefficient', data.get('default_coefficient')), data.get('percentage', data.get('default_percentage')), data.get('net_target'), data.get('palk_row', 5), data.get('palk_designation', data.get('palk_row', 5))) if methods_ready else ())
                 tx.execute('INSERT INTO pay_item_components(' + ','.join(fields) + ') VALUES (' + ','.join('?' for _ in fields) + ')', values)
         if generated_column_ready:
             tx.execute('DELETE FROM pay_item_components WHERE organisation_id=? AND item_id=? AND is_generated=1',

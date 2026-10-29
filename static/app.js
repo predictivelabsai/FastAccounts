@@ -4651,12 +4651,13 @@
         field("Default rate", "default_rate", values.default_rate ?? "", "number", 'step="0.0001"') +
         field("Default percentage", "default_percentage", values.default_percentage ?? "", "number", 'step="0.0001"') +
         field("Default coefficient", "default_coefficient", values.default_coefficient ?? "", "number", 'step="0.0001"') +
-        select("Statistics Estonia PALK row", "palk_row", [[5,"5 Base pay"],[6,"6 Overtime"],[7,"7 Shift, night, public holiday"],[8,"8 Irregular bonuses"],[9,"9 Non-worked time"],[10,"10 Non-monetary"],[15,"15 Benefits"],[16,"16 Benefits"],[17,"17 Benefits"],[18,"18 Benefits"]], values.palk_row || 5) +
+        select("Statistics Estonia PALK row", "palk_designation", [["","Unmapped"],[5,"5 Base pay"],[6,"6 Overtime"],[7,"7 Shift, night, public holiday"],[8,"8 Irregular bonuses"],[9,"9 Non-worked time"],[10,"10 Non-monetary"],[15,"15 Benefits"],[16,"16 Benefits"],[17,"17 Benefits"],[18,"18 Benefits"]], values.palk_designation ?? values.palk_row ?? 5) +
         select("Deduction liability", "liability_role", [["PAYROLL_DEDUCTION", t("Other deduction liability")], ["PAYROLL_BAILIFF", t("Bailiff withholding liability")]], values.liability_role) +
         check("Counts towards average and vacation pay", "is_wage", values.is_wage) + check("Active for new payment lines", "active", values.active) +
         `<div class="full-width component-flags">${componentFlagFields(values)}</div><p class="full-width muted">${tr("Levy flags apply to income lines. Deduction lines reduce net pay.")}</p>` + `<p class="full-width muted">${tr("Defaults can be overridden on each draft payment line. Confirm tax treatment before approval.")}</p>`,
       ));
       bindForm(editor, async (data, f) => {
+        if (data.palk_designation === "") data.palk_designation = null;
         componentFlags.forEach(([key]) => data[key] = f.elements[key].checked);
         data.is_wage = f.elements.is_wage.checked;
         data.active = f.elements.active.checked;
@@ -4713,7 +4714,8 @@
           const period = d.querySelector('[name="period"]').value, months = d.querySelector('[name="months"]').value;
           const params = new URLSearchParams({report, year, period, months, start: period, end: period});
           const result = await api(c.url(`/payroll/reports/${report}`) + `?${params}`);
-          d.querySelector('[data-payroll-report-result]').textContent = JSON.stringify(result, null, 2);
+          const warning = result.warning ? `${tr('PALK unmapped warning')}\n${result.unmapped_types.map((item) => `${item.name}: ${item.amount}`).join('\n')}\n\n` : '';
+          d.querySelector('[data-payroll-report-result]').textContent = warning + JSON.stringify(result, null, 2);
           d.querySelector('[data-payroll-report-xlsx]').href = `/api${c.url('/payroll/reports.xlsx')}?${params}`;
         } else if (b.dataset.action === 'savePayrollEmailSettings') {
           await post(c.url('/payroll/report-settings'), Object.fromEntries(['sender_name','reply_to','cc'].map((key) => [key, d.querySelector(`[name="${key}"]`).value])), 'PUT');

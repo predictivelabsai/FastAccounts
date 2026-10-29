@@ -82,7 +82,7 @@ class PayrollReportsService:
     def statistics_palk(self, organisation_id, period):
         with self.db.transaction() as tx:
             rows = self._approved(tx, organisation_id, period, period)
-            components = tx.rows("SELECT c.palk_row,c.amount,c.direction,c.name,i.fte,i.pay_basis,i.employee_id "
+            components = tx.rows("SELECT c.palk_designation,c.amount,c.direction,c.name,i.fte,i.pay_basis,i.employee_id "
                 "FROM pay_runs r JOIN pay_run_items i ON i.organisation_id=r.organisation_id AND i.pay_run_id=r.id "
                 "JOIN pay_item_components c ON c.organisation_id=i.organisation_id AND c.item_id=i.id "
                 "WHERE r.organisation_id=? AND r.status='Approved' AND r.period=?", (organisation_id, period))
@@ -96,14 +96,16 @@ class PayrollReportsService:
                 result['5'][key] += base
                 result['12'][key] += money(row['social_tax'])
                 result['13'][key] += money(row['ui_employer'])
-        unmapped = set()
+        unmapped = {}
         for c in components:
             if c['direction'] != 'income': continue
-            if c['palk_row'] is None:
-                unmapped.add(c.get('name', 'Unknown component')); continue
+            if c['palk_designation'] is None:
+                name = c.get('name', 'Unknown component')
+                unmapped[name] = unmapped.get(name, Decimal(0)) + money(c['amount'])
+                continue
             key = employees.get(c['employee_id'])
-            if key and str(c['palk_row']) in result:
-                result[str(c['palk_row'])][key] += money(c['amount'])
+            if key and str(c['palk_designation']) in result:
+                result[str(c['palk_designation'])][key] += money(c['amount'])
         for row in rows:
             key = employees[row['employee_id']]
             result['1'][key] += Decimal(1) / Decimal(1000)
@@ -115,7 +117,7 @@ class PayrollReportsService:
             else:
                 hours = Decimal(norm_hours(*map(int, period.split('-')))) * decimal(row.get('fte') or 1)
             result['3'][key] += hours / Decimal(1000)
-        return {'period': period, 'due_date': _due_date(period), 'rows': {k: {n: db_number(v.quantize(Decimal('.01'))) for n,v in vals.items()} for k,vals in result.items()}, 'unmapped_types': sorted(unmapped)}
+        return {'period': period, 'due_date': _due_date(period), 'rows': {k: {n: db_number(v.quantize(Decimal('.01'))) for n,v in vals.items()} for k,vals in result.items()}, 'unmapped_types': [{'name': name, 'amount': db_number(money(amount))} for name, amount in sorted(unmapped.items())], 'warning': bool(unmapped)}
 
     def yearly_headcount(self, organisation_id, year):
         with self.db.transaction() as tx:

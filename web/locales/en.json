@@ -2411,7 +2411,9 @@
     "Report": "Report",
     "Average period": "Average period",
     "PALK report due date": "PALK report due date",
-    "Download selected PDF": "Download selected PDF"
+    "Download selected PDF": "Download selected PDF",
+    "Unmapped": "Unmapped",
+    "PALK unmapped warning": "The following payment types were used this period without a Statistics Estonia reporting designation:"
   },
   "views": {
     "overview": "Overview",

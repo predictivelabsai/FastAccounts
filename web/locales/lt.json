@@ -2411,7 +2411,9 @@
     "Report": "Ataskaita",
     "Average period": "Vidutinio atlygio laikotarpis",
     "PALK report due date": "PALK ataskaitos terminas",
-    "Download selected PDF": "Atsisiųsti pasirinktus algalapius PDF formatu"
+    "Download selected PDF": "Atsisiųsti pasirinktus algalapius PDF formatu",
+    "Unmapped": "Nepriskirta",
+    "PALK unmapped warning": "Šiuo laikotarpiu naudoti mokėjimų tipai, kuriems nepriskirta Estijos statistikos ataskaitos eilutė:"
   },
   "views": {
     "overview": "Overview",

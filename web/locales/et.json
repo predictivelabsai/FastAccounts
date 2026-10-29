@@ -2411,7 +2411,9 @@
     "Report": "Aruanne",
     "Average period": "Keskmiste tasude periood",
     "PALK report due date": "PALK aruande tähtaeg",
-    "Download selected PDF": "Laadi valitud palgateatised PDF-ina"
+    "Download selected PDF": "Laadi valitud palgateatised PDF-ina",
+    "Unmapped": "Määramata",
+    "PALK unmapped warning": "Arvestuskuus on kasutatud selliseid tasusid, millel statistika aruande määrang on tegemata"
   },
   "views": {
     "overview": "Ülevaade",
