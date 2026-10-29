@@ -106,3 +106,15 @@ def test_tor_api_requires_write_role_for_apply(db, ee_org, monkeypatch):
     assert client.post(f'{root}/{import_id}/apply', headers={'X-Test-User':'viewer@example.test'}, json={}).status_code == 403
     applied = client.post(f'{root}/{import_id}/apply', headers=owner, json={})
     assert applied.status_code == 200 and applied.json()['applied'] == 1
+
+    from api_app import User, api, current_user
+    from web_app import app
+    api.dependency_overrides[current_user] = lambda: User(email='owner@example.test')
+    try:
+        with TestClient(app) as session_client:
+            csrf_path = f'/api/organisations/{ee_org["id"]}/payroll/tor-imports/{import_id}/apply'
+            assert session_client.post(csrf_path, json={}).status_code == 403
+            token = session_client.get('/api/csrf').json()['csrf_token']
+            assert session_client.post(csrf_path, json={}, headers={'X-CSRF-Token':token}).status_code == 200
+    finally:
+        api.dependency_overrides.clear()
