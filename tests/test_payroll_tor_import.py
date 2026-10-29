@@ -36,6 +36,7 @@ def test_tor_apply_creates_employee_contract_and_position_idempotently(db, ee_or
     employee = db.one('SELECT * FROM employees WHERE organisation_id=? AND personal_id=?',
                        (ee_org['id'], '49001010018'))
     assert employee['name'] == 'Mari Tamm' and employee['gross_salary'] is None
+    assert employee['pay_basis'] == 'income_line'
     assert employee['fte'] == 0.5
     contract = db.one('SELECT * FROM payroll_contracts WHERE organisation_id=? AND employee_id=?',
                       (ee_org['id'], employee['id']))
@@ -47,6 +48,9 @@ def test_tor_apply_creates_employee_contract_and_position_idempotently(db, ee_or
     assert repeated['unchanged'] == 1
     assert db.scalar('SELECT COUNT(*) FROM employees WHERE organisation_id=?', (ee_org['id'],)) == 1
     assert db.scalar('SELECT COUNT(*) FROM payroll_contracts WHERE organisation_id=?', (ee_org['id'],)) == 1
+    from payroll import PayrollService
+    with pytest.raises(ValueError, match='eligible for the period'):
+        PayrollService(db).create_run(ee_org['id'], period='2026-11', actor='owner@example.test')
 
 
 def test_tor_apply_matches_existing_employee_and_updates_contract(db, ee_org):
