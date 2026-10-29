@@ -56,6 +56,8 @@ from payroll_payouts import PayoutConflict, PayoutService
 from payroll_absences import AbsenceConflict, PayrollAbsenceService, ABSENCE_TYPES
 from payroll_absence_payouts import AbsencePayoutService
 from payroll_withholdings import PayrollWithholdingService
+from payroll_reports import PayrollReportsService
+from payroll_delivery import PayrollDeliveryService
 from payroll_leave_service import PayrollLeaveLiabilityService
 from employee_details import EmployeeDetailsError
 from tax import TaxService
@@ -65,6 +67,18 @@ from prepayments import PrepaymentService
 from fixed_assets import FixedAssetService
 from opening_balances import OpeningBalanceService, parse_open_items_csv
 
+
+class PayrollEmailSettingsIn(BaseModel):
+    sender_name: str = ''
+    reply_to: str = ''
+    cc: str = ''
+
+class PayrollDeliveryIn(BaseModel):
+    employee_ids: list[str] = Field(min_length=1)
+
+class PayrollReviewIn(BaseModel):
+    recipient: str
+    include_payslips: bool = True
 
 class User(BaseModel):
     email: str
@@ -2174,6 +2188,7 @@ class EmployeeIn(BaseModel):
     employment_start_date: str | None = None
     employment_end_date: str | None = None
     tax_settings_period: str | None = None
+    report_language: Literal['et', 'en', 'lv', 'lt'] | None = None
 
 
 class EmployeePatch(BaseModel):
@@ -2197,6 +2212,7 @@ class EmployeePatch(BaseModel):
     employment_start_date: str | None = None
     employment_end_date: str | None = None
     tax_settings_period: str | None = None
+    report_language: Literal['et', 'en', 'lv', 'lt'] | None = None
 
 
 class PayRunIn(BaseModel):
@@ -2911,9 +2927,11 @@ def payroll_delete(organisation_id: str, run_id: str, user: User = Depends(requi
 
 
 @api.get('/organisations/{organisation_id}/pay-runs/{run_id}/payslips.pdf')
-def payroll_payslips(organisation_id: str, run_id: str, user: User = Depends(current_user)):
+def payroll_payslips(organisation_id: str, run_id: str, employee_ids: str | None = None,
+                    user: User = Depends(current_user)):
     _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
-    return Response(PayrollService().payslips_pdf(organisation_id, run_id), media_type='application/pdf',
+    selected = [item for item in (employee_ids or '').split(',') if item] or None
+    return Response(PayrollService().payslips_pdf(organisation_id, run_id, selected), media_type='application/pdf',
                     headers={'Content-Disposition': 'attachment; filename="payslips.pdf"'})
 
 
@@ -2927,6 +2945,86 @@ def payroll_workbook(organisation_id: str, run_id: str, user: User = Depends(cur
     )
 
 
+@api.get('/organisations/{organisation_id}/payroll/reports/annual-summary')
+def payroll_annual_summary(organisation_id: str, year: int, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    return PayrollReportsService().annual_summary(organisation_id, year)
+
+@api.get('/organisations/{organisation_id}/payroll/reports.xlsx')
+def payroll_report_xlsx(organisation_id: str, report: str, year: int | None = None,
+                        period: str | None = None, months: int = 6,
+                        start: str | None = None, end: str | None = None,
+                        user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    service = PayrollReportsService()
+    if report == 'annual-summary':
+        rows = [{'employee_name': employee['employee_name'], 'employee_id': employee['employee_id'],
+                 'month': month, **values, 'gross_by_type': values['types']}
+                for employee in service.annual_summary(organisation_id, year or 2026)
+                for month, values in employee['months'].items()]
+    elif report == 'average-pay': rows = service.average_pay(organisation_id, period or '2026-01', months)
+    elif report == 'palk':
+        result = service.statistics_palk(organisation_id, period or '2026-01')
+        rows = [{'row': key, **value} for key, value in result['rows'].items()]
+    elif report == 'headcount':
+        result = service.yearly_headcount(organisation_id, year or 2026)
+        rows = [{'year': result['year'], 'month': index + 1, **month}
+                for index, month in enumerate(result['months'])]
+    elif report == 'pay-list': rows = service.pay_list(organisation_id, start or period or '2026-01', end or period or '2026-01')
+    else: raise HTTPException(status_code=422, detail='Choose a supported payroll report')
+    content = PayrollReportsService.workbook(report, rows)
+    return Response(content, media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        headers={'Content-Disposition': f'attachment; filename="payroll-{report}.xlsx"'})
+
+@api.get('/organisations/{organisation_id}/payroll/reports/average-pay')
+def payroll_average_report(organisation_id: str, period: str, months: int = 6, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    return PayrollReportsService().average_pay(organisation_id, period, months)
+
+@api.get('/organisations/{organisation_id}/payroll/reports/palk')
+def payroll_palk_report(organisation_id: str, period: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    return PayrollReportsService().statistics_palk(organisation_id, period)
+
+@api.get('/organisations/{organisation_id}/payroll/reports/headcount')
+def payroll_headcount_report(organisation_id: str, year: int, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    return PayrollReportsService().yearly_headcount(organisation_id, year)
+
+@api.get('/organisations/{organisation_id}/payroll/reports/pay-list')
+def payroll_pay_list(organisation_id: str, start: str, end: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    return PayrollReportsService().pay_list(organisation_id, start, end)
+
+@api.get('/organisations/{organisation_id}/pay-runs/{run_id}/deliveries')
+def payroll_delivery_history(organisation_id: str, run_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    return PayrollDeliveryService().history(organisation_id, run_id)
+
+@api.post('/organisations/{organisation_id}/payroll/deliveries/{delivery_id}/retry')
+def payroll_retry_delivery(organisation_id: str, delivery_id: str, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return PayrollDeliveryService().retry(organisation_id, delivery_id, actor=user.email)
+@api.get('/organisations/{organisation_id}/payroll/report-settings')
+def payroll_report_settings(organisation_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES)
+    return PayrollDeliveryService().settings(organisation_id)
+
+@api.put('/organisations/{organisation_id}/payroll/report-settings')
+def payroll_save_report_settings(organisation_id: str, payload: PayrollEmailSettingsIn, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return PayrollDeliveryService().save_settings(organisation_id, payload.model_dump())
+
+@api.post('/organisations/{organisation_id}/pay-runs/{run_id}/deliveries/payslips')
+def payroll_send_payslips(organisation_id: str, run_id: str, payload: PayrollDeliveryIn, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return PayrollDeliveryService().send_payslips(organisation_id, run_id, payload.employee_ids, actor=user.email)
+
+@api.post('/organisations/{organisation_id}/pay-runs/{run_id}/deliveries/review')
+def payroll_send_for_review(organisation_id: str, run_id: str, payload: PayrollReviewIn, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return PayrollDeliveryService().send_for_review(organisation_id, run_id, payload.recipient,
+        include_payslips=payload.include_payslips, actor=user.email)
 @api.get('/organisations/{organisation_id}/payroll/tsd-preparations')
 def payroll_tsd_preparations(organisation_id: str, user: User = Depends(current_user)):
     _require(organisation_id, user, APPROVE_ROLES | {'viewer'})

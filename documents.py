@@ -1021,20 +1021,23 @@ def payroll_pdf(organisation: dict, run: dict) -> bytes:
             return value
         return unicodedata.normalize('NFKD', value).encode('ascii', 'ignore').decode('ascii')
 
-    ee = organisation.get('country_code') == 'EE'
+    language = 'et' if organisation.get('country_code') == 'EE' else 'en'
+    ee = language == 'et'
     def label(et, en):
-        return text(et if ee else en)
+        if ee:
+            return text(et)
+        if language in ('lv', 'lt'):
+            return text(i18n.catalog(language)['workspace'].get(en, en))
+        return text(en)
 
     from web import i18n
     from payroll import SOCIAL_TAX_MINIMUM_EXEMPTION_LABELS
     def catalogue(key):
-        return text(i18n.catalog('et' if ee else 'en')['workspace'].get(key, key))
+        return text(i18n.catalog(language if language in ('et', 'en', 'lv', 'lt') else 'en')['workspace'].get(key, key))
 
     output = BytesIO()
     canvas = Canvas(output, pagesize=A4)
     width, height = A4
-    title = label('PALGALEHT', 'PAYSLIP') + ' ' + run['period']
-    canvas.setTitle(title)
     rows = [
         ('Brutopalk', 'Gross salary', 'gross'),
         ('Kogumispension (II sammas)', 'Funded pension (II pillar)', 'funded_pension'),
@@ -1051,6 +1054,11 @@ def payroll_pdf(organisation: dict, run: dict) -> bytes:
     ]
     status = {'Approved': 'Kinnitatud', 'Draft': 'Kavand'}.get(run['status'], run['status']) if ee else run['status']
     for index, item in enumerate(run['items'], 1):
+        language = item.get('report_language') or language
+        ee = language == 'et'
+        status = {'Approved': 'Kinnitatud', 'Draft': 'Kavand'}.get(run['status'], run['status']) if ee else run['status']
+        title = label('PALGALEHT', 'PAYSLIP') + ' ' + run['period']
+        canvas.setTitle(title)
         canvas.setFont(bold, 20)
         canvas.drawString(42, height-55, title)
         canvas.setFont(regular, 11)

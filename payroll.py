@@ -345,6 +345,10 @@ class PayrollService:
         if not isinstance(data.get('name'), str) or not data['name'].strip() or len(data['name']) > 180:
             raise ValueError('Employee name must contain 1 to 180 characters')
         data['name'] = data['name'].strip()
+        language = data.get('report_language') or 'et'
+        if language not in {'et', 'en', 'lv', 'lt'}:
+            raise ValueError('Report language must be et, en, lv or lt')
+        data['report_language'] = language
         for field in ('board_member', 'active', 'apply_tax_free_minimum'):
             if data[field] not in (True, False, 0, 1):
                 raise ValueError(f'{field} must be a boolean')
@@ -437,7 +441,7 @@ class PayrollService:
         fields = ('name', 'email', 'personal_id', 'gross_salary', 'funded_pension_percent',
                   'apply_tax_free_minimum', 'board_member', 'active', 'pay_basis', 'fte', 'hourly_rate',
                   'social_tax_minimum_exemption', 'employment_start_date', 'employment_end_date',
-                  'phone', 'iban', 'bank_account_owner', 'address', 'date_of_birth')
+                  'phone', 'iban', 'bank_account_owner', 'address', 'date_of_birth', 'report_language')
         if set(changes) - set(fields):
             raise ValueError('Unknown employee field')
         # Keep the legacy board_member flag and the pay basis in step when only one is sent.
@@ -451,7 +455,7 @@ class PayrollService:
         return self._save_employee_tx(tx, organisation_id, actor, employee_id, fields, changes, period)
 
     def _save_employee_tx(self, tx, organisation_id, actor, employee_id, fields, changes, period=None):
-        self._organisation(tx, organisation_id)
+        organisation = self._organisation(tx, organisation_id)
         if employee_id:
             data = tx.one('SELECT * FROM employees WHERE organisation_id=? AND id=?', (organisation_id, employee_id))
             if not data:
@@ -465,7 +469,7 @@ class PayrollService:
             legacy_changes = {k: v for k, v in changes.items() if data.get(k) != v}
             data.update(changes)
         else:
-            data = dict(email=None, personal_id=None, apply_tax_free_minimum=False, board_member=False, active=True)
+            data = dict(email=None, personal_id=None, apply_tax_free_minimum=False, board_member=False, active=True, report_language=organisation.get('language') or 'et')
             data.update(changes)
             data.setdefault('funded_pension_percent', 0 if data['board_member'] else 2)
             legacy_changes = changes
@@ -1334,18 +1338,26 @@ class PayrollService:
             tx.execute('DELETE FROM pay_runs WHERE organisation_id=? AND id=?', (organisation_id, run_id))
             audit(tx, organisation_id, actor, 'payroll.deleted', 'pay_run', run_id)
 
-    def payslips_pdf(self, organisation_id, run_id):
+    def payslips_pdf(self, organisation_id, run_id, employee_ids=None, language=None):
         from documents import payroll_pdf
         with self.db.transaction() as tx:
             run = self._run(tx, organisation_id, run_id)
             org = self._organisation(tx, organisation_id)
             for item in run['items']:
+                employee = tx.one('SELECT report_language FROM employees WHERE organisation_id=? AND id=?',
+                                  (organisation_id, item['employee_id']))
+                item['report_language'] = language or (employee or {}).get('report_language') or org.get('language') or 'et'
                 item['absences'] = tx.rows(
                     'SELECT a.absence_type,a.start_date,a.end_date,x.calendar_days,x.leave_days,x.working_days '
                     'FROM payroll_absence_run_items x JOIN payroll_absences a '
                     'ON a.organisation_id=x.organisation_id AND a.id=x.absence_id '
                     'WHERE x.organisation_id=? AND x.pay_run_id=? AND x.employee_id=? ORDER BY a.start_date,a.id',
                     (organisation_id, run_id, item['employee_id']))
+        if employee_ids is not None:
+            selected = set(employee_ids)
+            if len(selected) != len(employee_ids) or not selected.issubset({item['employee_id'] for item in run['items']}):
+                raise KeyError('One or more selected employees are not in this pay run')
+            run['items'] = [item for item in run['items'] if item['employee_id'] in selected]
         if run.get('show_leave_balance'):
             from payroll_leave_service import PayrollLeaveLiabilityService
             period = run['period']
@@ -1357,6 +1369,8 @@ class PayrollService:
                 item['remaining_leave_days'] = balances.get(item['employee_id'], '0')
         return payroll_pdf(org, run)
 
+    def payslip_pdf(self, organisation_id, run_id, employee_id, language=None):
+        return self.payslips_pdf(organisation_id, run_id, [employee_id], language=language)
     def workbook_xlsx(self, organisation_id, run_id):
         from excel_export import pay_run_workbook
         with self.db.transaction() as tx:

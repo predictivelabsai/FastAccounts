@@ -2350,3 +2350,17 @@ run kinds.
 
 Validation: `tests/test_migrations_and_tenancy.py`, 17 passed. Full requested
 payroll acceptance suite has not yet been run.
+
+## 2026-10-29: Payroll reports and delivery (Build 8 in progress)
+
+- Added migration 0065 for organisation payroll email settings, employee report
+  languages and tenant-scoped delivery history.
+- Added selected employee payslip emails, reviewer packs with XLSX and optional
+  PDF attachments, send history and retry actions. Added report calculations and
+  workbook downloads for annual summaries, average pay, PALK, headcount and pay
+  lists. The workspace now includes report, settings and delivery dialogs.
+- Focused payroll, workspace, locale, bulk email, report/delivery and migration
+  checks pass individually. All email tests use mocked transport. PALK unmapped
+  designation support, dashboard deadline feed integration, dedicated route
+  security/retry tests, translated payslip review and bureau UAT remain open.
+  See `payroll_reports_delivery_validation.md`.

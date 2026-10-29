@@ -10,3 +10,5 @@ CREATE TABLE payroll_deliveries (
  FOREIGN KEY(organisation_id,employee_id) REFERENCES employees(organisation_id,id)
 );
 CREATE INDEX payroll_deliveries_history ON payroll_deliveries(organisation_id,pay_run_id,created_at,id);
+
+UPDATE employees SET report_language=COALESCE((SELECT language FROM organisations WHERE organisations.id=employees.organisation_id),'et');

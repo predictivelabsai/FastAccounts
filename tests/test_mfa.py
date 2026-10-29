@@ -360,7 +360,7 @@ def test_locales_and_workspace(lang):
     keys = {k for k in english["auth"] if k.startswith("mfa_")}
     assert len(keys) == 22
     assert keys == {k for k in raw["auth"] if k.startswith("mfa_")}
-    assert list(raw)[-(7):] == ["invoice_exports", "bulk_sending", "reminder_rules", "fx_rates", "document_settings", "copilot", "periods"]
+    assert list(raw)[-(8):] == ["invoice_exports", "bulk_sending", "reminder_rules", "fx_rates", "document_settings", "copilot", "periods", "payroll_corrections"]
     for key in keys:
         assert i18n.t("auth." + key, lang) == raw["auth"][key] and "\u2014" not in raw["auth"][key]
     from web.public import workspace_page

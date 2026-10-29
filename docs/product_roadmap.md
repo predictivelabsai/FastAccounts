@@ -2255,3 +2255,15 @@ run navigation and offset confirmation, with en/et/lv/lt translations. Requested
 offline acceptance files pass individually. Remaining work is accountant UAT,
 e-MTA acceptance and external validation. See
 `payroll_corrections_validation.md` for commands, counts and commits.
+
+## Payroll reports and delivery (Build 8 in progress, 2026-10-29)
+
+Migration 0065 and the initial implementation add payroll report services for
+annual summaries, average pay, monthly PALK, yearly headcount/FTE and pay lists,
+with XLSX exports. Organisation email settings, employee report language,
+payslip delivery, review packs and per-run delivery history are available in the
+payroll workspace. Focused payroll, workspace, locale, email and migration tests
+pass individually. Remaining validation includes route permission/CSRF tests,
+failed-delivery retries, PALK unmapped designations, general dashboard deadline
+integration, translated payslip review and bureau UAT. See
+`payroll_reports_delivery_validation.md`.

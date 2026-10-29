@@ -249,7 +249,7 @@ def test_migration_rerun_preserves_data_and_checks(env):
 def test_locale_tail_keys_merge_and_nav(language):
     raw = json.loads((i18n.LOCALES_DIR / f'{language}.json').read_text(encoding='utf-8'))
     english = json.loads((i18n.LOCALES_DIR / 'en.json').read_text(encoding='utf-8'))
-    assert list(raw)[-(7):] == ['invoice_exports', 'bulk_sending', 'reminder_rules', 'fx_rates', 'document_settings', 'copilot', 'periods']
+    assert list(raw)[-(8):] == ['invoice_exports', 'bulk_sending', 'reminder_rules', 'fx_rates', 'document_settings', 'copilot', 'periods', 'payroll_corrections']
     assert set(raw['document_settings']) == set(english['document_settings']) == {'nav', 'views', 'workspace'}
     for section in ['nav', 'views', 'workspace']:
         assert set(raw['document_settings'][section]) == set(english['document_settings'][section])

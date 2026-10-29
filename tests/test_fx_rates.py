@@ -258,7 +258,7 @@ def test_invoice_api_override_and_base_currency_rate(db, ee_org, sending):
 def test_locale_tail(language):
     from web import i18n
     raw = json.loads((i18n.LOCALES_DIR / f'{language}.json').read_text(encoding='utf-8'))
-    assert list(raw)[-(7):] == ['invoice_exports', 'bulk_sending', 'reminder_rules', 'fx_rates', 'document_settings', 'copilot', 'periods']
+    assert list(raw)[-(8):] == ['invoice_exports', 'bulk_sending', 'reminder_rules', 'fx_rates', 'document_settings', 'copilot', 'periods', 'payroll_corrections']
     assert set(raw['fx_rates']) == {'nav', 'views', 'workspace'}
     assert {'Document', 'Revalue balances', 'Revaluation date', 'Run revaluation',
             'Open portion', 'Booked base', 'Target base', 'Delta', 'Revaluation history',

@@ -2239,7 +2239,7 @@
             t("Payroll"),
             t("People, payslips and postings for this client."),
             button("Add employee", "employee") + button("Payout summary", "payoutSummary") +
-            button("Withholdings", "withholdings") + button("Absences", "absences") + button("Leave liability", "leaveLiability") +
+            button("Reports", "payrollReports") + button("Withholdings", "withholdings") + button("Absences", "absences") + button("Leave liability", "leaveLiability") +
               (['owner','administrator'].includes(org?.role) ? button("Leave settings", "leaveSettings") : "") +
               button("Payment types", "paymentTypes") + button("Payroll accounts", "payrollAccounts") + button("Payday settings", "paydaySettings") +
               button("Run payroll for month", "run", true),
@@ -2313,6 +2313,8 @@
         payrollAccounts: () => payrollAccountsDialog(c),
         paydaySettings: () => paydaySettingsDialog(c),
         withholdings: () => payrollWithholdingsDialog(c, employees || []),
+        payrollReports: () => payrollReportsDialog(c),
+        sendPayslips: (b) => payrollDeliveryDialog(c, runs.find((run) => run.id === b.dataset.id)),
         managePayouts: (b) => payrollPayoutsDialog(c, runs.find((run) => run.id === b.dataset.id), bankAccounts || []),
         createCorrection: async (b) => { await post(c.url(`/pay-runs/${b.dataset.id}/corrections`), {}); await render(); },
         createSupplementary: async (b) => {
@@ -4225,6 +4227,7 @@
       form(
         field("Name", "name", e.name || "", "text", "required") +
           field("Email", "email", e.email || "", "email") +
+          select("Reports language", "report_language", [['et','Eesti'],['en','English'],['lv','Latviešu'],['lt','Lietuvių']], e.report_language || org?.language || 'et') +
           field("Personal ID", "personal_id", e.personal_id || "") +
           field("Phone", "phone", e.phone || "", "tel", 'maxlength="50"') +
           field("Date of birth", "date_of_birth", e.date_of_birth || "", "date") +
@@ -4470,9 +4473,10 @@
     const approved = runs.filter((r) => r.status === "Approved");
     if (!approved.length) return "";
     const labels = {none: "Not prepared", prepared: "Prepared", settled: "Settled"};
+    const palkDue = (period) => { const [year, month] = period.split('-').map(Number), nextMonth = month === 12 ? 1 : month + 1, nextYear = month === 12 ? year + 1 : year; return `${nextYear}-${String(nextMonth).padStart(2,'0')}-18`; };
     return `<section class="section payroll-declarations"><h2>${tr("Month-end declarations")}</h2>${table(["Period", "Declaration state", "Due date", "Actions"], approved.map((r) => row([
       td(esc(r.period)), td(tr(labels[r.declaration_state] || "Not prepared")),
-      td(`${esc(r.declaration_due_date || "")}${r.declaration_overdue ? `<small class="declaration-overdue">${tr("Overdue declaration")}</small>` : ""}`),
+      td(`${esc(r.declaration_due_date || "")}${r.declaration_overdue ? `<small class="declaration-overdue">${tr("Overdue declaration")}</small>` : ""}<small>${tr('PALK report due date')}: ${esc(palkDue(r.period))}</small>`),
       td(r.declaration_state === "settled" ? "" : (r.declaration_state === "prepared" ? "" : button("Prepare TSD", "tsd_prepare", false, `data-id="${esc(r.id)}"`)) + button("Reclassify TSD liabilities", "settleDeclaration", false, `data-id="${esc(r.id)}"`)),
     ])))}</section>`;
   }
@@ -4697,6 +4701,54 @@
     input.addEventListener('change', async () => { try { report = await load(input.value); d.querySelector('[data-liability-report]').innerHTML = renderReport(report); d.querySelector('[data-liability-xlsx]').href = `/api${c.url('/payroll/leave-liability.xlsx')}?as_at=${encodeURIComponent(input.value)}`; } catch(error) { toast(error.message,'error'); } });
     d.addEventListener('click', async (event) => { const b = event.target.closest('[data-action="postLeaveReserve"]'); if (!b) return; confirmAction('Post vacation reserve', `${tr('Period')}: ${esc(b.dataset.period)}`, async () => { await post(c.url('/payroll/leave-reserve-postings'), {period:b.dataset.period}); toast(tr('Vacation reserve posted'),'success'); }); });
   }
+  async function payrollReportsDialog(c) {
+    const d = dialog('Payroll reports', `<p>${tr('Annual summary payslip')}, ${tr('Average pay report')}, ${tr('Statistics report')}, ${tr('Yearly average headcount')}, ${tr('Pay list')}</p>${select('Report', 'report', [['annual-summary','Annual summary payslip'],['average-pay','Average pay report'],['palk','Statistics report'],['headcount','Yearly average headcount'],['pay-list','Pay list']], 'annual-summary')}${field('Year','year',new Date().getFullYear(),'number')}${field('Period','period',new Date().toISOString().slice(0,7),'month')}${select('Average period','months',[['6','6 months'],['9','9 months'],['12','12 months']], '6')}${button('Show report','showPayrollReport',true)} <a data-payroll-report-xlsx class="button" href="#">${tr('Export Excel')}</a><pre data-payroll-report-result></pre><h3>${tr('Email settings')}</h3>${field('Sender name','sender_name','')}${field('Reply-to','reply_to','')}${field('CC','cc','')}${button('Save email settings','savePayrollEmailSettings')}</div>`);
+    const settings = await api(c.url('/payroll/report-settings'));
+    for (const key of ['sender_name','reply_to','cc']) d.querySelector(`[name="${key}"]`).value = settings[key] || '';
+    d.addEventListener('click', async (event) => {
+      const b = event.target.closest('[data-action]'); if (!b) return;
+      try {
+        if (b.dataset.action === 'showPayrollReport') {
+          const report = d.querySelector('[name="report"]').value, year = d.querySelector('[name="year"]').value;
+          const period = d.querySelector('[name="period"]').value, months = d.querySelector('[name="months"]').value;
+          const params = new URLSearchParams({report, year, period, months, start: period, end: period});
+          const result = await api(c.url(`/payroll/reports/${report}`) + `?${params}`);
+          d.querySelector('[data-payroll-report-result]').textContent = JSON.stringify(result, null, 2);
+          d.querySelector('[data-payroll-report-xlsx]').href = `/api${c.url('/payroll/reports.xlsx')}?${params}`;
+        } else if (b.dataset.action === 'savePayrollEmailSettings') {
+          await post(c.url('/payroll/report-settings'), Object.fromEntries(['sender_name','reply_to','cc'].map((key) => [key, d.querySelector(`[name="${key}"]`).value])), 'PUT');
+          toast(tr('Settings saved'), 'success');
+        }
+      } catch (error) { toast(error.message, 'error'); }
+    });
+  }
+
+  async function payrollDeliveryDialog(c, run) {
+    if (!run) return;
+    const employees = run.items || [];
+    const options = employees.map((employee) => `<label class="check-row"><input type="checkbox" name="selected_employee" value="${esc(employee.employee_id)}" checked> ${esc(employee.employee_name)}</label>`).join('');
+    const d = dialog('Send payslips', `<p>${esc(run.period)}</p>${options}${button('Send selected payslips','sendSelectedPayslips',true)}<h3>${tr('Send for review')}</h3>${field('Reviewer email','reviewer_email','')}<label class="check-row"><input type="checkbox" name="include_payslips" checked> ${tr('Include payslips')}</label>${button('Send for review','sendPayrollReview')}<div data-delivery-history></div>`);
+    const history = async () => {
+      const rows = await api(c.url(`/pay-runs/${run.id}/deliveries`));
+      d.querySelector('[data-delivery-history]').innerHTML = table(['Recipient','Status','Date','Actions'], rows.map((item) => row([td(esc(item.recipient)),td(pill(item.status)),td(esc(item.created_at)),td(item.status === 'Failed' ? button('Retry delivery','retryPayrollDelivery',false,`data-id="${item.id}"`) : '')])));
+    };
+    await history();
+    d.addEventListener('click', async (event) => {
+      const b = event.target.closest('[data-action]'); if (!b) return;
+      try {
+        if (b.dataset.action === 'sendSelectedPayslips') {
+          const employee_ids = [...d.querySelectorAll('[name="selected_employee"]:checked')].map((input) => input.value);
+          await post(c.url(`/pay-runs/${run.id}/deliveries/payslips`), {employee_ids});
+        } else if (b.dataset.action === 'sendPayrollReview') {
+          await post(c.url(`/pay-runs/${run.id}/deliveries/review`), {recipient:d.querySelector('[name="reviewer_email"]').value,include_payslips:d.querySelector('[name="include_payslips"]').checked});
+        } else if (b.dataset.action === 'retryPayrollDelivery') {
+          await post(c.url(`/payroll/deliveries/${b.dataset.id}/retry`), {});
+        }
+        await history();
+      } catch (error) { toast(error.message, 'error'); }
+    });
+  }
+
   async function payrollPayoutsDialog(c, run, bankAccounts) {
     if (!run) return;
     const refresh = async () => api(c.url('/payroll/payouts') + `?run_id=${encodeURIComponent(run.id)}`);
@@ -5049,7 +5101,7 @@
         (draft
           ? button("Delete draft", "delete", false, `data-id="${r.id}"`) +
               button("Approve & post", "approve", true, `data-id="${r.id}"`)
-          : button("Payroll payouts", "managePayouts", false, `data-id="${r.id}"`) + (r.kind === 'regular' ? button('Create correction', 'createCorrection', false, `data-id="${r.id}"`) + button('Add supplementary run', 'createSupplementary', false, `data-id="${r.id}"`) : '') + link(
+          : button("Send payslips", "sendPayslips", false, `data-id="${r.id}"`) + button("Payroll payouts", "managePayouts", false, `data-id="${r.id}"`) + (r.kind === 'regular' ? button('Create correction', 'createCorrection', false, `data-id="${r.id}"`) + button('Add supplementary run', 'createSupplementary', false, `data-id="${r.id}"`) : '') + link(
               "Payslips PDF",
               `/api${c.url(`/pay-runs/${r.id}/payslips.pdf`)}`,
             ) + tsdActions) +
