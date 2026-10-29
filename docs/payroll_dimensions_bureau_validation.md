@@ -27,6 +27,9 @@ All commands used the required PowerShell `Start-Job` wrapper with a 600-second 
 - `tests/test_migrations_and_tenancy.py`: initial run exposed the CI catalogue line-format defect after 11 passed; after correcting the explicit CI list, 20 passed in 170.02s.
 - `tests/test_payroll_dimensions.py`: initial run exposed a report-format expectation mismatch after 3 passed; after correcting the expected two-decimal amount, 4 passed in 36.53s.
 - `tests/test_payroll.py`: 16 passed in 156.11s with one upstream `asyncio.iscoroutinefunction` deprecation warning.
+- After the ledger dimension change, `tests/test_migrations_and_tenancy.py`: 20 passed in 166.88s.
+- After the ledger dimension change, `tests/test_payroll_dimensions.py`: 5 passed in 47.74s.
+- After the ledger dimension change, `tests/test_payroll.py`: 16 passed in 144.10s with the same upstream deprecation warning.
 
 ## Completed implementation checkpoints
 
@@ -42,10 +45,10 @@ All commands used the required PowerShell `Start-Job` wrapper with a 600-second 
   migration 0069.
 - Commit `63e78a1` adds a dimension cost API, report selector and en/et/lv/lt
   locale labels, plus frozen-value tenant-scope coverage.
+- Migration `0071_payroll_ledger_dimensions` stores tenant-checked department and cost-centre tags alongside analytical GL tags. Payroll salary, social-tax and employer UI expense lines now split by each approved item's frozen department, cost centre and project; liability lines remain untagged and aggregated. Corrections keep the same analytical tags when reversing line direction.
 
 ## Remaining work
 
-- Split salary and employer levy ledger postings by frozen department, cost centre and project dimensions through the analytical-object mechanism, preserve balanced totals, and leave payout postings unchanged.
 - Add reviewed CSV/XLSX imports for departments, positions (with position group), cost centres and projects.
 - Add the bureau overview, read-only organisation membership matrix, and grouped payroll settings page with owner/admin protections and required UI/locales.
 - Run each touched test file individually with the required timeout wrapper and record exact outcomes.

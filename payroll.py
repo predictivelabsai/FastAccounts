@@ -1427,32 +1427,47 @@ class PayrollService:
                     sum((money(c['amount']) for item in baseline_run['items'] for c in item['components']
                     if c['direction'] == 'deduction' and c['liability_role'] == role), Decimal(0))
                     for role in ('PAYROLL_BAILIFF', 'PAYROLL_DEDUCTION')}
-            postings = [('PAYROLL_SALARY', totals['gross'], True, memo),
+            postings = []
+            for item in run['items']:
+                previous_item = baseline.get(item['employee_id'], {}) if correction else {}
+                item_amount = lambda key: money(decimal(item[key]) - decimal(previous_item.get(key, 0))) if correction else money(item[key])
+                dimensions = {
+                    'projects_project_id': item.get('project_id'),
+                    'payroll_department_id': item.get('department_id'),
+                    'payroll_cost_centre_id': item.get('cost_centre_id'),
+                }
+                postings.append(('PAYROLL_SALARY', item_amount('gross'), True, memo, dimensions))
+                social_topup = item_amount('social_tax_minimum_topup')
+                postings.append(('PAYROLL_SOCIAL', item_amount('social_tax') - social_topup, True, memo, dimensions))
+                postings.append(('PAYROLL_SOCIAL', social_topup, True, topup_memo, dimensions))
+                postings.append(('PAYROLL_UI', item_amount('ui_employer'), True, memo, dimensions))
+            postings.extend([
                         ('PAYROLL_SALARY_PAYABLE', totals['gross'], False, memo),
                         ('PAYROLL_SALARY_PAYABLE', totals['withholding_total'], True, memo),
                         ('PAYROLL_INCOME_WITHHELD', totals['income_tax'], False, memo),
                         ('PAYROLL_PENSION_WITHHELD', totals['funded_pension'], False, memo),
                         ('PAYROLL_UI_ACCRUED', totals['ui_employee'], False, memo),
                         *((role, value, False, memo) for role, value in deductions.items()),
-                        ('PAYROLL_SOCIAL', totals['social_tax']-topup, True, memo),
                         ('PAYROLL_SOCIAL_ACCRUED', totals['social_tax']-topup, False, memo),
-                        ('PAYROLL_SOCIAL', topup, True, topup_memo),
                         ('PAYROLL_SOCIAL_ACCRUED', topup, False, topup_memo),
-                        ('PAYROLL_UI', totals['ui_employer'], True, memo),
-                        ('PAYROLL_UI_ACCRUED', totals['ui_employer'], False, memo)]
+                        ('PAYROLL_UI_ACCRUED', totals['ui_employer'], False, memo)])
             accounts = {role: self._posting_account(tx, organisation_id, role) for role in ROLES}
             for role, account in accounts.items():
                 tx.execute('INSERT INTO pay_run_posting_accounts(organisation_id,pay_run_id,role,account_id) VALUES (?,?,?,?)',
                            (organisation_id, run_id, role, account['id']))
             source_id = original_id if correction else run_id
             lines = [PostingLine(accounts[role]['id'], debit=value if debit else Decimal(0), credit=Decimal(0) if debit else value,
-                                 memo=line_memo, source_line_type='pay_run', source_line_id=source_id)
-                     for role, value, debit, line_memo in postings if value]
+                                 memo=line_memo, source_line_type='pay_run', source_line_id=source_id,
+                                 **(dimension_values[0] if dimension_values else {}))
+                     for role, value, debit, line_memo, *dimension_values in postings if value]
             if correction:
                 lines = [PostingLine(line.account_id,
                     debit=abs(line.debit or line.credit) if (line.debit > 0 or line.credit < 0) else Decimal(0),
                     credit=abs(line.credit or line.debit) if (line.credit > 0 or line.debit < 0) else Decimal(0),
-                    memo=line.memo, source_line_type=line.source_line_type, source_line_id=line.source_line_id)
+                    memo=line.memo, source_line_type=line.source_line_type, source_line_id=line.source_line_id,
+                    projects_project_id=line.projects_project_id,
+                    payroll_department_id=line.payroll_department_id,
+                    payroll_cost_centre_id=line.payroll_cost_centre_id)
                     for line in lines]
             year, month = map(int, run['period'].split('-'))
             batch = LedgerService(self.db).post(organisation_id=organisation_id, voucher_type='payroll', voucher_id=run_id,

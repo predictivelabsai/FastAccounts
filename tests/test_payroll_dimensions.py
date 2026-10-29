@@ -70,3 +70,27 @@ def test_approved_payroll_dimension_costs_use_frozen_tenant_scoped_values(db, ee
     assert report[0]['dimension_id'] == department['id']
     assert report[0]['gross'] == '2000.00'
     assert PayrollReportsService(db).dimension_costs('other-tenant', '2026-10', '2026-10') == []
+
+
+def test_approval_splits_payroll_expenses_with_frozen_analytical_tags(db, ee_org, legacy_payroll):
+    from decimal import Decimal
+    dimensions = PayrollDimensionService(db)
+    department = dimensions.save(ee_org['id'], kind='department', code='OPS', name='Operations', actor='owner@example.test')
+    run = legacy_payroll(db, ee_org['id'], name='Tagged employee', gross='2000')
+    PayrollService(db).save_employee(ee_org['id'], employee_id='legacy-employee', actor='owner@example.test',
+                                     department_id=department['id'])
+    PayrollService(db).approve(ee_org['id'], run['id'], actor='owner@example.test')
+    batch = db.one('SELECT * FROM posting_batches WHERE organisation_id=? AND voucher_id=?', (ee_org['id'], run['id']))
+    entries = db.rows('SELECT g.*,a.system_role,d.payroll_department_id,d.payroll_cost_centre_id,d.projects_project_id '
+                      'FROM gl_entries g JOIN accounts a ON a.organisation_id=g.organisation_id AND a.id=g.account_id '
+                      'LEFT JOIN gl_entry_objects d ON d.organisation_id=g.organisation_id AND d.line_id=g.id '
+                      'WHERE g.organisation_id=? AND g.posting_batch_id=? ORDER BY g.line_number',
+                      (ee_org['id'], batch['id']))
+    salary = [entry for entry in entries if entry['system_role'] == 'PAYROLL_SALARY']
+    assert sum((Decimal(entry['debit']) for entry in salary), Decimal(0)) == Decimal(run['items'][0]['gross'])
+    assert len(salary) == 1
+    assert salary[0]['payroll_department_id'] == department['id']
+    expense_entries = [entry for entry in entries if entry['system_role'] in {'PAYROLL_SALARY', 'PAYROLL_SOCIAL', 'PAYROLL_UI'}]
+    assert all(entry['payroll_department_id'] == department['id'] for entry in expense_entries)
+    assert all(not entry['payroll_department_id'] for entry in entries if entry['system_role'] not in {'PAYROLL_SALARY', 'PAYROLL_SOCIAL', 'PAYROLL_UI'})
+    assert sum((Decimal(entry['debit']) for entry in entries), Decimal(0)) == sum((Decimal(entry['credit']) for entry in entries), Decimal(0))
