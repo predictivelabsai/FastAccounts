@@ -4657,12 +4657,11 @@
         `<div class="full-width component-flags">${componentFlagFields(values)}</div><p class="full-width muted">${tr("Levy flags apply to income lines. Deduction lines reduce net pay.")}</p>` + `<p class="full-width muted">${tr("Defaults can be overridden on each draft payment line. Confirm tax treatment before approval.")}</p>`,
       ));
       bindForm(editor, async (data, f) => {
-        if (data.palk_designation === "") data.palk_designation = null;
+        data.palk_designation = data.palk_designation === "" ? null : Number(data.palk_designation);
         componentFlags.forEach(([key]) => data[key] = f.elements[key].checked);
         data.is_wage = f.elements.is_wage.checked;
         data.active = f.elements.active.checked;
         data.tsd_payment_type = Number(f.elements.tsd_payment_type.value);
-        data.palk_row = Number(f.elements.palk_row.value);
         for (const key of ['default_rate','default_percentage','default_coefficient']) data[key] = data[key] || null;
         await post(c.url(`/payroll/component-types${type ? `/${type.id}` : ""}`), data, type ? "PUT" : "POST");
         await saved(editor);
