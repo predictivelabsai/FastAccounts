@@ -2410,7 +2410,8 @@
     "Payroll reports": "Algu pārskati",
     "Report": "Pārskats",
     "Average period": "Vidējās algas periods",
-    "PALK report due date": "PALK pārskata termiņš"
+    "PALK report due date": "PALK pārskata termiņš",
+    "Download selected PDF": "Lejupielādēt atlasītos algas aprēķinus PDF formātā"
   },
   "views": {
     "overview": "Overview",

@@ -4727,7 +4727,13 @@
     if (!run) return;
     const employees = run.items || [];
     const options = employees.map((employee) => `<label class="check-row"><input type="checkbox" name="selected_employee" value="${esc(employee.employee_id)}" checked> ${esc(employee.employee_name)}</label>`).join('');
-    const d = dialog('Send payslips', `<p>${esc(run.period)}</p>${options}${button('Send selected payslips','sendSelectedPayslips',true)}<h3>${tr('Send for review')}</h3>${field('Reviewer email','reviewer_email','')}<label class="check-row"><input type="checkbox" name="include_payslips" checked> ${tr('Include payslips')}</label>${button('Send for review','sendPayrollReview')}<div data-delivery-history></div>`);
+    const d = dialog('Send payslips', `<p>${esc(run.period)}</p>${options}${button('Send selected payslips','sendSelectedPayslips',true)} <a class="button" data-selected-pdf href="#">${tr('Download selected PDF')}</a><h3>${tr('Send for review')}</h3>${field('Reviewer email','reviewer_email','')}<label class="check-row"><input type="checkbox" name="include_payslips" checked> ${tr('Include payslips')}</label>${button('Send for review','sendPayrollReview')}<div data-delivery-history></div>`);
+    const updatePdfLink = () => {
+      const ids = [...d.querySelectorAll('[name="selected_employee"]:checked')].map((input) => input.value);
+      d.querySelector('[data-selected-pdf]').href = `/api${c.url(`/pay-runs/${run.id}/payslips.pdf`)}?employee_ids=${encodeURIComponent(ids.join(','))}`;
+    };
+    d.addEventListener('change', (event) => { if (event.target.matches('[name="selected_employee"]')) updatePdfLink(); });
+    updatePdfLink();
     const history = async () => {
       const rows = await api(c.url(`/pay-runs/${run.id}/deliveries`));
       d.querySelector('[data-delivery-history]').innerHTML = table(['Recipient','Status','Date','Actions'], rows.map((item) => row([td(esc(item.recipient)),td(pill(item.status)),td(esc(item.created_at)),td(item.status === 'Failed' ? button('Retry delivery','retryPayrollDelivery',false,`data-id="${item.id}"`) : '')])));

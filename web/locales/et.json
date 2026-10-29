@@ -2410,7 +2410,8 @@
     "Payroll reports": "Palgaaruanded",
     "Report": "Aruanne",
     "Average period": "Keskmiste tasude periood",
-    "PALK report due date": "PALK aruande tähtaeg"
+    "PALK report due date": "PALK aruande tähtaeg",
+    "Download selected PDF": "Laadi valitud palgateatised PDF-ina"
   },
   "views": {
     "overview": "Ülevaade",

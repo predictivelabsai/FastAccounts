@@ -2410,7 +2410,8 @@
     "Payroll reports": "Payroll reports",
     "Report": "Report",
     "Average period": "Average period",
-    "PALK report due date": "PALK report due date"
+    "PALK report due date": "PALK report due date",
+    "Download selected PDF": "Download selected PDF"
   },
   "views": {
     "overview": "Overview",

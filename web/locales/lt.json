@@ -2410,7 +2410,8 @@
     "Payroll reports": "Darbo užmokesčio ataskaitos",
     "Report": "Ataskaita",
     "Average period": "Vidutinio atlygio laikotarpis",
-    "PALK report due date": "PALK ataskaitos terminas"
+    "PALK report due date": "PALK ataskaitos terminas",
+    "Download selected PDF": "Atsisiųsti pasirinktus algalapius PDF formatu"
   },
   "views": {
     "overview": "Overview",
