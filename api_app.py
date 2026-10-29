@@ -53,6 +53,7 @@ from payroll import PayrollConflict, PayrollService
 from payroll_tax_settings import EmployeeTaxSettingsService, TaxSettingConflict, TaxSettingValidationError
 from payroll_payday import PaydaySettingsService
 from payroll_contracts import PayrollContractService
+from payroll_tor_import import TORImportService
 from payroll_payouts import PayoutConflict, PayoutService
 from payroll_absences import AbsenceConflict, PayrollAbsenceService, ABSENCE_TYPES
 from payroll_absence_payouts import AbsencePayoutService
@@ -2486,6 +2487,22 @@ def payroll_create_salary_agreement(organisation_id: str, contract_id: str, payl
     start_date = data.pop('start_date')
     return PayrollContractService(get_database()).add_agreement(
         organisation_id, contract_id, start_date=start_date, actor=user.email, **data)
+
+
+@api.post('/organisations/{organisation_id}/payroll/tor-imports', status_code=201)
+async def payroll_stage_tor_import(organisation_id: str, file: UploadFile = File(...),
+                                  user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    content = await file.read(5_000_001)
+    if len(content) > 5_000_000:
+        raise HTTPException(status_code=413, detail='TÖR CSV must be 5 MB or smaller')
+    return TORImportService(get_database()).stage(organisation_id, content, actor=user.email)
+
+
+@api.get('/organisations/{organisation_id}/payroll/tor-imports/{import_id}')
+def payroll_get_tor_import(organisation_id: str, import_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    return TORImportService(get_database()).get(organisation_id, import_id)
 
 
 @api.delete('/organisations/{organisation_id}/employees/{employee_id}', status_code=204)
