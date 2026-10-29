@@ -1,6 +1,7 @@
 from payroll import PayrollService
 from payroll_contracts import PayrollContractService
 from decimal import Decimal
+from fastapi.testclient import TestClient
 
 
 def test_contract_agreement_history_and_tenant_scope(db, ee_org, legacy_payroll):
@@ -34,3 +35,22 @@ def test_contract_validation_rejects_bad_fte_and_foreign_employee(db, ee_org):
     else:
         raise AssertionError('Invalid FTE was accepted')
     assert PayrollService(db).employees(ee_org['id']) == []
+
+
+def test_contract_api_enforces_tenant_roles_and_csrf(db, ee_org, monkeypatch):
+    monkeypatch.setenv('FASTACCOUNTS_DB', db.path)
+    monkeypatch.setenv('DB_URL', '')
+    from api_app import api
+    client = TestClient(api)
+    root = f"/organisations/{ee_org['id']}"
+    headers = {'X-Test-User': 'owner@example.test'}
+    employee = client.post(root + '/employees', headers=headers, json={'name': 'API employee', 'gross_salary': '2000'}).json()
+    payload = {'contract_type': 'employment', 'start_date': '2026-01-01',
+               'agreement': {'base_pay_type': 'monthly', 'rate': '2000'},
+               'position': {'position': 'Accountant'}}
+    assert client.get(root + f"/employees/{employee['id']}/contracts", headers=headers).status_code == 200
+    created = client.post(root + f"/employees/{employee['id']}/contracts", headers=headers, json=payload)
+    assert created.status_code == 201, created.text
+    assert created.json()['contract_type'] == 'employment'
+    assert client.get(root + f"/employees/{employee['id']}/contracts", headers={'X-Test-User': 'outsider@example.test'}).status_code == 403
+    assert client.post(root + f"/employees/{employee['id']}/contracts", headers={'X-Test-User': 'viewer@example.test'}, json=payload).status_code == 403

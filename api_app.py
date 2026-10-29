@@ -52,6 +52,7 @@ from organisations import APPROVE_ROLES, WRITE_ROLES, AccessDenied, Organisation
 from payroll import PayrollConflict, PayrollService
 from payroll_tax_settings import EmployeeTaxSettingsService, TaxSettingConflict, TaxSettingValidationError
 from payroll_payday import PaydaySettingsService
+from payroll_contracts import PayrollContractService
 from payroll_payouts import PayoutConflict, PayoutService
 from payroll_absences import AbsenceConflict, PayrollAbsenceService, ABSENCE_TYPES
 from payroll_absence_payouts import AbsencePayoutService
@@ -2222,6 +2223,32 @@ class PayRunIn(BaseModel):
     show_leave_balance: bool = False
 
 
+class PayrollContractIn(BaseModel):
+    model_config = {'extra': 'forbid'}
+    contract_type: Literal['employment', 'board_member', 'services', 'other', 'none']
+    start_date: str
+    end_date: str | None = None
+    document_name: str | None = Field(default=None, max_length=180)
+    workplace_address: str | None = Field(default=None, max_length=2000)
+    monthly_net_advance: Decimal = Field(default=Decimal('0'), ge=0, max_digits=12, decimal_places=2)
+    payday_rule: Literal['next_month_day', 'current_month_day', 'next_month_first_working_day'] | None = None
+    payday_day: int | None = Field(default=None, ge=1, le=31)
+    agreement: dict | None = None
+    position: dict | None = None
+
+
+class PayrollAgreementIn(BaseModel):
+    model_config = {'extra': 'forbid'}
+    start_date: str
+    base_pay_type: Literal['monthly', 'monthly_day_based', 'hourly', 'contract_sum', 'contract_sum_x_qty']
+    hours_per_day: Decimal = Field(default=Decimal('8'), gt=0, le=24, max_digits=5, decimal_places=2)
+    rate: Decimal = Field(ge=0, max_digits=12, decimal_places=2)
+    fte: Decimal = Field(default=Decimal('1'), gt=0, le=1, max_digits=5, decimal_places=4)
+    is_full_time: bool = True
+    automatic_working_time: bool = True
+    account_override: str | None = Field(default=None, max_length=30)
+
+
 class PaySupplementaryIn(BaseModel):
     model_config = {'extra': 'forbid'}
     employee_ids: list[str] = Field(min_length=1, max_length=500)
@@ -2432,6 +2459,33 @@ def payroll_create_employee(organisation_id: str, payload: EmployeeIn, user: Use
 def payroll_update_employee(organisation_id: str, employee_id: str, payload: EmployeePatch, user: User = Depends(require_csrf)):
     _require(organisation_id, user, WRITE_ROLES)
     return PayrollService().save_employee(organisation_id, employee_id=employee_id, actor=user.email, **payload.model_dump(exclude_unset=True))
+
+
+@api.get('/organisations/{organisation_id}/employees/{employee_id}/contracts')
+def payroll_employee_contracts(organisation_id: str, employee_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    return PayrollContractService(get_database()).list(organisation_id, employee_id)
+
+
+@api.post('/organisations/{organisation_id}/employees/{employee_id}/contracts', status_code=201)
+def payroll_create_contract(organisation_id: str, employee_id: str, payload: PayrollContractIn,
+                           user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    data = payload.model_dump()
+    agreement = data.pop('agreement')
+    position = data.pop('position')
+    return PayrollContractService(get_database()).create(
+        organisation_id, employee_id, actor=user.email, agreement=agreement, position=position, **data)
+
+
+@api.post('/organisations/{organisation_id}/payroll/contracts/{contract_id}/agreements', status_code=201)
+def payroll_create_salary_agreement(organisation_id: str, contract_id: str, payload: PayrollAgreementIn,
+                                   user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    data = payload.model_dump()
+    start_date = data.pop('start_date')
+    return PayrollContractService(get_database()).add_agreement(
+        organisation_id, contract_id, start_date=start_date, actor=user.email, **data)
 
 
 @api.delete('/organisations/{organisation_id}/employees/{employee_id}', status_code=204)
