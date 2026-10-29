@@ -2380,3 +2380,21 @@ payroll acceptance suite has not yet been run.
 - Focused validation and counts are in `payroll_reports_delivery_validation.md`.
   Confirm the due-date interpretation and bureau wording; add PALK dates to the
   general overview in a separate dashboard follow-up.
+
+## 2026-10-29: Payroll contract run integration (Build 9 in progress)
+
+- Added migration 0068 for tenant-scoped frozen contract base lines. Payroll run
+  creation now resolves salary agreements over the pay period and prorates
+  mid-month changes by `payroll_calendar` working days. Each contract's base
+  line carries its type-specific TSD payment code while employee taxes remain
+  aggregated on the run item.
+- Approval creates a draft advance payout for configured monthly net advances,
+  dated the 15th of the earning month and capped at calculated net. A paid
+  advance reduces the salary payout amount; gross and payroll taxes are
+  unchanged. Single backfilled contracts retain legacy payroll amounts.
+- Fixed the payment-type editor payload after reproducing its failure at
+  baseline 7371730. The editor now sends an integer PALK designation and omits
+  the nonexistent PALK row field.
+- Updated the explicit migration catalogue in the migration test and CI
+  workflow. Validation results and remaining Merit mapping, TÖR apply and UI
+  work are recorded in `payroll_contracts_validation.md`.

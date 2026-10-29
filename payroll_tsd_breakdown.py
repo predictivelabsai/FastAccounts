@@ -34,7 +34,7 @@ def _allocate(total, weights):
     return result
 
 
-def calculate_tsd_breakdown(*, item, components, context):
+def calculate_tsd_breakdown(*, item, components, context, contract_lines=()):
     """Return frozen per-type lines that reconcile to ``item`` aggregate values.
 
     Component levy flags and payment codes are read only from the supplied frozen
@@ -63,14 +63,22 @@ def calculate_tsd_breakdown(*, item, components, context):
             if flags.get(flag):
                 record[field] += amount
 
-    salary_amount = money(decimal(item["gross"]) - sum((money(c["amount"]) for c in components
-                                                          if c["direction"] == "income"), Decimal(0)))
-    if salary_amount < 0:
-        salary_amount = Decimal(0)
-    add(item.get("tsd_payment_type") or {"monthly": 10, "hourly": 10,
-        "board_fee": 21, "income_line": 17}[item["pay_basis"]], salary_amount,
-        {"income_tax": True, "social_tax": True, "ui_employee": item["pay_basis"] != "board_fee",
-         "ui_employer": item["pay_basis"] != "board_fee", "funded_pension": True})
+    if contract_lines:
+        for line in contract_lines:
+            kind = line["contract_type"]
+            add(line["payment_type"], line["gross"], {
+                "income_tax": True, "social_tax": True,
+                "ui_employee": kind == "employment", "ui_employer": kind == "employment",
+                "funded_pension": kind == "employment"})
+    else:
+        salary_amount = money(decimal(item["gross"]) - sum((money(c["amount"]) for c in components
+                                                              if c["direction"] == "income"), Decimal(0)))
+        if salary_amount < 0:
+            salary_amount = Decimal(0)
+        add(item.get("tsd_payment_type") or {"monthly": 10, "hourly": 10,
+            "board_fee": 21, "income_line": 17}[item["pay_basis"]], salary_amount,
+            {"income_tax": True, "social_tax": True, "ui_employee": item["pay_basis"] != "board_fee",
+             "ui_employer": item["pay_basis"] != "board_fee", "funded_pension": True})
     for component in components:
         if component["direction"] != "income":
             continue
@@ -136,11 +144,12 @@ def calculate_tsd_breakdown(*, item, components, context):
 
 
 def freeze_tsd_breakdown(tx, organisation_id, source_kind, source_id, *, item, components, context,
-                         payout_batch_id=None, records=None):
+                         payout_batch_id=None, records=None, contract_lines=()):
     """Persist a breakdown inside the caller's approval transaction."""
     if not tsd_lines_table_ready(tx):
         return []
-    records = records if records is not None else calculate_tsd_breakdown(item=item, components=components, context=context)
+    records = records if records is not None else calculate_tsd_breakdown(
+        item=item, components=components, context=context, contract_lines=contract_lines)
     for record in records:
         payment = payment_type(record["payment_type"])
         tx.execute(

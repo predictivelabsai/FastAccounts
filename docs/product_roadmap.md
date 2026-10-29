@@ -2275,11 +2275,11 @@ dashboard follow-up. Production UAT remains external.
 
 ## Payroll contracts and TÖR import (Build 9 in progress, 2026-10-29)
 
-Migration 0067 and the initial tenant-scoped contract, dated salary-agreement,
-position-history and TÖR CSV staging services are present. Contract list/create
-and agreement-add API routes have payroll role and CSRF checks. Existing
-employees receive a backfilled contract and agreement without changing their
-legacy rows. This is a foundation checkpoint only. Contract-driven run
-calculation, multiple contract items/TSD lines, advances, Merit review mapping,
-TÖR apply actions and employee/payroll workspace UI remain open. See
-`payroll_contracts_validation.md` for test results and remaining work.
+Migrations 0067 and 0068 provide tenant-scoped contract history and frozen
+contract base lines. Run creation selects dated agreements, prorates monthly
+changes by payroll working days, allocates TSD lines by contract type and
+proposes configured net advances for payment during the earning month. Paid
+advances reduce the later salary payout without changing gross or tax. Legacy
+single-contract payroll amounts remain unchanged. Merit review mapping, TÖR
+apply actions and employee/payroll workspace UI remain open. See
+`payroll_contracts_validation.md` for validation results and remaining work.

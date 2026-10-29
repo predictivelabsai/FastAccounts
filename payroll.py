@@ -227,6 +227,66 @@ class PayrollService:
         self.db = db or get_database()
 
     @staticmethod
+    def _contract_pay_lines(tx, organisation_id, employee_id, period, hours=None):
+        """Resolve dated contract pay into working-day-weighted run lines."""
+        if not tx.table_exists('payroll_contracts'):
+            return []
+        from payroll_calendar import is_working_day
+        year, month = map(int, period.split('-'))
+        first = date(year, month, 1)
+        last = date(year, month, calendar.monthrange(year, month)[1])
+        month_days = [first + timedelta(days=offset) for offset in range((last - first).days + 1)]
+        working_days = [day for day in month_days if is_working_day(day)]
+        if not working_days:
+            return []
+        contracts = tx.rows(
+            'SELECT * FROM payroll_contracts WHERE organisation_id=? AND employee_id=? '
+            'AND start_date<=? AND (end_date IS NULL OR end_date>=?) ORDER BY start_date,id',
+            (organisation_id, employee_id, last.isoformat(), first.isoformat()))
+        resolved = []
+        for contract in contracts:
+            if contract['contract_type'] == 'none':
+                continue
+            agreements = tx.rows(
+                'SELECT * FROM payroll_salary_agreements WHERE organisation_id=? AND contract_id=? '
+                'AND start_date<=? ORDER BY start_date,id',
+                (organisation_id, contract['id'], last.isoformat()))
+            effective = {}
+            for day in working_days:
+                iso = day.isoformat()
+                if iso < contract['start_date'] or contract.get('end_date') and iso > contract['end_date']:
+                    continue
+                current = next((row for row in reversed(agreements) if row['start_date'] <= iso), None)
+                if current:
+                    effective.setdefault(current['id'], {'agreement': current, 'days': []})['days'].append(day)
+            for grouped in effective.values():
+                agreement = grouped['agreement']
+                days = grouped['days']
+                base_type = agreement['base_pay_type']
+                fte = decimal(agreement['fte'])
+                rate = decimal(agreement['rate'])
+                fte_factor = (Decimal(1) if contract['id'] == f"contract-{employee_id}"
+                              and agreement['id'] == f"agreement-{employee_id}" else fte)
+                if base_type in ('monthly', 'monthly_day_based', 'contract_sum', 'contract_sum_x_qty'):
+                    gross = money(rate * fte_factor * Decimal(len(days)) / Decimal(len(working_days)))
+                elif base_type == 'hourly':
+                    hours_total = decimal(hours or 0)
+                    gross = money(rate * hours_total * Decimal(len(days)) / Decimal(len(working_days)))
+                else:
+                    continue
+                payment_type = {'employment': 10, 'board_member': 21, 'services': 17, 'other': 16}[contract['contract_type']]
+                resolved.append({
+                    'contract_id': contract['id'], 'agreement_id': agreement['id'],
+                    'contract_type': contract['contract_type'], 'base_pay_type': base_type,
+                    'payment_type': payment_type, 'effective_start': min(days).isoformat(),
+                    'effective_end': max(days).isoformat(), 'gross': gross,
+                    'monthly_net_advance': decimal(contract['monthly_net_advance']),
+                    'fte': fte, 'rate': rate, 'days': len(days),
+                    'period_working_days': len(working_days),
+                })
+        return resolved
+
+    @staticmethod
     def _absence_component_lines(tx, organisation_id, employee, period, absences):
         """Build draft-only statutory absence components with frozen calculation details."""
         from datetime import date
@@ -523,6 +583,9 @@ class PayrollService:
             run['payment_date'] = settlement_date(run['period']).isoformat()
         run['items'] = tx.rows('SELECT * FROM pay_run_items WHERE organisation_id=? AND pay_run_id=? ORDER BY employee_name,id', (organisation_id, run_id))
         for item in run['items']:
+            item['contract_lines'] = tx.rows(
+                'SELECT * FROM payroll_contract_run_lines WHERE organisation_id=? AND pay_run_item_id=? ORDER BY effective_start,contract_id,agreement_id',
+                (organisation_id, item['id'])) if tx.table_exists('payroll_contract_run_lines') else []
             item['components'] = [serialise(row) for row in tx.rows(
                 'SELECT c.*,t.preset_key FROM pay_item_components c JOIN pay_component_types t '
                 'ON t.organisation_id=c.organisation_id AND t.id=c.type_id '
@@ -835,7 +898,16 @@ class PayrollService:
         exemption_cap = remaining_monthly_exemption(
             context.get('tax_free_mode') or ('maximum' if context.get('apply_tax_free_minimum') else 'none'),
             context.get('tax_free_amount'), rules_for(pay_date).basic_exemption, used_exemption)
-        amounts = calculate_pay(item | context, period=run['period'], hours=worked, components=lines,
+        contract_components = []
+        contract_rows = tx.rows('SELECT * FROM payroll_contract_run_lines WHERE organisation_id=? AND pay_run_item_id=? AND is_primary=0',
+                                (organisation_id, item_id)) if tx.table_exists('payroll_contract_run_lines') else []
+        for line in contract_rows:
+            kind = line['contract_type']
+            contract_components.append({'amount': line['gross'], 'direction': 'income',
+                'income_tax': True, 'social_tax': True, 'ui_employee': kind == 'employment',
+                'ui_employer': kind == 'employment', 'funded_pension': kind == 'employment',
+                'social_minimum': kind == 'employment'})
+        amounts = calculate_pay(item | context, period=run['period'], hours=worked, components=lines + contract_components,
                                 settlement_on=pay_date, exemption_remaining=exemption_cap,
                                 allow_zero_monthly=(item['pay_basis'] == 'monthly' and
                                     (item.get('worked_days') == 0 or is_adjustable and money(item['gross_salary']) == 0)))
@@ -933,8 +1005,7 @@ class PayrollService:
         result = tx.execute("INSERT INTO pay_runs(id,organisation_id,period,total_gross,total_net,total_employer_cost,created_by,created_at,settlement_date,show_leave_balance) VALUES (?,?,?,0,0,0,?,?,?,?) ON CONFLICT DO NOTHING", (run_id, organisation_id, period, actor, utc_now(), pay_date.isoformat(), int(bool(show_leave_balance))))
         if result.rowcount != 1:
             raise PayrollConflict(f'A pay run already exists for {period}')
-        employees = [e for e in tx.rows('SELECT * FROM employees WHERE organisation_id=? AND active=1 ORDER BY id', (organisation_id,))
-                     if employed_days(e, period)[0] > 0]
+        employees = tx.rows('SELECT * FROM employees WHERE organisation_id=? AND active=1 ORDER BY id', (organisation_id,))
         if not employees:
             raise ValueError('A pay run requires at least one active employee')
         monthly_minimum, hourly_minimum = minimum_wage(period)
@@ -947,11 +1018,56 @@ class PayrollService:
             election = resolve_tax_settings(tx, organisation_id, employee, pay_date)
             employee = employee | election
             employee_for_average = employee
+            contract_lines = self._contract_pay_lines(tx, organisation_id, employee['id'], period,
+                                                       (hours or {}).get(employee['id']))
+            contract_mode = bool(contract_lines)
+            has_contracts = (bool(tx.one('SELECT id FROM payroll_contracts WHERE organisation_id=? AND employee_id=? LIMIT 1',
+                                         (organisation_id, employee['id'])))
+                             if tx.table_exists('payroll_contracts') else False)
+            if not contract_mode and (has_contracts or employed_days(employee, period)[0] == 0):
+                continue
+            primary_contract_id = None
+            contract_components = []
+            if contract_mode:
+                by_contract = {}
+                for line in contract_lines:
+                    entry = by_contract.setdefault(line['contract_id'], {'gross': Decimal(0), 'type': line['contract_type'], 'fte': Decimal(0), 'base_pay_type': line['base_pay_type']})
+                    entry['gross'] += line['gross']
+                    entry['fte'] += line['fte'] * Decimal(line['days']) / Decimal(line['period_working_days'])
+                priority = {'employment': 0, 'board_member': 1, 'services': 2, 'other': 3}
+                primary_contract_id = min(by_contract, key=lambda key: (priority[by_contract[key]['type']], key))
+                primary = by_contract[primary_contract_id]
+                contract_types = {entry['type'] for entry in by_contract.values()}
+                if contract_types == {'board_member'}:
+                    basis = 'board_fee'
+                elif contract_types == {'services'}:
+                    basis = 'income_line'
+                elif primary['base_pay_type'] == 'hourly' and len(contract_types) == 1:
+                    basis = 'hourly'
+                else:
+                    basis = 'monthly'
+                employee = employee | {'pay_basis': basis,
+                    'gross_salary': db_number(primary['gross'] if basis != 'income_line' else Decimal(0)),
+                    'fte': db_number(min(Decimal(1), sum((entry['fte'] for entry in by_contract.values()), Decimal(0))))}
+                if basis == 'hourly':
+                    entered_hours = self._hours(employee, hours)
+                    total_base = sum((line['gross'] for line in contract_lines if line['contract_id'] == primary_contract_id), Decimal(0))
+                    employee['hourly_rate'] = db_number(total_base / entered_hours if entered_hours else 0)
+                for line in contract_lines:
+                    if line['contract_id'] == primary_contract_id and basis != 'income_line':
+                        continue
+                    kind = line['contract_type']
+                    contract_components.append(line | {'amount': line['gross'], 'direction': 'income',
+                        'income_tax': True, 'social_tax': True,
+                        'ui_employee': kind == 'employment', 'ui_employer': kind == 'employment',
+                        'funded_pension': kind == 'employment', 'social_minimum': kind == 'employment'})
             basis, fte, worked, required = pay_basis(employee), _fte(employee.get('fte')), None, None
             if basis == 'monthly':
                 # Part-time: the monthly minimum wage is pro-rated by the work-time fraction.
                 agreement_minimum = money(monthly_minimum * fte)
-                if money(employee['gross_salary']) < agreement_minimum:
+                minimum_gross = (sum((line['gross'] for line in contract_lines), Decimal(0))
+                                 if contract_mode else money(employee['gross_salary']))
+                if money(minimum_gross) < agreement_minimum:
                     suffix = f" (EUR {monthly_minimum:.2f} × {_fraction(fte)})" if fte != 1 else ''
                     raise ValueError(f"{employee['name']}: gross salary must be at least EUR {agreement_minimum:.2f}{suffix}")
             elif basis == 'hourly':
@@ -965,11 +1081,20 @@ class PayrollService:
             if basis == 'monthly':
                 norm_days_snapshot = absence_snapshot['norm_days']
                 worked_days = absence_snapshot['worked_days']
-                employee = employee | {'gross_salary': db_number(money(
-                    decimal(employee['gross_salary']) * Decimal(worked_days) / Decimal(norm_days_snapshot)
-                    if norm_days_snapshot else Decimal(0)))}
-                required = money(agreement_minimum * Decimal(worked_days) / Decimal(norm_days_snapshot)
-                                 if norm_days_snapshot else Decimal(0))
+                if contract_mode:
+                    factor = Decimal(worked_days) / Decimal(norm_days_snapshot) if norm_days_snapshot else Decimal(0)
+                    employee = employee | {'gross_salary': db_number(money(decimal(employee['gross_salary']) * factor))}
+                    for line in contract_lines:
+                        line['gross'] = money(line['gross'] * factor)
+                    for component in contract_components:
+                        component['amount'] = money(component['amount'] * factor)
+                    required = money(agreement_minimum * factor)
+                else:
+                    employee = employee | {'gross_salary': db_number(money(
+                        decimal(employee['gross_salary']) * Decimal(worked_days) / Decimal(norm_days_snapshot)
+                        if norm_days_snapshot else Decimal(0)))}
+                    required = money(agreement_minimum * Decimal(worked_days) / Decimal(norm_days_snapshot)
+                                     if norm_days_snapshot else Decimal(0))
             generated = self._absence_component_lines(tx, organisation_id, employee_for_average, period,
                                                        absence_snapshot['absences'])
             generated_lines = []
@@ -982,7 +1107,7 @@ class PayrollService:
             exemption_cap = remaining_monthly_exemption(
                 election['tax_free_mode'], election.get('tax_free_amount'),
                 rules_for(pay_date).basic_exemption, used_exemption)
-            amounts = calculate_pay(employee, period=period, hours=worked, components=generated_lines, settlement_on=pay_date,
+            amounts = calculate_pay(employee, period=period, hours=worked, components=generated_lines + contract_components, settlement_on=pay_date,
                                     exemption_remaining=exemption_cap,
                                     allow_zero_monthly=basis == 'monthly' and worked_days == 0)
             item_id = new_id()
@@ -996,6 +1121,13 @@ class PayrollService:
             tx.execute('INSERT INTO pay_run_items('+','.join(columns)+') VALUES ('+','.join('?' for _ in columns)+')',
                        values+tuple(db_number(amounts[k]) for k in AMOUNTS)+
                        (worked_days, norm_days_snapshot, absence_snapshot['absence_working_days']))
+            if contract_mode:
+                for line in contract_lines:
+                    tx.execute('INSERT INTO payroll_contract_run_lines(id,organisation_id,pay_run_item_id,contract_id,agreement_id,contract_type,is_primary,payment_type,effective_start,effective_end,gross,monthly_net_advance) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
+                        (new_id(), organisation_id, item_id, line['contract_id'], line['agreement_id'],
+                         line['contract_type'], int(line['contract_id'] == primary_contract_id and basis != 'income_line'), line['payment_type'],
+                         line['effective_start'], line['effective_end'], db_number(line['gross']),
+                         db_number(line['monthly_net_advance'])))
             self._save_absence_components(tx, organisation_id, item_id, generated, 0)
             context_fields = ('tax_free_mode', 'tax_free_amount', 'unemployment_applies',
                               'tax_free_setting_id', 'pension_setting_id', 'unemployment_setting_id')
@@ -1012,6 +1144,9 @@ class PayrollService:
                            (db_number(amounts['net']), db_number(amounts['withholding_total']), organisation_id, item_id))
             for key in totals:
                 totals[key] += amounts[key]
+        if not tx.scalar('SELECT COUNT(*) FROM pay_run_items WHERE organisation_id=? AND pay_run_id=?',
+                         (organisation_id, run_id)):
+            raise ValueError('A pay run requires at least one active employee eligible for the period')
         tx.execute('UPDATE pay_runs SET total_gross=?,total_net=?,total_employer_cost=? WHERE organisation_id=? AND id=?', tuple(db_number(totals[k]) for k in totals)+(organisation_id, run_id))
         audit(tx, organisation_id, actor, 'payroll.drafted', 'pay_run', run_id, {'period': period})
         return self._run(tx, organisation_id, run_id)
@@ -1052,6 +1187,11 @@ class PayrollService:
                         if 'id' in copied:
                             copied['id'] = new_id()
                         self._insert_copied_row(tx, table, copied)
+                for source_line in tx.rows('SELECT * FROM payroll_contract_run_lines WHERE organisation_id=? AND pay_run_item_id=?',
+                                           (organisation_id, source['id'])):
+                    copied = dict(source_line)
+                    copied.update(id=new_id(), pay_run_item_id=item_id)
+                    self._insert_copied_row(tx, 'payroll_contract_run_lines', copied)
                 for absence in tx.rows('SELECT * FROM payroll_absence_run_items WHERE organisation_id=? AND pay_run_id=? AND employee_id=?',
                                        (organisation_id, original_run_id, source['employee_id'])):
                     copied = dict(absence)
@@ -1095,6 +1235,11 @@ class PayrollService:
                     copied = dict(context)
                     copied['item_id'] = item_id
                     self._insert_copied_row(tx, 'pay_item_context', copied)
+                for source_line in tx.rows('SELECT * FROM payroll_contract_run_lines WHERE organisation_id=? AND pay_run_item_id=?',
+                                           (organisation_id, source['id'])):
+                    copied = dict(source_line)
+                    copied.update(id=new_id(), pay_run_item_id=item_id)
+                    self._insert_copied_row(tx, 'payroll_contract_run_lines', copied)
             audit(tx, organisation_id, actor, 'payroll.supplementary.drafted', 'pay_run', run_id,
                   {'original_run_id': original_run_id, 'employee_ids': selected})
             return self._run(tx, organisation_id, run_id)
@@ -1183,7 +1328,8 @@ class PayrollService:
                 if not context:
                     raise ValueError('Pay run calculation snapshot is missing')
                 if correction:
-                    current_lines = calculate_tsd_breakdown(item=item, components=item['components'], context=context)
+                    current_lines = calculate_tsd_breakdown(item=item, components=item['components'], context=context,
+                                                            contract_lines=item.get('contract_lines', []))
                     prior_rows = tx.rows(
                         "SELECT l.* FROM pay_item_tsd_lines l JOIN pay_run_items i "
                         "ON i.organisation_id=l.organisation_id AND i.id=l.source_id "
@@ -1210,10 +1356,12 @@ class PayrollService:
                             delta[field] = decimal(current_line.get(field, 0)) - decimal(previous_line.get(field, 0))
                         delta_lines.append(delta)
                     freeze_tsd_breakdown(tx, organisation_id, 'pay_run_item', item['id'],
-                        item=item, components=item['components'], context=context, records=delta_lines)
+                        item=item, components=item['components'], context=context, records=delta_lines,
+                        contract_lines=item.get('contract_lines', []))
                 else:
                     freeze_tsd_breakdown(tx, organisation_id, 'pay_run_item', item['id'],
-                                         item=item, components=item['components'], context=context)
+                                         item=item, components=item['components'], context=context,
+                                         contract_lines=item.get('contract_lines', []))
             snapshot_totals = {k: sum((decimal(i[k]) for i in run['items']), Decimal(0)) for k in AMOUNTS}
             totals = deltas if correction else snapshot_totals
             memo = f"Payroll correction {run['period']}" if correction else f"Payroll {run['period']}"
@@ -1270,6 +1418,24 @@ class PayrollService:
                 lines=lines, actor=actor, currency='EUR', tx=tx)
             tx.execute('UPDATE pay_runs SET posted_batch_id=?,total_gross=?,total_net=?,total_employer_cost=? WHERE organisation_id=? AND id=?',
                        (batch['id'], db_number(snapshot_totals['gross']), db_number(snapshot_totals['net']), db_number(snapshot_totals['employer_cost']), organisation_id, run_id))
+            if not correction:
+                for item in run['items']:
+                    advances = {}
+                    for line in item.get('contract_lines', []):
+                        advances[line['contract_id']] = max(advances.get(line['contract_id'], Decimal(0)),
+                                                             decimal(line['monthly_net_advance']))
+                    proposed = min(money(sum(advances.values(), Decimal(0))), money(item['net']))
+                    if proposed <= 0:
+                        continue
+                    payout_id = new_id()
+                    payout_date = f"{run['period']}-15"
+                    tx.execute('INSERT INTO payroll_payout_batches(id,organisation_id,pay_run_id,payout_type,payout_date,created_at) VALUES (?,?,?,?,?,?)',
+                               (payout_id, organisation_id, run_id, 'advance', payout_date, utc_now()))
+                    employee_bank = tx.one('SELECT iban,bank_account_owner,name FROM employees WHERE organisation_id=? AND id=?',
+                                           (organisation_id, item['employee_id']))
+                    tx.execute('INSERT INTO payroll_payout_lines(id,organisation_id,payout_batch_id,employee_id,amount,requested_amount,iban,account_owner) VALUES (?,?,?,?,?,?,?,?)',
+                               (new_id(), organisation_id, payout_id, item['employee_id'], db_number(proposed),
+                                db_number(proposed), employee_bank['iban'], employee_bank['bank_account_owner'] or employee_bank['name']))
             audit(tx, organisation_id, actor, 'payroll.approved', 'pay_run', run_id, {'posted_batch_id': batch['id']})
             return self._run(tx, organisation_id, run_id)
 

@@ -37,7 +37,8 @@ class PayoutService:
         for item in items:
             paid = tx.one("SELECT COALESCE(SUM(l.amount),0) amount FROM payroll_payout_lines l "
                            "JOIN payroll_payout_batches b ON b.organisation_id=l.organisation_id AND b.id=l.payout_batch_id "
-                           "WHERE b.organisation_id=? AND b.pay_run_id=? AND b.status!='Cancelled' AND l.employee_id=?",
+                           "WHERE b.organisation_id=? AND b.pay_run_id=? AND b.status!='Cancelled' AND l.employee_id=? "
+                           "AND (b.payout_type!='advance' OR b.status='Paid')",
                            (organisation_id, run_id, item['employee_id']))
             offsets = tx.one("SELECT COALESCE(SUM(o.amount),0) amount FROM payroll_receivable_offsets o "
                              "JOIN payroll_payout_batches b ON b.organisation_id=o.organisation_id AND b.id=o.payout_batch_id "
@@ -102,7 +103,10 @@ class PayoutService:
                        (db_number(amounts['net']), organisation_id, item['id']))
             tsd_item = item | amounts | {'gross': gross_delta, 'gross_salary': gross_delta}
             from payroll_tsd_breakdown import calculate_tsd_breakdown
-            records = calculate_tsd_breakdown(item=tsd_item, components=[], context=context)
+            contract_lines = tx.rows('SELECT * FROM payroll_contract_run_lines WHERE organisation_id=? AND pay_run_item_id=?',
+                                     (organisation_id, item['id'])) if tx.table_exists('payroll_contract_run_lines') else []
+            records = calculate_tsd_breakdown(item=tsd_item, components=[], context=context,
+                                              contract_lines=contract_lines)
             previous_net = money(decimal(item['net']) - decimal(prior['net']))
             adjustments = {
                 'PAYROLL_SALARY_PAYABLE': money(amounts['net'] - previous_net),
@@ -487,7 +491,8 @@ class PayoutService:
                 for item in items:
                     paid = tx.one("SELECT COALESCE(SUM(l.amount),0) amount FROM payroll_payout_lines l "
                                   "JOIN payroll_payout_batches b ON b.organisation_id=l.organisation_id AND b.id=l.payout_batch_id "
-                                  "WHERE b.organisation_id=? AND b.pay_run_id=? AND b.status='Paid' AND l.employee_id=?",
+                                  "WHERE b.organisation_id=? AND b.pay_run_id=? AND b.status='Paid' AND l.employee_id=? "
+                                  "AND b.payout_type!='withholding'",
                                   (organisation_id, run['id'], item['employee_id']))
                     offsets = tx.one("SELECT COALESCE(SUM(o.amount),0) amount FROM payroll_receivable_offsets o "
                                      "JOIN payroll_payout_batches b ON b.organisation_id=o.organisation_id AND b.id=o.payout_batch_id "
