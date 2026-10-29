@@ -8,7 +8,7 @@ CREATE TABLE payroll_contracts (
  document_name TEXT,
  workplace_address TEXT,
  monthly_net_advance NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK(monthly_net_advance>=0),
- payday_rule TEXT CHECK(payday_rule IN ('last_day','fixed_day','last_working_day','first_working_day')),
+ payday_rule TEXT CHECK(payday_rule IN ('next_month_day','current_month_day','next_month_first_working_day')),
  payday_day INTEGER CHECK(payday_day BETWEEN 1 AND 31),
  created_at TEXT NOT NULL,
  FOREIGN KEY(organisation_id,employee_id) REFERENCES employees(organisation_id,id),
