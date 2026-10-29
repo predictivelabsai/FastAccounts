@@ -1,7 +1,7 @@
 # Payroll dimensions and bureau validation
 
-Date: 2026-10-29. Branch: `feat/payroll-dimensions-bureau`, based on
-`feat/payroll-contracts` at `1a9646b`.
+Date: 2026-10-29. Branch: `feat/payroll-dimensions-bureau`, at the current
+Build 10 implementation commits.
 
 ## Build decision and progress
 
@@ -9,64 +9,61 @@ The existing `objects` table is tenant-scoped, but its object-type check and
 ledger dimension schema only cover project, location, person and generic object.
 Payroll uses a separate tenant-scoped `payroll_dimensions` register for
 `department`, `position_group`, `position` and `cost_centre`, while projects
-continue to use the analytical-object register. Migration 0069 currently adds
-register storage and optional dimension references on employee, contract,
-salary-agreement, component and frozen contract-run records.
+continue to use the analytical-object register. Migration 0069 adds register
+storage and optional references on employees, contracts, salary agreements,
+component lines and frozen contract-run records. Migration 0070 adds frozen
+employee-level dimensions to payroll run items.
 
-Build 10 is in progress. This migration has not yet been validated, and no
-acceptance criteria should be treated as complete.
+Build 10 remains in progress. The register service, employee/contract/agreement
+dimension writes, component-line dimension writes, approval snapshots on payroll
+items, and a dimension cost report API/XLSX route have been started. The report
+uses frozen payroll item values. Department and cost-centre dimensions are not
+yet represented on GL entries, so the analytical posting split is outstanding.
 
 ## Validation commands and outcomes
 
-No pytest command run yet. Per requested procedure, each pytest invocation will
-use the PowerShell `Start-Job` wrapper, a 300-second timeout, and
-`-q -p no:cacheprovider -x`.
+Every attempted pytest command used the requested PowerShell `Start-Job` wrapper,
+a 300-second timeout, and `-q -p no:cacheprovider -x`. The `test_payroll.py`
+timeout from the previous session must not be repeated.
+
+- `tests/test_payroll_dimensions.py`: earlier checkpoint had 2 passed. New
+  acceptance coverage was added for employee/contract validation and frozen
+  report tenant scope. The latest invocation returned no captured pytest output,
+  so the new coverage is not counted as passed.
+- `tests/test_migrations_and_tenancy.py`: the prior checkpoint had 20 passed
+  before migration 0070. Subsequent runs found old-schema compatibility defects
+  in employee approval and component edits. Fixes were committed; the latest
+  invocation returned no captured output. It needs a surfaced process result
+  before it can be counted as passing.
+- `tests/test_payroll.py`: timed out in the previous session and must not be run
+  again.
+
+## Completed implementation checkpoints
+
+- Commit `2408204` wires employee, contract and salary-agreement dimensions and
+  validates IDs against active, same-organisation register values. Component
+  updates accept department, cost-centre and project IDs. The checkpoint's
+  dimensions suite passed 3 tests before subsequent additions.
+- Commit `0cd13f4` adds migration 0070 for frozen payroll item dimensions and
+  updates the explicit migration catalogues in the test and CI files.
+- Commit `191d111` keeps approval compatible with schemas older than migration
+  0070.
+- Commit `6f5ad78` keeps component edits compatible with schemas predating
+  migration 0069.
+- Commit `63e78a1` adds a dimension cost API, report selector and en/et/lv/lt
+  locale labels, plus frozen-value tenant-scope coverage.
 
 ## Remaining work
 
-- Add the payroll-dimension repository/service with kind validation, CRUD,
-  relationship checks and tenant isolation.
-- Freeze resolved department, cost centre and project values on approved lines;
-  split salary and employer-levy ledger postings by dimensions and keep batches
-  balanced. Payout postings remain unchanged.
-- Add period cost report on screen and XLSX.
-- Add reviewed CSV/XLSX dimension import for departments, positions, cost centres
-  and projects.
-- Add bureau overview, organisation membership matrix, payroll settings page,
-  locale strings in en/et/lv/lt, and role/CSRF protections.
-- Add focused coverage, update both migration catalogues in
-  `tests/test_migrations_and_tenancy.py` and `.github/workflows/ci.yml`, run the
-  requested per-file test list, and update roadmap/change log when complete.
-
-Migration checkpoint validation:
-
-- `tests/test_migrations_and_tenancy.py`: 20 passed in 156.49 seconds using
-  the required PowerShell wrapper. The first attempt exposed a SQLite lock in
-  the new test because it created a second organisation inside an open write
-  transaction; organisation creation was moved before that transaction.
-- Migration 0069 is included in the explicit expected migration list in both
-  `tests/test_migrations_and_tenancy.py` and `.github/workflows/ci.yml`.
-
-The tenant-scoped payroll dimension service now supports listing, create/update,
-deactivation, active filtering, code uniqueness, and position-to-group validation.
-`tests/test_payroll_dimensions.py` passed (2 tests) using the required wrapper.
-This checkpoint does not yet wire employee/contracts into the service or add
-approval freezing and the remaining Build 10 features.
-
-## Additional requested test run
-
-- `tests/test_payroll.py`: no result was returned by the required job wrapper
-  within the 300-second limit. Process inspection showed this invocation's
-  `.venv` pytest child still running after the wrapper stalled; only that
-  child process was stopped. The independently running full test worktree was
-  left untouched. This test file is not considered passed.
-
-## Scope remaining at this checkpoint
-
-Only the register schema and register service are implemented. Employee and
-contract editing do not yet accept these dimension IDs. Approval does not freeze
-the selected dimensions or split expense and employer levy postings. Dimension
-cost reporting, reviewed CSV/XLSX staging, bureau overview and membership
-matrix, settings grouping, locales, workspace routes and their role/CSRF tests
-remain unimplemented. The requested existing test files other than the migration
-file have not been validated; `tests/test_payroll.py` timed out as noted above.
+- Split salary and employer-levy ledger postings by frozen dimensions through
+  the analytical-object mechanism, preserve balanced totals, and leave payout
+  postings unchanged.
+- Verify the dimension cost report and finish period grouping and XLSX output.
+- Add reviewed CSV/XLSX imports for departments, positions, cost centres and
+  projects.
+- Add the bureau overview, read-only organisation membership matrix, and
+  grouped payroll settings page with owner/admin protections.
+- Complete UI flows and tests for imports, overview tenant isolation, matrix
+  access, settings grouping, report output and frozen ledger dimensions.
+- Run the requested test files individually, except `tests/test_payroll.py`
+  which must remain unrun due to its recorded timeout. Record the exact results.

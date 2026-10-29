@@ -4,6 +4,18 @@ Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as
 delivered.
 
+## 2026-10-29: Payroll dimensions and bureau overview (Build 10, in progress)
+
+- Added migration 0070 for frozen employee-level dimensions on payroll run
+  items, and updated both explicit migration catalogues. Employee, contract,
+  agreement and component inputs validate active, same-organisation dimension
+  references.
+- Added a dimension cost report API and export selector, plus locale labels in
+  en, et, lv and lt. Approval snapshots employee dimensions for the report.
+- Build 10 remains incomplete. GL posting splits, reviewed imports, the bureau
+  overview and membership matrix, grouped payroll settings and their acceptance
+  tests remain outstanding. See `payroll_dimensions_bureau_validation.md`.
+
 ## 2026-10-29: Payroll contracts and TÖR import (Build 9 implementation complete)
 
 - Added migration 0067 with tenant-scoped employee contracts, dated salary
