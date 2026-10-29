@@ -4,6 +4,8 @@ from __future__ import annotations
 import os
 import re
 import secrets
+import base64
+import binascii
 from datetime import date
 from decimal import Decimal
 from typing import Any, Literal
@@ -53,6 +55,7 @@ from payroll import PayrollConflict, PayrollService
 from payroll_tax_settings import EmployeeTaxSettingsService, TaxSettingConflict, TaxSettingValidationError
 from payroll_payday import PaydaySettingsService
 from payroll_contracts import PayrollContractService
+from payroll_dimension_imports import PayrollDimensionImportService
 from payroll_tor_import import TORImportService
 from payroll_payouts import PayoutConflict, PayoutService
 from payroll_absences import AbsenceConflict, PayrollAbsenceService, ABSENCE_TYPES
@@ -848,6 +851,13 @@ class MasterDataImportIn(BaseModel):
     csv_content: str = Field(min_length=1, max_length=2_000_000)
 
 
+class PayrollDimensionImportIn(BaseModel):
+    kind: Literal['department', 'position', 'cost_centre', 'project']
+    file_name: str = Field(min_length=1, max_length=180)
+    csv_content: str | None = Field(default=None, max_length=2_000_000)
+    xlsx_base64: str | None = Field(default=None, max_length=3_000_000)
+
+
 @api.post('/organisations/{organisation_id}/imports', status_code=201)
 def stage_master_data(organisation_id: str, payload: MasterDataImportIn, user: User = Depends(require_csrf)):
     _require(organisation_id, user, WRITE_ROLES)
@@ -870,6 +880,42 @@ def commit_master_data_import(organisation_id: str, batch_id: str, user: User = 
 def discard_master_data_import(organisation_id: str, batch_id: str, user: User = Depends(require_csrf)):
     _require(organisation_id, user, WRITE_ROLES)
     return MasterDataImportService().discard(organisation_id, batch_id, actor=user.email)
+
+
+@api.post('/organisations/{organisation_id}/payroll/dimension-imports', status_code=201)
+def stage_payroll_dimension_import(organisation_id: str, payload: PayrollDimensionImportIn,
+                                  user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    if (payload.csv_content is None) == (payload.xlsx_base64 is None):
+        raise ValueError('Supply either csv_content or xlsx_base64')
+    if payload.xlsx_base64 is not None:
+        try:
+            content = base64.b64decode(payload.xlsx_base64, validate=True)
+        except (ValueError, binascii.Error) as exc:
+            raise ValueError('Invalid XLSX base64 content') from exc
+    else:
+        content = payload.csv_content
+    return PayrollDimensionImportService().stage(organisation_id, payload.kind, content,
+                                                  file_name=payload.file_name, actor=user.email)
+
+
+@api.get('/organisations/{organisation_id}/payroll/dimension-imports/{batch_id}')
+def get_payroll_dimension_import(organisation_id: str, batch_id: str, limit: int = 100, offset: int = 0,
+                                 user: User = Depends(current_user)):
+    _require(organisation_id, user, {'owner', 'administrator', 'accountant', 'approver', 'viewer'})
+    return PayrollDimensionImportService().get(organisation_id, batch_id, limit=limit, offset=offset)
+
+
+@api.post('/organisations/{organisation_id}/payroll/dimension-imports/{batch_id}/commit')
+def commit_payroll_dimension_import(organisation_id: str, batch_id: str, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return PayrollDimensionImportService().commit(organisation_id, batch_id, actor=user.email)
+
+
+@api.post('/organisations/{organisation_id}/payroll/dimension-imports/{batch_id}/discard')
+def discard_payroll_dimension_import(organisation_id: str, batch_id: str, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return PayrollDimensionImportService().discard(organisation_id, batch_id, actor=user.email)
 
 
 @api.post("/organisations/{organisation_id}/contacts", status_code=201)

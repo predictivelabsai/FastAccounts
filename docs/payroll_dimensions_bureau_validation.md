@@ -5,20 +5,18 @@ Build 10 implementation commits.
 
 ## Build decision and progress
 
-The existing `objects` table is tenant-scoped, but its object-type check and
-ledger dimension schema only cover project, location, person and generic object.
-Payroll uses a separate tenant-scoped `payroll_dimensions` register for
-`department`, `position_group`, `position` and `cost_centre`, while projects
-continue to use the analytical-object register. Migration 0069 adds register
-storage and optional references on employees, contracts, salary agreements,
-component lines and frozen contract-run records. Migration 0070 adds frozen
-employee-level dimensions to payroll run items.
+Payroll uses a tenant-scoped `payroll_dimensions` register for departments,
+position groups, positions and cost centres; projects remain analytical objects.
+Migrations 0069 and 0070 store register links and frozen employee dimensions.
+Migration 0071 adds department and cost-centre tags to analytical GL entries.
+Migration 0072 adds reviewed dimension import batches and rows.
 
-Build 10 remains in progress. The register service, employee/contract/agreement
-dimension writes, component-line dimension writes, approval snapshots on payroll
-items, and a dimension cost report API/XLSX route have been started. The report
-uses frozen payroll item values. Department and cost-centre dimensions are not
-yet represented on GL entries, so the analytical posting split is outstanding.
+The register service, employee/contract/agreement and component dimension
+writes, approval snapshots, dimension cost report API/XLSX output, split payroll
+expense postings and reviewed CSV/XLSX imports are implemented. Salary, employer
+social tax and employer unemployment insurance expenses use the approved
+employee snapshot. Liability postings remain unsplit. Import application is
+explicit after row review and scopes every read and write to the organisation.
 
 ## Validation commands and outcomes
 
@@ -30,6 +28,8 @@ All commands used the required PowerShell `Start-Job` wrapper with a 600-second 
 - After the ledger dimension change, `tests/test_migrations_and_tenancy.py`: 20 passed in 166.88s.
 - After the ledger dimension change, `tests/test_payroll_dimensions.py`: 5 passed in 47.74s.
 - After the ledger dimension change, `tests/test_payroll.py`: 16 passed in 144.10s with the same upstream deprecation warning.
+- `tests/test_payroll_dimension_import.py`: 5 passed in 48.68s, covering CSV/XLSX staging, review, apply/discard, position groups, project tenancy and API roles.
+- After migration 0072, `tests/test_migrations_and_tenancy.py`: 20 passed in 172.86s.
 
 ## Completed implementation checkpoints
 
@@ -46,9 +46,10 @@ All commands used the required PowerShell `Start-Job` wrapper with a 600-second 
 - Commit `63e78a1` adds a dimension cost API, report selector and en/et/lv/lt
   locale labels, plus frozen-value tenant-scope coverage.
 - Migration `0071_payroll_ledger_dimensions` stores tenant-checked department and cost-centre tags alongside analytical GL tags. Payroll salary, social-tax and employer UI expense lines now split by each approved item's frozen department, cost centre and project; liability lines remain untagged and aggregated. Corrections keep the same analytical tags when reversing line direction.
+- Migration `0072_payroll_dimension_imports` adds isolated review batches. CSV and XLSX imports cover departments, positions with position groups, cost centres and projects; commits revalidate rows and apply accepted records in the tenant transaction.
 
 ## Remaining work
 
-- Add reviewed CSV/XLSX imports for departments, positions (with position group), cost centres and projects.
-- Add the bureau overview, read-only organisation membership matrix, and grouped payroll settings page with owner/admin protections and required UI/locales.
-- Run each touched test file individually with the required timeout wrapper and record exact outcomes.
+- Add the bureau overview and read-only organisation membership matrix.
+- Add the grouped payroll settings page with owner/admin protections.
+- Complete the remaining UI flows and locale strings.
