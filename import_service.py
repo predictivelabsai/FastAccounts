@@ -929,6 +929,12 @@ class ImportService:
         if not external_id:
             raise ValueError("External ID is required to apply an employee record")
         changes = {field: payload[field] for field in EMPLOYEE_FIELDS if field in payload}
+        merit_contract = sync["provider"] == "merit_palk"
+        if merit_contract:
+            # Merit Palk salary terms belong in dated contract history. Keep the
+            # employee's legacy pay fields untouched while applying identity data.
+            for field in ("gross_salary", "pay_basis", "fte", "hourly_rate", "board_member"):
+                changes.pop(field, None)
         if not isinstance(changes.get("name"), str) or not changes["name"].strip():
             raise ValueError("Employee name is required")
         warning = payload.get("import_warning")
@@ -954,11 +960,25 @@ class ImportService:
             ):
                 raise ValueError(warning)
             if (
-                not existing
+                not merit_contract
+                and not existing
                 and "gross_salary" not in changes
                 and changes.get("pay_basis", "monthly") not in {"hourly", "income_line"}
             ):
                 raise ValueError("Gross salary is required")
+            if merit_contract and not existing:
+                # New employee rows still require a valid legacy fallback. Existing
+                # employee salary fields are never overwritten by Merit imports.
+                initial = (payload.get("merit_palk_salary_agreements") or [{}])[0]
+                if payload.get("merit_palk_income_basis") == "income_line":
+                    changes["pay_basis"] = "income_line"
+                elif payload.get("board_member"):
+                    changes["pay_basis"] = "board_fee"
+                    changes["board_member"] = True
+                    changes["gross_salary"] = money(Decimal(str(initial.get("Amount"))))
+                else:
+                    changes["pay_basis"] = "monthly"
+                    changes["gross_salary"] = money(Decimal(str(initial.get("Amount"))))
             self._assert_name_available(tx, organisation_id, changes["name"].strip(), employee_id)
             outcome = "applied"
             if existing and self._employee_unchanged(existing, changes):
@@ -994,6 +1014,9 @@ class ImportService:
                         utc_now(),
                     ),
                 )
+            if merit_contract:
+                if self._apply_merit_contract_history(tx, organisation_id, employee["id"], payload):
+                    outcome = "updated" if existing else "applied"
             tx.execute(
                 "UPDATE import_staged_records SET status='Applied',matched_local_employee_id=?,"
                 "matched_local_id=?,review_note=NULL,updated_at=? WHERE organisation_id=? AND id=?",
@@ -1017,6 +1040,63 @@ class ImportService:
             "outcome": outcome,
             "employee_id": employee["id"],
         }
+
+    @staticmethod
+    def _apply_merit_contract_history(tx, organisation_id, employee_id, payload):
+        contract_type = "board_member" if payload.get("board_member") else (
+            "services" if payload.get("merit_palk_income_basis") == "income_line" else "employment"
+        )
+        agreements = payload.get("merit_palk_salary_agreements") or []
+        starts = [str(item.get("StartDate") or payload.get("employment_start_date") or "")
+                  for item in agreements]
+        starts = [value for value in starts if value]
+        start_date = min(starts) if starts else str(payload.get("employment_start_date") or "")
+        if not start_date:
+            raise ValueError("Merit Palk contract start date is required")
+        end_date = payload.get("employment_end_date")
+        contract = tx.one(
+            "SELECT * FROM payroll_contracts WHERE organisation_id=? AND employee_id=? AND contract_type=? "
+            "ORDER BY start_date,id LIMIT 1", (organisation_id, employee_id, contract_type)
+        )
+        changed = False
+        if contract is None:
+            contract_id = new_id()
+            tx.execute(
+                "INSERT INTO payroll_contracts(id,organisation_id,employee_id,contract_type,start_date,end_date,created_at) "
+                "VALUES (?,?,?,?,?,?,?)", (contract_id, organisation_id, employee_id, contract_type, start_date, end_date, utc_now())
+            )
+            changed = True
+        else:
+            contract_id = contract["id"]
+            # Refresh imported dates without changing unrelated local contract settings.
+            changed = contract["start_date"] != start_date or contract["end_date"] != end_date
+            tx.execute("UPDATE payroll_contracts SET start_date=?,end_date=? WHERE organisation_id=? AND id=?",
+                       (start_date, end_date, organisation_id, contract_id))
+        for item in agreements:
+            agreement_start = str(item.get("StartDate") or start_date)
+            try:
+                rate = money(Decimal(str(item.get("Amount"))))
+            except (InvalidOperation, TypeError) as exc:
+                raise ValueError("Merit Palk salary agreement amount is invalid") from exc
+            if not rate.is_finite() or rate < 0:
+                raise ValueError("Merit Palk salary agreement amount is invalid")
+            existing = tx.one(
+                "SELECT id,rate FROM payroll_salary_agreements WHERE organisation_id=? AND contract_id=? AND start_date=?",
+                (organisation_id, contract_id, agreement_start),
+            )
+            if existing:
+                if Decimal(str(existing["rate"])) != rate:
+                    tx.execute("UPDATE payroll_salary_agreements SET rate=? WHERE organisation_id=? AND id=?",
+                               (format(rate, "f"), organisation_id, existing["id"]))
+                    changed = True
+                continue
+            tx.execute(
+                "INSERT INTO payroll_salary_agreements(id,organisation_id,contract_id,start_date,base_pay_type,hours_per_day,rate,fte,is_full_time,automatic_working_time,created_at) "
+                "VALUES (?,?,?,?,'monthly',8,?,1,1,1,?)",
+                (new_id(), organisation_id, contract_id, agreement_start, format(rate, "f"), utc_now()),
+            )
+            changed = True
+        return changed
 
     def _payroll_import_employee(self, tx, organisation_id: str, row: dict, payload: dict) -> dict:
         employee_id = row.get("matched_local_id") or row.get("matched_local_employee_id")

@@ -121,7 +121,7 @@ def test_contract_types_import_code_and_salary(palk, ee_org, kind, basis, board)
     assert payload["external_id"] == "42" and payload["personal_id"] == "49003159999"
     assert payload["board_member"] is board and payload.get("pay_basis") == basis
     if kind != 5:
-        assert Decimal(payload["gross_salary"]) == Decimal("2400.13")
+        assert "gross_salary" not in payload
     outcome = apply(palk, ee_org["id"], sync, rows)
     if kind == 5:
         assert payload["merit_palk_income_basis"] == "income_line"
@@ -129,9 +129,14 @@ def test_contract_types_import_code_and_salary(palk, ee_org, kind, basis, board)
         saved = palk[0].db.one("SELECT * FROM employees WHERE organisation_id=?", (ee_org["id"],))
         assert saved["pay_basis"] == "income_line" and saved["gross_salary"] is None
     else:
-        assert outcome["applied"] == 1
+        assert outcome["applied"] == 1, outcome["outcomes"]
         saved = palk[0].db.one("SELECT * FROM employees WHERE organisation_id=?", (ee_org["id"],))
         assert bool(saved["board_member"]) is board and saved["pay_basis"] == basis
+    contract = palk[0].db.one("SELECT * FROM payroll_contracts WHERE organisation_id=? AND employee_id=?", (ee_org["id"], saved["id"]))
+    assert contract["contract_type"] == ("board_member" if board else "services" if kind == 5 else "employment")
+    if kind != 5:
+        agreement_row = palk[0].db.one("SELECT * FROM payroll_salary_agreements WHERE organisation_id=? AND contract_id=?", (ee_org["id"], contract["id"]))
+        assert Decimal(str(agreement_row["rate"])) == Decimal("2400.13")
 
 
 @pytest.mark.parametrize("dates", [{"EndDate": "2026-10-01"}, {"StartDate": "2027-01-01"}])
@@ -157,7 +162,8 @@ def test_personal_code_then_import_code_upsert_and_salary_agreement(palk, ee_org
     sync, rows = stage(palk, ee_org["id"], "salary_agreement")
     assert rows[0]["matched_local_employee_name"] == "Mari Testmaa"
     assert apply(palk, ee_org["id"], sync, rows)["updated"] == 1
-    assert Decimal(str(db.scalar("SELECT gross_salary FROM employees WHERE id=?", (local["id"],)))) == Decimal("2600")
+    assert Decimal(str(db.scalar("SELECT gross_salary FROM employees WHERE id=?", (local["id"],)))) == Decimal("2000")
+    assert Decimal(str(db.scalar("SELECT rate FROM payroll_salary_agreements WHERE organisation_id=?", (ee_org["id"],)))) == Decimal("2600")
     assert db.scalar("SELECT COUNT(*) FROM employees WHERE organisation_id=?", (ee_org["id"],)) == 1
     sync, rows = stage(palk, ee_org["id"], "salary_agreement")
     assert apply(palk, ee_org["id"], sync, rows)["unchanged"] == 1
@@ -165,7 +171,8 @@ def test_personal_code_then_import_code_upsert_and_salary_agreement(palk, ee_org
 
 def test_import_code_identity_is_shared_between_employee_and_agreement_pulls(palk, ee_org, db):
     sync, rows = stage(palk, ee_org["id"])
-    assert apply(palk, ee_org["id"], sync, rows)["applied"] == 1
+    applied = apply(palk, ee_org["id"], sync, rows)
+    assert applied["applied"] == 1, applied["outcomes"]
     palk[1]["getemployees"][0]["PersonalCode"] = "49003158888"
     palk[1]["getpayterms"]["EntryRow"][0]["PersonalCode"] = "49003158888"
     sync, rows = stage(palk, ee_org["id"], "salary_agreement")
@@ -391,7 +398,8 @@ def test_services_contract_without_salary_agreement_uses_income_components(palk,
     assert not rows[0]["review_note"] and apply(palk, ee_org["id"], sync, rows)["applied"] == 1
     palk[1]["getsalaryreport"][0].update(SalaryTypeName="Töövõtulepingu tasu", Sum="100.12", Hours="0")
     sync, rows = stage(palk, ee_org["id"], "salary_hours")
-    assert apply(palk, ee_org["id"], sync, rows)["applied"] == 1
+    applied = apply(palk, ee_org["id"], sync, rows)
+    assert applied["applied"] == 1, applied["outcomes"]
     payroll = PayrollService(db)
     run = payroll.runs(ee_org["id"])[0]
     item = run["items"][0]

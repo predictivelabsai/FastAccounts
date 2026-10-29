@@ -809,8 +809,6 @@ class MeritPalkProvider(HTTPProvider):
         elif self.config.get("salary_amount_basis") != "monthly":
             # The manual calls Amount a tariff/rate, without a unit. Never infer it from Hours.
             record.setdefault("import_warning", "Confirm Merit Palk salary agreement amounts are monthly before applying")
-        else:
-            record["gross_salary"] = money(MeritProvider._decimal(relevant[0].get("Amount")))
         return record
 
     def pull(self, object_type: str, *, cursor: str | None = None) -> ConnectorResult:
