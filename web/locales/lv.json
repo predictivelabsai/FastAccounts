@@ -2920,7 +2920,13 @@
       "Last TSD date": "Pēdējā TSD datums",
       "User management": "Lietotāju pārvaldība",
       "Dimension costs": "Izmaksas pēc dimensijām",
-      "Payroll settings": "Algu iestatījumi"
-    }
+      "Payroll settings": "Algu iestatījumi",
+      "Read-only membership overview for companies you administer.": "Jūsu pārvaldīto uzņēmumu dalībnieku pārskats.",
+      "Manage membership": "Pārvaldīt dalību",
+      "Invitation status": "Uzaicinājuma statuss",
+      "Member": "Dalībnieks",
+      "No administered organisations": "Nav pārvaldītu uzņēmumu"
+    },
+    "nav": {"bureau_overview": "Uzņēmumu pārskats", "bureau_memberships": "Lietotāju pārvaldība"}
   }
 }

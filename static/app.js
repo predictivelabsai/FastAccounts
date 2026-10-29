@@ -1091,6 +1091,25 @@
     bindStages();
   }
   const views = {
+    "bureau-overview": async (c) => {
+      const companies = await api("/payroll/bureau-overview");
+      c.mount(page(t("Companies overview"), t("Companies overview"), "",
+        companies.length ? table(["Organisation", "Role", "Next payday", "Current month run", ["Unpaid net pay"], "Last APA export", "Open blocking findings", "PALK due", "TSD due"],
+          companies.map((x) => row([
+            td(`<strong>${esc(x.name)}</strong><small>${esc(x.country_code)}</small>`), td(tr(x.role)), td(esc(x.payday || "–")),
+            td(pill(x.run_status === "none" ? "No run" : x.run_status)), cash(x.unpaid_net_pay, x.base_currency),
+            td(x.last_apa_export_date ? `${esc(x.last_apa_export_date.slice(0, 10))} · ${tr(x.last_apa_export_status)}` : "–"),
+            td(num(x.open_blocking_findings), "numeric"), td(esc(x.palk_due_date)), td(esc(x.tsd_due_date)),
+          ]))) : empty("No organisations", "")));
+    },
+    "bureau-memberships": async (c) => {
+      const companies = await api("/payroll/bureau-memberships");
+      c.mount(page(t("User management"), t("Read-only membership overview for companies you administer."), "",
+        companies.length ? companies.map((company) => `<section class="section"><div class="section-head"><h2>${esc(company.name)}</h2><a href="#settings">${tr("Manage membership")}</a></div>${table(["User", "Role", "Invitation status"], [
+          ...company.members.map((member) => row([td(esc(member.email)), td(tr(member.role)), td(tr("Member"))])),
+          ...company.invitations.map((invite) => row([td(esc(invite.email)), td(tr(invite.role)), td(`${tr(invite.status)}${invite.expires_at ? ` · ${esc(invite.expires_at.slice(0, 10))}` : ""}`)])),
+        ])}</section>`).join("") : empty("No administered organisations", "")));
+    },
     overview: async (c) => {
       const [invoices, bills, bank, runs, absences, clients] = await Promise.all([
         api(c.url("/invoices")),

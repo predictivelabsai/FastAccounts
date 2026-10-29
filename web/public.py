@@ -609,7 +609,7 @@ def workspace_page(user: dict, lang: str = "en"):
     T = lambda key: i18n.t(key, lang)
     display_name = user.get("name") or user.get("email") or ""
     groups = [
-        ("bureau", [("overview", "overview")]),
+        ("bureau", [("overview", "overview"), ("bureau-overview", "bureau_overview"), ("bureau-memberships", "bureau_memberships")]),
         ("documents", [("invoices", "invoices"), ("quotes", "quotes"), ("bills", "bills"), ("periodised", "periodised"), ("contacts", "contacts")]),
         ("automation", [("recurring", "recurring")]),
         ("money", [("banking", "banking")]),

@@ -2920,7 +2920,13 @@
       "Last TSD date": "Last TSD date",
       "User management": "User management",
       "Dimension costs": "Dimension costs",
-      "Payroll settings": "Payroll settings"
-    }
+      "Payroll settings": "Payroll settings",
+      "Read-only membership overview for companies you administer.": "Read-only membership overview for companies you administer.",
+      "Manage membership": "Manage membership",
+      "Invitation status": "Invitation status",
+      "Member": "Member",
+      "No administered organisations": "No administered organisations"
+    },
+    "nav": {"bureau_overview": "Companies overview", "bureau_memberships": "User management"}
   }
 }

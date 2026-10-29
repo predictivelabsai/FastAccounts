@@ -2920,7 +2920,13 @@
       "Last TSD date": "Paskutinė TSD data",
       "User management": "Naudotojų valdymas",
       "Dimension costs": "Sąnaudos pagal dimensijas",
-      "Payroll settings": "Darbo užmokesčio nustatymai"
-    }
+      "Payroll settings": "Darbo užmokesčio nustatymai",
+      "Read-only membership overview for companies you administer.": "Jūsų administruojamų įmonių narių apžvalga.",
+      "Manage membership": "Tvarkyti narystę",
+      "Invitation status": "Kvietimo būsena",
+      "Member": "Narys",
+      "No administered organisations": "Nėra administruojamų įmonių"
+    },
+    "nav": {"bureau_overview": "Įmonių apžvalga", "bureau_memberships": "Naudotojų valdymas"}
   }
 }

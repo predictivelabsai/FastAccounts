@@ -2920,7 +2920,13 @@
       "Last TSD date": "Viimase TSD kuupäev",
       "User management": "Kasutajate haldamine",
       "Dimension costs": "Kulude analüüs mõõtmete järgi",
-      "Payroll settings": "Palgaarvestuse seaded"
-    }
+      "Payroll settings": "Palgaarvestuse seadistused",
+      "Read-only membership overview for companies you administer.": "Sinu hallatavate ettevõtete liikmete ülevaade.",
+      "Manage membership": "Halda liikmesust",
+      "Invitation status": "Kutse olek",
+      "Member": "Liige",
+      "No administered organisations": "Hallatavaid ettevõtteid pole"
+    },
+    "nav": {"bureau_overview": "Ettevõtete koondvaade", "bureau_memberships": "Kasutajate haldamine"}
   }
 }

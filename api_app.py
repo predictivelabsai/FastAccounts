@@ -670,6 +670,23 @@ def payroll_bureau_overview(user: User = Depends(current_user)):
     return PayrollBureauOverviewService().for_user(user.email)
 
 
+@api.get('/payroll/bureau-memberships')
+def payroll_bureau_memberships(user: User = Depends(current_user)):
+    db = get_database()
+    organisations = db.rows(
+        "SELECT o.id,o.name,m.role FROM organisations o JOIN memberships m ON m.organisation_id=o.id "
+        "WHERE lower(m.email)=lower(?) AND m.role IN ('owner','administrator') AND o.active=1 ORDER BY o.name,o.id",
+        (user.email,))
+    result = []
+    for organisation in organisations:
+        members = db.rows("SELECT email,role FROM memberships WHERE organisation_id=? ORDER BY lower(email)",
+                          (organisation['id'],))
+        invitations = db.rows("SELECT email,role,status,expires_at FROM invitations WHERE organisation_id=? ORDER BY lower(email)",
+                              (organisation['id'],))
+        result.append({**organisation, 'members': members, 'invitations': invitations})
+    return result
+
+
 @api.get("/email-status")
 def get_email_status(user: User = Depends(current_user)):
     del user

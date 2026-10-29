@@ -38,3 +38,20 @@ def test_dimension_register_api_is_readable_to_members_and_write_restricted(db, 
         assert saved.status_code == 201
         assert client.get(path, headers=viewer).json()[0]['id'] == saved.json()['id']
         assert client.post(path, headers=viewer, json={'kind': 'department', 'code': 'FIN', 'name': 'Finance'}).status_code == 403
+
+
+def test_membership_matrix_is_limited_to_administered_companies(db, ee_org, monkeypatch):
+    monkeypatch.setenv('FASTACCOUNTS_DB', db.path)
+    monkeypatch.setenv('DB_URL', '')
+    reset_database_cache()
+    second = OrganisationService(db).create(name='Administered client', country_code='EE', entity_type='EE_OU',
+                                             owner_email='other@example.test')
+    other = OrganisationService(db).create(name='Other client', country_code='EE', entity_type='EE_OU',
+                                            owner_email='other@example.test')
+    with db.transaction() as tx:
+        tx.execute('INSERT INTO memberships(id,organisation_id,email,role,created_at) VALUES (?,?,?,?,?)',
+                   ('matrix-admin', second['id'], 'owner@example.test', 'administrator', '2026-01-01'))
+    with TestClient(api) as client:
+        rows = client.get('/payroll/bureau-memberships', headers={'X-Test-User': 'owner@example.test'}).json()
+    ids = {row['id'] for row in rows}
+    assert ee_org['id'] in ids and second['id'] in ids and other['id'] not in ids

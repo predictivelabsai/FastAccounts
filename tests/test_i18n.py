@@ -25,6 +25,25 @@ def test_payroll_preset_names_descriptions_and_settings_in_all_locales():
     assert i18n.catalog('et')['nav']['payment_types'] == 'Makseliigid'
 
 
+def test_payroll_bureau_labels_exist_in_all_locales():
+    labels = ('Departments', 'Positions', 'Position groups', 'Cost centres', 'Companies overview',
+              'Unpaid net pay', 'Last TSD date', 'User management', 'Dimension costs', 'Payroll settings',
+              'Invitation status', 'Member')
+    for language in ('en', 'et', 'lv', 'lt'):
+        workspace = i18n.catalog(language)['workspace']
+        assert all(workspace.get(label, '').strip() for label in labels)
+    estonian = i18n.catalog('et')
+    assert estonian['workspace']['Departments'] == 'Osakonnad'
+    assert estonian['workspace']['Positions'] == 'Ametid'
+    assert estonian['workspace']['Position groups'] == 'Ametigrupid'
+    assert estonian['workspace']['Cost centres'] == 'Kulukohad'
+    assert estonian['workspace']['Companies overview'] == 'Ettevõtete koondvaade'
+    assert estonian['workspace']['Unpaid net pay'] == 'Väljamaksmata tasud'
+    assert estonian['workspace']['Last TSD date'] == 'Viimase TSD kuupäev'
+    assert estonian['workspace']['User management'] == 'Kasutajate haldamine'
+    assert estonian['workspace']['Payroll settings'] == 'Palgaarvestuse seadistused'
+
+
 def test_absence_pay_workspace_labels_exist_in_all_supported_locales():
     labels = ('Vacation pay', 'Average', 'Unchanged salary', 'Best of', 'Fixed sum',
               'Sick benefit', 'Unused leave compensation', 'Add to payout', 'In payout',
