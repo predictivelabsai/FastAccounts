@@ -52,3 +52,21 @@ deactivation, active filtering, code uniqueness, and position-to-group validatio
 `tests/test_payroll_dimensions.py` passed (2 tests) using the required wrapper.
 This checkpoint does not yet wire employee/contracts into the service or add
 approval freezing and the remaining Build 10 features.
+
+## Additional requested test run
+
+- `tests/test_payroll.py`: no result was returned by the required job wrapper
+  within the 300-second limit. Process inspection showed this invocation's
+  `.venv` pytest child still running after the wrapper stalled; only that
+  child process was stopped. The independently running full test worktree was
+  left untouched. This test file is not considered passed.
+
+## Scope remaining at this checkpoint
+
+Only the register schema and register service are implemented. Employee and
+contract editing do not yet accept these dimension IDs. Approval does not freeze
+the selected dimensions or split expense and employer levy postings. Dimension
+cost reporting, reviewed CSV/XLSX staging, bureau overview and membership
+matrix, settings grouping, locales, workspace routes and their role/CSRF tests
+remain unimplemented. The requested existing test files other than the migration
+file have not been validated; `tests/test_payroll.py` timed out as noted above.
