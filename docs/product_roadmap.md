@@ -2290,3 +2290,9 @@ and apply. All workspace labels are translated in en, et, lv and lt. Offline
 acceptance files passed; the full Merit Palk file exceeded its 300-second limit
 and passed in timed sections. Validation remains against a redacted official
 TÖR sample before production use. See `payroll_contracts_validation.md`.
+- Build 10 payroll dimensions are partially implemented on `feat/payroll-dimensions-bureau`.
+  The existing analytical-object register has a fixed object-type constraint and
+  line schema, so payroll uses a new tenant-scoped `payroll_dimensions` register
+  for departments, position groups, positions and cost centres; projects retain
+  the existing analytical object register. This keeps payroll-specific hierarchy
+  rules separate while preserving project identity.

@@ -2407,3 +2407,12 @@ payroll acceptance suite has not yet been run.
   in the migration test and CI workflow. Merit mapping, TÖR apply and workspace
   UI are complete. Offline validation and the remaining official TÖR sample
   check are recorded in `payroll_contracts_validation.md`.
+
+## Payroll dimensions and bureau overview (Build 10, in progress, 2026-10-29)
+
+Migration 0069 adds a tenant-scoped payroll dimension register for departments,
+position groups, positions and cost centres, and optional dimension columns on
+employees, contracts, salary agreements, component lines and frozen contract run
+lines. Projects continue to use the existing analytical object register. This
+build is not complete; see `payroll_dimensions_bureau_validation.md` for
+remaining implementation and validation.
