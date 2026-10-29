@@ -2908,5 +2908,19 @@
       "FTE": "Etato dalis",
       "Hours per day": "Valandos per dieną"
     }
+  },
+  "payroll_dimensions_bureau": {
+    "workspace": {
+      "Departments": "Skyriai",
+      "Positions": "Pareigos",
+      "Position groups": "Pareigybių grupės",
+      "Cost centres": "Sąnaudų centrai",
+      "Companies overview": "Įmonių apžvalga",
+      "Unpaid net pay": "Neišmokėtas neto darbo užmokestis",
+      "Last TSD date": "Paskutinė TSD data",
+      "User management": "Naudotojų valdymas",
+      "Dimension costs": "Sąnaudos pagal dimensijas",
+      "Payroll settings": "Darbo užmokesčio nustatymai"
+    }
   }
 }

@@ -137,6 +137,43 @@ class PayrollReportsService:
             paid = {(r['pay_run_id'], r['employee_id']) for r in tx.rows("SELECT b.pay_run_id,l.employee_id FROM payroll_payout_batches b JOIN payroll_payout_lines l ON l.organisation_id=b.organisation_id AND l.payout_batch_id=b.id WHERE b.organisation_id=? AND b.status='Paid' AND b.payout_type='salary'", (organisation_id,))}
         return [{'period': r['period'], 'employee_id': r['employee_id'], 'employee_name': r['employee_name'], 'gross': db_number(money(r['gross'])), 'net': db_number(money(r['net'])), 'status': 'Paid' if (r['run_id'],r['employee_id']) in paid else 'Unpaid'} for r in rows]
 
+    def dimension_costs(self, organisation_id, start, end):
+        if len(start) != 7 or len(end) != 7 or start > end:
+            raise ValueError('Choose a valid payroll period range')
+        with self.db.transaction() as tx:
+            rows = tx.rows("SELECT r.period,i.department_id,i.cost_centre_id,i.project_id,i.gross,i.social_tax,i.ui_employer "
+                "FROM pay_runs r JOIN pay_run_items i ON i.organisation_id=r.organisation_id AND i.pay_run_id=r.id "
+                "WHERE r.organisation_id=? AND r.status='Approved' AND r.period BETWEEN ? AND ? ORDER BY r.period,i.id",
+                (organisation_id, start, end))
+            names = {}
+            for row in tx.rows('SELECT id,kind,code,name FROM payroll_dimensions WHERE organisation_id=?', (organisation_id,)):
+                names[row['id']] = (row['kind'], row['code'], row['name'])
+            for row in tx.rows("SELECT id,'project' kind,code,name FROM objects WHERE organisation_id=? AND object_type='project'", (organisation_id,)):
+                names[row['id']] = (row['kind'], row['code'], row['name'])
+        totals = {}
+        for row in rows:
+            for field, kind in (('department_id', 'department'), ('cost_centre_id', 'cost_centre'), ('project_id', 'project')):
+                dimension_id = row.get(field)
+                if not dimension_id:
+                    continue
+                record = names.get(dimension_id)
+                if not record or record[0] != kind:
+                    continue
+                key = (kind, dimension_id, row['period'])
+                result = totals.setdefault(key, {'kind': kind, 'dimension_id': dimension_id,
+                    'code': record[1], 'name': record[2], 'period': row['period'],
+                    'gross': Decimal(0), 'social_tax': Decimal(0), 'ui_employer': Decimal(0),
+                    'employer_levies': Decimal(0), 'total_employer_cost': Decimal(0)})
+                result['gross'] += money(row['gross'])
+                result['social_tax'] += money(row['social_tax'])
+                result['ui_employer'] += money(row['ui_employer'])
+        for row in totals.values():
+            row['employer_levies'] = row['social_tax'] + row['ui_employer']
+            row['total_employer_cost'] = row['gross'] + row['employer_levies']
+            for field in ('gross', 'social_tax', 'ui_employer', 'employer_levies', 'total_employer_cost'):
+                row[field] = db_number(money(row[field]))
+        return list(totals.values())
+
     @staticmethod
     def workbook(title, rows):
         from openpyxl import Workbook

@@ -3082,6 +3082,22 @@ def payroll_annual_summary(organisation_id: str, year: int, user: User = Depends
     _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
     return PayrollReportsService().annual_summary(organisation_id, year)
 
+
+@api.get('/organisations/{organisation_id}/payroll/reports/dimensions')
+def payroll_dimension_cost_report(organisation_id: str, start: str, end: str,
+                                  user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    try:
+        return PayrollReportsService().dimension_costs(organisation_id, start, end)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@api.get('/organisations/{organisation_id}/payroll/reports/dimension-costs')
+def payroll_dimension_cost_report_ui(organisation_id: str, start: str, end: str,
+                                     user: User = Depends(current_user)):
+    return payroll_dimension_cost_report(organisation_id, start, end, user)
+
 @api.get('/organisations/{organisation_id}/payroll/reports.xlsx')
 def payroll_report_xlsx(organisation_id: str, report: str, year: int | None = None,
                         period: str | None = None, months: int = 6,
@@ -3103,6 +3119,7 @@ def payroll_report_xlsx(organisation_id: str, report: str, year: int | None = No
         rows = [{'year': result['year'], 'month': index + 1, **month}
                 for index, month in enumerate(result['months'])]
     elif report == 'pay-list': rows = service.pay_list(organisation_id, start or period or '2026-01', end or period or '2026-01')
+    elif report == 'dimension-costs': rows = service.dimension_costs(organisation_id, start or period or '2026-01', end or period or '2026-12')
     else: raise HTTPException(status_code=422, detail='Choose a supported payroll report')
     content = PayrollReportsService.workbook(report, rows)
     return Response(content, media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

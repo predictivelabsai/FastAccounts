@@ -2908,5 +2908,19 @@
       "FTE": "Koormus",
       "Hours per day": "Tunde päevas"
     }
+  },
+  "payroll_dimensions_bureau": {
+    "workspace": {
+      "Departments": "Osakonnad",
+      "Positions": "Ametid",
+      "Position groups": "Ametigrupid",
+      "Cost centres": "Kulukohad",
+      "Companies overview": "Ettevõtete koondvaade",
+      "Unpaid net pay": "Väljamaksmata tasud",
+      "Last TSD date": "Viimase TSD kuupäev",
+      "User management": "Kasutajate haldamine",
+      "Dimension costs": "Kulude analüüs mõõtmete järgi",
+      "Payroll settings": "Palgaarvestuse seaded"
+    }
   }
 }

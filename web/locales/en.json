@@ -2908,5 +2908,19 @@
       "FTE": "FTE",
       "Hours per day": "Hours per day"
     }
+  },
+  "payroll_dimensions_bureau": {
+    "workspace": {
+      "Departments": "Departments",
+      "Positions": "Positions",
+      "Position groups": "Position groups",
+      "Cost centres": "Cost centres",
+      "Companies overview": "Companies overview",
+      "Unpaid net pay": "Unpaid net pay",
+      "Last TSD date": "Last TSD date",
+      "User management": "User management",
+      "Dimension costs": "Dimension costs",
+      "Payroll settings": "Payroll settings"
+    }
   }
 }

@@ -53,3 +53,20 @@ def test_employee_and_contract_dimensions_are_tenant_checked(db, ee_org, legacy_
     with pytest.raises(ValueError, match='belong to this organisation'):
         PayrollService(db).save_employee(ee_org['id'], employee_id='legacy-employee', actor='owner@example.test',
                                          department_id='foreign-dimension')
+
+
+def test_approved_payroll_dimension_costs_use_frozen_tenant_scoped_values(db, ee_org, legacy_payroll):
+    from payroll_reports import PayrollReportsService
+    dimensions = PayrollDimensionService(db)
+    department = dimensions.save(ee_org['id'], kind='department', code='OPS', name='Operations', actor='owner@example.test')
+    run = legacy_payroll(db, ee_org['id'], name='Frozen dimension employee', gross='2000')
+    PayrollService(db).save_employee(ee_org['id'], employee_id='legacy-employee', actor='owner@example.test',
+                                     department_id=department['id'])
+    PayrollService(db).approve(ee_org['id'], run['id'], actor='owner@example.test')
+    PayrollService(db).save_employee(ee_org['id'], employee_id='legacy-employee', actor='owner@example.test',
+                                     department_id=None)
+    report = PayrollReportsService(db).dimension_costs(ee_org['id'], '2026-10', '2026-10')
+    assert len(report) == 1
+    assert report[0]['dimension_id'] == department['id']
+    assert report[0]['gross'] == '2000'
+    assert PayrollReportsService(db).dimension_costs('other-tenant', '2026-10', '2026-10') == []

@@ -2908,5 +2908,19 @@
       "FTE": "Slodze",
       "Hours per day": "Stundas dienā"
     }
+  },
+  "payroll_dimensions_bureau": {
+    "workspace": {
+      "Departments": "Nodaļas",
+      "Positions": "Amati",
+      "Position groups": "Amatu grupas",
+      "Cost centres": "Izmaksu centri",
+      "Companies overview": "Uzņēmumu pārskats",
+      "Unpaid net pay": "Neizmaksātā neto alga",
+      "Last TSD date": "Pēdējā TSD datums",
+      "User management": "Lietotāju pārvaldība",
+      "Dimension costs": "Izmaksas pēc dimensijām",
+      "Payroll settings": "Algu iestatījumi"
+    }
   }
 }
