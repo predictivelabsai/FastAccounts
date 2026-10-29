@@ -57,6 +57,7 @@ from payroll_payday import PaydaySettingsService
 from payroll_contracts import PayrollContractService
 from payroll_dimension_imports import PayrollDimensionImportService
 from bureau_overview import PayrollBureauOverviewService
+from payroll_dimensions import PayrollDimensionService
 from payroll_tor_import import TORImportService
 from payroll_payouts import PayoutConflict, PayoutService
 from payroll_absences import AbsenceConflict, PayrollAbsenceService, ABSENCE_TYPES
@@ -78,6 +79,13 @@ class PayrollEmailSettingsIn(BaseModel):
     sender_name: str = ''
     reply_to: str = ''
     cc: str = ''
+
+class PayrollDimensionIn(BaseModel):
+    kind: Literal['department', 'position_group', 'position', 'cost_centre']
+    code: str
+    name: str
+    parent_id: str | None = None
+    active: bool = True
 
 class PayrollDeliveryIn(BaseModel):
     employee_ids: list[str] = Field(min_length=1)
@@ -886,6 +894,51 @@ def commit_master_data_import(organisation_id: str, batch_id: str, user: User = 
 def discard_master_data_import(organisation_id: str, batch_id: str, user: User = Depends(require_csrf)):
     _require(organisation_id, user, WRITE_ROLES)
     return MasterDataImportService().discard(organisation_id, batch_id, actor=user.email)
+
+
+@api.get('/organisations/{organisation_id}/payroll/dimensions')
+def list_payroll_dimensions(organisation_id: str, kind: str | None = None,
+                           user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    try:
+        return PayrollDimensionService(get_database()).list(organisation_id, kind)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@api.post('/organisations/{organisation_id}/payroll/dimensions', status_code=201)
+def save_payroll_dimension(organisation_id: str, payload: PayrollDimensionIn,
+                           user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES & {'owner', 'administrator'})
+    try:
+        return PayrollDimensionService(get_database()).save(organisation_id, actor=user.email,
+            **payload.model_dump())
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@api.put('/organisations/{organisation_id}/payroll/dimensions/{dimension_id}')
+def update_payroll_dimension(organisation_id: str, dimension_id: str, payload: PayrollDimensionIn,
+                             user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES & {'owner', 'administrator'})
+    try:
+        return PayrollDimensionService(get_database()).save(organisation_id, dimension_id=dimension_id,
+            actor=user.email, **payload.model_dump())
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail='Payroll dimension not found') from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@api.post('/organisations/{organisation_id}/payroll/dimensions/{dimension_id}/deactivate')
+def deactivate_payroll_dimension(organisation_id: str, dimension_id: str,
+                                 user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES & {'owner', 'administrator'})
+    try:
+        return PayrollDimensionService(get_database()).deactivate(organisation_id, dimension_id,
+                                                                  actor=user.email)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail='Payroll dimension not found') from exc
 
 
 @api.post('/organisations/{organisation_id}/payroll/dimension-imports', status_code=201)
