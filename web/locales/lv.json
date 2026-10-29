@@ -2925,7 +2925,17 @@
       "Manage membership": "Pārvaldīt dalību",
       "Invitation status": "Uzaicinājuma statuss",
       "Member": "Dalībnieks",
-      "No administered organisations": "Nav pārvaldītu uzņēmumu"
+      "No administered organisations": "Nav pārvaldītu uzņēmumu",
+      "Add dimension":"Pievienot dimensiju","Cost centre":"Izmaksu centrs","Current month run":"Šī mēneša algu aprēķins",
+      "Deactivate dimension":"Deaktivizēt dimensiju","Department":"Nodaļa","Dimension registers":"Dimensiju reģistri",
+      "Dimension type":"Dimensijas veids","Edit dimension":"Rediģēt dimensiju","Import applied":"Imports piemērots",
+      "Import dimensions":"Importēt dimensijas","Import type":"Importa veids","Last APA export":"Pēdējais APA eksports",
+      "Manage departments, position groups, positions and cost centres for this company.":"Pārvaldiet uzņēmuma nodaļas, amatu grupas, amatus un izmaksu centrus.",
+      "Next payday":"Nākamā algas diena","Open blocking findings":"Atvērto bloķējošo atradņu skaits","Organisation":"Uzņēmums","PALK due":"PALK termiņš",
+      "Payroll start, payday rules, email settings, leave expiry, reserve posting, posting accounts and dimension registers.":"Algu aprēķina sākums, izmaksas dienas noteikumi, e-pasta iestatījumi, atvaļinājuma termiņš, rezerves grāmatojumi, konti un dimensiju reģistri.",
+      "Position group":"Amatu grupa","Role":"Loma","TSD due":"TSD termiņš",
+      "Upload a CSV or XLSX for review. Accepted rows are applied only after review.":"Augšupielādējiet CSV vai XLSX failu pārskatīšanai. Apstiprinātās rindas tiek lietotas tikai pēc pārbaudes.",
+      "Invitation created":"Uzaicinājums izveidots","Share this one-time token over a trusted channel":"Nosūtiet šo vienreizējo pilnvaru pa uzticamu kanālu"
     },
     "nav": {"bureau_overview": "Uzņēmumu pārskats", "bureau_memberships": "Lietotāju pārvaldība"}
   }

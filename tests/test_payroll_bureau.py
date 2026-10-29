@@ -20,7 +20,7 @@ def test_bureau_overview_only_includes_the_signed_in_users_organisations(db, ee_
     assert {row['id'] for row in rows} == {ee_org['id'], second['id']}
     assert next(row for row in rows if row['id'] == second['id'])['role'] == 'accountant'
     assert all(row['period'] == '2026-10' for row in rows)
-    assert all(row['palk_due_date'] == row['tsd_due_date'] == '2026-11-10' for row in rows)
+    assert all(row['palk_due_date'] == '2026-11-18' and row['tsd_due_date'] == '2026-11-10' for row in rows)
 
 
 def test_dimension_register_api_is_readable_to_members_and_write_restricted(db, ee_org, monkeypatch):

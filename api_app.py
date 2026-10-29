@@ -2462,6 +2462,9 @@ class PayComponentLine(BaseModel):
     funded_pension: bool | None = None
     social_minimum: bool | None = None
     liability_role: Literal['PAYROLL_BAILIFF', 'PAYROLL_DEDUCTION'] | None = None
+    department_id: str | None = None
+    cost_centre_id: str | None = None
+    project_id: str | None = None
 
 
 class PayItemPatch(BaseModel):

@@ -1105,10 +1105,11 @@
     "bureau-memberships": async (c) => {
       const companies = await api("/payroll/bureau-memberships");
       c.mount(page(t("User management"), t("Read-only membership overview for companies you administer."), "",
-        companies.length ? companies.map((company) => `<section class="section"><div class="section-head"><h2>${esc(company.name)}</h2><a href="#settings">${tr("Manage membership")}</a></div>${table(["User", "Role", "Invitation status"], [
+        companies.length ? companies.map((company) => `<section class="section"><div class="section-head"><h2>${esc(company.name)}</h2>${button("Manage membership","manageMembership",false,`data-id="${esc(company.id)}"`)}</div>${table(["User", "Role", "Invitation status"], [
           ...company.members.map((member) => row([td(esc(member.email)), td(tr(member.role)), td(tr("Member"))])),
           ...company.invitations.map((invite) => row([td(esc(invite.email)), td(tr(invite.role)), td(`${tr(invite.status)}${invite.expires_at ? ` · ${esc(invite.expires_at.slice(0, 10))}` : ""}`)])),
         ])}</section>`).join("") : empty("No administered organisations", "")));
+      bindActions(content, {manageMembership: (b) => manageBureauMembership(b.dataset.id, companies.find((x)=>x.id===b.dataset.id))});
     },
     overview: async (c) => {
       const [invoices, bills, bank, runs, absences, clients] = await Promise.all([
@@ -2259,6 +2260,7 @@
             t("People, payslips and postings for this client."),
             button("Add employee", "employee") + button("Payout summary", "payoutSummary") +
             button("Reports", "payrollReports") + button("Withholdings", "withholdings") + button("Absences", "absences") + button("Leave liability", "leaveLiability") + button("TÖR import from file", "torImport") +
+              button("Dimension registers", "payrollDimensions") + button("Payroll settings", "payrollSettings") +
               (['owner','administrator'].includes(org?.role) ? button("Leave settings", "leaveSettings") : "") +
               button("Payment types", "paymentTypes") + button("Payroll accounts", "payrollAccounts") + button("Payday settings", "paydaySettings") +
               button("Run payroll for month", "run", true),
@@ -2334,6 +2336,8 @@
         paydaySettings: () => paydaySettingsDialog(c),
         withholdings: () => payrollWithholdingsDialog(c, employees || []),
         payrollReports: () => payrollReportsDialog(c),
+        payrollDimensions: () => payrollDimensionsDialog(c),
+        payrollSettings: () => payrollSettingsDialog(c),
         sendPayslips: (b) => payrollDeliveryDialog(c, runs.find((run) => run.id === b.dataset.id)),
         managePayouts: (b) => payrollPayoutsDialog(c, runs.find((run) => run.id === b.dataset.id), bankAccounts || []),
         createCorrection: async (b) => { await post(c.url(`/pay-runs/${b.dataset.id}/corrections`), {}); await render(); },
@@ -4235,6 +4239,8 @@
     const url = path("/employees") + (employee ? `/${employee.id}` : "");
     const writable = ["owner", "administrator", "accountant"].includes(org?.role);
     let histories = employee ? await api(url + "/tax-settings") : [];
+    const dimensionRows = await api(path('/payroll/dimensions')).catch(() => []);
+    const dimensionChoices = (kind) => [['','None'],...dimensionRows.filter((x)=>x.kind===kind && (x.active || x.id===employee?.[`${kind === 'department' ? 'department' : 'position'}_id`])).map((x)=>[x.id,x.name])];
     const e = employee || {
       active: true,
       apply_tax_free_minimum: true,
@@ -4254,6 +4260,8 @@
           field("Address", "address", e.address || "", "text", 'maxlength="2000"') +
           field("IBAN", "iban", e.iban || "", "text", 'maxlength="80"') +
           field("Bank account owner", "bank_account_owner", e.bank_account_owner || "", "text", 'maxlength="180"') +
+          select("Department", "department_id", dimensionChoices('department'), e.department_id || '') +
+          select("Position", "position_id", dimensionChoices('position'), e.position_id || '') +
           select(
             "Pay basis",
             "pay_basis",
@@ -4349,6 +4357,7 @@
         "employment_end_date",
       ])
         if (!data[k]) data[k] = null;
+      for (const k of ['department_id','position_id']) if (!data[k]) data[k] = null;
       await post(url, data, employee ? "PATCH" : "POST");
       await saved(d);
     });
@@ -4446,8 +4455,11 @@
     const refresh = async () => { contracts = await api(base); render(); };
     render();
   }
-  function contractEditDialog(employee, contract, refresh) {
+  async function contractEditDialog(employee, contract, refresh) {
     const creating = !contract;
+    const dimensionRows = await api(path('/payroll/dimensions')).catch(() => []);
+    const objectRows = await api(path('/objects')).catch(() => []);
+    const dimensionSelect = (label,kind,key,value) => select(label,key,[['','None'],...dimensionRows.filter((x)=>x.kind===kind && (x.active || x.id===value)).map((x)=>[x.id,x.name])],value || '');
     const contractTypeOptions = [['employment','Employment contract'],['board_member','Board member contract'],['services','Services contract'],['other','Other contract'],['none','No contract']];
     const d = dialog(creating ? 'Add contract' : 'Edit contract', form(
       select('Contract type','contract_type',contractTypeOptions.map(([value,label]) => [value,tr(label)]),contract?.contract_type || 'employment') +
@@ -4455,12 +4467,17 @@
       field('End date','end_date',contract?.end_date || '','date') +
       field('Document name','document_name',contract?.document_name || '', 'text','maxlength="180"') +
       field('Workplace address','workplace_address',contract?.workplace_address || '', 'text','maxlength="2000"') +
+      dimensionSelect('Department','department','department_id',contract?.department_id) +
+      dimensionSelect('Position','position','position_id',contract?.position_id) +
       field('Monthly advance','monthly_net_advance',contract?.monthly_net_advance || '0','number','min="0" step="0.01"') +
       select('Payday override','payday_rule',[['','Organisation default'],['next_month_day','Next month, day'],['current_month_day','Current month, day'],['next_month_first_working_day','Next month, first working day']].map(([value,label]) => [value,tr(label)]),contract?.payday_rule || '') +
       field('Payday day','payday_day',contract?.payday_day || '','number','min="1" max="31" step="1"') +
       (creating ? `<h3 class="full-width">${tr('Initial salary agreement')}</h3>` +
         select('Pay type','base_pay_type',[['monthly','Monthly'],['monthly_day_based','Monthly, day-based'],['hourly','Hourly'],['contract_sum','Contract sum'],['contract_sum_x_qty','Contract sum x quantity']].map(([value,label]) => [value,tr(label)]),'monthly') +
         field('Rate','rate','','number','min="0" step="0.01"') + field('FTE','fte','1','number','min="0.0001" max="1" step="0.0001"') +
+        dimensionSelect('Agreement department','department','agreement_department_id','') +
+        dimensionSelect('Cost centre','cost_centre','agreement_cost_centre_id','') +
+        select('Project','agreement_project_id',[['','None'],...objectRows.filter((x)=>x.object_type==='project' && x.active).map((x)=>[x.id,x.name])],'') +
         field('Position','position','','text','maxlength="180"') + field('Position start date','position_start_date',today(),'date') : '')
     ));
     const formEl = d.querySelector('form');
@@ -4474,24 +4491,30 @@
       data.payday_day = data.payday_day ? Number(data.payday_day) : null;
       data.monthly_net_advance = data.monthly_net_advance || '0';
       if (creating) {
-        const agreement = data.rate ? {start_date:data.start_date,base_pay_type:data.base_pay_type,rate:data.rate,fte:data.fte || '1'} : null;
+        const agreement = data.rate ? {start_date:data.start_date,base_pay_type:data.base_pay_type,rate:data.rate,fte:data.fte || '1',department_id:data.agreement_department_id || null,cost_centre_id:data.agreement_cost_centre_id || null,project_id:data.agreement_project_id || null} : null;
         const position = data.position ? {position:data.position,occupation_code:null} : null;
-        for (const key of ['base_pay_type','rate','fte','position','position_start_date']) delete data[key];
+        for (const key of ['base_pay_type','rate','fte','position','position_start_date','agreement_department_id','agreement_cost_centre_id','agreement_project_id']) delete data[key];
         data.agreement = agreement; data.position = position;
         await post(path(`/employees/${employee.id}/contracts`), data);
       } else {
-        for (const key of ['base_pay_type','rate','fte','position','position_start_date']) delete data[key];
+        for (const key of ['base_pay_type','rate','fte','position','position_start_date','agreement_department_id','agreement_cost_centre_id','agreement_project_id']) delete data[key];
         await post(path(`/payroll/contracts/${contract.id}`), data, 'PATCH');
       }
       closeDialog(d); await refresh();
     });
   }
-  function agreementEditDialog(contractId, refresh) {
+  async function agreementEditDialog(contractId, refresh) {
+    const dimensionRows = await api(path('/payroll/dimensions')).catch(() => []);
+    const objectRows = await api(path('/objects')).catch(() => []);
+    const choices = (kind) => [['','None'],...dimensionRows.filter((x)=>x.kind===kind && x.active).map((x)=>[x.id,x.name])];
     const d = dialog('Add salary agreement', form(
       field('Effective from','start_date',today(),'date','required') +
       select('Pay type','base_pay_type',[['monthly','Monthly'],['monthly_day_based','Monthly, day-based'],['hourly','Hourly'],['contract_sum','Contract sum'],['contract_sum_x_qty','Contract sum x quantity']].map(([value,label]) => [value,tr(label)]),'monthly') +
       field('Rate','rate','','number','required min="0" step="0.01"') + field('Hours per day','hours_per_day','8','number','min="0.01" max="24" step="0.01"') +
-      field('FTE','fte','1','number','min="0.0001" max="1" step="0.0001"') + check('Full time','is_full_time',true) + check('Automatic working time','automatic_working_time',true)
+      field('FTE','fte','1','number','min="0.0001" max="1" step="0.0001"') +
+      select('Department','department_id',choices('department')) + select('Cost centre','cost_centre_id',choices('cost_centre')) +
+      select('Project','project_id',[['','None'],...objectRows.filter((x)=>x.object_type==='project' && x.active).map((x)=>[x.id,x.name])]) +
+      check('Full time','is_full_time',true) + check('Automatic working time','automatic_working_time',true)
     ));
     bindForm(d, async (data, formEl) => {
       data.is_full_time = formEl.elements.is_full_time.checked; data.automatic_working_time = formEl.elements.automatic_working_time.checked;
@@ -4840,6 +4863,74 @@
     });
   }
 
+  async function payrollDimensionsDialog(c) {
+    const kinds = [['department','Departments'],['position_group','Position groups'],['position','Positions'],['cost_centre','Cost centres']];
+    let dimensions = await api(c.url('/payroll/dimensions'));
+    const writable = ['owner','administrator'].includes(org?.role);
+    const render = () => {
+      const sections = kinds.map(([kind,label]) => {
+        const rows = dimensions.filter((item) => item.kind === kind);
+        return `<section class="section"><div class="section-head"><h3>${tr(label)}</h3>${writable ? button('Add dimension','addDimension',false,`data-kind="${kind}"`) : ''}</div>${rows.length ? table(['Code','Name','Status','Actions'],rows.map((item) => row([td(esc(item.code)),td(esc(item.name)),td(pill(item.active ? 'Active' : 'Inactive')),td(writable ? button('Edit dimension','editDimension',false,`data-id="${item.id}"`) + (item.active ? button('Deactivate dimension','deactivateDimension',false,`data-id="${item.id}"`) : '') : '')]))) : empty('No dimensions',writable ? button('Add dimension','addDimension',false,`data-kind="${kind}"`) : '')}</section>`;
+      }).join('');
+      const d = dialog('Dimension registers', `<p>${tr('Manage departments, position groups, positions and cost centres for this company.')}</p>${writable ? button('Import dimensions','importDimensions') : ''}${sections}`);
+      bindActions(d, {
+        addDimension: (b) => edit(null,b.dataset.kind),
+        editDimension: (b) => edit(dimensions.find((item) => item.id === b.dataset.id)),
+        deactivateDimension: async (b) => { await post(c.url(`/payroll/dimensions/${b.dataset.id}/deactivate`),{}); dimensions = await api(c.url('/payroll/dimensions')); closeDialog(d); await payrollDimensionsDialog(c); },
+        importDimensions: () => importDialog(),
+      });
+    };
+    const edit = (item, kind) => {
+      const selectedKind = item?.kind || kind;
+      const groups = dimensions.filter((d) => d.kind === 'position_group' && (d.active || d.id === item?.parent_id)).map((d) => [d.id,d.name]);
+      const editor = dialog(item ? 'Edit dimension' : 'Add dimension', form(
+        select('Dimension type','kind',kinds.map(([value,label])=>[value,tr(label)]),selectedKind) +
+        field('Code','code',item?.code || '','text','required maxlength="40"') + field('Name','name',item?.name || '','text','required maxlength="180"') +
+        select('Position group','parent_id',[['','None'],...groups],item?.parent_id || '') + check('Active','active',item ? !!item.active : true)
+      ));
+      const f = editor.querySelector('form');
+      f.elements.parent_id.closest('label').hidden = selectedKind !== 'position';
+      f.elements.kind.onchange = () => { f.elements.parent_id.closest('label').hidden = f.elements.kind.value !== 'position'; };
+      bindForm(editor, async (data, formEl) => {
+        data.active = formEl.elements.active.checked; data.parent_id = data.kind === 'position' ? (data.parent_id || null) : null;
+        await post(c.url(`/payroll/dimensions${item ? `/${item.id}` : ''}`),data,item ? 'PUT' : 'POST');
+        closeDialog(editor); dimensions = await api(c.url('/payroll/dimensions')); closeDialog(document.querySelector('.dialog')); render();
+      });
+    };
+    const importDialog = () => {
+      const d = dialog('Import dimensions', `<p>${tr('Upload a CSV or XLSX for review. Accepted rows are applied only after review.')}</p>${select('Import type','kind',[['department','Departments'],['position','Positions'],['cost_centre','Cost centres'],['project','Projects']],'department')}<form><label>${tr('CSV or XLSX file')}<input name="file" type="file" accept=".csv,.xlsx" required></label><button type="submit">${tr('Upload for review')}</button></form><div data-import-review></div>`);
+      d.querySelector('form').onsubmit = async (event) => {
+        event.preventDefault(); const file = event.currentTarget.elements.file.files[0]; if (!file) return;
+        const payload = {kind:d.querySelector('[name="kind"]').value,file_name:file.name};
+        if (file.name.toLowerCase().endsWith('.xlsx')) payload.xlsx_base64 = await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result).split(',')[1]);reader.onerror=reject;reader.readAsDataURL(file);});
+        else payload.csv_content = await file.text();
+        try { const batch = await post(c.url('/payroll/dimension-imports'),payload); const review = await api(c.url(`/payroll/dimension-imports/${batch.id}`));
+          d.querySelector('[data-import-review]').innerHTML = `<p>${tr('Status')}: ${tr(review.status)} · ${num(review.total_rows)} ${tr('Rows')} · ${num(review.error_count)} ${tr('Errors')}</p>${table(['File row','Name','Errors'],review.rows.map((r)=>row([td(r.row_number),td(esc(r.parsed?.name || r.parsed_json?.name || '')),td(esc(r.error || ''))])))}${button('Apply reviewed rows','applyDimensionImport',true)}`;
+          d.querySelector('[data-action="applyDimensionImport"]').onclick = async () => { await post(c.url(`/payroll/dimension-imports/${batch.id}/commit`),{}); toast(tr('Import applied'),'success'); closeDialog(d); dimensions = await api(c.url('/payroll/dimensions')); render(); };
+        } catch(error) { toast(error.message,'error'); }
+      };
+    };
+    render();
+  }
+
+  async function payrollSettingsDialog(c) {
+    const d = dialog('Payroll settings', `<p>${tr('Payroll start, payday rules, email settings, leave expiry, reserve posting, posting accounts and dimension registers.')}</p><div class="settings-list">${[
+      ['Payroll start and payday rules','paydaySettings'],['Email settings','payrollEmailSettings'],['Leave expiry','leaveSettings'],
+      ['Reserve posting','leaveLiability'],['Posting accounts','payrollAccounts'],['Dimension registers','payrollDimensions'],
+    ].map(([label,action])=>`<section class="section"><h3>${tr(label)}</h3>${button(label,action)}</section>`).join('')}</div>`);
+    bindActions(d,{paydaySettings:()=>paydaySettingsDialog(c),payrollEmailSettings:()=>payrollReportsDialog(c),leaveSettings:()=>payrollLeaveSettingsDialog(c),leaveLiability:()=>payrollLeaveLiabilityDialog(c),payrollAccounts:()=>payrollAccountsDialog(c),payrollDimensions:()=>payrollDimensionsDialog(c)});
+  }
+
+  function manageBureauMembership(organisationId, organisation) {
+    const d = dialog('Manage membership', `<p>${esc(organisation?.name || '')}</p>${form(field('Email','email','','email','required') + select('Role','role',[['administrator','Administrator'],['accountant','Accountant'],['approver','Approver'],['viewer','Viewer']],'accountant'), 'Create invitation')}<div data-invite-result></div>`);
+    bindForm(d, async (data) => {
+      try {
+        const result = await post(`/organisations/${encodeURIComponent(organisationId)}/invitations`,data);
+        d.querySelector('[data-invite-result]').innerHTML = `<p>${tr('Invitation created')}: ${esc(result.invitation.email)} · ${tr(result.invitation.role)}</p><p>${tr('Share this one-time token over a trusted channel')} <code>${esc(result.accept_token)}</code></p>`;
+      } catch(error) { toast(error.message,'error'); }
+    });
+  }
+
   async function payrollDeliveryDialog(c, run) {
     if (!run) return;
     const employees = run.items || [];
@@ -5060,7 +5151,10 @@
     };
     await render();
   }
-  function payrollItemDialog(c, run, item, types) {
+  async function payrollItemDialog(c, run, item, types) {
+    const dimensions = await api(c.url('/payroll/dimensions')).catch(() => []);
+    const projects = await api(c.url('/objects')).catch(() => []);
+    const choices = (kind) => [['','None'],...dimensions.filter((x)=>x.kind===kind && (x.active || x.id===item?.[kind === 'department' ? 'department_id' : 'cost_centre_id'])).map((x)=>[x.id,x.name])];
     const d = dialog("Edit draft pay", form(
       `<p class="full-width"><strong>${esc(item.employee_name)}</strong> · ${esc(run.period)}</p>` +
       (item.pay_basis === "hourly" ? field("Hours worked", "hours", item.hours, "number", 'required min="0.01" max="744" step="0.01"') : `<p class="full-width">${tr("Base gross salary")}: ${esc(money(item.gross_salary, "EUR"))}</p>`) +
@@ -5080,7 +5174,7 @@
       const draw = () => {
         const input = (key) => field(key === 'net_target' ? 'Net target' : key[0].toUpperCase()+key.slice(1), key, value[key] ?? selected[`default_${key}`] ?? (key==='quantity' || key==='coefficient' ? 1 : ''), 'number', 'step="0.0001"');
         const dynamic = (methodInputs[method] || []).map(input).join('');
-        el.innerHTML = `<legend>${tr("Payment line")}</legend><div class="form-grid">${select("Payment type", "type_id", availableTypes.map((x) => [x.id, t(x.name)]), value.type_id)}<p class="full-width muted">${tr(methodLabels[method] || 'Sum')}. ${tr('The server recalculates and validates this amount when saved.')}</p>${method==='fixed_sum' ? field("Amount", "amount", value.amount || "", "number", 'required step="0.01"') : `<output class="full-width" data-computed-amount>${esc(value.amount || '0.00')}</output>`}<div data-calc-fields class="full-width form-grid">${dynamic}</div>${select("Direction", "direction", [["income", t("Income")], ["deduction", t("Deduction")]], value.direction)}${field("Name", "name", value.name, "text", 'required maxlength="180"')}<div class="full-width component-flags">${componentFlagFields(value)}</div></div>${button("Remove payment line", "removePayment")}`;
+        el.innerHTML = `<legend>${tr("Payment line")}</legend><div class="form-grid">${select("Payment type", "type_id", availableTypes.map((x) => [x.id, t(x.name)]), value.type_id)}<p class="full-width muted">${tr(methodLabels[method] || 'Sum')}. ${tr('The server recalculates and validates this amount when saved.')}</p>${method==='fixed_sum' ? field("Amount", "amount", value.amount || "", "number", 'required step="0.01"') : `<output class="full-width" data-computed-amount>${esc(value.amount || '0.00')}</output>`}<div data-calc-fields class="full-width form-grid">${dynamic}</div>${select("Direction", "direction", [["income", t("Income")], ["deduction", t("Deduction")]], value.direction)}${field("Name", "name", value.name, "text", 'required maxlength="180"')}${select('Department','department_id',choices('department'),value.department_id || '')}${select('Cost centre','cost_centre_id',choices('cost_centre'),value.cost_centre_id || '')}${select('Project','project_id',[['','None'],...projects.filter((x)=>x.object_type==='project' && x.active).map((x)=>[x.id,x.name])],value.project_id || '')}<div class="full-width component-flags">${componentFlagFields(value)}</div></div>${button("Remove payment line", "removePayment")}`;
         const liability = document.createElement('div');
         liability.innerHTML = select("Deduction liability", "liability_role", [["PAYROLL_DEDUCTION", t("Other deduction liability")], ["PAYROLL_BAILIFF", t("Bailiff withholding liability")]], value.liability_role);
         el.querySelector('.form-grid').append(liability.firstElementChild);
@@ -5108,7 +5202,7 @@
     bindForm(d, async () => {
       const components = [...container.children].map((el) => {
         const value = {};
-        for (const key of ['type_id', 'name', 'amount', 'direction', 'liability_role','quantity','rate','coefficient','percentage','net_target']) { const input=el.querySelector(`[name="${key}"]`); if(input) value[key] = input.value; }
+        for (const key of ['type_id', 'name', 'amount', 'direction', 'liability_role','quantity','rate','coefficient','percentage','net_target','department_id','cost_centre_id','project_id']) { const input=el.querySelector(`[name="${key}"]`); if(input) value[key] = input.value || null; }
         for (const key of ['quantity','rate','coefficient','percentage','net_target']) if (value[key] === '') value[key] = null;
         for (const [key] of componentFlags) value[key] = el.querySelector(`[name="${key}"]`).checked;
         return value;

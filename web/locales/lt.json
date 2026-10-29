@@ -2925,7 +2925,17 @@
       "Manage membership": "Tvarkyti narystę",
       "Invitation status": "Kvietimo būsena",
       "Member": "Narys",
-      "No administered organisations": "Nėra administruojamų įmonių"
+      "No administered organisations": "Nėra administruojamų įmonių",
+      "Add dimension":"Pridėti dimensiją","Cost centre":"Sąnaudų centras","Current month run":"Šio mėnesio darbo užmokesčio skaičiavimas",
+      "Deactivate dimension":"Deaktyvinti dimensiją","Department":"Skyrius","Dimension registers":"Dimensijų registrai",
+      "Dimension type":"Dimensijos tipas","Edit dimension":"Redaguoti dimensiją","Import applied":"Importas pritaikytas",
+      "Import dimensions":"Importuoti dimensijas","Import type":"Importo tipas","Last APA export":"Paskutinis APA eksportas",
+      "Manage departments, position groups, positions and cost centres for this company.":"Tvarkykite įmonės skyrius, pareigybių grupes, pareigas ir sąnaudų centrus.",
+      "Next payday":"Kita atlyginimo mokėjimo diena","Open blocking findings":"Atvirų blokuojančių radinių","Organisation":"Įmonė","PALK due":"PALK terminas",
+      "Payroll start, payday rules, email settings, leave expiry, reserve posting, posting accounts and dimension registers.":"Darbo užmokesčio pradžia, mokėjimo dienos taisyklės, el. pašto nustatymai, atostogų galiojimas, rezervo įrašai, sąskaitos ir dimensijų registrai.",
+      "Position group":"Pareigybių grupė","Role":"Vaidmuo","TSD due":"TSD terminas",
+      "Upload a CSV or XLSX for review. Accepted rows are applied only after review.":"Įkelkite CSV arba XLSX failą peržiūrai. Priimtos eilutės taikomos tik po peržiūros.",
+      "Invitation created":"Kvietimas sukurtas","Share this one-time token over a trusted channel":"Pasidalykite šiuo vienkartiniu žetonu patikimu kanalu"
     },
     "nav": {"bureau_overview": "Įmonių apžvalga", "bureau_memberships": "Naudotojų valdymas"}
   }

@@ -1,7 +1,7 @@
 # Payroll dimensions and bureau validation
 
-Date: 2026-10-29. Branch: `feat/payroll-dimensions-bureau`, at the current
-Build 10 implementation commits.
+Date: 2026-10-29. Branch: `feat/payroll-dimensions-bureau`. Build 10 is
+implemented and verified; independent payroll bureau UAT is pending.
 
 ## Build decision and progress
 
@@ -18,6 +18,21 @@ social tax and employer unemployment insurance expenses use the approved
 employee snapshot. Liability postings remain unsplit. Import application is
 explicit after row review and scopes every read and write to the organisation.
 
+The bureau overview API and workspace page include only the signed-in user's
+active organisations. The summary includes current-month run status and unpaid
+net pay, the next rule-based payday, most recent APA export, blocking APA
+findings, PALK due date (18th of the following month, adjusted to a working day)
+and TSD due date (10th after the payment month, adjusted to a working day).
+The owner/administrator matrix lists member roles and invitation states and
+opens the existing invitation API workflow. Payroll settings group the current
+payday, email, leave, reserve, posting-account and dimension controls. Register
+editing, reviewed imports, employee/contract/agreement/component selectors and
+the dimension-cost report are wired into the workspace.
+
+No migration was required for this final UI/API step. The explicit migration
+catalogues in `tests/test_migrations_and_tenancy.py` and `.github/workflows/ci.yml`
+remain at migration 0072.
+
 ## Validation commands and outcomes
 
 All commands used the required PowerShell `Start-Job` wrapper with a 600-second timeout, `-q -p no:cacheprovider -x`, and ran individually.
@@ -30,6 +45,18 @@ All commands used the required PowerShell `Start-Job` wrapper with a 600-second 
 - After the ledger dimension change, `tests/test_payroll.py`: 16 passed in 144.10s with the same upstream deprecation warning.
 - `tests/test_payroll_dimension_import.py`: 5 passed in 48.68s, covering CSV/XLSX staging, review, apply/discard, position groups, project tenancy and API roles.
 - After migration 0072, `tests/test_migrations_and_tenancy.py`: 20 passed in 172.86s.
+- `tests/test_payroll_bureau.py`: 3 passed in 26.74s, covering membership
+  filtering across two of three organisations, dimension API role protection
+  and administered-company matrix isolation.
+- `tests/test_workspace_payroll.py`: 21 passed in 180.43s, then 21 passed in
+  173.65s after the component request schema was aligned with the dimension
+  fields. One upstream `asyncio.iscoroutinefunction` deprecation warning.
+- `tests/test_i18n.py`: 21 passed in 1.40s after adding the complete bureau UI
+  labels to all four locales. One upstream deprecation warning.
+- `tests/test_migrations_and_tenancy.py`: 20 passed in 162.55s.
+- `tests/test_workspace_payroll_bureau.py`: 1 passed in 8.46s, exercising the
+  overview, two-company membership matrix and invitation action in Playwright.
+- `node --check static/app.js` and `git diff --check` completed successfully.
 
 ## Completed implementation checkpoints
 
@@ -47,9 +74,18 @@ All commands used the required PowerShell `Start-Job` wrapper with a 600-second 
   locale labels, plus frozen-value tenant-scope coverage.
 - Migration `0071_payroll_ledger_dimensions` stores tenant-checked department and cost-centre tags alongside analytical GL tags. Payroll salary, social-tax and employer UI expense lines now split by each approved item's frozen department, cost centre and project; liability lines remain untagged and aggregated. Corrections keep the same analytical tags when reversing line direction.
 - Migration `0072_payroll_dimension_imports` adds isolated review batches. CSV and XLSX imports cover departments, positions with position groups, cost centres and projects; commits revalidate rows and apply accepted records in the tenant transaction.
+- Commit `f6ae210` adds the membership-scoped bureau overview read API and
+  cross-tenant test.
+- Commit `2de2fec` adds owner/administrator-protected dimension register API
+  endpoints without changing the migration catalogue.
+- Commit `053dd08` adds bureau overview and membership matrix workspace views,
+  localized labels and role-filtered membership data.
+- The final Build 10 checkpoint adds settings and register/import dialogs,
+  dimension selectors, APA finding and due-date summaries, invitation workflow
+  and the browser-level acceptance test.
 
-## Remaining work
+## Open validation
 
-- Add the bureau overview and read-only organisation membership matrix.
-- Add the grouped payroll settings page with owner/admin protections.
-- Complete the remaining UI flows and locale strings.
+- Independent Estonian bureau UAT remains necessary for production approval.
+- Confirm with the bureau that PALK's 18th-day working-day adjustment is
+  acceptable; the existing report service and bureau overview use that rule.

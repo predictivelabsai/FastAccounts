@@ -3,19 +3,20 @@
 **Research baseline:** 2026-08-10  
 **Status:** engineering pilot implemented; independent UK/EE accountant UAT and provider approvals pending
 
-## Payroll dimensions and bureau overview (Build 10, in progress)
+## Payroll dimensions and bureau overview (Build 10, complete; production UAT pending)
 
 - Migration 0069 adds tenant-scoped department, position-group, position and
   cost-centre registers with optional links to employee, contract, agreement,
   component and contract-run records. Migration 0070 adds frozen employee-level
   dimensions to payroll run items.
-- Employee, contract, agreement and component dimension writes now validate
-  active same-organisation references. Approval snapshots employee dimensions,
-  and a dimension cost report endpoint and export selector are in progress.
-- Remaining acceptance includes balanced GL expense and levy splits using
-  frozen dimensions, reviewed CSV/XLSX imports, the bureau overview and
-  membership matrix, grouped settings, complete locale/UI flows, and the
-  requested test runs. This feature is not complete or production validated.
+- Employee, contract, agreement and component dimension writes validate active
+  same-organisation references. Approval snapshots employee dimensions, and
+  payroll expense postings split by frozen dimensions while liabilities remain
+  aggregated. The dimension cost report includes an XLSX export.
+- Reviewed CSV/XLSX imports, the tenant-filtered bureau overview, owner/admin
+  membership matrix with invitation workflow, payroll settings groups, register
+  editing and dimension selectors are available in the workspace in en, et, lv
+  and lt. Build 10 acceptance suites pass. Independent bureau UAT remains pending.
 - Validation and limitations are recorded in
   `payroll_dimensions_bureau_validation.md`.
 

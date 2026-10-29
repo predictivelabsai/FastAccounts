@@ -2925,7 +2925,17 @@
       "Manage membership": "Halda liikmesust",
       "Invitation status": "Kutse olek",
       "Member": "Liige",
-      "No administered organisations": "Hallatavaid ettevõtteid pole"
+      "No administered organisations": "Hallatavaid ettevõtteid pole",
+      "Add dimension":"Lisa mõõde","Cost centre":"Kulukohad","Current month run":"Käesoleva kuu palgaarvestus",
+      "Deactivate dimension":"Deaktiveeri mõõde","Department":"Osakond","Dimension registers":"Mõõtmete registrid",
+      "Dimension type":"Mõõtme tüüp","Edit dimension":"Muuda mõõdet","Import applied":"Import rakendatud",
+      "Import dimensions":"Impordi mõõtmed","Import type":"Impordi tüüp","Last APA export":"Viimane APA eksport",
+      "Manage departments, position groups, positions and cost centres for this company.":"Halda ettevõtte osakondi, ametigruppe, ameteid ja kulukohti.",
+      "Next payday":"Järgmine palgapäev","Open blocking findings":"Avatud blokeerivad leiud","Organisation":"Ettevõte","PALK due":"PALK tähtaeg",
+      "Payroll start, payday rules, email settings, leave expiry, reserve posting, posting accounts and dimension registers.":"Palgaarvestuse algus, palgapäeva reeglid, e-posti seaded, puhkuse aegumine, reservi kanded, kontod ja mõõtmete registrid.",
+      "Position group":"Ametigrupp","Role":"Roll","TSD due":"TSD tähtaeg",
+      "Upload a CSV or XLSX for review. Accepted rows are applied only after review.":"Laadi üles CSV- või XLSX-fail kontrollimiseks. Lubatud read rakendatakse alles pärast ülevaatust.",
+      "Invitation created":"Kutse loodud","Share this one-time token over a trusted channel":"Jaga seda ühekordset võtit usaldusväärse kanali kaudu"
     },
     "nav": {"bureau_overview": "Ettevõtete koondvaade", "bureau_memberships": "Kasutajate haldamine"}
   }

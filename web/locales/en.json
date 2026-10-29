@@ -2925,7 +2925,17 @@
       "Manage membership": "Manage membership",
       "Invitation status": "Invitation status",
       "Member": "Member",
-      "No administered organisations": "No administered organisations"
+      "No administered organisations": "No administered organisations",
+      "Add dimension":"Add dimension","Cost centre":"Cost centre","Current month run":"Current month run",
+      "Deactivate dimension":"Deactivate dimension","Department":"Department","Dimension registers":"Dimension registers",
+      "Dimension type":"Dimension type","Edit dimension":"Edit dimension","Import applied":"Import applied",
+      "Import dimensions":"Import dimensions","Import type":"Import type","Last APA export":"Last APA export",
+      "Manage departments, position groups, positions and cost centres for this company.":"Manage departments, position groups, positions and cost centres for this company.",
+      "Next payday":"Next payday","Open blocking findings":"Open blocking findings","Organisation":"Organisation","PALK due":"PALK due",
+      "Payroll start, payday rules, email settings, leave expiry, reserve posting, posting accounts and dimension registers.":"Payroll start, payday rules, email settings, leave expiry, reserve posting, posting accounts and dimension registers.",
+      "Position group":"Position group","Role":"Role","TSD due":"TSD due",
+      "Upload a CSV or XLSX for review. Accepted rows are applied only after review.":"Upload a CSV or XLSX for review. Accepted rows are applied only after review.",
+      "Invitation created":"Invitation created","Share this one-time token over a trusted channel":"Share this one-time token over a trusted channel"
     },
     "nav": {"bureau_overview": "Companies overview", "bureau_memberships": "User management"}
   }
