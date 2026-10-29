@@ -1337,8 +1337,15 @@ class PayrollService:
                    for item in run['items']):
                 raise ValueError('Every employee requires positive gross pay before approval')
             for item in run['items']:
-                employee_dimensions = tx.one('SELECT department_id,position_id FROM employees WHERE organisation_id=? AND id=?',
-                                              (organisation_id, item['employee_id'])) or {}
+                if tx.dialect == 'postgres':
+                    employee_columns = {row['column_name'] for row in tx.rows("SELECT column_name FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='employees'")}
+                    item_columns = {row['column_name'] for row in tx.rows("SELECT column_name FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='pay_run_items'")}
+                else:
+                    employee_columns = {row['name'] for row in tx.rows('PRAGMA table_info(employees)')}
+                    item_columns = {row['name'] for row in tx.rows('PRAGMA table_info(pay_run_items)')}
+                employee_dimension_sql = ','.join(field for field in ('department_id', 'position_id') if field in employee_columns)
+                employee_dimensions = tx.one(f'SELECT {employee_dimension_sql} FROM employees WHERE organisation_id=? AND id=?',
+                                              (organisation_id, item['employee_id'])) if employee_dimension_sql else {}
                 primary_line = next((line for line in item.get('contract_lines', []) if line.get('is_primary')),
                                     (item.get('contract_lines') or [None])[0])
                 frozen = {
@@ -1347,8 +1354,11 @@ class PayrollService:
                     'cost_centre_id': (primary_line or {}).get('cost_centre_id'),
                     'project_id': (primary_line or {}).get('project_id'),
                 }
-                tx.execute('UPDATE pay_run_items SET department_id=?,position_id=?,cost_centre_id=?,project_id=? WHERE organisation_id=? AND id=?',
-                           (frozen['department_id'], frozen['position_id'], frozen['cost_centre_id'], frozen['project_id'], organisation_id, item['id']))
+                frozen_columns = [field for field in frozen if field in item_columns]
+                if frozen_columns:
+                    tx.execute('UPDATE pay_run_items SET ' + ','.join(f'{field}=?' for field in frozen_columns) +
+                               ' WHERE organisation_id=? AND id=?',
+                               tuple(frozen[field] for field in frozen_columns) + (organisation_id, item['id']))
                 item.update(frozen)
             from payroll_tsd_breakdown import calculate_tsd_breakdown, freeze_tsd_breakdown
             from payroll_tsd_breakdown import LINE_FIELDS
