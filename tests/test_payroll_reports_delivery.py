@@ -126,3 +126,95 @@ def test_review_pack_contains_pay_list_and_optional_payslip(db, ee_org, monkeypa
     assert any(content.startswith(b'PK') for content in decoded)
     assert delivery.history(ee_org['id'], run['id'])[0]['kind'] == 'review'
 
+
+def test_report_and_delivery_routes_enforce_roles_csrf_tenancy_and_retry(db, ee_org, uk_org, monkeypatch):
+    from fastapi.testclient import TestClient
+    from organisations import OrganisationService
+    from payroll_delivery import PayrollDeliveryService
+    from api_app import api, current_user, User
+    import httpx
+
+    monkeypatch.setenv('FASTACCOUNTS_DB', db.path)
+    monkeypatch.setenv('DB_URL', '')
+    monkeypatch.setenv('FASTACCOUNTS_ALLOW_TEST_AUTH', 'true')
+    monkeypatch.setenv('POSTMARK_API_TOKEN', 'synthetic-token')
+    monkeypatch.setenv('FROM_EMAIL', 'payroll@example.test')
+    from database import reset_database_cache
+    reset_database_cache()
+    orgs = OrganisationService(db)
+    for role in ('accountant', 'administrator', 'viewer'):
+        orgs.add_member(ee_org['id'], ACTOR, f'{role}@example.test', role)
+
+    payroll = PayrollService(db)
+    employee = payroll.save_employee(ee_org['id'], actor=ACTOR, name='Route employee', gross_salary='2000', email='route@example.test')
+    run = payroll.create_run(ee_org['id'], period='2026-04', actor=ACTOR)
+    other_org = orgs.create(name='Other synthetic EE', country_code='EE', entity_type='EE_OU', owner_email='other-owner@example.test')
+    other_employee = payroll.save_employee(other_org['id'], actor=ACTOR, name='Other tenant employee', gross_salary='2000', email='other@example.test')
+    other_run = payroll.create_run(other_org['id'], period='2026-04', actor=ACTOR)
+    root = f"/organisations/{ee_org['id']}"
+    read_routes = [
+        ('GET', f'{root}/payroll/reports/annual-summary?year=2026'),
+        ('GET', f'{root}/payroll/reports.xlsx?report=annual-summary&year=2026'),
+        ('GET', f'{root}/payroll/reports/average-pay?period=2026-04&months=6'),
+        ('GET', f'{root}/payroll/reports/palk?period=2026-04'),
+        ('GET', f'{root}/payroll/reports/headcount?year=2026'),
+        ('GET', f'{root}/payroll/reports/pay-list?start=2026-04&end=2026-04'),
+        ('GET', f'{root}/pay-runs/{run["id"]}/payslips.pdf'),
+        ('GET', f'{root}/pay-runs/{run["id"]}/deliveries'),
+        ('GET', f'{root}/payroll/report-settings'),
+    ]
+    with TestClient(api) as client:
+        for role, allowed in (('viewer', False), ('accountant', True), ('administrator', True), ('owner', True)):
+            headers = {'X-Test-User': ACTOR if role == 'owner' else f'{role}@example.test'}
+            for method, path in read_routes:
+                response = client.request(method, path, headers=headers)
+                expected = allowed or (role == 'viewer' and not path.endswith('/payroll/report-settings'))
+                assert response.status_code == (200 if expected else 403), (role, path, response.text)
+
+        class FlakyTransport:
+            attempts = 0
+            def post(self, *_args, **_kwargs):
+                self.attempts += 1
+                if self.attempts == 1:
+                    raise RuntimeError('synthetic transport failure')
+                class Response:
+                    def raise_for_status(self): pass
+                    def json(self): return {'ErrorCode': 0, 'MessageID': 'synthetic'}
+                return Response()
+
+        transport = FlakyTransport()
+        monkeypatch.setattr(httpx, 'Client', lambda **_kwargs: transport)
+        owner = {'X-Test-User': ACTOR}
+        payload = {'employee_ids': [employee['id']]}
+        sent = client.post(f'{root}/pay-runs/{run["id"]}/deliveries/payslips', headers=owner, json=payload)
+        assert sent.status_code == 200 and sent.json()[0]['status'] == 'Failed'
+        delivery_id = sent.json()[0]['id']
+        retried = client.post(f'{root}/payroll/deliveries/{delivery_id}/retry', headers=owner)
+        assert retried.status_code == 200 and retried.json()[0]['status'] == 'Sent'
+        assert sorted(row['status'] for row in PayrollDeliveryService(db).history(ee_org['id'], run['id'])) == ['Failed', 'Sent']
+
+        assert client.get(f'{root}/pay-runs/{other_run["id"]}/payslips.pdf', headers=owner).status_code == 404
+        assert client.get(f'/organisations/{other_org["id"]}/pay-runs/{run["id"]}/deliveries', headers=owner).status_code == 403
+        foreign_send = client.post(f'{root}/pay-runs/{run["id"]}/deliveries/payslips', headers=owner,
+                                   json={'employee_ids': [other_employee['id']]})
+        assert foreign_send.status_code == 404
+        assert client.get(f'{root}/payroll/deliveries/{delivery_id}/retry', headers=owner).status_code == 405
+
+    from web_app import app
+    api.dependency_overrides[current_user] = lambda: User(email=ACTOR)
+    monkeypatch.setenv('FASTACCOUNTS_ALLOW_TEST_AUTH', 'false')
+    try:
+        with TestClient(app) as mounted:
+            writes = [
+                ('PUT', f'/api{root}/payroll/report-settings', {'sender_name': 'Test'}),
+                ('POST', f'/api{root}/pay-runs/{run["id"]}/deliveries/payslips', {'employee_ids': [employee['id']]}),
+                ('POST', f'/api{root}/pay-runs/{run["id"]}/deliveries/review', {'recipient': 'review@example.test'}),
+                ('POST', f'/api{root}/payroll/deliveries/{delivery_id}/retry', {}),
+            ]
+            for method, path, payload in writes:
+                response = mounted.request(method, path, json=payload)
+                assert response.status_code == 403, (method, path, response.text)
+    finally:
+        api.dependency_overrides.pop(current_user, None)
+    reset_database_cache()
+
