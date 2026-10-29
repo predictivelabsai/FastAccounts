@@ -1,12 +1,12 @@
 """Tenant-scoped payroll report calculations and XLSX serialisation."""
 from collections import defaultdict
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 import json
 
 from core_utils import db_number, decimal, money
 from database import get_database
-from payroll_calendar import norm_hours
+from payroll_calendar import is_working_day, norm_hours
 
 
 class PayrollReportsService:
@@ -157,4 +157,7 @@ def _serialise_employee(row):
 
 def _due_date(period):
     year, month = map(int, period.split('-'))
-    return date(year + (month == 12), month % 12 + 1, 18).isoformat()
+    due = date(year + (month == 12), month % 12 + 1, 18)
+    while not is_working_day(due):
+        due += timedelta(days=1)
+    return due.isoformat()

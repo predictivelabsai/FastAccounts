@@ -35,6 +35,7 @@ def test_reports_use_frozen_tenant_scoped_payroll(db, ee_org):
 
     palk = reports.statistics_palk(ee_org['id'], '2026-04')
     assert palk['due_date'] == '2026-05-18'
+    assert reports.statistics_palk(ee_org['id'], '2026-03')['due_date'] == '2026-04-20'
     assert palk['rows']['1'] == {'full_time': '0.00', 'part_time': '0.00'}
     assert palk['rows']['2'] == {'full_time': '0.00', 'part_time': '0.00'}
     assert Decimal(palk['rows']['3']['full_time']) > 0
@@ -185,6 +186,9 @@ def test_report_and_delivery_routes_enforce_roles_csrf_tenancy_and_retry(db, ee_
         transport = FlakyTransport()
         monkeypatch.setattr(httpx, 'Client', lambda **_kwargs: transport)
         owner = {'X-Test-User': ACTOR}
+        unmapped_type = client.post(f'{root}/payroll/component-types', headers=owner,
+                                    json={'name': 'Route unmapped component', 'palk_designation': None})
+        assert unmapped_type.status_code == 201 and unmapped_type.json()['palk_designation'] is None
         payload = {'employee_ids': [employee['id']]}
         sent = client.post(f'{root}/pay-runs/{run["id"]}/deliveries/payslips', headers=owner, json=payload)
         assert sent.status_code == 200 and sent.json()[0]['status'] == 'Failed'
@@ -192,6 +196,18 @@ def test_report_and_delivery_routes_enforce_roles_csrf_tenancy_and_retry(db, ee_
         retried = client.post(f'{root}/payroll/deliveries/{delivery_id}/retry', headers=owner)
         assert retried.status_code == 200 and retried.json()[0]['status'] == 'Sent'
         assert sorted(row['status'] for row in PayrollDeliveryService(db).history(ee_org['id'], run['id'])) == ['Failed', 'Sent']
+
+        for role in ('viewer', 'accountant', 'administrator', 'owner'):
+            role_headers = {'X-Test-User': ACTOR if role == 'owner' else f'{role}@example.test'}
+            permitted = role != 'viewer'
+            actions = [
+                client.put(f'{root}/payroll/report-settings', headers=role_headers, json={'sender_name': role}),
+                client.post(f'{root}/pay-runs/{run["id"]}/deliveries/payslips', headers=role_headers, json=payload),
+                client.post(f'{root}/pay-runs/{run["id"]}/deliveries/review', headers=role_headers,
+                            json={'recipient': f'{role}@example.test'}),
+                client.post(f'{root}/payroll/deliveries/{delivery_id}/retry', headers=role_headers),
+            ]
+            assert [response.status_code for response in actions] == ([200] * 4 if permitted else [403] * 4)
 
         assert client.get(f'{root}/pay-runs/{other_run["id"]}/payslips.pdf', headers=owner).status_code == 404
         assert client.get(f'/organisations/{other_org["id"]}/pay-runs/{run["id"]}/deliveries', headers=owner).status_code == 403

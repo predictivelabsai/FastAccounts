@@ -2256,14 +2256,19 @@ offline acceptance files pass individually. Remaining work is accountant UAT,
 e-MTA acceptance and external validation. See
 `payroll_corrections_validation.md` for commands, counts and commits.
 
-## Payroll reports and delivery (Build 8 in progress, 2026-10-29)
+## Payroll reports and delivery (Build 8 implementation complete, 2026-10-29)
 
-Migration 0065 and the initial implementation add payroll report services for
-annual summaries, average pay, monthly PALK, yearly headcount/FTE and pay lists,
-with XLSX exports. Organisation email settings, employee report language,
-payslip delivery, review packs and per-run delivery history are available in the
-payroll workspace. Focused payroll, workspace, locale, email and migration tests
-pass individually. Remaining validation includes route permission/CSRF tests,
-failed-delivery retries, PALK unmapped designations, general dashboard deadline
-integration, translated payslip review and bureau UAT. See
+Migrations 0065-0066 add organisation payroll email settings, employee report
+language, tenant-scoped delivery history and nullable PALK designations for
+component types and frozen run lines. Payroll reports cover annual summaries,
+average pay, monthly PALK, yearly headcount/FTE and pay lists, with XLSX exports.
+The workspace supports selected payslip delivery, review packs, report settings,
+history and retries. Unmapped PALK types appear with their amounts as a warning
+and are omitted from mapped rows. Focused route, CSRF, role, tenancy, retry,
+migration and locale checks are recorded in
 `payroll_reports_delivery_validation.md`.
+
+Follow-ups: confirm the next-working-day PALK due-date interpretation against the
+Statistics Estonia reporting calendar and accounting-bureau wording. The general
+overview currently has no deadline feed; adding PALK dates there is deferred to a
+dashboard follow-up. Production UAT remains external.

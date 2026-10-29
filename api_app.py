@@ -2256,6 +2256,7 @@ class PayComponentIn(BaseModel):
     default_percentage: Decimal | None = None
     default_coefficient: Decimal | None = None
     palk_row: Literal[5,6,7,8,9,10,15,16,17,18] = 5
+    palk_designation: Literal[5,6,7,8,9,10,15,16,17,18] | None = None
 
 
 class PayComponentLine(BaseModel):
@@ -2809,13 +2810,13 @@ def export_payroll_payout_sepa(organisation_id: str, payout_id: str, user: User 
 @api.post('/organisations/{organisation_id}/payroll/component-types', status_code=201)
 def payroll_create_component_type(organisation_id: str, payload: PayComponentIn, user: User = Depends(require_csrf)):
     _require(organisation_id, user, WRITE_ROLES)
-    return PayrollService().save_component_type(organisation_id, actor=user.email, **payload.model_dump())
+    return PayrollService().save_component_type(organisation_id, actor=user.email, **payload.model_dump(exclude_unset=True))
 
 
 @api.put('/organisations/{organisation_id}/payroll/component-types/{type_id}')
 def payroll_save_component_type(organisation_id: str, type_id: str, payload: PayComponentIn, user: User = Depends(require_csrf)):
     _require(organisation_id, user, WRITE_ROLES)
-    return PayrollService().save_component_type(organisation_id, type_id=type_id, actor=user.email, **payload.model_dump())
+    return PayrollService().save_component_type(organisation_id, type_id=type_id, actor=user.email, **payload.model_dump(exclude_unset=True))
 
 
 @api.get('/organisations/{organisation_id}/payroll/posting-mappings')

@@ -2351,7 +2351,7 @@ run kinds.
 Validation: `tests/test_migrations_and_tenancy.py`, 17 passed. Full requested
 payroll acceptance suite has not yet been run.
 
-## 2026-10-29: Payroll reports and delivery (Build 8 in progress)
+## 2026-10-29: Payroll reports and delivery (Build 8 implementation complete)
 
 - Added migration 0065 for organisation payroll email settings, employee report
   languages and tenant-scoped delivery history.
@@ -2359,8 +2359,11 @@ payroll acceptance suite has not yet been run.
   PDF attachments, send history and retry actions. Added report calculations and
   workbook downloads for annual summaries, average pay, PALK, headcount and pay
   lists. The workspace now includes report, settings and delivery dialogs.
-- Focused payroll, workspace, locale, bulk email, report/delivery and migration
-  checks pass individually. All email tests use mocked transport. PALK unmapped
-  designation support, dashboard deadline feed integration, dedicated route
-  security/retry tests, translated payslip review and bureau UAT remain open.
-  See `payroll_reports_delivery_validation.md`.
+- Migration 0066 adds nullable PALK designations to component types and frozen
+  lines. Unmapped amounts are reported as a warning and excluded from mapped
+  rows. Route tests cover role access, CSRF, tenant boundaries and failed-send
+  retry. Email transport is mocked. Weekend and Estonian public-holiday due
+  dates move to the next working day.
+- Focused validation and counts are in `payroll_reports_delivery_validation.md`.
+  Confirm the due-date interpretation and bureau wording; add PALK dates to the
+  general overview in a separate dashboard follow-up.
