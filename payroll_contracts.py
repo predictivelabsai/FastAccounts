@@ -45,7 +45,7 @@ class PayrollContractService:
 
     def create(self, organisation_id, employee_id, *, contract_type, start_date, actor, end_date=None,
                document_name=None, workplace_address=None, monthly_net_advance='0', payday_rule=None,
-               payday_day=None, agreement=None, position=None):
+               payday_day=None, agreement=None, position=None, department_id=None, position_id=None):
         start_date = _date(start_date, 'Contract start date')
         if end_date:
             end_date = _date(end_date, 'Contract end date')
@@ -67,9 +67,11 @@ class PayrollContractService:
         with self.db.transaction() as tx:
             if not tx.one('SELECT id FROM employees WHERE organisation_id=? AND id=?', (organisation_id, employee_id)):
                 raise ValueError('Employee not found')
-            tx.execute('INSERT INTO payroll_contracts(id,organisation_id,employee_id,contract_type,start_date,end_date,document_name,workplace_address,monthly_net_advance,payday_rule,payday_day,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)',
+            from payroll_dimensions import validate_employee_dimensions
+            validate_employee_dimensions(tx, organisation_id, {'department_id': department_id, 'position_id': position_id})
+            tx.execute('INSERT INTO payroll_contracts(id,organisation_id,employee_id,contract_type,start_date,end_date,document_name,workplace_address,monthly_net_advance,payday_rule,payday_day,department_id,position_id,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)',
                        (contract_id, organisation_id, employee_id, contract_type, start_date, end_date,
-                        document_name, workplace_address, advance, payday_rule, payday_day))
+                        document_name, workplace_address, advance, payday_rule, payday_day, department_id, position_id))
             if agreement_data:
                 self._insert_agreement(tx, organisation_id, contract_id, agreement_data)
             if position:
@@ -91,7 +93,7 @@ class PayrollContractService:
 
     def update(self, organisation_id, contract_id, *, actor, **changes):
         allowed = {'contract_type', 'start_date', 'end_date', 'document_name', 'workplace_address',
-                   'monthly_net_advance', 'payday_rule', 'payday_day'}
+                   'monthly_net_advance', 'payday_rule', 'payday_day', 'department_id', 'position_id'}
         if set(changes) - allowed:
             raise ValueError('Unknown contract field')
         with self.db.transaction() as tx:
@@ -116,9 +118,11 @@ class PayrollContractService:
             if values['payday_day'] is not None and (type(values['payday_day']) is not int or not 1 <= values['payday_day'] <= 31):
                 raise ValueError('Payday day must be between 1 and 31')
             values['monthly_net_advance'] = _amount(values['monthly_net_advance'], 'Monthly net advance')
-            tx.execute('UPDATE payroll_contracts SET contract_type=?,start_date=?,end_date=?,document_name=?,workplace_address=?,monthly_net_advance=?,payday_rule=?,payday_day=? WHERE organisation_id=? AND id=?',
+            from payroll_dimensions import validate_employee_dimensions
+            validate_employee_dimensions(tx, organisation_id, values)
+            tx.execute('UPDATE payroll_contracts SET contract_type=?,start_date=?,end_date=?,document_name=?,workplace_address=?,monthly_net_advance=?,payday_rule=?,payday_day=?,department_id=?,position_id=? WHERE organisation_id=? AND id=?',
                        tuple(values[key] for key in ('contract_type', 'start_date', 'end_date', 'document_name',
-                                                      'workplace_address', 'monthly_net_advance', 'payday_rule', 'payday_day')) +
+                                                      'workplace_address', 'monthly_net_advance', 'payday_rule', 'payday_day', 'department_id', 'position_id')) +
                        (organisation_id, contract_id))
             audit(tx, organisation_id, actor, 'payroll.contract.updated', 'payroll_contract', contract_id)
         return next(item for item in self.list(organisation_id, current['employee_id']) if item['id'] == contract_id)
@@ -160,12 +164,16 @@ class PayrollContractService:
                 'hours_per_day': hours, 'rate': _amount(data.get('rate'), 'Rate'), 'fte': format(fte, 'f'),
                 'is_full_time': int(bool(data.get('is_full_time', True))),
                 'automatic_working_time': int(bool(data.get('automatic_working_time', True))),
-                'account_override': data.get('account_override')}
+                'account_override': data.get('account_override'), 'department_id': data.get('department_id'),
+                'cost_centre_id': data.get('cost_centre_id'), 'project_id': data.get('project_id')}
 
     @staticmethod
     def _insert_agreement(tx, organisation_id, contract_id, data, agreement_id=None):
         agreement_id = agreement_id or new_id()
-        tx.execute('INSERT INTO payroll_salary_agreements(id,organisation_id,contract_id,start_date,base_pay_type,hours_per_day,rate,fte,is_full_time,automatic_working_time,account_override,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)',
+        from payroll_dimensions import validate_agreement_dimensions
+        validate_agreement_dimensions(tx, organisation_id, data)
+        tx.execute('INSERT INTO payroll_salary_agreements(id,organisation_id,contract_id,start_date,base_pay_type,hours_per_day,rate,fte,is_full_time,automatic_working_time,account_override,department_id,cost_centre_id,project_id,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)',
                    (agreement_id, organisation_id, contract_id, data['start_date'], data['base_pay_type'],
                     data['hours_per_day'], data['rate'], data['fte'], data['is_full_time'],
-                    data['automatic_working_time'], data['account_override']))
+                    data['automatic_working_time'], data['account_override'], data.get('department_id'),
+                    data.get('cost_centre_id'), data.get('project_id')))

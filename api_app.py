@@ -2191,6 +2191,8 @@ class EmployeeIn(BaseModel):
     employment_end_date: str | None = None
     tax_settings_period: str | None = None
     report_language: Literal['et', 'en', 'lv', 'lt'] | None = None
+    department_id: str | None = None
+    position_id: str | None = None
 
 
 class EmployeePatch(BaseModel):
@@ -2215,6 +2217,8 @@ class EmployeePatch(BaseModel):
     employment_end_date: str | None = None
     tax_settings_period: str | None = None
     report_language: Literal['et', 'en', 'lv', 'lt'] | None = None
+    department_id: str | None = None
+    position_id: str | None = None
 
 
 class PayRunIn(BaseModel):
@@ -2236,6 +2240,8 @@ class PayrollContractIn(BaseModel):
     payday_day: int | None = Field(default=None, ge=1, le=31)
     agreement: dict | None = None
     position: dict | None = None
+    department_id: str | None = None
+    position_id: str | None = None
 
 
 class PayrollAgreementIn(BaseModel):
@@ -2248,6 +2254,9 @@ class PayrollAgreementIn(BaseModel):
     is_full_time: bool = True
     automatic_working_time: bool = True
     account_override: str | None = Field(default=None, max_length=30)
+    department_id: str | None = None
+    cost_centre_id: str | None = None
+    project_id: str | None = None
 
 
 class TORImportApplyIn(BaseModel):
@@ -2265,6 +2274,8 @@ class PayrollContractPatchIn(BaseModel):
     monthly_net_advance: Decimal | None = Field(default=None, ge=0, max_digits=12, decimal_places=2)
     payday_rule: Literal['next_month_day', 'current_month_day', 'next_month_first_working_day'] | None = None
     payday_day: int | None = Field(default=None, ge=1, le=31)
+    department_id: str | None = None
+    position_id: str | None = None
 
 
 class PayrollPositionIn(BaseModel):

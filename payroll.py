@@ -277,6 +277,10 @@ class PayrollService:
                 payment_type = {'employment': 10, 'board_member': 21, 'services': 17, 'other': 16}[contract['contract_type']]
                 resolved.append({
                     'contract_id': contract['id'], 'agreement_id': agreement['id'],
+                    'department_id': agreement.get('department_id') or contract.get('department_id'),
+                    'position_id': contract.get('position_id'),
+                    'cost_centre_id': agreement.get('cost_centre_id'),
+                    'project_id': agreement.get('project_id'),
                     'contract_type': contract['contract_type'], 'base_pay_type': base_type,
                     'payment_type': payment_type, 'effective_start': min(days).isoformat(),
                     'effective_end': max(days).isoformat(), 'gross': gross,
@@ -501,7 +505,8 @@ class PayrollService:
         fields = ('name', 'email', 'personal_id', 'gross_salary', 'funded_pension_percent',
                   'apply_tax_free_minimum', 'board_member', 'active', 'pay_basis', 'fte', 'hourly_rate',
                   'social_tax_minimum_exemption', 'employment_start_date', 'employment_end_date',
-                  'phone', 'iban', 'bank_account_owner', 'address', 'date_of_birth', 'report_language')
+                  'phone', 'iban', 'bank_account_owner', 'address', 'date_of_birth', 'report_language',
+                  'department_id', 'position_id')
         if set(changes) - set(fields):
             raise ValueError('Unknown employee field')
         # Keep the legacy board_member flag and the pay basis in step when only one is sent.
@@ -534,6 +539,8 @@ class PayrollService:
             data.setdefault('funded_pension_percent', 0 if data['board_member'] else 2)
             legacy_changes = changes
         data = self._employee_values(data)
+        from payroll_dimensions import validate_employee_dimensions
+        validate_employee_dimensions(tx, organisation_id, data)
         record_id = employee_id or new_id()
         if employee_id:
             result = tx.execute('UPDATE employees SET '+','.join(f'{f}=?' for f in fields)+
@@ -758,7 +765,8 @@ class PayrollService:
                            (organisation_id, item_id))
             for position, line in enumerate(components):
                 allowed = {'type_id', 'name', 'amount', 'direction', 'liability_role', 'is_generated',
-                           'quantity', 'rate', 'coefficient', 'percentage', 'net_target', *FLAGS}
+                           'quantity', 'rate', 'coefficient', 'percentage', 'net_target', 'department_id',
+                           'cost_centre_id', 'project_id', *FLAGS}
                 if set(line) - allowed:
                     raise ValueError('Unknown payment component field')
                 data = tx.one('SELECT * FROM pay_component_types WHERE organisation_id=? AND id=?', (organisation_id, line.get('type_id')))
@@ -771,6 +779,8 @@ class PayrollService:
                 data.setdefault('is_wage', True)
                 data.setdefault('active', True)
                 data.update(line)
+                from payroll_dimensions import validate_agreement_dimensions
+                validate_agreement_dimensions(tx, organisation_id, data)
                 method = data.get('calculation_method', 'fixed_sum')
                 component_amount = data.get('amount')
                 formula_inputs = {
@@ -859,8 +869,8 @@ class PayrollService:
                 else:
                     has_tsd = 'tsd_payment_type' in {row['name'] for row in tx.rows('PRAGMA table_info(pay_item_components)')}
                 methods_ready = ('calculation_method' in component_columns)
-                fields = ('id', 'organisation_id', 'item_id', 'type_id', 'position', 'name', 'amount', 'direction', *FLAGS, 'liability_role') + (('is_wage',) if metadata_ready else ()) + (('tsd_payment_type',) if has_tsd else ()) + (('calculation_method', 'quantity', 'rate', 'coefficient', 'percentage', 'net_target', 'palk_row', 'palk_designation') if methods_ready else ())
-                values = (new_id(), organisation_id, item_id, data['id'], position, data['name'], db_number(amount), data['direction'], *(data[key] for key in FLAGS), data['liability_role']) + ((data['is_wage'],) if metadata_ready else ()) + ((data.get('tsd_payment_type', 10),) if has_tsd else ()) + ((method, data.get('quantity'), data.get('rate', data.get('default_rate')), data.get('coefficient', data.get('default_coefficient')), data.get('percentage', data.get('default_percentage')), data.get('net_target'), data.get('palk_row', 5), data.get('palk_designation', data.get('palk_row', 5))) if methods_ready else ())
+                fields = ('id', 'organisation_id', 'item_id', 'type_id', 'position', 'name', 'amount', 'direction', *FLAGS, 'liability_role', 'department_id', 'cost_centre_id', 'project_id') + (('is_wage',) if metadata_ready else ()) + (('tsd_payment_type',) if has_tsd else ()) + (('calculation_method', 'quantity', 'rate', 'coefficient', 'percentage', 'net_target', 'palk_row', 'palk_designation') if methods_ready else ())
+                values = (new_id(), organisation_id, item_id, data['id'], position, data['name'], db_number(amount), data['direction'], *(data[key] for key in FLAGS), data['liability_role'], data.get('department_id'), data.get('cost_centre_id'), data.get('project_id')) + ((data['is_wage'],) if metadata_ready else ()) + ((data.get('tsd_payment_type', 10),) if has_tsd else ()) + ((method, data.get('quantity'), data.get('rate', data.get('default_rate')), data.get('coefficient', data.get('default_coefficient')), data.get('percentage', data.get('default_percentage')), data.get('net_target'), data.get('palk_row', 5), data.get('palk_designation', data.get('palk_row', 5))) if methods_ready else ())
                 tx.execute('INSERT INTO pay_item_components(' + ','.join(fields) + ') VALUES (' + ','.join('?' for _ in fields) + ')', values)
         if generated_column_ready:
             tx.execute('DELETE FROM pay_item_components WHERE organisation_id=? AND item_id=? AND is_generated=1',
@@ -1020,6 +1030,9 @@ class PayrollService:
             employee_for_average = employee
             contract_lines = self._contract_pay_lines(tx, organisation_id, employee['id'], period,
                                                        (hours or {}).get(employee['id']))
+            for contract_line in contract_lines:
+                contract_line['department_id'] = (contract_line.get('department_id') or employee.get('department_id'))
+                contract_line['position_id'] = contract_line.get('position_id') or employee.get('position_id')
             contract_mode = bool(contract_lines)
             has_contracts = (bool(tx.one(
                 'SELECT c.id FROM payroll_contracts c LEFT JOIN payroll_salary_agreements a '
@@ -1126,11 +1139,12 @@ class PayrollService:
                        (worked_days, norm_days_snapshot, absence_snapshot['absence_working_days']))
             if contract_mode:
                 for line in contract_lines:
-                    tx.execute('INSERT INTO payroll_contract_run_lines(id,organisation_id,pay_run_item_id,contract_id,agreement_id,contract_type,is_primary,payment_type,effective_start,effective_end,gross,monthly_net_advance) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
+                    tx.execute('INSERT INTO payroll_contract_run_lines(id,organisation_id,pay_run_item_id,contract_id,agreement_id,contract_type,is_primary,payment_type,effective_start,effective_end,gross,monthly_net_advance,department_id,position_id,cost_centre_id,project_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
                         (new_id(), organisation_id, item_id, line['contract_id'], line['agreement_id'],
                          line['contract_type'], int(line['contract_id'] == primary_contract_id and basis != 'income_line'), line['payment_type'],
                          line['effective_start'], line['effective_end'], db_number(line['gross']),
-                         db_number(line['monthly_net_advance'])))
+                         db_number(line['monthly_net_advance']), line.get('department_id'), line.get('position_id'),
+                         line.get('cost_centre_id'), line.get('project_id')))
             self._save_absence_components(tx, organisation_id, item_id, generated, 0)
             context_fields = ('tax_free_mode', 'tax_free_amount', 'unemployment_applies',
                               'tax_free_setting_id', 'pension_setting_id', 'unemployment_setting_id')

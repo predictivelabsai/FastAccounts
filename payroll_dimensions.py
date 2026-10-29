@@ -5,6 +5,32 @@ from database import get_database
 KINDS = ('department', 'position_group', 'position', 'cost_centre')
 
 
+def validate_employee_dimensions(tx, organisation_id, values):
+    """Validate optional employee dimension links against this organisation."""
+    for field, kind in (('department_id', 'department'), ('position_id', 'position')):
+        dimension_id = values.get(field)
+        if dimension_id:
+            row = tx.one('SELECT kind,active FROM payroll_dimensions WHERE organisation_id=? AND id=?',
+                         (organisation_id, dimension_id))
+            if not row or row['kind'] != kind or not row['active']:
+                raise ValueError(f'{field.replace("_id", "").replace("_", " ").title()} must be active and belong to this organisation')
+
+
+def validate_agreement_dimensions(tx, organisation_id, values):
+    for field, kind in (('department_id', 'department'), ('cost_centre_id', 'cost_centre')):
+        dimension_id = values.get(field)
+        if dimension_id:
+            row = tx.one('SELECT kind,active FROM payroll_dimensions WHERE organisation_id=? AND id=?',
+                         (organisation_id, dimension_id))
+            if not row or row['kind'] != kind or not row['active']:
+                raise ValueError(f'{field.replace("_id", "").replace("_", " ").title()} must be active and belong to this organisation')
+    project_id = values.get('project_id')
+    if project_id:
+        row = tx.one("SELECT object_type,active FROM objects WHERE organisation_id=? AND id=?", (organisation_id, project_id))
+        if not row or row['object_type'] != 'project' or not row['active']:
+            raise ValueError('Project must be active and belong to this organisation')
+
+
 class PayrollDimensionService:
     def __init__(self, db=None):
         self.db = db or get_database()
