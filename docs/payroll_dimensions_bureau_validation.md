@@ -46,3 +46,9 @@ Migration checkpoint validation:
   transaction; organisation creation was moved before that transaction.
 - Migration 0069 is included in the explicit expected migration list in both
   `tests/test_migrations_and_tenancy.py` and `.github/workflows/ci.yml`.
+
+The tenant-scoped payroll dimension service now supports listing, create/update,
+deactivation, active filtering, code uniqueness, and position-to-group validation.
+`tests/test_payroll_dimensions.py` passed (2 tests) using the required wrapper.
+This checkpoint does not yet wire employee/contracts into the service or add
+approval freezing and the remaining Build 10 features.

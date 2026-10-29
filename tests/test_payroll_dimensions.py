@@ -1,0 +1,32 @@
+from payroll_dimensions import PayrollDimensionService
+
+
+def test_payroll_dimension_register_crud_and_tenant_scope(db, ee_org):
+    service = PayrollDimensionService(db)
+    group = service.save(ee_org['id'], kind='position_group', code='FIN', name='Finance', actor='owner@example.test')
+    position = service.save(ee_org['id'], kind='position', code='ACC', name='Accountant', parent_id=group['id'], actor='owner@example.test')
+    department = service.save(ee_org['id'], kind='department', code='OPS', name='Operations', actor='owner@example.test')
+    assert service.list(ee_org['id'], 'position') == [position]
+    assert service.list('another-tenant') == []
+    updated = service.save(ee_org['id'], kind='department', code='OPS', name='Operations team', dimension_id=department['id'], active=False, actor='owner@example.test')
+    assert updated['name'] == 'Operations team' and updated['active'] == 0
+    assert service.list(ee_org['id'], 'department', active_only=True) == []
+    assert service.deactivate(ee_org['id'], position['id'], actor='owner@example.test') == {'deactivated': True}
+
+
+def test_payroll_dimension_rejects_invalid_group_and_duplicate_code(db, ee_org):
+    service = PayrollDimensionService(db)
+    group = service.save(ee_org['id'], kind='position_group', code='FIN', name='Finance', actor='owner@example.test')
+    try:
+        service.save(ee_org['id'], kind='position', code='ACC', name='Accountant', parent_id='foreign-id', actor='owner@example.test')
+    except ValueError as error:
+        assert 'Position group' in str(error)
+    else:
+        raise AssertionError('Foreign position group accepted')
+    try:
+        service.save(ee_org['id'], kind='position_group', code='FIN', name='Other', actor='owner@example.test')
+    except ValueError as error:
+        assert 'already exists' in str(error)
+    else:
+        raise AssertionError('Duplicate dimension code accepted')
+    assert service.list(ee_org['id']) == [group]
