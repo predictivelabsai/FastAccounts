@@ -56,6 +56,7 @@ from payroll_tax_settings import EmployeeTaxSettingsService, TaxSettingConflict,
 from payroll_payday import PaydaySettingsService
 from payroll_contracts import PayrollContractService
 from payroll_dimension_imports import PayrollDimensionImportService
+from bureau_overview import PayrollBureauOverviewService
 from payroll_tor_import import TORImportService
 from payroll_payouts import PayoutConflict, PayoutService
 from payroll_absences import AbsenceConflict, PayrollAbsenceService, ABSENCE_TYPES
@@ -654,6 +655,11 @@ def csrf(request: Request, user: User = Depends(current_user)):
 @api.get("/organisations")
 def list_organisations(user: User = Depends(current_user)):
     return OrganisationService().for_user(user.email)
+
+
+@api.get("/payroll/bureau-overview")
+def payroll_bureau_overview(user: User = Depends(current_user)):
+    return PayrollBureauOverviewService().for_user(user.email)
 
 
 @api.get("/email-status")
