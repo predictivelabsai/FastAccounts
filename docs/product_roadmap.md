@@ -2273,13 +2273,20 @@ Statistics Estonia reporting calendar and accounting-bureau wording. The general
 overview currently has no deadline feed; adding PALK dates there is deferred to a
 dashboard follow-up. Production UAT remains external.
 
-## Payroll contracts and TÖR import (Build 9 in progress, 2026-10-29)
+## Payroll contracts and TÖR import (Build 9 implementation complete, 2026-10-29)
 
 Migrations 0067 and 0068 provide tenant-scoped contract history and frozen
 contract base lines. Run creation selects dated agreements, prorates monthly
 changes by payroll working days, allocates TSD lines by contract type and
 proposes configured net advances for payment during the earning month. Paid
 advances reduce the later salary payout without changing gross or tax. Legacy
-single-contract payroll amounts remain unchanged. Merit review mapping, TÖR
-apply actions and employee/payroll workspace UI remain open. See
-`payroll_contracts_validation.md` for validation results and remaining work.
+single-contract payroll amounts remain unchanged. Merit Palk imports map
+reviewed employee and salary-agreement data into dated contract history.
+Reviewed TÖR rows create or update employees, contracts and position history
+with tenant-local personal-code matching and conflict review. The employee
+workspace manages contract details, salary and position history, payday
+overrides and monthly advances. The payroll area supports TÖR upload, review
+and apply. All workspace labels are translated in en, et, lv and lt. Offline
+acceptance files passed; the full Merit Palk file exceeded its 300-second limit
+and passed in timed sections. Validation remains against a redacted official
+TÖR sample before production use. See `payroll_contracts_validation.md`.

@@ -4,18 +4,26 @@ Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as
 delivered.
 
-## 2026-10-29: Payroll contracts and TÖR import foundation (Build 9 in progress)
+## 2026-10-29: Payroll contracts and TÖR import (Build 9 implementation complete)
 
 - Added migration 0067 with tenant-scoped employee contracts, dated salary
   agreements, position history and idempotent TÖR CSV staging. Existing salary
   fields are backfilled without rewriting employee or payroll records.
-- Added contract history services and role/CSRF-protected contract and salary
-  agreement APIs. Added review staging for UTF-8 e-MTA TÖR CSV files with
-  English and Estonian header aliases, assumptions and row errors.
-- Build 9 remains incomplete. Payroll run integration, effective agreement
-  selection and proration, concurrent contract TSD lines, advances, Merit
-  mapping, TÖR apply actions and workspace UI are outstanding. See
-  `payroll_contracts_validation.md`.
+- Added contract list, create and update services, dated agreement and position
+  history, and role/CSRF-protected APIs. The employee card exposes contract
+  terms, history, payday override and monthly advance controls.
+- Reviewed Merit Palk pulls now update contract and dated salary agreement
+  history while preserving existing employee salary fields and provider source
+  mappings.
+- TÖR review rows can create or update employees and contracts using
+  organisation-local personal-code matches. Duplicate matches remain visible as
+  conflicts. Row application is retry-safe and never deletes employees or
+  contract history. The payroll workspace includes upload, review and apply.
+- Added the requested en, et, lv and lt workspace labels. Workspace, payroll,
+  contracts, TÖR, locale and migration acceptance checks are recorded in
+  `payroll_contracts_validation.md`. The full Merit Palk file exceeded the
+  per-file test limit; focused sections passed. A redacted official TÖR export
+  remains necessary to confirm exact source aliases and contract type values.
 
 ## 2026-10-29: Payroll withholdings (Build 7 complete)
 
@@ -2381,7 +2389,7 @@ payroll acceptance suite has not yet been run.
   Confirm the due-date interpretation and bureau wording; add PALK dates to the
   general overview in a separate dashboard follow-up.
 
-## 2026-10-29: Payroll contract run integration (Build 9 in progress)
+## 2026-10-29: Payroll contract run integration (Build 9 implementation complete)
 
 - Added migration 0068 for tenant-scoped frozen contract base lines. Payroll run
   creation now resolves salary agreements over the pay period and prorates
@@ -2395,6 +2403,7 @@ payroll acceptance suite has not yet been run.
 - Fixed the payment-type editor payload after reproducing its failure at
   baseline 7371730. The editor now sends an integer PALK designation and omits
   the nonexistent PALK row field.
-- Updated the explicit migration catalogue in the migration test and CI
-  workflow. Validation results and remaining Merit mapping, TÖR apply and UI
-  work are recorded in `payroll_contracts_validation.md`.
+- The explicit migration catalogue already includes migrations 0067 and 0068
+  in the migration test and CI workflow. Merit mapping, TÖR apply and workspace
+  UI are complete. Offline validation and the remaining official TÖR sample
+  check are recorded in `payroll_contracts_validation.md`.

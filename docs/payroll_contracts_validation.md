@@ -1,7 +1,8 @@
 # Payroll contracts validation
 
-Date: 2026-10-29. Branch: `feat/payroll-contracts`, based on
-`7371730` (`feat/payroll-reports-delivery`). Build 9 is in progress.
+Date: 2026-10-29. Branch: `feat/payroll-contracts`, started at `3b815c3`.
+Build 9 implementation is complete. External validation remains for a redacted
+official e-MTA TÖR sample.
 
 ## Implemented in this checkpoint
 
@@ -12,13 +13,29 @@ for each existing employee. Monthly and hourly employees become employment
 contracts, board fees become board-member contracts, and income-line employees
 become services contracts. The old employee records are retained unchanged.
 
-`PayrollContractService` lists and creates contracts, positions and dated salary
-agreements. The API exposes list/create contract and add agreement endpoints
-with organisation membership, payroll write-role and CSRF checks. Agreement
-history remains dated and supports all requested base-pay types. TÖR CSV upload
-stages UTF-8 files for review, normalises the supported English and Estonian
-headers, records parse assumptions and row errors, and uses a content hash to
-avoid duplicate staging. No live e-MTA query or network call is used.
+`PayrollContractService` lists, creates and updates contracts, positions and
+dated salary agreements. The employee card exposes contract terms, salary and
+position history, payday override, monthly advance and future-dated agreement
+entry. Contract and position APIs enforce organisation membership, payroll
+write roles and CSRF checks. All new workspace copy is available in en, et, lv
+and lt, including the requested Estonian labels.
+
+TÖR CSV upload stages UTF-8 files for review, normalises supported English and
+Estonian headers, records assumptions and row errors, and uses a content hash to
+avoid duplicate staging. Reviewed rows match employees by personal code within
+the organisation, create employees when no match exists, and create or update
+contract and position history without deleting existing records. Duplicate
+personal codes remain visible as conflicts. Application is retry-safe, and new
+employees without a salary agreement are excluded from regular payroll until a
+dated agreement is added. Upload, review and apply actions have role and CSRF
+checks. No live e-MTA query or network call is used.
+
+Reviewed Merit Palk employee and salary-agreement pulls create or update
+contracts and dated monthly salary agreements. Existing employee salary fields
+are not overwritten. New employee records receive an initial legacy fallback;
+later Merit agreement changes update dated contract history. Existing external
+employee mappings and provider source identities are retained, and repeated
+pulls do not duplicate contracts or agreement dates.
 
 The run model now selects each active contract's salary agreements effective during the
 period and prorates monthly rates across the working days from `payroll_calendar`.
@@ -44,17 +61,17 @@ Every pytest command used the requested PowerShell `Start-Job` wrapper with
 
 | File | Result |
 |---|---:|
-| `tests/test_workspace_payroll.py` | 17 passed |
+| `tests/test_merit_palk.py` | Full file reached 300-second timeout. 32 cases passed before the earlier services-contract regression; that case passed separately after the fix, and 16 later cases passed in a filtered run. |
+| `tests/test_workspace_payroll.py` | 21 passed |
+| `tests/test_payroll_contracts.py` | 9 passed |
+| `tests/test_payroll_tor_import.py` | 6 passed |
+| `tests/test_i18n.py` | 20 passed |
 | `tests/test_payroll.py` | 16 passed |
-| `tests/test_payroll_demo_fixes.py` | 24 passed |
-| `tests/test_payroll_part_time_hourly.py` | 30 passed |
-| `tests/test_payroll_payouts.py` | 7 passed |
-| `tests/test_tsd_export.py` | 14 passed |
-| `tests/test_payroll_contracts.py` | 8 passed |
-| `tests/test_payroll_tor_import.py` | 2 passed |
 | `tests/test_migrations_and_tenancy.py` | 19 passed |
 
-The nine requested files passed, 137 tests total.
+The six non-Merit requested files passed, 91 tests total. Merit Palk coverage
+passed across the timed run and two focused continuation runs, 49 cases in total.
+The complete Merit Palk file did not finish inside the required per-file limit.
 
 No full test suite or network test was run. The separate worktree full test run
 was left alone. `demo-guide.html` and `docs/website_review_2026-10-09.md` were
@@ -66,19 +83,10 @@ form field and sent `palk_designation` as a string; the API rejected the
 payload. The editor now omits the invalid field and converts the selected
 designation to an integer. The workspace file passes after the fix.
 
-## Remaining Build 9 work
+## Remaining external validation
 
-- Map reviewed Merit Palk contract and salary data into the history tables.
-- Add TÖR import apply/review actions, including tenant-local personal-code
-  matching, employee/contract upsert, per-row failure reporting and retry-safe
-  application.
-- Add the employee-card Contracts UI and payroll TÖR entry. Add and verify the
-  requested en/et/lv/lt labels, including `Lepingud` and `TÖR import failist`.
-- Add TÖR apply/idempotency and employee/payroll UI tests for roles, CSRF and
-  the requested en/et/lv/lt labels.
-- Add and execute a PostgreSQL migration path check if the available CI or
-  optional local PostgreSQL test environment supports it.
-
-No accountant or production e-MTA export layout was supplied. The staged CSV
-parser currently assumes UTF-8 and ISO dates; exact export aliases and contract
-type translations need validation against a redacted official sample.
+No redacted official TÖR export was supplied. The staged CSV parser currently
+assumes UTF-8 and ISO dates. Confirm header aliases and contract type values
+against an official sample before production use. The focused migration suite
+passed against the local SQLite migration catalogue. No PostgreSQL service or
+live provider connection was used.
