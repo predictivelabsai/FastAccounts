@@ -1336,6 +1336,20 @@ class PayrollService:
             if not correction and any(money(item['gross']) <= 0 and not (item['pay_basis'] == 'monthly' and item.get('worked_days') == 0)
                    for item in run['items']):
                 raise ValueError('Every employee requires positive gross pay before approval')
+            for item in run['items']:
+                employee_dimensions = tx.one('SELECT department_id,position_id FROM employees WHERE organisation_id=? AND id=?',
+                                              (organisation_id, item['employee_id'])) or {}
+                primary_line = next((line for line in item.get('contract_lines', []) if line.get('is_primary')),
+                                    (item.get('contract_lines') or [None])[0])
+                frozen = {
+                    'department_id': (primary_line or {}).get('department_id') or employee_dimensions.get('department_id'),
+                    'position_id': (primary_line or {}).get('position_id') or employee_dimensions.get('position_id'),
+                    'cost_centre_id': (primary_line or {}).get('cost_centre_id'),
+                    'project_id': (primary_line or {}).get('project_id'),
+                }
+                tx.execute('UPDATE pay_run_items SET department_id=?,position_id=?,cost_centre_id=?,project_id=? WHERE organisation_id=? AND id=?',
+                           (frozen['department_id'], frozen['position_id'], frozen['cost_centre_id'], frozen['project_id'], organisation_id, item['id']))
+                item.update(frozen)
             from payroll_tsd_breakdown import calculate_tsd_breakdown, freeze_tsd_breakdown
             from payroll_tsd_breakdown import LINE_FIELDS
             from payroll_tsd_types import payment_type
