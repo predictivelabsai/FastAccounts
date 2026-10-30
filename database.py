@@ -253,6 +253,13 @@ FROM pay_component_types t WHERE t.organisation_id=c.organisation_id AND t.id=c.
                 elif path.stem == "0054_payroll_tsd_lines":
                     script = script.split("CREATE TRIGGER guard_pay_item_tsd_lines_update", 1)[0]
                     script += _POSTGRES_TSD_LINE_TRIGGERS
+                elif path.stem in {"0052_payroll_tsd_payment_types", "0063_payroll_pay_type_methods", "0066_payroll_palk_unmapped"}:
+                    # These SQLite migrations temporarily drop and recreate the
+                    # component update guard around backfills. Keep the DDL and
+                    # data updates, then install the equivalent PostgreSQL guard.
+                    script = script.replace("DROP TRIGGER guard_pay_item_components_update;", "")
+                    script = script.split("CREATE TRIGGER guard_pay_item_components_update", 1)[0]
+                    script += _postgres_payroll_component_triggers()
                 elif path.stem == "0055_tsd_apa_history":
                     script = script.replace("file_xml BLOB", "file_xml BYTEA")
                 elif path.stem == "0061_payroll_payout_tsd_lines":
@@ -308,6 +315,10 @@ FOR EACH ROW EXECUTE FUNCTION guard_pay_run_original_tenant();
                     script = _POSTGRES_PAYROLL_0035
                 elif path.stem == "0034_payroll_demo_fixes":
                     script = script.split('-- SQLITE_PAYROLL_IMMUTABILITY', 1)[0] + _postgres_payroll_component_triggers()
+                # SQLite's BLOB type has no PostgreSQL equivalent. Apply this
+                # dialect conversion after migration-specific rewrites so it
+                # covers declarations with constraints such as BLOB NOT NULL.
+                script = re.sub(r"\bBLOB\b", "BYTEA", script, flags=re.IGNORECASE)
                 connection.execute(script)
                 connection.execute(
                     "INSERT INTO schema_migrations(version) VALUES (%s)",
