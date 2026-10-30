@@ -82,7 +82,10 @@ class Transaction:
         return query.replace("?", "%s") if self.dialect == "postgres" else query
 
     def execute(self, query: str, params: Sequence[Any] = ()):
-        return self.connection.execute(self._sql(query), tuple(params))
+        values = tuple(params)
+        if self.dialect == "postgres":
+            values = tuple(int(value) if isinstance(value, bool) else value for value in values)
+        return self.connection.execute(self._sql(query), values)
 
     def one(self, query: str, params: Sequence[Any] = ()) -> dict[str, Any] | None:
         row = self.execute(query, params).fetchone()
