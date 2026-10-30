@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<processing result="PARTLYERROR">
+	<entryHeader>
+		<entryNumber>EE0201001</entryNumber>	
+		<validations>
+			<validation>
+				<errorLevel>OK</errorLevel>
+				<errorCode>OK</errorCode>
+				<errorDescription>Andmed korras</errorDescription>
+				<lineReferences>
+					<lineReference>
+						<lineInternalId>XX1</lineInternalId>
+						<lineNumberCounter>1</lineNumberCounter>
+					</lineReference>
+				</lineReferences>
+			</validation>
+			<validation>
+				<errorLevel>WARNING</errorLevel>
+				<errorCode>WARNING</errorCode>
+				<errorDescription>Leidub hoiatusi</errorDescription>
+				<lineReferences>
+					<lineReference>
+						<lineInternalId>XX2</lineInternalId> 
+						<lineNumberCounter>2</lineNumberCounter>
+					</lineReference>
+				</lineReferences>
+			</validation>
+			<validation>
+				<errorLevel>ERROR</errorLevel>
+				<errorCode>ERROR</errorCode>
+				<errorDescription>Leidub vigu</errorDescription>
+				<lineReferences>
+					<lineReference> 
+						<lineInternalId>XX_8</lineInternalId> 
+						<lineNumberCounter>3</lineNumberCounter>
+					</lineReference>
+					<lineReference> 
+						<lineInternalId>XX_9</lineInternalId> 
+						<lineNumberCounter>4</lineNumberCounter>
+					</lineReference>
+				</lineReferences>
+			</validation>
+		</validations>
+		<responseData>
+			<entryDetail>
+				<lineReferences>
+					<lineReference>
+						<lineInternalId>XX1</lineInternalId> 
+						<lineNumberCounter>1</lineNumberCounter>
+					</lineReference>
+				</lineReferences>
+				<data>
+					<code>TSD_KTM</code> 
+					<description>Kinnipeetud tulumaks</description>
+					<info>241,45</info>
+				</data>
+			</entryDetail>
+			<entryDetail>
+				<lineReferences>
+					<lineReference>
+						<lineInternalId>XX2</lineInternalId> 
+						<lineNumberCounter>2</lineNumberCounter>
+					</lineReference>
+				</lineReferences>
+				<data>
+					<code>TSD_KTM</code> 
+					<description>Kinnipeetud tulumaks</description>
+					<info>161,00</info>
+				</data>
+				<data>
+					<code>TSD_SM</code> 
+					<description>Sotsiaalmaks</description>
+					<info>200,00</info>
+				</data>
+				<data>
+					<code>KR_ISIK_3</code> 
+					<description>WARNING</description>
+					<info>Isik koodiga 35612122737 on surnud.</info>
+				</data>
+			</entryDetail>
+			<entryDetail>
+				<lineReferences>
+					<lineReference>
+						<lineInternalId>XX_8</lineInternalId> 
+						<lineNumberCounter>3</lineNumberCounter>
+					</lineReference>
+				</lineReferences>
+				<data>
+					<code>KR_XBRL_VALJAMAKSED_3</code> 
+					<description>ERROR</description>
+					<info>Väljamaksel peab olema määratud toimingu tüüp</info>
+					<info_EN>Action type is missing</info_EN>
+				</data>
+			</entryDetail>
+			<entryDetail>
+				<lineReferences>
+					<lineReference>
+						<lineInternalId>XX_9</lineInternalId> 
+						<lineNumberCounter>4</lineNumberCounter>
+					</lineReference>
+				</lineReferences>
+				<data>
+					<code>KR_SM_02</code> 
+					<description>ERROR</description>
+					<info>4841221298, 24, selle väljamakse liigiga ei tohi sotsiaalmaksu summa olla märgitud, kuna väljamakset ei maksustata sotsiaalmaksuga.</info>
+					<info_EN>english translation for this error</info_EN>
+					<info_RU>Русский перевод сообщения об ошибке</info_RU>
+				</data>
+				<data>
+					<code>KR_MVT_01</code> 
+					<description>ERROR</description>
+					<info>Väljamakse liigil 24 ei ole maksuvaba tulu arvestamine lubatud.</info>
+					<info_EN>english translation for this error</info_EN>
+					<info_RU>Русский перевод сообщения об ошибке</info_RU>
+				</data>
+			</entryDetail>
+		</responseData>
+	</entryHeader>
+	<entryHeader>
+		<entryNumber>EE0201002</entryNumber>	
+		<validations>
+			<validation>
+				<errorLevel>ERROR</errorLevel>
+				<errorCode>ERROR</errorCode>
+				<errorDescription>Leidub vigu</errorDescription>
+				<lineReferences>
+					<lineReference> 
+						<lineInternalId>XX_10</lineInternalId> 
+						<lineNumberCounter>5</lineNumberCounter>
+					</lineReference>
+				</lineReferences>
+			</validation>
+		</validations>
+		<responseData>
+			<entryDetail>
+				<lineReferences>
+					<lineReference>
+						<lineInternalId>XX_10</lineInternalId> 
+						<lineNumberCounter>5</lineNumberCounter>
+					</lineReference>
+				</lineReferences>
+				<data>
+					<code>KR_XBRL_VALJAMAKSED_3</code> 
+					<description>ERROR</description>
+					<info>Väljamaksel peab olema määratud toimingu tüüp</info>
+					<info_EN>Action type is missing</info_EN>
+				</data>
+			</entryDetail>
+		</responseData>
+	</entryHeader>
+</processing>

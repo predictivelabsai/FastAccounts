@@ -539,7 +539,10 @@ class DocumentService:
         return self.bill(bill_id)
 
     def create_bank_account(self, organisation_id: str, *, name: str, currency: str,
-                            iban: str = "", sort_code: str = "") -> dict:
+                            iban: str = "", sort_code: str = "", bic: str = "") -> dict:
+        bic = bic.strip().upper()
+        if bic and (len(bic) not in (8, 11) or not bic.isalnum()):
+            raise ValueError('Enter a valid 8 or 11 character BIC')
         account_id, bank_id = new_id(), new_id()
         with self.db.transaction() as tx:
             code = f"10{int(tx.scalar('SELECT COUNT(*) FROM bank_accounts WHERE organisation_id=?', (organisation_id,)) or 0) + 1:02d}"
@@ -554,6 +557,14 @@ class DocumentService:
                  f"…{sort_code.replace('-', '')[-2:]}" if sort_code else None,
                  iban.replace(" ", "").upper() or None),
             )
+            if self.db.dialect == 'sqlite':
+                has_bic = any(row['name'] == 'bic' for row in tx.rows('PRAGMA table_info(bank_accounts)'))
+            else:
+                has_bic = bool(tx.one("SELECT column_name FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='bank_accounts' AND column_name='bic'"))
+            if bic and not has_bic:
+                raise ValueError('BIC storage is unavailable until the bank account migration is applied')
+            if has_bic:
+                tx.execute('UPDATE bank_accounts SET bic=? WHERE organisation_id=? AND id=?', (bic or None, organisation_id, bank_id))
         return self.db.one("SELECT * FROM bank_accounts WHERE id=?", (bank_id,)) or {}
 
     def record_payment(self, organisation_id: str, *, payment_type: str, bank_account_id: str,
@@ -1010,20 +1021,23 @@ def payroll_pdf(organisation: dict, run: dict) -> bytes:
             return value
         return unicodedata.normalize('NFKD', value).encode('ascii', 'ignore').decode('ascii')
 
-    ee = organisation.get('country_code') == 'EE'
+    language = 'et' if organisation.get('country_code') == 'EE' else 'en'
+    ee = language == 'et'
     def label(et, en):
-        return text(et if ee else en)
+        if ee:
+            return text(et)
+        if language in ('lv', 'lt'):
+            return text(i18n.catalog(language)['workspace'].get(en, en))
+        return text(en)
 
     from web import i18n
     from payroll import SOCIAL_TAX_MINIMUM_EXEMPTION_LABELS
     def catalogue(key):
-        return text(i18n.t('workspace.' + key, 'et' if ee else 'en'))
+        return text(i18n.catalog(language if language in ('et', 'en', 'lv', 'lt') else 'en')['workspace'].get(key, key))
 
     output = BytesIO()
     canvas = Canvas(output, pagesize=A4)
     width, height = A4
-    title = label('PALGALEHT', 'PAYSLIP') + ' ' + run['period']
-    canvas.setTitle(title)
     rows = [
         ('Brutopalk', 'Gross salary', 'gross'),
         ('Kogumispension (II sammas)', 'Funded pension (II pillar)', 'funded_pension'),
@@ -1040,6 +1054,11 @@ def payroll_pdf(organisation: dict, run: dict) -> bytes:
     ]
     status = {'Approved': 'Kinnitatud', 'Draft': 'Kavand'}.get(run['status'], run['status']) if ee else run['status']
     for index, item in enumerate(run['items'], 1):
+        language = item.get('report_language') or language
+        ee = language == 'et'
+        status = {'Approved': 'Kinnitatud', 'Draft': 'Kavand'}.get(run['status'], run['status']) if ee else run['status']
+        title = label('PALGALEHT', 'PAYSLIP') + ' ' + run['period']
+        canvas.setTitle(title)
         canvas.setFont(bold, 20)
         canvas.drawString(42, height-55, title)
         canvas.setFont(regular, 11)
@@ -1053,8 +1072,33 @@ def payroll_pdf(organisation: dict, run: dict) -> bytes:
                    label('Juhatuse liige', 'Board member') if item['board_member'] else label('Töötaja', 'Employee')]
         if item.get('pay_basis') == 'hourly' and item.get('hours') is not None:
             details.append(f"{catalogue('Hourly rate')}: {item['hourly_rate']} EUR × {item['hours']} {catalogue('Hours').lower()}")
+        if item.get('pay_basis') == 'monthly' and item.get('worked_days') is not None:
+            details.append(f"{catalogue('Worked days / norm days')}: {item['worked_days']} / {item['norm_days']}")
+        if item.get('absences'):
+            details.append(label('Puudumised perioodis', 'Absences in period') + ':')
+            absence_names = {
+                'annual_leave': ('Põhipuhkus', 'Annual leave'),
+                'extended_leave': ('Pikendatud puhkus', 'Extended leave'),
+                'child_leave': ('Lapsepuhkus', 'Child leave'),
+                'paternity_leave': ('Isapuhkus', 'Paternity leave'),
+                'maternity_leave': ('Emapuhkus', 'Maternity leave'),
+                'parental_leave': ('Vanemapuhkus', 'Parental leave'),
+                'study_leave': ('Õppepuhkus', 'Study leave'),
+                'care_leave': ('Hoolduspuhkus', 'Care leave'),
+                'sick_leave': ('Töövõimetus', 'Sick leave'),
+                'permitted_absence': ('Puudumine tööandja loal', 'Permitted absence'),
+                'truancy': ('Tööluus', 'Unauthorised absence'),
+                'unpaid_leave': ('Palgata puhkus', 'Unpaid leave'),
+                'alternative_service': ('Aja- ja asendusteenistus', 'Alternative service'),
+                'other': ('Muu töökatkestus', 'Other absence'),
+            }
+            for absence in item['absences']:
+                et_name, en_name = absence_names.get(absence['absence_type'], ('Muu töökatkestus', 'Other absence'))
+                details.append(f"{label(et_name, en_name)}: {absence['start_date']}–{absence['end_date']} ({absence['leave_days']} {catalogue('Leave days').lower()})")
         if item.get('fte') not in (None, '1'):
             details.append(f"{catalogue('Work-time fraction (FTE)')}: {item['fte']}")
+        if item.get('remaining_leave_days') is not None:
+            details.append(f"{catalogue('Remaining leave days')}: {item['remaining_leave_days']}")
         reason = item.get('social_tax_minimum_exemption')
         if reason in SOCIAL_TAX_MINIMUM_EXEMPTION_LABELS:
             details.append(f"{catalogue('Social tax minimum exemption')}: {catalogue(SOCIAL_TAX_MINIMUM_EXEMPTION_LABELS[reason])}")
@@ -1082,6 +1126,39 @@ def payroll_pdf(organisation: dict, run: dict) -> bytes:
                 y -= 14
             y -= 8
         canvas.drawRightString(width-42, 32, f"{index} / {len(run['items'])}")
+        canvas.showPage()
+    # Keep the first page per employee stable for existing payslip download links.
+    from payroll_components import FLAGS, FLAG_LABELS
+    for item in run['items']:
+        if not item.get('components'):
+            continue
+        y = 0
+        for component in item['components']:
+            lines = simpleSplit(catalogue(component['name']), regular, 11, width-235)
+            flags = ', '.join(catalogue(label) for key, label in zip(FLAGS, FLAG_LABELS) if component[key])
+            detail = catalogue('Income' if component['direction'] == 'income' else 'Deduction') + ': ' + (flags or catalogue('No levies'))
+            details = simpleSplit(detail, regular, 9, width-84)
+            if y < 70 + 16 * (len(lines) + len(details)):
+                if y:
+                    canvas.showPage()
+                canvas.setFont(bold, 16)
+                canvas.drawString(42, height-50, catalogue('Payment components') + ' ' + run['period'])
+                canvas.setFont(regular, 11)
+                y = height-75
+                for name_line in simpleSplit(text(item['employee_name']), regular, 11, width-84):
+                    canvas.drawString(42, y, name_line)
+                    y -= 16
+                y -= 19
+            canvas.setFont(regular, 11)
+            canvas.drawRightString(width-42, y, f"{money(component['amount']):.2f} EUR")
+            for line in lines:
+                canvas.drawString(42, y, line)
+                y -= 16
+            canvas.setFont(regular, 9)
+            for line in details:
+                canvas.drawString(42, y, line)
+                y -= 14
+            y -= 14
         canvas.showPage()
     canvas.save()
     return output.getvalue()

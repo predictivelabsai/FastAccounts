@@ -1,0 +1,175 @@
+# Payroll APA TSD validation
+
+Date: 2026-10-28. Branch: `feat/payroll-tsd-apa`, based on `e7cfb5e`.
+
+## Implemented in this checkpoint
+
+Migrations 0052 and 0053 add tenant-scoped payment-type codes to component
+types, frozen component rows and base-pay run items, with preset defaults and
+backfills. Migration 0054 adds `pay_item_tsd_lines`. At approval, pay-run items
+and absence-pay calculations freeze one line per payment type. Salary and bonus
+amounts with code 10 are grouped together. The pure allocator preserves the
+existing aggregate pay calculation and assigns cent residuals to the largest
+record for each levy. A social-tax minimum top-up is placed on an eligible base
+salary record. Exemption 610 is allocated to the base salary record first and
+then by payment type, capped at each record's taxable amount.
+
+TSD preparation reads the frozen lines. For earlier approved runs it rebuilds
+the split read-only from frozen component rows and employee context when those
+inputs are complete. Otherwise it retains one base-type record and displays the
+warning `Legacy run: per-type split unavailable`. Export rows continue to
+include payment type codes; absence-pay lines remain separate and use their
+payout date. Older database snapshots without migration 0054 skip persistence
+during approval until they are upgraded.
+
+## Verification
+
+The migration list is explicit in both `tests/test_migrations_and_tenancy.py`
+and `.github/workflows/ci.yml`. Each requested test file was run individually:
+
+```powershell
+.venv\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache --basetemp=.tmp\test-tsd-repeat tests\test_tsd_export.py
+# 10 passed
+.venv\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache --basetemp=.tmp\test-absence-repeat tests\test_payroll_absence_pay.py
+# 10 passed
+.venv\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache --basetemp=.tmp\test-payouts tests\test_payroll_payouts.py
+# 7 passed
+.venv\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache --basetemp=.tmp\test-settlement tests\test_payroll_settlement.py
+# 8 passed
+.venv\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache --basetemp=.tmp\test-payroll-final2 tests\test_payroll.py
+# 16 passed
+.venv\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache --basetemp=.tmp\test-demo-fixes tests\test_payroll_demo_fixes.py
+# 24 passed
+.venv\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache --basetemp=.tmp\test-hourly tests\test_payroll_part_time_hourly.py
+# 30 passed
+.venv\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache --basetemp=.tmp\test-merit-final2 tests\test_merit_palk.py
+# 49 passed
+.venv\Scripts\python.exe -m pytest -q -o cache_dir=.tmp\pytest-cache --basetemp=.tmp\test-migrations-repeat tests\test_migrations_and_tenancy.py
+# 16 passed
+```
+
+Total: 170 passed. No live EMTA or other network calls were made. The full
+Merit Palk suite includes the older-schema upgrade test; approval skips new
+TSD-line persistence when migration 0054 has not been applied.
+The PostgreSQL migration branch has a matching immutability trigger, but no
+PostgreSQL server was used for integration testing.
+
+## Remaining validation
+
+- Verify the exact component preset codes with an Estonian accountant. Author,
+  parental, non-taxable expense and deduction classifications need confirmation.
+- Confirm generated XBRL GL XML and transitional CSV acceptance with EMTA before
+  filing. Outputs remain review-only and are not submitted by the application.
+
+## 4a completion
+
+Steps 4 and 5 are implemented. The legacy Annex 1 CSV upload is separate from
+the internal review CSV, UTF-8 semicolon-delimited with dot-decimal amounts to
+two places, and refuses payment dates after 31 December 2027. Codes 1040 and
+1050 are blank because the 2024 guide does not describe 1040 and the employee
+snapshot has no A1/E101 country. This file convention needs e-MTA confirmation.
+The XLSX accountant workpaper has Payments, By payment type and By recipient
+sheets. The on-screen preparation view includes list/group views, payment-month
+filter, frozen totals, record count and legacy-run warnings in en/et/lv/lt.
+
+These are implemented and locally tested export formats, not live-verified e-MTA
+uploads. Direct submission remains disabled.
+
+The final requested files passed individually: `tests/test_tsd_export.py` (14),
+`tests/test_workspace_payroll.py` (17), `tests/test_i18n.py` (16),
+`tests/test_payroll.py` (16) and `tests/test_merit_palk.py` (49). Node syntax and
+`git diff --check` passed. Python runtime was 3.14.6; no live network or
+PostgreSQL tests were used.
+
+Exact preset and legal classifications still require Estonian accountant
+confirmation. XML and CSV output remain unverified against e-MTA, and direct
+submission remains disabled.
+
+## Correction and supplementary payout exports (2026-10-28)
+
+When a correction is paid in the original payment month, its deltas update the
+original run's workpaper and legacy CSV. Changed APA content is emitted as
+operation `M`, a full replacement under the original line numbers. A negative
+later-month correction remains a receivable and is included in the original
+period's replacement. A positive later-month correction is recalculated using
+the payout month's remaining allowance; its immutable payout TSD snapshot is
+exported from its paid payout as a separate `R` transaction dated in that month.
+The later-month test verifies the allowance and income-tax values in the
+workpaper as well as the transaction identity and date.
+
+If an accountant cancels a transaction, operation `T` is retained as
+cancellation XML in history; a subsequent replacement must use `R` and fresh
+line numbers. The requested tests and remaining external checks are recorded in
+`payroll_corrections_validation.md`. No live e-MTA or network test was run.
+
+## Scope 4b handoff (2026-10-28)
+
+Vendored the official business example, cancellation example, feedback report XSD and four feedback report examples under `tests/fixtures/emta/`. Provenance and retrieval date are in that directory's README. The developer guide states that each XBRL GL file represents a single transaction (see local extract, sections 1 and 3); the target export must therefore use one file per payout transaction, not one file per organisation and payment month. The XBRL GL schema archive was not downloaded. Full XBRL GL schema validation remains pending.
+
+## Scope 4b step 1 status
+
+Step 1 is complete and committed: the business example's XBRL GL fields have
+been mapped to their taxonomy meaning, required or conditional status, and
+FastAccounts source in `docs/tsd-export.md`.
+
+The APA XML generator and payout download routes are implemented for salary
+payouts and absence-pay payouts. Each generated document represents one paid
+payout and uses the vendored example's namespace set and codelist-coded
+elements. A reviewed payment-month ZIP gathers one file per paid payout across
+the organisation. The former review-only XBRL endpoint remains available and is
+marked deprecated in `docs/tsd-export.md`.
+
+Remaining 4b work includes offline APA business-rule validation and declaration
+panel controls. Full XBRL GL schema validation and live e-MTA acceptance remain
+pending. No live network calls were made.
+
+## Scope 4b step 5 checkpoint
+
+Added pure frozen-record checks in `tsd_apa_rules.py`. The implemented subset is
+`KR_XBRL_VALJAMAKSED_10` (personal-code structure and checksum),
+`KR_XBRL_VALJAMAKSED_14` (allowed resident payment type),
+`KR_XBRL_VALJAMAKSED_17` (payment month), `KR_TK_1`, `KR_KOP_01`,
+`KR_MVT_01`, `KR_MVT_08`, and internal FastAccounts rule `FA_APA_AMOUNT_01`
+(negative values in positive payout records). MUST and PUNANE findings block
+APA payout and month ZIP export with HTTP 409 and the findings in the response;
+SININE findings remain non-blocking. Findings include Estonian text and English
+text, with English used for non-Estonian locales.
+
+| Rule codes | Status | Offline limitation |
+| --- | --- | --- |
+| KR_XBRL_VALJAMAKSED_10, KR_XBRL_VALJAMAKSED_14, KR_XBRL_VALJAMAKSED_17, KR_TK_1, KR_KOP_01, KR_MVT_01, KR_MVT_08, FA_APA_AMOUNT_01 | Implemented | Evaluated from frozen recipient code, payment type, date/month and amounts. `FA_APA_AMOUNT_01` is a local export invariant, not an EMTA rule code. |
+| Other payment-type/levy compatibility rules, including `KR_SM_05` | Not implemented | The frozen APA records do not include all EMTA recipient states, exemption types, work capacity, A1 and levy-rate inputs needed to decide these conditions safely. |
+| Calendar-year/month cumulative caps, declaration amendments and confirmation state rules | Not implemented | Require other payouts across all payers, MTA-held state or declaration status unavailable in this tenant's frozen payout snapshot. |
+| XML structure, payer authorisation, current classifications and catalogue rules | Not implemented | Require schema validation, request context, current EMTA catalogue or external authorisation data. |
+
+The offline rule review is complete for this checkpoint: rules computable from
+the frozen payout data are implemented, and rules requiring unavailable payer,
+recipient or e-MTA state are listed above as not implementable offline. Full
+XBRL GL schema validation and live e-MTA acceptance remain pending.
+
+## Scope 4b steps 2 and 4
+
+APA payout downloads are recorded by organisation and payout, with stable
+transaction IDs for unchanged files, SHA-256 hashes, version numbers, actor,
+timestamp and status. A changed payload creates a new version. Cancellation
+downloads follow the vendored EMTA cancellation XML structure and mark the
+history row `Cancelled`; repeated cancellation is rejected. Feedback uploads
+store the transaction result and each validation message, including line
+references, and update the matching organisation's export status. Unknown
+transaction IDs are saved as unmatched results without affecting another
+tenant. API route tests cover write roles, viewer access, tenant checks and CSRF.
+
+Feedback is structurally parsed because the active venv does not contain
+`lxml` or `xmlschema`. The vendored feedback XSD is not run. The four EMTA
+feedback examples are covered by local tests; no network tests were run.
+
+## Scope 4b step 6: declaration panel
+
+The completed accountant preparation dialog shows findings by payment month
+and payout, with category styling and the translated message. XML and month ZIP
+exports are disabled when blocking findings exist, and the control exposes the
+blocking rule and reason. The panel also provides month ZIP downloads,
+cancellation downloads, feedback report upload and export history with status
+and feedback results in en/et/lv/lt. Scope 4b is implemented; schema validation
+and live e-MTA acceptance are the remaining external validation tasks. Direct
+submission remains disabled.

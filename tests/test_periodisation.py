@@ -1,4 +1,7 @@
 """Offline purchase expense, VAT, tenancy, migration and API regressions."""
+
+from tests.migration_catalogue import catalogue, catalogue_after
+
 from concurrent.futures import ThreadPoolExecutor
 from decimal import Decimal
 from pathlib import Path
@@ -300,9 +303,11 @@ def test_upgrade_preserves_data_and_custom_chart(tmp_path, monkeypatch, country,
             tx.execute("INSERT INTO accounts(id,organisation_id,code,name,account_type,normal_balance,system_role) VALUES (?,?,?,'Custom deferred','Asset','Debit','PERIODISED_PURCHASES')", (new_id(), oid, '9999'))
     before = {t: db.rows(f'SELECT * FROM {t} ORDER BY id') for t in ['organisations', 'accounts', 'contacts', 'bills', 'gl_entries', 'posting_batches', 'audit_events']}
     monkeypatch.setattr(database, 'MIGRATIONS', original)
-    assert db.migrate() == ['0021_periodisation', '0022_payment_links', '0023_analytical_objects', '0024_reminder_rules', '0025_fx_realised', '0026_fx_revaluations', '0027_mfa', '0028_document_settings', '0029_copilot', '0030_master_data_maintenance', '0031_master_data_groups', '0032_copilot_access'] and db.migrate() == []
+    assert db.migrate() == catalogue_after('0020_quotes') and db.migrate() == []
     organisations_now = db.rows("SELECT * FROM organisations ORDER BY id")
     assert all(row.pop('copilot_enabled') == 0 for row in organisations_now)
+    for row in organisations_now:
+        row.pop('language', None)
     for table, rows in before.items():
         if table == 'accounts':
             assert all(r in db.rows('SELECT * FROM accounts') for r in rows)
@@ -401,7 +406,8 @@ def test_locale_additions_are_at_file_end_and_do_not_override_existing_keys():
         name = f'web/locales/{language}.json'
         current = Path(name).read_text(encoding='utf-8')
         new = json.loads(current)
-        assert list(new)[-(10):] == ['periodisation', 'payment_links', 'analytical_objects', 'invoice_exports', 'bulk_sending', 'reminder_rules', 'fx_rates', 'document_settings', 'copilot', 'periods']
+        sections = ['periodisation', 'payment_links', 'analytical_objects', 'invoice_exports', 'bulk_sending', 'reminder_rules', 'fx_rates', 'document_settings', 'copilot', 'periods', 'payroll_corrections', 'payroll_contracts', 'payroll_dimensions_bureau']
+        assert list(new)[-len(sections):] == sections
         for section, values in new['periodisation'].items():
             assert not (values.keys() & new[section].keys())
         assert i18n.catalog(language)['nav']['periodised'] == i18n.catalog(language)['workspace']['Periodised']

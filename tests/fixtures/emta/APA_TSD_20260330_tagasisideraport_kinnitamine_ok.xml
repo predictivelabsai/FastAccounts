@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<processing result="OK">
+	<entryHeader>
+		<validations>
+			<validation>
+				<errorLevel>OK</errorLevel>
+				<errorCode>OK</errorCode>
+				<errorDescription>Deklaratsioon kinnitatud</errorDescription>
+			</validation>
+		</validations>
+		<responseData>
+			<entryDetail>
+				<data>
+					<code>110</code> 
+					<description>Kinnipeetud tulumaks</description>
+					<info>509.58</info>
+				</data>
+				<data>
+					<code>114</code> 
+					<description>Erijuhtude tulumaks</description>
+					<info>0.00</info>
+				</data>
+				<data>
+					<code>115</code> 
+					<description>Sotsiaalmaks</description>
+					<info>847.11</info>
+				</data>
+				<data>
+					<code>116</code> 
+					<description>Töötuskindlustusmakse</description>
+					<info>45.61</info>
+				</data>
+				<data>
+					<code>117</code> 
+					<description>Kohustusliku kogumispensioni makse</description>
+					<info>31.34</info>
+				</data>
+				<data>
+					<code>118</code> 
+					<description>Maksukohustus kokku</description>
+					<info>1433.64</info>
+				</data>
+				<data>
+					<code>119</code> 
+					<description>Kuulub tagastamisele</description>
+					<info>0.00</info>
+				</data>
+			</entryDetail>
+		</responseData>
+	</entryHeader>
+</processing>

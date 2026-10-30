@@ -18,6 +18,7 @@ import base64
 import csv
 import io
 import json
+import os
 import re
 from datetime import datetime, timedelta, timezone
 
@@ -25,8 +26,11 @@ from core_utils import audit, money, new_id, utc_now
 from copilot_provider import (
     CopilotProviderError,
     chat_completion,
+    stream_completion,
     configured,
 )
+import copilot_repository
+from integration_service import CredentialVault
 from database import get_database
 
 MAX_MESSAGE_CHARS = 8000
@@ -79,8 +83,9 @@ def _day() -> str:
 
 
 def _insert_message(db, organisation_id, user_email, role, content, *,
-                    attachment_ids=None, stage=None, reply=None):
-    with db.transaction() as tx:
+                    attachment_ids=None, stage=None, reply=None, tx=None):
+    from contextlib import nullcontext
+    with (nullcontext(tx) if tx is not None else db.transaction()) as tx:
         message_id = new_id()
         tx.execute(
             "INSERT INTO copilot_messages(id,organisation_id,user_email,role,content,"
@@ -90,7 +95,8 @@ def _insert_message(db, organisation_id, user_email, role, content, *,
              json.dumps(attachment_ids) if attachment_ids else None,
              json.dumps(stage) if stage else None,
              reply["tokens_in"] if reply else 0, reply["tokens_out"] if reply else 0,
-             reply["model"] if reply else "", utc_now()))
+             reply["model"] if reply else "",
+             datetime.now(timezone.utc).isoformat(timespec="microseconds")))
         return one_message(tx, message_id)
 
 
@@ -123,11 +129,12 @@ class CopilotService:
 
     ADMIN_ROLES = ("owner", "administrator")
 
-    @staticmethod
-    def _gate(organisation_id, user_email):
-        if not configured():
+    def _gate(self, organisation_id, user_email):
+        if os.getenv("FASTACCOUNTS_COPILOT_ENABLED", "").lower() != "true":
             raise CopilotDisabled("AI copilot is not configured.")
-        service = CopilotService()
+        if not (configured() or self.settings(organisation_id)["configured"]):
+            raise CopilotDisabled("AI copilot is not configured.")
+        service = self
         if not service.enabled(organisation_id):
             raise CopilotDisabled("AI copilot is off for this organisation.")
         access = service.access(organisation_id, user_email)
@@ -170,7 +177,9 @@ class CopilotService:
             "FROM copilot_usage WHERE organisation_id=? AND day=?", (organisation_id, _day()))
         access = self.access(organisation_id, user_email)
         return {
-            "available": bool(configured()),
+            "available": os.getenv("FASTACCOUNTS_COPILOT_ENABLED", "").lower() == "true"
+                         and bool(configured() or self.settings(organisation_id)["configured"]),
+            "settings": self.settings(organisation_id) if access["admin"] else None,
             "enabled": self.enabled(organisation_id),
             "access": {"role": access["role"], "admin": access["admin"],
                        "granted": access["granted"]},
@@ -192,7 +201,11 @@ class CopilotService:
     def messages(self, organisation_id, user_email, limit=HISTORY_MESSAGES):
         return self.db.rows(
             "SELECT id,role,content,attachment_ids_json,stage_proposal_json,"
-            "tokens_in,tokens_out,model,created_at FROM copilot_messages "
+            "tokens_in,tokens_out,model,created_at, EXISTS(SELECT 1 FROM audit_events a "
+            "WHERE a.organisation_id=copilot_messages.organisation_id "
+            "AND a.actor=copilot_messages.user_email AND a.object_id=copilot_messages.id "
+            "AND a.action='copilot.message' AND a.details_json LIKE '%\"outcome\":\"interrupted\"%') retryable "
+            "FROM copilot_messages "
             "WHERE organisation_id=? AND user_email=? ORDER BY created_at DESC "
             "LIMIT ?", (organisation_id, user_email, int(limit)))
 
@@ -213,6 +226,42 @@ class CopilotService:
             (organisation_id, int(limit)))
 
     # writes --------------------------------------------------------------
+
+    def settings(self, organisation_id):
+        row = copilot_repository.settings(self.db, organisation_id)
+        return {"configured": bool(row.get("encrypted_credentials")),
+                "model": row.get("model", "")}
+
+    def update_settings(self, organisation_id, *, api_key=None, model=None, actor):
+        if not self.access(organisation_id, actor)["admin"]:
+            raise CopilotAccessDenied("Only owners and administrators can configure the copilot.")
+        row = copilot_repository.settings(self.db, organisation_id)
+        encrypted = row.get("encrypted_credentials")
+        version = row.get("encryption_key_version")
+        if model is not None and (len(model) > 128 or (model and not re.fullmatch(r"[a-zA-Z0-9._:-]+", model))):
+            raise ValueError("Invalid copilot model")
+        if api_key is not None:
+            if not isinstance(api_key, str):
+                raise ValueError("Invalid copilot API key")
+            api_key = api_key.strip()
+            if len(api_key) > 4096 or any(ord(c) < 33 or ord(c) > 126 for c in api_key):
+                raise ValueError("Invalid copilot API key")
+            vault = CredentialVault() if api_key else None
+            encrypted = vault.encrypt({"api_key": api_key}) if vault else None
+            version = vault.version if vault else None
+        copilot_repository.save_settings(
+            self.db, organisation_id, encrypted=encrypted, version=version,
+            model=row.get("model", "") if model is None else model, actor=actor)
+        return self.settings(organisation_id)
+
+    def _provider_options(self, organisation_id):
+        row = copilot_repository.settings(self.db, organisation_id)
+        options = {}
+        if row.get("encrypted_credentials"):
+            options["api_key"] = CredentialVault().decrypt(row["encrypted_credentials"])["api_key"]
+        if row.get("model"):
+            options["model_id"] = row["model"]
+        return options
 
     def set_enabled(self, organisation_id, enabled, *, actor):
         with self.db.transaction() as tx:
@@ -276,8 +325,7 @@ class CopilotService:
 
     # send ----------------------------------------------------------------
 
-    def send(self, organisation_id, user_email, content, *,
-             attachment_ids=None, page=None, client=None):
+    def _prepare_send(self, organisation_id, user_email, content, *, attachment_ids=None, page=None):
         self._gate(organisation_id, user_email)
         content = self._check_text(content)
         if page is not None and (not isinstance(page, str) or len(page) > 64
@@ -287,26 +335,87 @@ class CopilotService:
         evidence = [self._load_evidence(organisation_id, a) for a in attachments]
         history = list(reversed(self.messages(organisation_id, user_email)))
         prompt = self._compose(organisation_id, content, history, evidence, page=page)
-        self._consume_quota(organisation_id, user_email,
-                            scans=sum(1 for e in evidence),
-                            prompt_chars=len(prompt))
-        user_message = _insert_message(self.db, organisation_id, user_email, "user",
-                                       content, attachment_ids=[a["id"] for a in attachments])
+        prompt_chars = len(json.dumps(prompt, ensure_ascii=False))
+        if prompt_chars > 280000:
+            raise CopilotQuotaExceeded("Your copilot volume allowance is used up for today.")
+        options = self._provider_options(organisation_id)
+        user_message, quota_day = self._consume_quota(organisation_id, user_email,
+                            scans=len(evidence), prompt_chars=prompt_chars,
+                            content=content, attachment_ids=[a["id"] for a in attachments])
+        return {"prompt": prompt, "user_message": user_message, "options": options,
+                "scans": len(evidence), "prompt_chars": prompt_chars, "day": quota_day}
+
+    def _finish_reply(self, organisation_id, user_email, prepared, reply, *, error=None):
+        stage = None if error else extract_stage(reply["content"])
         with self.db.transaction() as tx:
-            audit(tx, organisation_id, user_email, "copilot.message", "copilot",
-                  organisation_id,
-                  {"attachments": len(attachments), "prompt_chars": len(prompt)})
-        reply = chat_completion(prompt, client=client)
-        stage = extract_stage(reply["content"])
-        assistant = _insert_message(self.db, organisation_id, user_email, "assistant",
-                                    reply["content"], reply=reply, stage=stage)
-        self._record_usage(organisation_id, user_email,
-                           messages=1,
-                           scans=sum(1 for e in evidence),
-                           prompt_chars=len(prompt),
-                           tokens_in=reply["tokens_in"],
-                           tokens_out=reply["tokens_out"])
-        return {"user_message": user_message, "assistant": assistant, "stage": stage}
+            assistant = _insert_message(self.db, organisation_id, user_email, "assistant",
+                                        reply["content"], reply=reply, stage=stage, tx=tx)
+            if error and reply["content"] == error:
+                # Preserve the existing zero-token failure/retry accounting.
+                tx.execute("UPDATE copilot_usage SET messages=messages-1,scans=scans-?,"
+                           "prompt_chars=prompt_chars-? WHERE organisation_id=? AND user_email=? AND day=?",
+                           (prepared["scans"], prepared["prompt_chars"], organisation_id, user_email, prepared["day"]))
+                tx.execute("DELETE FROM copilot_usage WHERE organisation_id=? AND user_email=? AND day=? "
+                           "AND messages=0 AND scans=0 AND prompt_chars=0 AND tokens_in=0 AND tokens_out=0",
+                           (organisation_id, user_email, prepared["day"]))
+            else:
+                self._record_usage(organisation_id, user_email, messages=0, scans=0, prompt_chars=0,
+                                   tokens_in=reply["tokens_in"], tokens_out=reply["tokens_out"], tx=tx, day=prepared["day"])
+            audit(tx, organisation_id, user_email, "copilot.message", "copilot", assistant["id"],
+                  {"model": reply["model"], "tokens_in": reply["tokens_in"],
+                   "tokens_out": reply["tokens_out"], "outcome": "interrupted" if error else "completed"})
+        assistant["retryable"] = bool(error)
+        return {"user_message": prepared["user_message"], "assistant": assistant, "stage": stage,
+                "retryable": bool(error), "error": error,
+                "quota_consumed": not error or reply["content"] != error}
+
+    def send(self, organisation_id, user_email, content, *,
+             attachment_ids=None, page=None, client=None):
+        prepared = self._prepare_send(organisation_id, user_email, content,
+                                      attachment_ids=attachment_ids, page=page)
+        try:
+            reply = chat_completion(prepared["prompt"], client=client, **prepared["options"])
+        except CopilotProviderError as error:
+            self._finish_reply(organisation_id, user_email, prepared,
+                               {"content": str(error), "model": "", "tokens_in": 0, "tokens_out": 0},
+                               error=str(error))
+            raise
+        return self._finish_reply(organisation_id, user_email, prepared, reply)
+
+    def stream(self, organisation_id, user_email, content, *,
+               attachment_ids=None, page=None, client=None):
+        # Preflight is eager: HTTP errors happen before StreamingResponse sends headers.
+        prepared = self._prepare_send(organisation_id, user_email, content,
+                                      attachment_ids=attachment_ids, page=page)
+        return self._stream_reply(organisation_id, user_email, prepared, client=client)
+
+    def _stream_reply(self, organisation_id, user_email, prepared, *, client=None):
+        reply = {"content": "", "model": "", "tokens_in": 0, "tokens_out": 0}
+        error = None
+        def event(kind, data):
+            return "event: " + kind + "\ndata: " + json.dumps(data, ensure_ascii=False) + "\n\n"
+        try:
+            for delta in stream_completion(prepared["prompt"], client=client, **prepared["options"]):
+                text = delta["content"]
+                if len(reply["content"]) + len(text) > MAX_REPLY_CHARS - 500:
+                    raise CopilotProviderError("The AI provider returned an unexpected reply.")
+                reply["content"] += text
+                reply["model"] = delta["model"]
+                reply["tokens_in"] = max(reply["tokens_in"], delta["tokens_in"])
+                reply["tokens_out"] = max(reply["tokens_out"], delta["tokens_out"])
+                if text:
+                    yield event("delta", {"text": text})
+        except CopilotProviderError as exc:
+            error = str(exc)
+        except GeneratorExit:
+            error = "The reply was interrupted. Please retry."
+            raise
+        finally:
+            if error:
+                reply["content"] = (reply["content"] + "\n\n" + error).strip()
+            result = self._finish_reply(organisation_id, user_email, prepared, reply, error=error)
+        # Persistence precedes this event, including when the browser disconnects here.
+        yield event("done", result)
 
     def scan(self, organisation_id, user_email, attachment_id, *, client=None):
         return self.send(organisation_id, user_email,
@@ -441,9 +550,19 @@ class CopilotService:
             "quotes_awaiting_decision": int(quotes.get("n", 0)),
         }
 
-    def _consume_quota(self, organisation_id, user_email, *, scans, prompt_chars):
+    def _consume_quota(self, organisation_id, user_email, *, scans, prompt_chars, content, attachment_ids):
         """Atomic pre-spend check; raises before any provider cost is incurred."""
+        quota_day = _day()
         with self.db.transaction() as tx:
+            tx.execute("UPDATE organisations SET name=name WHERE id=?", (organisation_id,))
+            row = tx.one("SELECT copilot_enabled FROM organisations WHERE id=?", (organisation_id,))
+            if not row or not row["copilot_enabled"]:
+                raise CopilotDisabled("AI copilot is off for this organisation.")
+            role = self._membership_role(tx, organisation_id, user_email)
+            if role not in self.ADMIN_ROLES and not tx.one(
+                    "SELECT id FROM copilot_access_grants WHERE organisation_id=? AND lower(email)=lower(?)",
+                    (organisation_id, user_email)):
+                raise CopilotAccessDenied("AI copilot access has not been granted to this account.")
             recent = tx.one(
                 "SELECT COUNT(*) n FROM copilot_messages WHERE organisation_id=? "
                 "AND user_email=? AND role='user' AND created_at>=?",
@@ -456,14 +575,14 @@ class CopilotService:
             user = tx.one(
                 "SELECT messages,scans,prompt_chars FROM copilot_usage "
                 "WHERE organisation_id=? AND user_email=? AND day=?",
-                (organisation_id, user_email, _day()))
+                (organisation_id, user_email, quota_day))
             user_messages, user_scans, user_chars = (
                 (int(user["messages"]), int(user["scans"]), int(user["prompt_chars"]))
                 if user else (0, 0, 0))
             org = tx.one(
                 "SELECT COALESCE(SUM(messages),0) messages, "
                 "COALESCE(SUM(prompt_chars),0) chars FROM copilot_usage "
-                "WHERE organisation_id=? AND day=?", (organisation_id, _day()))
+                "WHERE organisation_id=? AND day=?", (organisation_id, quota_day))
             if user_messages + 1 > MESSAGES_PER_USER_DAY:
                 raise CopilotQuotaExceeded("Your daily copilot allowance is used up. "
                                            "Try again tomorrow.")
@@ -480,9 +599,18 @@ class CopilotService:
                 raise CopilotQuotaExceeded("The organisation has reached today's "
                                            "copilot volume. Try again tomorrow.")
 
+            self._record_usage(organisation_id, user_email, messages=1, scans=scans,
+                               prompt_chars=prompt_chars, tokens_in=0, tokens_out=0, tx=tx, day=quota_day)
+            user_message = _insert_message(self.db, organisation_id, user_email, "user", content,
+                                           attachment_ids=attachment_ids, tx=tx)
+            audit(tx, organisation_id, user_email, "copilot.message", "copilot", organisation_id,
+                  {"attachments": len(attachment_ids), "prompt_chars": prompt_chars, "outcome": "started"})
+            return user_message, quota_day
+
     def _record_usage(self, organisation_id, user_email, *, messages, scans,
-                      prompt_chars, tokens_in, tokens_out):
-        with self.db.transaction() as tx:
+                      prompt_chars, tokens_in, tokens_out, tx=None, day=None):
+        from contextlib import nullcontext
+        with (nullcontext(tx) if tx is not None else self.db.transaction()) as tx:
             tx.execute(
                 "INSERT INTO copilot_usage(organisation_id,user_email,day,messages,"
                 "scans,prompt_chars,tokens_in,tokens_out) VALUES (?,?,?,?,?,?,?,?) "
@@ -491,5 +619,5 @@ class CopilotService:
                 "prompt_chars=prompt_chars+excluded.prompt_chars,"
                 "tokens_in=tokens_in+excluded.tokens_in,"
                 "tokens_out=tokens_out+excluded.tokens_out",
-                (organisation_id, user_email, _day(), messages, scans, prompt_chars,
+                (organisation_id, user_email, day or _day(), messages, scans, prompt_chars,
                  tokens_in, tokens_out))

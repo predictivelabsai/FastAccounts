@@ -2,10 +2,13 @@
 
 This is the agreed 2026 accounting-bureau demo specification. Production
 accountant UAT is pending. Only EUR Estonian books and 2026 periods are accepted.
-Monthly calculations cover monthly salaries (full- or part-time), hourly pay and
-board-member fees, and the social tax minimum obligation. They exclude leave,
-sickness, benefits, non-resident calculations, direct TSD submission and payment
-execution. Reviewed resident-only TSD manual-upload files are documented in
+Monthly calculations cover monthly salaries (full- or part-time), hourly pay,
+board-member fees, income-line services-contract pay and the social tax minimum
+obligation. Absence pay calculations are described below. The demo excludes
+non-resident calculations, direct TSD
+submission and payment execution. Bureau-entered payment components can represent
+additional remuneration and net deductions. Reviewed resident-only TSD manual-upload
+files are documented in
 [`tsd-export.md`](tsd-export.md).
 
 All calculations use Decimal, with ROUND_HALF_UP to cents on each tax/deduction.
@@ -13,7 +16,8 @@ Each employee's rounded amounts are then summed; aggregate taxes are not recompu
 
 - Pay basis (`pay_basis`): `monthly` (gross = `gross_salary`), `hourly`
   (gross = `hourly_rate` × hours entered on the pay run, rounded to cents) or
-  `board_fee` (board-member fee; kept in step with `board_member`).
+  `board_fee` (board-member fee; kept in step with `board_member`), or
+  `income_line` (zero base pay; reviewed income components provide the gross).
 - Work-time fraction (`fte`, 0 < FTE ≤ 1, default 1) records part-time work
   (osakoormus). It pro-rates the monthly minimum wage; it does not change pay.
 - Funded pension (II pillar): 0%, 2%, 4% or 6% of gross, default 2%. 0% is for
@@ -22,11 +26,12 @@ Each employee's rounded amounts are then summed; aggregate taxes are not recompu
   The supplied specification freezes those rates through 2028; this demo only
   accepts 2026 periods and does not extend other rules to later years.
 - Income tax: 22% of max(0, gross - pension - employee unemployment - exemption).
-- Exemption: flat EUR 700 monthly only on the employee's application
-  (`apply_tax_free_minimum=true`), otherwise zero. It is an allowance, not a deduction.
+- Exemption: up to EUR 700 monthly on the employee's effective application
+  (maximum, limited amount, or none). The legacy boolean remains compatible.
+  It is an allowance, not a deduction.
   `tax_free_minimum` records the amount actually used, capped at
   gross − pension − employee unemployment (e.g. 688.80 on a EUR 700 part-time salary).
-- Withholding total: pension + employee unemployment + income tax.
+- Withholding total: pension + employee unemployment + income tax + net deductions.
 - Net pay: gross - withholding total.
 - Employer social tax: 33% of the social tax base (`social_tax_base`), which is
   the gross pay, or the 2026 monthly minimum base of EUR 886 when that is higher
@@ -54,7 +59,7 @@ rahandusministri 15.03.2013 määrus nr 17 (§ 2 lg 1, § 5).
 - The employer pays social tax on at least EUR 886 per month for 2026
   (EUR 292.38). The shortfall `social_tax_minimum_topup` = 33% × base − 33% ×
   gross is an employer cost. On approval it is posted as a separate line on the
-  existing social-tax accounts (debit 6120, credit 2240) with the memo
+  mapped social-tax expense and accrual accounts (default debit 6120, credit 2253) with the memo
   "Sotsiaalmaksu miinimumkohustuse lisamakse YYYY-MM".
 - Partial month: when employment starts or ends during the month, the minimum
   base is pro-rated by calendar days employed (886 / days in month × days,
@@ -144,22 +149,533 @@ migration 0006: `pay_basis`, `fte`, `hourly_rate`, `social_tax_minimum_exemption
 `employment_start_date`, `employment_end_date`; `gross_salary` is empty for hourly staff.
 
 A draft snapshots active employees; later employee changes do not rewrite it.
-Delete and recreate a draft to refresh it. One run per organisation/month is
+Hours and payment components can be edited on each draft item; totals are
+recomputed atomically from frozen base pay, allowance application, employment
+dates and levy settings. Delete and recreate a draft to refresh employee details. One run per organisation/month is
 allowed. Approved runs cannot be edited/deleted/reapproved through the service.
 Approval posts at calendar month-end and respects configured fiscal-period locks.
 One transaction changes status and creates the immutable balanced ledger batch;
 a posting failure rolls both back. Existing ledger reversal tools provide linked
 accounting corrections; this demo has no payroll amendment workflow.
 
-| Account | Debit / credit |
-|---|---|
-| 6110 Salary expense | Gross debit |
-| 6120 Social tax expense | Social tax debit (minimum top-up as its own line) |
-| 6130 Employer unemployment expense | Employer UI debit |
-| 2210 Employee net payable | Net credit |
-| 2220 Payroll income tax payable | Income tax credit |
-| 2230 Employee pension and unemployment payable | Pension + employee UI credit |
-| 2240 Employer payroll taxes payable | Social tax + employer UI credit (minimum top-up as its own line) |
+## Employee lifecycle and draft editing
 
-The migration adds these accounts to existing EE charts and organisation creation
-adds them to future EE books. UK charts and UK demo books are unchanged.
+Archive and unarchive use `PATCH /employees/{id}` with `active=false/true`.
+Archived staff remain in existing drafts and approved runs, and are excluded from
+new drafts. `DELETE /employees/{id}` permanently deletes only employees with no
+`pay_run_items` rows; otherwise the service returns 409 and points to archive.
+Archive, unarchive and deletion each create an audit event.
+
+`PATCH /pay-runs/{run_id}/items/{item_id}` accepts `hours` for hourly employees
+and/or a complete `components` list. Each line has `type_id`, decimal-string
+`amount`, optional name/direction snapshots and six effective boolean flags:
+`income_tax`, `social_tax`, `ui_employee`, `ui_employer`, `funded_pension`,
+`social_minimum`. Omitted flags inherit the type defaults; the editor sends the
+frozen effective flags when saving an existing line. Negative income amounts
+allow gross adjustments; deductions must be positive. Invalid or excessive net
+deductions roll back the whole save. Gross and every tax base must remain valid,
+and monthly gross must retain the snapshotted minimum wage. Hourly gross must
+retain the snapshotted hourly minimum multiplied by the entered hours, including
+after negative income adjustments. Approval freezes
+hours, base pay and component lines.
+
+Types belong to the organisation: `GET/POST /payroll/component-types` and
+`PUT /payroll/component-types/{id}`. Editing a type never changes saved lines.
+The 33 seeded types are editable bureau defaults, not a substitute for the
+accountant's decision for the recipient and payment period. Stable `preset_key`
+values identify them independently of editable organisation names. The settings
+navigation includes **Payment types / Makseliigid** (`#payment-types`), with the
+same add/edit surface as the payroll editor and a link to payroll account
+mappings. Owners, administrators and accountants can add named custom categories
+and set their direction, liability role and six levy defaults. Custom categories
+have no preset key. New income types in this editor start with all levy flags on.
+Names and preset-basis descriptions are translated into English, Estonian,
+Latvian and Lithuanian. Descriptions describe the preset basis, rather than
+claiming to validate later bureau edits to its flags.
+
+| Preset key | Estonian name | Direction | Income tax | Social tax | Employee / employer UI | II pillar | Counts towards social minimum |
+|---|---|---|---|---|---|---|---|
+| `base_adjustment` | Põhipalga korrigeerimine | Income | Yes | Yes | Yes / Yes | Yes | Yes |
+| `contract` | Töövõtulepingu tasu | Income | Yes | Yes | Yes / Yes | Yes | No |
+| `bailiff` | Kinnipidamine kohtutäiturile | Net deduction | No | No | No / No | No | No |
+| `author` | Autori tasu | Income | Yes | Yes | Yes / Yes | Yes | Yes |
+| `parental` | Vanemapuhkused | Income | Yes | Yes | Yes / Yes | Yes | Yes |
+| `annual_leave` | Puhkusetasu | Income | Yes | Yes | Yes / Yes | Yes | Yes |
+| `unused_leave` | Kasutamata puhkuse hüvitis | Income | Yes | Yes | Yes / Yes | Yes | Yes |
+| `employer_sick_pay` | Tööandja haigushüvitis piirmäära ulatuses | Income | Yes | No | No / No | No | No |
+| `overtime` | Ületunnitöö tasu | Income | Yes | Yes | Yes / Yes | Yes | Yes |
+| `extra_work` | Lisatöö tasu | Income | Yes | Yes | Yes / Yes | Yes | Yes |
+| `bonus` | Preemia ja boonus | Income | Yes | Yes | Yes / Yes | Yes | Yes |
+| `thirteenth_salary` | 13. palk | Income | Yes | Yes | Yes / Yes | Yes | Yes |
+| `public_holiday` | Riigipühal töötamise tasu | Income | Yes | Yes | Yes / Yes | Yes | Yes |
+| `night_work` | Öötöö tasu | Income | Yes | Yes | Yes / Yes | Yes | Yes |
+| `rest_day` | Puhkepäeval töötamise tasu | Income | Yes | Yes | Yes / Yes | Yes | Yes |
+| `standby` | Valveaja tasu | Income | Yes | Yes | Yes / Yes | Yes | Yes |
+| `substitution` | Asendustasu | Income | Yes | Yes | Yes / Yes | Yes | Yes |
+| `commission` | Müügitasu | Income | Yes | Yes | Yes / Yes | Yes | Yes |
+| `study_leave` | Õppepuhkuse tasu | Income | Yes | Yes | Yes / Yes | Yes | Yes |
+| `average_pay` | Keskmise töötasu säilitamine | Income | Yes | Yes | Yes / Yes | Yes | Yes |
+| `severance` | Töölepingu lõpetamise hüvitis | Income | Yes | Yes | Yes / Yes | Yes | Yes |
+| `expense_reimbursement` | Dokumenteeritud kulude hüvitis | Income | No | No | No / No | No | No |
+| `salary_advance` | Väljamakstud palga ettemaks | Net deduction | No | No | No / No | No | No |
+| `advance_recovery` | Varasema ettemaksu tasaarvestus | Net deduction | No | No | No / No | No | No |
+| `alimony` | Elatise kinnipidamine | Net deduction | No | No | No / No | No | No |
+| `union_fee` | Ametiühingu liikmemaksu kinnipidamine | Net deduction | No | No | No / No | No | No |
+| `agreed_deduction` | Muu kokkulepitud kinnipidamine | Net deduction | No | No | No / No | No | No |
+
+Treatment references checked 2026-10-25:
+
+- EMTA [Palgatulu](https://www.emta.ee/eraklient/maksud-ja-tasumine/maksustatavad-tulud/palgatulu):
+  ordinary employment remuneration and TLS section 84 unused leave compensation
+  carry the ordinary employment levies. All ordinary pay supplements in the table
+  follow this basis. The catalogue supplies amounts and defaults, with no
+  automatic entitlement, average-pay, leave-day or overtime calculation.
+- EMTA [Sotsiaalmaks](https://www.emta.ee/ariklient/maksud-ja-tasumine/tulumaks-ja-sotsiaalmaks/sotsiaalmaks),
+  employer sick-pay section: the sick-pay preset is restricted to qualifying
+  employer payments for days 1 to 8 within the statutory average-pay limit and
+  backed by a valid certificate. Only income tax is enabled. Days 4 to 8 are the
+  ordinary mandatory employer-paid days; days 1 to 3 may be voluntary. The bureau
+  must check days, certificate and limit, and enter excess as fully taxable pay.
+  This preset does not cover Tervisekassa payments or arbitrary sick-leave top-ups.
+- EMTA [documented cost reimbursement, questions 24 and 25](https://www.emta.ee/ariklient/maksud-ja-tasumine/tulumaks-ja-sotsiaalmaks/erisoodustused/toolahetuse-kusimused-ja-vastused),
+  TuMS section 12(3): documented costs incurred for the employer's business are
+  reimbursed with all levies off. This narrow preset excludes per diem allowances,
+  private costs, fringe benefits and disguised remuneration. The bureau checks
+  supporting documents and avoids duplicating a reimbursement already in books.
+- EMTA [Töötuskindlustusmakse](https://www.emta.ee/ariklient/maksud-ja-tasumine/tulumaks-ja-sotsiaalmaks/tootuskindlustusmakse):
+  statutory termination compensation may be exempt from unemployment insurance;
+  general agreed compensation is not universally exempt. The generic severance
+  preset, including notice compensation, deliberately defaults to all levies on.
+  The bureau must distinguish statutory TLS sections 100/109 payments from agreed
+  supplements and confirm both UI flags and social-minimum counting at UAT.
+
+Newly seeded author and employer parental-leave categories now default to fully
+taxable income because their payment basis and recipient treatment are uncertain.
+Accountant UAT must confirm every applicable levy, the contract and social-minimum
+counting. The parental category is employer-side only, not a state benefit or an
+assertion of a universal employer entitlement. No maternity or state-paid parental
+benefit category is added. Existing organisation defaults, including the earlier
+author social-tax demo assumption and parental exemptions, are preserved by the
+migration and require bureau review at UAT. Contract-pay recipient flags and
+minimum counting also retain their documented UAT requirement.
+
+Standby pay, study-leave pay, retained average wages and general severance use
+conservative fully taxable income defaults. The bureau confirms their contractual
+or legal basis and social-minimum treatment at UAT. Qualifying sick pay and
+reimbursement require the evidence and limits above. No exemption is inferred
+from an uncertain payment name. Every income-line flag remains editable per period.
+
+All net deductions leave tax bases unchanged and use `PAYROLL_DEDUCTION`, except
+bailiff garnishments, which use `PAYROLL_BAILIFF`. Direct alimony is separate from
+bailiff enforcement. The bureau confirms lawful authority and deduction limits.
+`salary_advance` recognises an advance already paid for the current period;
+`advance_recovery` recovers an earlier advance. Both reduce outstanding net pay,
+without executing payment or reducing gross. Never apply both to the same advance.
+They use the requested deduction liability role; clearing an already recorded
+advance remains the accountant's responsibility.
+
+Migration 0036 inserts missing catalogue entries into existing EE organisations
+with `ON CONFLICT(organisation_id,preset_key) DO NOTHING`, reusing the unique
+constraint introduced in 0034. Existing names, levy edits, custom types and frozen
+payroll or ledger rows remain unchanged. New EE organisations receive the same
+catalogue through `payroll_components.seed_types`. SQL migration values are a
+versioned snapshot, checked against that catalogue in upgrade tests. UK
+organisations receive no payroll types. No historical migration is rewritten.
+
+Income amounts enter each levy base only when that levy flag is on. Pension and
+employee UI are rounded on their respective aggregate bases and deducted from
+the income-tax base before the allowance and 22% withholding. All income enters
+gross and employee net before withholding, even when no tax flags apply.
+Employer cost includes gross, social tax and employer UI, excluding net deductions.
+
+The social minimum shortfall is `max(0, pro-rated minimum - minimum-counting pay)`.
+Social tax base is social-taxable pay plus that shortfall; the top-up is total
+social tax less rounded tax on actual social-taxable pay. Existing exemptions
+remove the shortfall obligation, including for author payments. This means that
+social tax and minimum-counting flags are deliberately independent. Monthly pay
+is not automatically pro-rated. Bureau users must confirm mixed-component
+contribution deductibility and the minimum-counting treatment during UAT.
+
+PDFs append translated component detail after the employee payslips, preserving
+existing per-employee page links. The Excel book includes a translated component
+sheet. Reviewed integration push payloads retain frozen item/component detail;
+the existing Merit/SmartAccounts transport remains a balanced GL journal export.
+
+## Reviewed Merit Palk imports
+
+Sources checked 2026-10-24: Merit Palk
+[Getting Employee's List](https://api.merit.ee/merit-palk-api/palk-reference-manual/requesting-data-from-merit-palk/getting-employees-list/) and
+[Getting Salary and Hours Report data](https://api.merit.ee/merit-palk-api/palk-reference-manual/requesting-data-from-merit-palk/getting-salary-and-hours-report-data/).
+The employee endpoint identifies TypeId 5 as a contract of services
+(`Töövõtuleping`). FastAccounts maps it to `pay_basis=income_line` with zero
+monthly base pay, rather than inferring an employment salary from a tariff.
+Reviewed `Töövõtulepingu tasu` or author's-fee income components provide remuneration;
+the accountant must confirm their levy flags and recipient circumstances.
+The contract-pay preset enables income tax, social tax, both unemployment
+insurance flags and funded pension, with social-minimum counting off. These are
+editable bureau defaults, not a universal tax decision for every recipient.
+This basis carries no automatic employment-contract social minimum. Social tax
+on taxable income still follows the component flags. See EMTA
+[Sotsiaalmaks](https://www.emta.ee/ariklient/maksud-ja-tasumine/tulumaks-ja-sotsiaalmaks/sotsiaalmaks)
+and [Maksumäärad](https://www.emta.ee/ariklient/maksud-ja-tasumine/tulumaks-ja-sotsiaalmaks/maksumaarad),
+with SMS § 2 and the social-minimum rules above; accountant UAT remains pending.
+
+The salary report uses `POST /api/v1/getsalaryreport`, with `StartDate` and
+`EndDate` covering the selected month, `Language=EN` and `SortOption=2`.
+Its `EmployeeFullName`, `SalaryTypeName`, `Month6`, `Hours` and `Sum` become
+reviewed employee-period proposals. The response has no personal-code identity,
+so only a unique employee name within the organisation can match. Missing or
+ambiguous names stay blocked for review. Salary type names are customisable in
+Merit: the base-salary allowlist is `Base salary`, `Monthly salary`,
+`Hourly salary`, `Põhipalk`, `Kuupalk` and `Tunnipalk`. An exact existing
+component-type name also maps automatically. Unmapped lines remain visible with
+warnings. Existing draft components are retained; a collision with an imported
+component type blocks apply for manual review to prevent duplicate income. Hourly
+base pay differences use the visible base-adjustment component without changing
+the hourly rate. New drafts require reviewed hours for every hourly employee;
+unselected and rejected proposals do not supply hours.
+
+Apply fills or creates the period's draft through the payroll service, using
+Decimal money helpers for gross and component amounts and validated decimal
+hours for hourly staff. It preserves the unique period constraint, tenant scope
+and repeat-apply idempotency. An identical report is unchanged on repeat import;
+a changed report updates the draft using the previous applied payload to identify
+source components, while retaining unrelated manual lines. If source component
+amounts have been edited locally, apply blocks for review instead of discarding
+the edits. Approved runs cannot be changed. Source employer
+taxes, dimensions and totals remain review evidence; local payroll rules
+calculate the draft's taxes. Merit warns that unpaid salaries can affect report
+results, so live PRO reconciliation and accountant acceptance remain required.
+
+Employee-list requests support only the optional exact `PersonalCode` and
+`Month6` filters. There is no documented offset, cursor or personal-code range.
+The [Merit Palk FAQ](https://api.merit.ee/merit-palk-api/frequently-asked-questions-faq/)
+states the 100-record limit for growing lists. FastAccounts fails closed when a
+response reaches that ceiling; companies with more than 100 employees must
+repeat imports with each exact
+PersonalCode. No undocumented paging or silently truncated import is used.
+
+## Month-end posting and TSD reclassification
+
+Migration 0034 adds ten liability roles to EE charts without changing historical
+posted batches. The original payroll accounts remain for historical reporting.
+Expense roles retain their existing defaults. The following role mappings define
+the monthly posting shape; organisations may select their own active chart codes.
+
+| Role | Default code | Month-end debit / credit |
+|---|---|---|
+| PAYROLL_SALARY | 6110 | Gross salary expense debit |
+| PAYROLL_SALARY_PAYABLE | 2250 | Gross credit, all employee withholdings debit |
+| PAYROLL_BAILIFF | 2251 | Bailiff garnishment credit |
+| PAYROLL_DEDUCTION | 2252 | Other net deductions credit |
+| PAYROLL_SOCIAL | 6120 | Social tax expense debit, top-up separately |
+| PAYROLL_SOCIAL_ACCRUED | 2253 | Social tax credit, top-up separately |
+| PAYROLL_INCOME_WITHHELD | 2254 | Income tax credit |
+| PAYROLL_PENSION_WITHHELD | 2255 | Funded pension credit |
+| PAYROLL_UI_ACCRUED | 2256 | Employee UI and employer UI credits |
+| PAYROLL_UI | 6130 | Employer UI expense debit |
+
+`GET /payroll/posting-mappings` and `PUT /payroll/posting-mappings/{role}` expose
+these mappings and the three payable roles below. They reuse migration 0011's
+`account_mappings`, with provider `payroll:<lowercase role>` and matching local
+and external code fields. A separate provider key per role permits shared target
+accounts while preserving provider export mapping uniqueness. The UI's Payroll
+accounts dialog lets the organisation select codes such as Sunio's 7001/7500/7550,
+2210/2517/2563/2552/2554/2565 and 2320/2330/2340 after adding those chart accounts.
+
+Each approved run has declaration state `none`, `prepared` after the existing
+TSD preparation flow, or `settled` after explicit bureau reclassification.
+`POST /pay-runs/{run_id}/tsd/settle` creates one separate,
+immutable balanced batch dated on the TSD due date: the 10th of the month after
+the payment month, moved forward to the next working day when needed:
+
+| Debit accrual role | Credit payable role | Default payable code |
+|---|---|---|
+| PAYROLL_SOCIAL_ACCRUED | PAYROLL_SOCIAL_PAYABLE | 2257 |
+| PAYROLL_INCOME_WITHHELD | PAYROLL_INCOME_PAYABLE | 2258 |
+| PAYROLL_UI_ACCRUED | PAYROLL_UI_PAYABLE | 2259 |
+| PAYROLL_PENSION_WITHHELD | PAYROLL_SOCIAL_PAYABLE | 2257 |
+
+An approved run with zero tax liabilities can be marked settled by the same
+explicit action without creating a zero-value journal; it retains a null
+`declaration_batch_id` and an audit explaining that no liability existed.
+
+The bureau may prepare TSD outside FastAccounts, so reclassification does not
+require the in-app file preparation flow or frozen personal IDs. In-app
+preparation remains available independently. The action is never automatic on
+payroll approval or payment posting. Settlement
+means this reclassification only; it does not claim a bank payment or EMTA
+submission. Run responses include `declaration_state`, `declaration_due_date`,
+`declaration_overdue` and `declaration_batch_id`. The month-end panel lists all
+approved periods; the dashboard links to the count overdue after the due date.
+
+Accrual account IDs are frozen at approval so a later mapping change cannot
+strand the original liability. Reclassification of runs approved before 0034
+debits their original combined legacy liabilities. Both entries respect fiscal
+locks, tenant scope and atomic posting. Repeat settlement returns 409. Existing
+ledger reversals remain the correction mechanism; there is no payroll amendment
+or declaration-unsettling workflow. UK charts and books are unchanged.
+
+## Rule selection
+
+`payroll_rules.rules_for(date)` returns a frozen, year-specific rule set. Only
+verified 2026 values are configured. Unsupported years fail validation with a
+translated message; no other year inherits 2026 rates. `settlement_date(period)`
+is the single settlement-date boundary and currently returns calendar month end.
+The legacy `calculate_pay` call without a period retains its 2026 defaults.
+The January to March and April onwards minimum-wage values are unchanged.
+
+## Estonian working calendar
+
+`payroll_calendar` uses the Anonymous Gregorian computus for Good Friday,
+Easter Sunday and Pentecost Sunday. Working days are Monday to Friday excluding
+the Estonian public holidays listed in the module. Full-time norms use eight
+hours per working day, reduced by three hours for a working day immediately
+before 24 February, 23 June, 24 December or 1 January. For 2026, October is
+22 days / 176 hours; February is 19 / 149, June is 20 / 157, and December is
+21 / 162. These are calendar norms, before individual schedules or leave.
+
+Company payday histories are effective-dated. `next_month_day` and
+`current_month_day` clamp dates beyond the target month's length. A resulting
+weekend or public holiday shifts the payday backwards to the previous working
+day. `next_month_first_working_day` starts on the first day of the next month
+and moves forward to its first working day. The company payroll start date is
+stored separately from the dated payday rule history.
+
+Payroll freezes the date selected for its tax calculation on the run. The
+resolution priority is an existing salary payout date, the effective payday
+rule date, then the period end. A salary payout for an approved run must remain
+in the payment month frozen by its calculation; a different month needs a
+correction. Draft runs resolve again when created. For each employee and
+payment month, approved frozen items consume the applicable maximum or limited
+tax-free amount. Later runs in that payment month receive only the remaining
+exemption. This aggregation uses the selected salary payout date when one exists,
+otherwise the frozen settlement date, and does not rewrite earlier calculations.
+An approved positive correction paid in a later month is recalculated at payout
+creation against that month's remaining exemption. Its payout TSD snapshot and
+the corresponding liability adjustment are recorded separately. A negative
+correction is an employee receivable and amends the original declaration period.
+
+## Effective-dated employee tax elections
+
+Migration 0037 adds organisation-scoped `employee_tax_settings` histories for
+`tax_free`, `pension` and `unemployment`. Initial rows use employment start or
+2026-01-01. Legacy exemption booleans become maximum/none applications; pension
+rates are retained; employee unemployment insurance starts enabled except for
+board fees. A limited application requires a non-negative amount with at most
+two decimal places, no greater than that year's verified monthly maximum.
+
+The final calendar day of the run month determines the effective row, including
+mid-month changes. There is no daily pro-rating of an application. Before the
+first history row, the defaults are no application, no funded pension and
+ordinary employee unemployment insurance. The flag affects the employee's
+unemployment deduction only; employer unemployment remains payable for ordinary
+employment. Board-fee base remuneration retains both automatic UI exclusions.
+
+Draft creation freezes the resolved mode, limit, pension rate, employee UI flag
+and source row identifiers alongside the existing pay item context. Draft edits
+reuse that snapshot. Later history changes affect newly created runs only.
+Approved source rows cannot be edited or deleted. Existing approved amounts are
+preserved; the migration does not infer historical elections from current data.
+
+Legacy `apply_tax_free_minimum` and `funded_pension_percent` fields remain readable
+and writable. They expose the legacy employee-master values, not a projection of
+the latest effective history. Changed values create/update the corresponding
+history row. `tax_settings_period` (YYYY-MM) selects its effective run month,
+starting on day 1. Without it, writes use the latest existing run month; before
+any run they use employment start or 2026-01-01. An unchanged value is a no-op.
+A write conflicting with an approved source row fails with 409; use an explicit
+later period or add a dated election. Existing drafts retain their snapshot.
+
+## Wage component metadata and absence rules
+
+Migration 0042 adds `is_wage` and `active` to organisation payment types and
+freezes `is_wage` on each saved component line. `is_wage` controls inclusion in
+average-pay history; changing a type later does not rewrite approved components.
+New types default to wage and active. The seeded wage presets are base adjustment,
+contract, author, overtime, extra work, bonus, 13th salary, public-holiday work,
+night work, rest-day work, standby, substitution, commission, study-leave pay
+and average pay. Parental payments, annual leave pay, unused-leave compensation,
+employer sick benefit, severance, expense reimbursement and all deductions are
+non-wage by default. Bureau users can change the flag for their policy and source
+documents. Inactive types are unavailable on new payment lines; saved history
+remains valid.
+
+The Estonian Employment Contracts Act (Töölepingu seadus) § 54(3) excludes
+national and public holidays from basic leave days; § 55 sets the default basic
+leave entitlement at 28 calendar days; § 70(2) sets the vacation-pay deadline as
+the penultimate calendar working day before leave unless the parties agree
+otherwise. Average pay follows the Government Regulation “Keskmise töötasu
+maksmise tingimused ja kord” § 2: wage amounts earned in the six calendar months
+before the event month are used, with the regulation's short-service and no-wage
+rules to be applied by the average-pay service. Sources: [Employment Contracts
+Act](https://www.riigiteataja.ee/akt/123122024006) and [Average Pay
+Regulation](https://www.riigiteataja.ee/akt/13191217).
+
+`payroll_average.py` version `EE-AVG-2026-v1` consumes approved frozen item
+snapshots and reviewed historical earnings. It sums monthly/hourly base pay and
+only income components whose frozen `is_wage` flag is true. The calendar-day
+denominator subtracts public holidays and the union of dates explicitly marked
+as absences with `wage_paid=false`. The working-day variant subtracts unpaid
+absence working days; the hourly variant divides summed wage earnings by recorded
+worked hours. When there is no non-zero wage history, the documented fallback
+projects the current agreed monthly salary over six full months, or the current
+hourly rate over the six calendar norm-hour totals. The returned breakdown lists
+the source months, totals, excluded days, denominators, averages and fallback
+description. Its window follows the requested six-full-month rule; short-service
+and specific statutory exclusions need accountant review before production use.
+
+The absence register stores inclusive start and end dates, a document reference
+and a comment for each organisation-scoped employee record. Calendar days count
+both endpoints. Annual and extended leave days exclude public holidays, while
+working days use the Estonian payroll calendar. Other absence types currently
+report inclusive calendar days as leave days. An employee cannot have overlapping
+absence records. The `permitted_absence` type has an organisation setting for
+whether salary continues; it defaults to unpaid. Collective annual leave creates
+one separately auditable absence per selected employee.
+
+For monthly employees, the run freezes standard calendar norm days, interrupted
+absence working days and resulting worked days. The frozen base salary and
+monthly minimum threshold are each multiplied by `worked_days / norm_days`.
+The agreed monthly salary already reflects the employee's FTE; the calendar day
+ratio therefore applies equally at every FTE. This demo has no employee-specific
+weekday schedule, so norm days use the Estonian Monday-to-Friday calendar at the
+configured FTE pay. Hourly employees retain the entered hours and hourly amount
+unchanged by absences. Run items and payslips display worked days against norm
+days.
+
+### Payroll absence calculation parameters
+
+The absence and average-pay service uses the dated statutory rules and the
+organisation's explicitly selected absence-pay method. It does not infer tax or
+employment-law treatment solely from absence labels. Parameters without a
+verified rule are year-versioned and identified in
+`payroll_absences_validation.md` under “Needs accountant confirmation”.
+
+For annual, extended and study leave, the pure absence-pay calculator supports
+`average`, `unchanged_salary`, `best_of` and `fixed_sum`. Average uses the
+versioned average-pay engine. Unchanged salary prorates agreed monthly salary by
+leave working days over norm working days. `best_of` selects the higher amount;
+fixed sum requires an explicit amount. The calculation returns both candidate
+amounts and the selected method for review. The current implementation exposes
+these calculations as a pure service; it does not yet create pending absence-pay
+records on saving an absence or attach them to a payout batch.
+
+`EE-SICK-2026-v1` configures employer-paid sick benefit at 70% of average daily
+pay for sickness days 2 through 5, with day 1 unpaid and Tervisekassa from day
+6. This is an explicit 2026 parameter pending accountant confirmation. The
+calculator returns qualifying days and the rule version. Vacation payout date
+defaults to the previous working day, using the Estonian payroll calendar.
+Unused leave compensation is remaining leave days multiplied by average daily
+pay; employee termination workflows do not yet offer this automatically.
+
+## Withholding implementation parameters (Build 7 in progress)
+
+The withholding register uses Decimal values and stores agreements by
+organisation, employee, recipient and effective dates. Its pure calculation
+helper caps a requested amount by remaining agreement cap, available net pay and
+any garnishable amount supplied by the caller. The garnishable amount is not yet
+derived from law or order-specific facts, so this helper must not be treated as
+a production bailiff calculation.
+
+The year parameters for protected wages and order exceptions still need
+accountant confirmation. Code of Enforcement Procedure §132 protects earnings
+up to the minimum monthly wage in the general case and provides distinct rules
+for periodic child maintenance and other enforcement claims. See the
+[Riigi Teataja English translation](https://www.riigiteataja.ee/en/akt/523012025002).
+
+Employer III pillar contributions are not ordinary salary exemption 610. EMTA's
+TSD handbook classifies them as payment type 25 and applies exemption type 640,
+tracked cumulatively against 15% of qualifying annual taxable payments and
+EUR 6,000. Excess contribution treatment and the qualifying annual base require
+accountant confirmation. See the [EMTA TSD handbook](https://emta.ee/node/330/handbook/20/pdf).
+These rules are documented for implementation and are not yet connected to
+pay-run tax calculations.
+
+## Employee contact and bank details
+
+The employee API and workbook include optional `phone`, `iban`,
+`bank_account_owner`, `address` and `date_of_birth`. IBAN input is normalised to
+uppercase without whitespace and must pass ISO 13616 mod-97 checksum validation.
+Date of birth is derived from a recognisable Estonian personal code when absent;
+a supplied valid YYYY-MM-DD date takes precedence. Existing personal codes are
+also derived on read when there is no stored date. These employee-master details
+use the existing organisation and audit boundary and do not change posted pay.
+
+## History API and editor
+
+`/organisations/{organisation_id}/employees/{employee_id}/tax-settings` supports
+GET (all histories, including a `frozen` indicator) and POST (a complete row).
+Append `/{setting_id}` for PUT (replace an unused row's date/value, retaining its
+kind) or DELETE. A row has `kind`, `start_date` and exactly the relevant payload:
+
+- `tax_free`: `mode` in maximum/limited/none, with `amount` required only for limited.
+- `pension`: `rate` in 0/2/4/6.
+- `unemployment`: boolean `applies` for employee unemployment withholding.
+
+Duplicate effective dates return 409. Rows referenced by approved payroll cannot
+be edited or deleted and return a translated 409. Future-dated and unused rows
+can be edited/deleted; this includes rows used only by a draft, whose values are
+already frozen. Migration backfill rows are not asserted to represent elections
+for old approved runs. Their existing calculation snapshots remain authoritative.
+
+Owner, administrator and accountant roles can write. Viewers and approvers can
+read. Every history write requires CSRF. The dialog lists the three histories,
+shows protected rows, and edits unused rows inline. Contact/master-data changes
+use the existing Save action; history changes save independently. The editor is
+read-only for viewers and approvers. Employee UI exclusions do not disable the
+employer contribution. Contract components retain their separately reviewed tax
+flags, and board-fee base remuneration keeps its automatic exclusions.
+
+Payment components also carry an editable EMTA VALJAMLIIK code. Preset defaults, matrix source and items needing accountant confirmation are listed in [tsd-export.md](tsd-export.md). These codes do not replace review of the recipient's legal relationship.
+
+## Payment-type calculation methods (Build 6)
+
+Every existing component type and saved component line migrates to `fixed_sum`.
+That preserves the prior entered amount exactly. Editing a type affects later
+lines only; draft and approved lines retain their calculation method, entered
+quantity/rate/coefficient/percentage, calculated amount, TSD payment code and
+PALK row. `fixed_sum` remains the default for newly created custom types.
+
+A gross-up searches integer cents from the lowest gross upward and uses the
+first gross whose net reaches the requested net after pension, employee
+unemployment and income tax. Each deduction and tax is rounded `ROUND_HALF_UP`
+to cents, as in the payroll engine. The gross-up is deterministic. It currently
+uses the 2026 rates and the exemption value supplied by the caller; accountant
+review is required for unusual exemption sharing and future tax-year rules.
+
+| Preset | Method/default | TSD type | PALK row | Review note |
+|---|---|---:|---:|---|
+| Overtime | Percentage of hourly rate, 150% | 10 | 6 | Ordinary employment levies |
+| Night work | Percentage of hourly rate, 25% | 10 | 7 | Verify agreement and hours |
+| Public-holiday work | Percentage of hourly rate, 100% | 10 | 7 | Verify agreement and hours |
+| Bonus | Percentage of base salary, percentage entered per line | 10 | 5 | Regular bonus classification |
+| Thirteenth salary | Fixed sum | 10 | 8 | Irregular bonus classification |
+| Annual leave and unused leave | Fixed sum unless entered from absence calculation | 10 | 9 | Existing absence calculation remains authoritative |
+| Severance | Average monthly pay | 33 | 8 | Confirm compensation type |
+| Notice pay | Average working-day pay | 33 | 8 | Confirm legal basis |
+| Car compensation | Fixed sum; EUR 0.30/km and EUR 335/month defaults | 10 | 15 | Mileage records, eligible recipient and monthly cap must be reviewed |
+| Birth allowance | Fixed sum | 14 | 16 | Tax-free preset; confirm eligibility |
+| Work-accident benefit | Fixed sum | 32 | 17 | Confirm legal basis and levies |
+| Care leave pay | Average working-day pay | 10 | 9 | Confirm payer and entitlement |
+| Child leave pay | Average working-day pay | 10 | 9 | Confirm payer and entitlement |
+
+The private-car reference limit is EUR 0.30 per kilometre, capped at EUR 335 per
+employer per calendar month when the required records are kept. This preset
+stores those values as editable defaults only and does not calculate the
+exempt/taxable split. The accountant must confirm current applicability and
+handle any excess as taxable fringe benefit. See the [Income Tax Act](https://www.riigiteataja.ee/en/akt/515052024003) and [EMTA car compensation guidance](https://www.emta.ee/en/node/168/main_chapter/11656/pdf).
+
+Component types also select a Statistics Estonia PALK row: 5 base pay including
+regular bonuses, 6 overtime, 7 shift/night/public-holiday work, 8 irregular
+bonuses, 9 non-worked time, 10 non-monetary benefits, and 15-18 benefits. This
+classification is stored for a later PALK report and is not currently exported.
+
+The PALK preset mapping assigns base adjustment, contract, author, extra work,
+regular bonus, standby, substitution and commission to row 5; overtime to row 6;
+night, public-holiday and rest-day work to row 7; thirteenth salary and
+termination payments to row 8; parental, leave, sickness, study-leave, average,
+care-leave and child-leave payments to row 9; and documented reimbursements and
+private-car benefits to row 15. Birth allowance maps to row 16 and work-accident
+benefit to row 17. Custom types default to row 5 and can be changed in the type
+editor. This is a stored classification for a later report.

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<processing result="ERROR">
+	<entryHeader>
+		<validations>
+			<validation>
+				<errorLevel>ERROR</errorLevel>
+				<errorCode> KR_VALIDATE_XBRL_FILE_7</errorCode>
+				<errorDescription> Maksustamisperiood peab olema kalendrikuu põhine</errorDescription>
+				<errorDescription_EN>Tax period must be one calendar month</errorDescription_EN>
+			</validation>
+		</validations>
+	</entryHeader>
+</processing>

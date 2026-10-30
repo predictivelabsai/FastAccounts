@@ -82,7 +82,10 @@ class Transaction:
         return query.replace("?", "%s") if self.dialect == "postgres" else query
 
     def execute(self, query: str, params: Sequence[Any] = ()):
-        return self.connection.execute(self._sql(query), tuple(params))
+        values = tuple(params)
+        if self.dialect == "postgres":
+            values = tuple(int(value) if isinstance(value, bool) else value for value in values)
+        return self.connection.execute(self._sql(query), values)
 
     def one(self, query: str, params: Sequence[Any] = ()) -> dict[str, Any] | None:
         row = self.execute(query, params).fetchone()
@@ -98,6 +101,15 @@ class Transaction:
         if isinstance(row, sqlite3.Row):
             return row[0]
         return next(iter(row.values()))
+
+    def table_exists(self, name: str) -> bool:
+        """Check a table in the active schema for legacy migration reads."""
+        query = (
+            "SELECT 1 FROM pg_tables WHERE schemaname=current_schema() AND tablename=?"
+            if self.dialect == 'postgres' else
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?"
+        )
+        return self.one(query, (name,)) is not None
 
 
 class Database:
@@ -163,8 +175,10 @@ class Database:
         with self.transaction() as tx:
             return tx.scalar(query, params)
 
-    def migrate(self) -> list[str]:
-        directory = MIGRATIONS / ("sqlite" if self.dialect == "postgres" else self.dialect)
+    def migrate(self, *, migrations: Path | None = None) -> list[str]:
+        """Apply a migration catalogue, with any override scoped to this call."""
+        catalogue = MIGRATIONS if migrations is None else migrations
+        directory = catalogue / ("sqlite" if self.dialect == "postgres" else self.dialect)
         applied: list[str] = []
         if self.dialect == "sqlite":
             connection = self.connect()
@@ -230,6 +244,96 @@ class Database:
                     script = script.replace(
                         "accent_colour GLOB '#[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]'",
                         "accent_colour ~ '^#[0-9a-fA-F]{6}$'")
+                elif path.stem == "0037_employee_tax_settings":
+                    script = script.split('-- SQLITE_TAX_HISTORY_IMMUTABILITY', 1)[0] + _POSTGRES_TAX_HISTORY_GUARD
+                elif path.stem == "0042_payroll_component_metadata":
+                    script = script.split('DROP TRIGGER guard_pay_item_components_update;', 1)[0]
+                    script += """
+DROP TRIGGER IF EXISTS guard_pay_item_components ON pay_item_components;
+UPDATE pay_item_components c SET is_wage=t.is_wage
+FROM pay_component_types t WHERE t.organisation_id=c.organisation_id AND t.id=c.type_id;
+""" + _postgres_payroll_component_triggers()
+                elif path.stem == "0054_payroll_tsd_lines":
+                    script = script.split("CREATE TRIGGER guard_pay_item_tsd_lines_update", 1)[0]
+                    script += _POSTGRES_TSD_LINE_TRIGGERS
+                elif path.stem in {
+                    "0049_payroll_component_source",
+                    "0052_payroll_tsd_payment_types",
+                    "0063_payroll_pay_type_methods",
+                    "0066_payroll_palk_unmapped",
+                }:
+                    # These SQLite migrations temporarily drop and recreate the
+                    # component update guard around backfills. Drop only the
+                    # PostgreSQL component guard for the matching UPDATE, then
+                    # reinstall the equivalent component and context guards.
+                    script = script.replace("DROP TRIGGER guard_pay_item_components_update;", "")
+                    script = script.split("CREATE TRIGGER guard_pay_item_components_update", 1)[0]
+                    script = script.replace(
+                        "UPDATE pay_item_components",
+                        "DROP TRIGGER IF EXISTS guard_pay_item_components ON pay_item_components;\n"
+                        "UPDATE pay_item_components",
+                        1,
+                    )
+                    script += _postgres_payroll_component_triggers()
+                elif path.stem == "0055_tsd_apa_history":
+                    script = script.replace("file_xml BLOB", "file_xml BYTEA")
+                elif path.stem == "0061_payroll_payout_tsd_lines":
+                    script = script.split("-- SQLITE_PAYOUT_TSD_IMMUTABILITY", 1)[0] + """
+CREATE OR REPLACE FUNCTION guard_payroll_payout_tsd_lines() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    RAISE EXCEPTION 'approved payout TSD lines are immutable';
+END; $$;
+CREATE TRIGGER guard_payroll_payout_tsd_update BEFORE UPDATE OR DELETE ON payroll_payout_tsd_lines
+FOR EACH ROW EXECUTE FUNCTION guard_payroll_payout_tsd_lines();
+"""
+                elif path.stem == "0062_payroll_run_lineage_parent_guard":
+                    script = """CREATE OR REPLACE FUNCTION guard_pay_run_original_parent() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP = 'DELETE' AND EXISTS (
+        SELECT 1 FROM pay_runs child
+        WHERE child.organisation_id=OLD.organisation_id AND child.original_run_id=OLD.id
+    ) THEN
+        RAISE EXCEPTION 'payroll original run has related runs';
+    END IF;
+    IF TG_OP = 'UPDATE' AND (NEW.id<>OLD.id OR NEW.organisation_id<>OLD.organisation_id) AND EXISTS (
+        SELECT 1 FROM pay_runs child
+        WHERE child.organisation_id=OLD.organisation_id AND child.original_run_id=OLD.id
+    ) THEN
+        RAISE EXCEPTION 'payroll original run has related runs';
+    END IF;
+    IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
+    RETURN NEW;
+END; $$;
+CREATE TRIGGER pay_runs_original_parent_update
+BEFORE UPDATE OF id,organisation_id ON pay_runs
+FOR EACH ROW EXECUTE FUNCTION guard_pay_run_original_parent();
+CREATE TRIGGER pay_runs_original_parent_delete
+BEFORE DELETE ON pay_runs
+FOR EACH ROW EXECUTE FUNCTION guard_pay_run_original_parent();
+"""
+                elif path.stem == "0060_payroll_run_lineage_tenancy":
+                    script = """CREATE OR REPLACE FUNCTION guard_pay_run_original_tenant() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF NEW.original_run_id IS NOT NULL AND NOT EXISTS (
+        SELECT 1 FROM pay_runs original
+        WHERE original.id=NEW.original_run_id AND original.organisation_id=NEW.organisation_id
+    ) THEN
+        RAISE EXCEPTION 'original pay run must belong to the same organisation';
+    END IF;
+    RETURN NEW;
+END; $$;
+CREATE TRIGGER pay_runs_original_same_organisation
+BEFORE INSERT OR UPDATE OF original_run_id,organisation_id ON pay_runs
+FOR EACH ROW EXECUTE FUNCTION guard_pay_run_original_tenant();
+"""
+                elif path.stem == "0035_payroll_income_line":
+                    script = _POSTGRES_PAYROLL_0035
+                elif path.stem == "0034_payroll_demo_fixes":
+                    script = script.split('-- SQLITE_PAYROLL_IMMUTABILITY', 1)[0] + _postgres_payroll_component_triggers()
+                # SQLite's BLOB type has no PostgreSQL equivalent. Apply this
+                # dialect conversion after migration-specific rewrites so it
+                # covers declarations with constraints such as BLOB NOT NULL.
+                script = re.sub(r"\bBLOB\b", "BYTEA", script, flags=re.IGNORECASE)
                 connection.execute(script)
                 connection.execute(
                     "INSERT INTO schema_migrations(version) VALUES (%s)",
@@ -243,6 +347,34 @@ class Database:
         finally:
             self._release(connection)
         return applied
+
+
+def _postgres_payroll_component_triggers():
+    script = ''
+    for table in ('pay_item_components', 'pay_item_context'):
+        script += f"""
+CREATE OR REPLACE FUNCTION guard_{table}() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP <> 'INSERT' THEN
+        IF EXISTS (SELECT 1 FROM pay_run_items i JOIN pay_runs r ON r.organisation_id=i.organisation_id AND r.id=i.pay_run_id
+                   WHERE i.organisation_id=OLD.organisation_id AND i.id=OLD.item_id AND r.status='Approved') THEN
+            RAISE EXCEPTION 'approved payroll components are immutable';
+        END IF;
+    END IF;
+    IF TG_OP <> 'DELETE' THEN
+        IF EXISTS (SELECT 1 FROM pay_run_items i JOIN pay_runs r ON r.organisation_id=i.organisation_id AND r.id=i.pay_run_id
+                   WHERE i.organisation_id=NEW.organisation_id AND i.id=NEW.item_id AND r.status='Approved') THEN
+            RAISE EXCEPTION 'approved payroll components are immutable';
+        END IF;
+    END IF;
+    IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
+    RETURN NEW;
+END; $$;
+DROP TRIGGER IF EXISTS guard_{table} ON {table};
+CREATE TRIGGER guard_{table} BEFORE INSERT OR UPDATE OR DELETE ON {table}
+FOR EACH ROW EXECUTE FUNCTION guard_{table}();
+"""
+    return script
 
 
 def _postgres_object_triggers():
@@ -399,6 +531,19 @@ DROP TRIGGER IF EXISTS bill_lines_approved_delete ON bill_lines;
 CREATE TRIGGER bill_lines_approved_delete BEFORE DELETE ON bill_lines FOR EACH ROW EXECUTE FUNCTION protect_bill_line();
 """
 
+_POSTGRES_TSD_LINE_TRIGGERS = r"""
+CREATE OR REPLACE FUNCTION guard_pay_item_tsd_lines_immutable() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    RAISE EXCEPTION 'approved TSD lines are immutable';
+END; $$;
+DROP TRIGGER IF EXISTS guard_pay_item_tsd_lines_update ON pay_item_tsd_lines;
+DROP TRIGGER IF EXISTS guard_pay_item_tsd_lines_delete ON pay_item_tsd_lines;
+CREATE TRIGGER guard_pay_item_tsd_lines_update BEFORE UPDATE ON pay_item_tsd_lines
+FOR EACH ROW EXECUTE FUNCTION guard_pay_item_tsd_lines_immutable();
+CREATE TRIGGER guard_pay_item_tsd_lines_delete BEFORE DELETE ON pay_item_tsd_lines
+FOR EACH ROW EXECUTE FUNCTION guard_pay_item_tsd_lines_immutable();
+"""
+
 
 # PostgreSQL equivalent of migrations/sqlite/0006_payroll_part_time_hourly.sql.
 # The SQLite file rebuilds employees because SQLite cannot drop a CHECK; here the
@@ -439,4 +584,40 @@ ALTER TABLE pay_run_items ADD COLUMN social_tax_base NUMERIC(12,2);
 ALTER TABLE pay_run_items ADD COLUMN social_tax_minimum_topup NUMERIC(12,2) NOT NULL DEFAULT 0;
 ALTER TABLE pay_run_items ADD COLUMN social_tax_minimum_exemption TEXT;
 UPDATE pay_run_items SET pay_basis=CASE WHEN board_member=1 THEN 'board_fee' ELSE 'monthly' END, social_tax_base=gross;
+"""
+
+
+# PostgreSQL extends the employee constraints without rebuilding the table.
+_POSTGRES_PAYROLL_0035 = r"""
+ALTER TABLE employees DROP CONSTRAINT employees_pay_basis_check;
+ALTER TABLE employees ADD CONSTRAINT employees_pay_basis_check CHECK(pay_basis IN ('monthly','hourly','board_fee','income_line'));
+ALTER TABLE employees DROP CONSTRAINT employees_pay_amount_check;
+ALTER TABLE employees ADD CONSTRAINT employees_pay_amount_check CHECK(
+ (pay_basis='hourly' AND hourly_rate IS NOT NULL)
+ OR (pay_basis IN ('monthly','board_fee') AND gross_salary IS NOT NULL)
+ OR (pay_basis='income_line' AND gross_salary IS NULL AND hourly_rate IS NULL));
+INSERT INTO pay_component_types(id,organisation_id,preset_key,name,direction,income_tax,social_tax,ui_employee,ui_employer,funded_pension,social_minimum,liability_role)
+SELECT id || '-component-contract',id,'contract','Töövõtulepingu tasu','income',1,1,1,1,1,0,'PAYROLL_DEDUCTION'
+FROM organisations WHERE country_code='EE' ON CONFLICT(organisation_id,preset_key) DO NOTHING;
+INSERT INTO pay_component_types(id,organisation_id,preset_key,name,direction,income_tax,social_tax,ui_employee,ui_employer,funded_pension,social_minimum,liability_role)
+SELECT id || '-component-base_adjustment',id,'base_adjustment','Põhipalga korrigeerimine','income',1,1,1,1,1,1,'PAYROLL_DEDUCTION'
+FROM organisations WHERE country_code='EE' ON CONFLICT(organisation_id,preset_key) DO NOTHING;
+"""
+
+
+_POSTGRES_TAX_HISTORY_GUARD = r"""
+CREATE OR REPLACE FUNCTION guard_employee_tax_settings() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+ IF EXISTS (SELECT 1 FROM pay_item_context c
+ JOIN pay_run_items i ON i.organisation_id=c.organisation_id AND i.id=c.item_id
+ JOIN pay_runs r ON r.organisation_id=i.organisation_id AND r.id=i.pay_run_id
+ WHERE c.organisation_id=OLD.organisation_id AND r.status='Approved'
+ AND (c.tax_free_setting_id=OLD.id OR c.pension_setting_id=OLD.id OR c.unemployment_setting_id=OLD.id)) THEN
+  RAISE EXCEPTION 'approved payroll tax settings are immutable';
+ END IF;
+ IF TG_OP='DELETE' THEN RETURN OLD; END IF;
+ RETURN NEW;
+END; $$;
+CREATE TRIGGER guard_employee_tax_settings BEFORE UPDATE OR DELETE ON employee_tax_settings
+FOR EACH ROW EXECUTE FUNCTION guard_employee_tax_settings();
 """

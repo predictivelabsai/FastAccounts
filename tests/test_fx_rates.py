@@ -1,4 +1,7 @@
 """Offline rate maintenance and gain/loss-free booking acceptance checks."""
+
+from tests.migration_catalogue import catalogue, catalogue_after
+
 import json
 import sqlite3
 from decimal import Decimal
@@ -99,7 +102,7 @@ def test_auth_and_csrf(sending):
 
 
 def test_existing_schema_resolution_and_migration_count(db, ee_org, uk_org):
-    assert db.scalar('SELECT COUNT(*) FROM schema_migrations') == 32
+    assert db.scalar('SELECT COUNT(*) FROM schema_migrations') == len(catalogue())
     service = ExchangeRateService(db)
     for day, value in [('2026-01-01', '1.05'), ('2026-01-10', '1.10'), ('2026-01-20', '1.20')]:
         service.create(ee_org['id'], **(RATE | {'rate_date': day, 'rate': value}), actor=ACTOR)
@@ -122,7 +125,7 @@ def test_existing_schema_resolution_and_migration_count(db, ee_org, uk_org):
     with pytest.raises(sqlite3.IntegrityError), db.transaction() as tx:
         tx.execute("INSERT INTO exchange_rates SELECT 'invalid',organisation_id,rate_date,from_currency,to_currency,0,'other',created_at FROM exchange_rates LIMIT 1")
     db.migrate()
-    assert db.scalar('SELECT COUNT(*) FROM schema_migrations') == 32
+    assert db.scalar('SELECT COUNT(*) FROM schema_migrations') == len(catalogue())
 
 
 def setup(db, org):
@@ -255,8 +258,12 @@ def test_invoice_api_override_and_base_currency_rate(db, ee_org, sending):
 def test_locale_tail(language):
     from web import i18n
     raw = json.loads((i18n.LOCALES_DIR / f'{language}.json').read_text(encoding='utf-8'))
-    assert list(raw)[-(7):] == ['invoice_exports', 'bulk_sending', 'reminder_rules', 'fx_rates', 'document_settings', 'copilot', 'periods']
+    english = json.loads((i18n.LOCALES_DIR / 'en.json').read_text(encoding='utf-8'))
+    sections = ['invoice_exports', 'bulk_sending', 'reminder_rules', 'fx_rates', 'document_settings', 'copilot', 'periods', 'payroll_corrections']
+    start = list(raw).index('invoice_exports')
+    assert list(raw)[start:start + len(sections)] == sections
     assert set(raw['fx_rates']) == {'nav', 'views', 'workspace'}
+    assert set(raw['fx_rates']) == set(english['fx_rates'])
     assert {'Document', 'Revalue balances', 'Revaluation date', 'Run revaluation',
             'Open portion', 'Booked base', 'Target base', 'Delta', 'Revaluation history',
             'Posting batch', 'No posting'} <= set(raw['fx_rates']['workspace'])

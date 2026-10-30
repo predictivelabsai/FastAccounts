@@ -1,4 +1,7 @@
 """Offline MFA engine, account persistence and browser-route regressions."""
+
+from tests.migration_catalogue import catalogue, catalogue_after
+
 import base64
 import json
 import re
@@ -279,7 +282,7 @@ def test_partial_migration_upgrade(env):
         tx.execute("DROP TABLE mfa_recovery_codes")
         tx.execute("ALTER TABLE user_accounts DROP COLUMN totp_enabled")
         tx.execute("ALTER TABLE user_accounts DROP COLUMN totp_last_step")
-    assert db.migrate() == ["0027_mfa"]
+    assert db.migrate() == ['0027_mfa']
     assert accounts.get(EMAIL)["totp_enabled"] == 0
     assert db.scalar("SELECT COUNT(*) FROM mfa_recovery_codes") == 0
 
@@ -340,24 +343,26 @@ def test_migration_rerun_preserves_data(env):
     db, client, _ = env
     secret, codes = enable(client)
     original = db.rows("SELECT * FROM mfa_recovery_codes")
-    assert db.scalar("SELECT COUNT(*) FROM schema_migrations") == 32
+    assert db.scalar("SELECT COUNT(*) FROM schema_migrations") == len(catalogue())
     for _ in range(2):
         with db.transaction() as tx:
             tx.execute("DELETE FROM schema_migrations WHERE version='0027_mfa'")
-        assert db.migrate() == ["0027_mfa"]
+        assert db.migrate() == ['0027_mfa']
     assert accounts.get(EMAIL)["totp_secret"] == secret
     assert db.rows("SELECT * FROM mfa_recovery_codes") == original
-    assert "'0025_fx_realised', '0026_fx_revaluations', '0027_mfa', '0028_document_settings', '0029_copilot', '0030_master_data_maintenance', '0031_master_data_groups', '0032_copilot_access']" in (ROOT / ".github/workflows/ci.yml").read_text()
+    assert f"'{catalogue()[-1]}'" in (ROOT / ".github/workflows/ci.yml").read_text()
 
 
 @pytest.mark.parametrize("lang", ["en", "et", "lt", "lv"])
 def test_locales_and_workspace(lang):
     raw = json.loads((i18n.LOCALES_DIR / f"{lang}.json").read_text(encoding="utf-8"))
     english = json.loads((i18n.LOCALES_DIR / "en.json").read_text(encoding="utf-8"))
+    sections = ["invoice_exports", "bulk_sending", "reminder_rules", "fx_rates", "document_settings", "copilot", "periods", "payroll_corrections"]
+    start = list(raw).index("invoice_exports")
+    assert list(raw)[start:start + len(sections)] == sections
     keys = {k for k in english["auth"] if k.startswith("mfa_")}
     assert len(keys) == 22
     assert keys == {k for k in raw["auth"] if k.startswith("mfa_")}
-    assert list(raw)[-(7):] == ["invoice_exports", "bulk_sending", "reminder_rules", "fx_rates", "document_settings", "copilot", "periods"]
     for key in keys:
         assert i18n.t("auth." + key, lang) == raw["auth"][key] and "\u2014" not in raw["auth"][key]
     from web.public import workspace_page

@@ -5,6 +5,13 @@
 > been uploaded to or accepted by e-MTA. Accountant review and manual upload
 > are required. Direct submission is disabled.
 
+The earlier `export.xbrl.xml` endpoint is a deprecated FastAccounts review
+envelope and is retained for existing review workflows. APA TSD downloads use
+the official example's XBRL GL namespaces and codelist fields. APA XML is
+downloaded per paid payout transaction; the payment-month ZIP contains one XML
+file for each paid payout. Both routes require an accountant-reviewed TSD
+preparation. Neither output is submitted to e-MTA.
+
 ## Scope and regulatory direction
 
 The implementation follows the direction recorded in
@@ -15,7 +22,10 @@ e-MTA supports XBRL GL file upload, and CSV upload is transitional only through
 the payment month. Annexes 3–8 are unchanged and are not produced here.
 
 This is an accountant-facing export from an **Approved** Estonian EUR pay run.
-One frozen `pay_run_items` row becomes one payment record. Preparing the export
+TSD records are grouped by recipient and frozen payment type. Base salary and
+components with the same type code form one record. Each approved run and
+absence-pay payout stores its per-type calculation lines in
+`pay_item_tsd_lines` in the approval transaction. Preparing the export
 creates a tenant-scoped `sync_runs` row with provider `emta`, direction `export`,
 object type `tsd`, and status `Review Required`. An owner, administrator, or
 accountant must mark that preparation reviewed before either file can be
@@ -29,65 +39,94 @@ downloaded. Downloading a file does not submit it.
    Annex 2 records from names, personal IDs, or other unreliable inference.
    Non-resident calculation and classification remain outside the payroll
    engine's current scope.
-2. A pay run stores a month, not an actual salary payment date. The exporter
-   uses the final calendar day of the pay-run month as `payment_date` and
-   derives the filing deadline from it. The accountant must check this date
-   against the real payment before upload.
-3. `EMPLOYMENT_SALARY` and `BOARD_MEMBER_FEE` are FastAccounts semantic labels.
+2. Pay-run records use the date of the run's non-cancelled salary payout when
+   one exists. Otherwise they use the run's frozen payday-rule date, falling
+   back to period end for older runs. Approved absence-pay payouts are separate
+   records dated on their frozen payout date. TSD is due on the 10th of the
+   month following each payment month; a weekend or Estonian public holiday
+   moves the due date forward to the next working day. The accountant must
+   check payment records before upload.
+3. `EMPLOYMENT_SALARY`, `BOARD_MEMBER_FEE` and `CONTRACTOR_FEE` are FastAccounts semantic labels.
    The payroll plan does not specify official e-MTA payment-type codes, and
-   these labels are not represented as verified EMTA codes.
+   these labels are not represented as verified EMTA codes. Services-contract
+   remuneration (`income_line`, töövõtulepingu tasu) uses `CONTRACTOR_FEE`;
+   its official code mapping is still pending.
 4. The XML uses published XBRL GL core element names plus a small FastAccounts
    TSD extension namespace (`urn:fastaccounts:ee:tsd:2026:review-only`). It is
    tested for well-formedness and the documented fields, not against an e-MTA
    schema or test environment.
-5. Amounts come from the frozen approved pay-run item and remain `Decimal`
-   values rounded by the payroll engine. No amount is recalculated with binary
-   floating point.
+5. Amounts come from frozen approved TSD lines and remain `Decimal` values.
+   Levy rounding residuals go to the largest eligible payment-type record so
+   each total matches the approved calculation. No money is recalculated with
+   binary floating point.
 6. The payer registration number and each frozen payee personal ID are
    required. Migration `0010_tsd_export` snapshots existing identifiers once;
    every new draft snapshots the identifier when the pay run is created.
    Later employee-master edits cannot change the export.
 
-The code-level classification tables are `TSD_PAYMENT_CLASSIFICATION` and
-`TSD_ANNEX_MAPPING` at the top of `tsd.py`.
+The rule extract is `payroll_tsd_types.py`, transcribed from resident
+natural-person rows in EMTA's 18 November 2025 matrix. Current preset defaults
+are:
+
+| Preset | VALJAMLIIK | Basis |
+| --- | ---: | --- |
+| Monthly/hourly base, base adjustment, bonus, overtime and ordinary employment additions | 10 | Legacy code 10 covers wages, supplements and holiday pay |
+| Board-member fee | 21 | Legacy code 21; no monthly minimum or unemployment insurance |
+| Services contract | 17 | Resident VÕS remuneration |
+| Employer sick benefit within the statutory limit | 24 | Excess must be separated as code 10 |
+| Termination compensation | 33 | Legacy termination compensation |
+| Author, parental, expenses and other deductions | 17, 10 or 16 | Needs accountant confirmation of the legal and tax basis |
+
+The payment-type editor lets an accountant change the code for future items.
+Legacy approved runs are reconstructed from their frozen component and employee
+context snapshots when all required inputs are present. If a snapshot is
+incomplete, the workpaper keeps one record using the frozen base payment type
+and displays `Legacy run: per-type split unavailable`. Legacy run values are
+never rewritten. Cent-allocation residuals go to the largest eligible record
+for the relevant levy. The social-tax minimum top-up goes on the base salary
+record, with the matrix eligibility checked.
 
 ## Per-payment field mapping
 
-The CSV header uses these fields in this order. The XML repeats the same fields
+The review CSV header uses these fields in this order. The XML repeats the same fields
 as `tsd:*` children of each XBRL GL `gl-cor:entryDetail`.
 
 | Export field | Source or derivation |
 | --- | --- |
 | `declaration` | Constant `TSD` |
 | `annex` | `1` for the currently supported resident-payment scope; `2` is reserved in the mapping table for future non-resident support |
-| `payment_record_id` | Immutable `pay_run_items.id` |
+| `payment_record_id` | Frozen TSD line ID, unique per pay-run item and payment type; legacy fallback uses the item ID |
 | `pay_run_id` | Tenant-scoped approved `pay_runs.id` |
-| `payment_date` | Last calendar day of `pay_runs.period` (assumption above) |
+| `payment_date` | Salary payout date, frozen payday-rule date, legacy period end, or absence-pay payout date |
 | `payment_month` | `YYYY-MM` from `payment_date` |
-| `filing_deadline` | The 10th day of the month following `payment_date` |
+| `filing_deadline` | The 10th day after `payment_date`'s month, moved forward to the next working day when needed |
 | `payer_registration_no` | `organisations.registration_no` |
 | `recipient_personal_id` | Frozen `pay_run_items.employee_personal_id` |
 | `recipient_name` | Frozen `pay_run_items.employee_name` |
-| `payment_classification` | Monthly/hourly → `EMPLOYMENT_SALARY`; board fee → `BOARD_MEMBER_FEE` |
-| `pay_basis` | Frozen `monthly`, `hourly`, or `board_fee` |
+| `payment_classification` | FastAccounts display label retained for compatibility |
+| `pay_basis` | Frozen `monthly`, `hourly`, `board_fee`, or `income_line` |
 | `currency` | Constant `EUR`; the service rejects non-EE/non-EUR books |
-| `gross_amount` | `pay_run_items.gross` |
-| `tax_free_minimum` | `pay_run_items.tax_free_minimum` |
-| `income_tax_base` | `max(0, gross − funded pension − employee unemployment insurance − tax-free minimum)` using `Decimal` |
-| `income_tax` | `pay_run_items.income_tax` |
-| `employee_unemployment_insurance` | `pay_run_items.ui_employee` |
-| `employer_unemployment_insurance` | `pay_run_items.ui_employer` |
-| `funded_pension` | `pay_run_items.funded_pension` |
-| `social_tax_base` | `pay_run_items.social_tax_base`, including the payroll engine's minimum-base treatment |
-| `social_tax` | `pay_run_items.social_tax` |
-| `net_amount` | `pay_run_items.net` |
-| `employer_cost` | `pay_run_items.employer_cost` |
+| `gross_amount` | Frozen TSD line amount for the payment type |
+| `tax_free_minimum` | Exemption 610 allocated to the payment type, capped at its taxable amount |
+| `income_tax_base` | Frozen per-type taxable amount plus the exemption allocated to that record |
+| `income_tax` | Frozen per-type allocation of the approved income-tax total |
+| `employee_unemployment_insurance` | Frozen per-type UI amount |
+| `employer_unemployment_insurance` | Frozen per-type employer UI amount |
+| `funded_pension` | Frozen per-type II-pillar amount |
+| `social_tax_base` | Frozen per-type social-tax base, including any eligible monthly-minimum top-up |
+| `social_tax` | Frozen per-type allocation of approved social tax |
+| `net_amount` | Approved net allocated across the payment-type records by gross amount |
+| `employer_cost` | Per-type gross plus social tax and employer UI |
 
 Before serialization, the sum of `gross_amount`, `net_amount`, and
 `employer_cost` must equal the corresponding approved pay-run totals. A mismatch
 stops the export.
 
 ## XBRL GL envelope mapping
+
+This table documents the earlier review-only FastAccounts envelope. It is not
+the APA export format. The APA example mapping and source-field decisions are
+documented in [APA TSD XBRL GL example mapping](#apa-tsd-xbrl-gl-example-mapping-4b-step-1).
 
 | XBRL GL element | Value |
 | --- | --- |
@@ -119,8 +158,134 @@ The CSV contains the per-payment fields above, encoded as UTF-8 with a BOM for
 spreadsheet compatibility. Export is rejected when the assumed payment date is
 after 31 December 2027. The CSV is not described as a permanent filing format.
 
+The separate **Legacy Annex 1 CSV upload** is a resident Part A row per frozen
+recipient and payment type. It contains codes 1000, 1010, 1020, 1030, 1040,
+1050, 1060-1090, 1100-1140 and 1150-1170. The 2024 Annex 1 guide does not
+define code 1040 and does not mention it between 1030 and 1050, so the column
+is kept blank. Code 1050 (A1/E101 country) is blank because the payroll snapshot
+does not record an A1 certificate. Codes 1070 and 1080 are zero because the
+payroll engine does not model those adjustments. Code 1090 contains only a
+positive frozen social-tax base excess above actual eligible payments. Codes
+1150/1160 contain exemption 610 when present. Code 1170 uses frozen withheld
+income tax, except payment types for which the guide excludes it.
+
+The guide defines the code meanings but does not specify an upload delimiter or
+number format. The upload file therefore uses semicolon delimiters, UTF-8
+without a BOM, and dot-decimal monetary amounts with exactly two decimal
+places. This is an implementation assumption and must be checked with e-MTA.
+This upload export is available only through payment month December 2027. The
+earlier internal review CSV remains available as `export.csv`.
+
+The accountant workpaper is available on screen and as XLSX, with payment list,
+payment-type and recipient views, month filter, record count, frozen levy
+totals and legacy-run warnings. The workbook has `Summary`, `Payments`, `By
+payment type` and `By recipient` sheets. UI totals combine employee and
+employer amounts.
+
 ## Submission boundary
 
 `EMTATSDExportProvider.submit()` always raises `PermissionError`. There is no
 X-tee client, SOAP client, e-MTA session, upload call, confirmation call, or
 status polling in this implementation.
+
+
+## APA TSD XBRL GL example mapping (4b step 1)
+
+Source: vendored `tests/fixtures/emta/APA_TSD_lahteandmed_ariuhingule_naide_XML_20251017.xml`, checked against taxonomy extract `APA_TSD_TAKSONOOMIA_20251017.txt` (general fields and EE0201001 columns) and developer guide `APA_TSD_juhend_arendajale_sh_kalkulaatorteenus_20260130.txt` (sections 1.3-1.4). The XML example deliberately covers conditional fields and several scenarios; conditional fields are emitted only when the frozen payout data supports them. Required means required for the supported resident cash-pay scenario, following the taxonomy's EE0201001 column and guide. Optional includes conditional and example-only fields.
+
+| Example XML path (namespace prefix) | Meaning in taxonomy / guide | Requirement | FastAccounts source for one payout |
+| --- | --- | --- | --- |
+| `xbrli:xbrl` | XBRL instance root | Mandatory | Constant document envelope |
+| `xbrll:schemaRef/@xlink:href`, `@xlink:arcrole`, `@xlink:type` | Reference to XBRL GL presentation taxonomy | Mandatory in example skeleton | Vendored example constants |
+| `xbrli:context/@id`; `xbrli:entity`; `xbrli:identifier/@scheme`; `xbrli:period/xbrli:instant` | Reporting entity and instant context | Mandatory | Organisation registry code; payout date |
+| `xbrli:unit/@id`; `xbrli:measure` | Currency and pure-number units | Mandatory in skeleton | EUR and count unit constants |
+| `gl-cor:accountingEntries/gl-cor:documentInfo/gl-cor:entriesType` | Entry transaction type; payroll uses `other` | Mandatory | Constant `other` |
+| `gl-cor:uniqueID` | Unique report identifier | Mandatory | Stable ID from organisation, payout ID and version |
+| `gl-cor:language` | Report language, ISO 639 code | Mandatory | Constant `iso639:et` |
+| `gl-cor:creationDate` | Report creation date | Mandatory | Frozen payout export date |
+| `gl-bus:creator` | Contact or creating unit | Optional | Omitted; no suitable frozen source |
+| `gl-cor:entriesComment` | Report purpose/comment | Optional | Constant APA TSD payment comment |
+| `gl-cor:periodCoveredStart`, `gl-cor:periodCoveredEnd` | Start and end of reporting period | Mandatory | Payout date for both (one transaction per file) |
+| `gl-bus:sourceApplication` | Accounting software name | Mandatory | Constant `FastAccounts` |
+| `gl-muc:defaultCurrency` | Report currency, `iso4217:eur` | Mandatory | Constant EUR |
+| `gl-cor:entityInformation/gl-bus:organizationIdentifiers/gl-bus:organizationIdentifier` | Reporting legal entity identifier | Mandatory | Tenant-scoped organisation registration number |
+| `gl-bus:organizationDescription` | Identifier type; example uses `ARIREGISTRIKOOD` | Mandatory | Constant `ARIREGISTRIKOOD` |
+| `gl-cor:entryHeader/gl-cor:entryNumber` | APA section identifier; payroll taxes section is `EE0201001` | Mandatory | Constant `EE0201001` |
+| `gl-cor:entryHeader/gl-cor:entryDetail/gl-cor:lineNumber` | Detail identity | Optional for periodic section; supplied in sample | Deterministic payout line index |
+| `gl-cor:lineNumberCounter` | Sequential detail number within section | Mandatory in example pattern | One-based detail index |
+| `gl-cor:account/gl-cor:accountSub/gl-cor:accountSubID` + `gl-cor:accountSubType` | Codelist code and codelist identifier | Mandatory; payment type and operation type | Frozen payment type (`VALJAMLIIK2023ap`) and `R` (`TOIMINGUTYYP2023ap`) |
+| `gl-cor:accountSub/gl-cor:segmentParentTuple/gl-cor:parentSubaccountCode` + `gl-cor:parentSubaccountType` | Related code pair for country/role composite codelists | Optional; sample's A1/foreign-work cases | Omitted for resident-only records until supported source exists |
+| `gl-cor:amount` | Gross payment amount, two decimal places | Mandatory | Frozen TSD line gross `Decimal` |
+| `gl-bus:allocationCode` | Access-control/allocation code | Optional | No source; omitted |
+| `gl-cor:identifierReference/gl-cor:identifierCode` | Payee personal or MTA non-resident identifier | Mandatory | Frozen employee personal ID |
+| `gl-cor:identifierDescription` | Identifier type codelist, `ISIKUKOOD` or `MRR_KOOD` | Mandatory with identifier | `ISIKUKOOD` for supported resident scope |
+| `gl-cor:documentDate` | Payment execution date | Mandatory | Salary or absence payout date |
+| `gl-bus:measurable/gl-bus:measurableID` + `gl-bus:measurableIDSchema` | Calculation event code and codelist (`TSD01`, `SYNDMUS2017ap`) | Mandatory for supported payroll detail | `TSD01`, `SYNDMUS2017ap` |
+| `gl-bus:measurableStartDateTime` | Date of calculation/payroll obligation | Conditional | Frozen calculation date when available; otherwise omitted |
+| `gl-bus:measurableDescription` + `gl-bus:measurableQuantity` | Measured tax base or exemption; descriptions use `MEASURABLEDESCRIPTION_enum` (e.g. `MVT_610`, `MVT_650`, `TSD_SMVM`) | Conditional, by applicable tax/base | Frozen exemption, social-tax base, and other supported bases as separate pairs |
+| `gl-cor:taxes/gl-cor:taxAmount` + `gl-cor:taxCode` | Tax amount and `TAXCODE_enum` code | Conditional, one pair per non-zero applicable levy | Frozen income tax (`TSD_KTM`), social tax (`TSD_SM`), employee pension (`TSD_KP`), employee unemployment (`TSD_TK`), employer unemployment (`TSD_TTK`) |
+| `gl-cor:taxes/gl-cor:taxPercentageRate` | Applicable tax rate | Conditional | Frozen rate only if stored; otherwise omitted |
+
+The example contains non-resident, foreign-work/A1 and other conditional variants. The supported exporter emits the resident fields above only. It must not infer country roles, allocation codes, tax-rate metadata, or calculation timestamps absent from the frozen payout snapshot. Each output file represents exactly one payout transaction, as specified by the developer guide's file examples and transaction-level upload model.
+
+## APA export history, cancellation and feedback (4b steps 2 and 4)
+
+Each downloaded APA payout XML has a tenant-scoped history row containing the
+payout, transaction ID, version, SHA-256, creation time and actor. Repeating an
+unchanged export returns the stored bytes and transaction ID. A changed file
+creates the next version and a new deterministic transaction ID. Export rows
+are immutable apart from their status, which moves through `Exported`,
+`Cancelled`, `Accepted`, `Rejected` or `PartiallyRejected`; actor and event
+details are retained in `audit_events`.
+
+Cancellation is a CSRF-protected POST download. It follows the vendored EMTA
+example and developer guide: the XBRL GL entry keeps the original unique
+`gl-cor:lineNumber`, includes `gl-cor:lineNumberCounter`, and contains only the
+operation codelist pair `T` / `TOIMINGUTYYP2023ap`. The export status changes to
+`Cancelled` in the same transaction. A second cancellation is refused.
+
+Feedback is uploaded as XML with the transaction ID selected by the caller.
+Results are matched inside the organisation and saved per transaction and per
+validation message, including rule code, category, message and any line
+references. Unknown transaction IDs are retained as unmatched results. The
+feedback routes require a payroll write role and CSRF token; history and result
+reads allow payroll approval roles and viewers.
+
+The local venv has neither `lxml` nor `xmlschema`, so uploads receive a
+structural XML parse rather than XSD validation. The XSD remains vendored at
+`tests/fixtures/emta/APA_TSD_20260330_feedbackReport.xsd`; no dependency was
+installed. All four recorded feedback examples are covered by offline tests.
+
+## APA offline validation and declaration controls (4b steps 5–6)
+
+The declaration preparation view evaluates frozen payout rows against the
+offline rule subset listed in [`payroll_tsd_validation.md`](payroll_tsd_validation.md).
+MUST and PUNANE findings disable an individual XML download and the payment
+month ZIP; the API returns HTTP 409 with rule codes and messages if a blocked
+download is requested directly. SININE and KOLLANE findings remain non-blocking.
+The interface displays Estonian messages in Estonian and English in English,
+Latvian and Lithuanian.
+
+The preparation view shows paid payouts by month, their findings, export
+history and imported feedback results. It provides cancellation downloads and
+feedback report upload through the existing tenant, role and CSRF protected
+routes. It does not submit a declaration to e-MTA. Rules that depend on EMTA
+state outside the frozen payout snapshot remain out of scope; the validation
+log lists those codes and reasons.
+
+## Payroll correction versions
+
+For a same-month correction, the reviewed workpaper and legacy CSV add the
+approved correction's frozen TSD deltas to the original payment records. An
+APA re-export of changed content uses operation `M` and repeats the complete
+replacement details under the existing line number. The APA developer guide,
+section 4, says `T` cancels by line number alone and that a cancelled line number
+cannot be reused. Cancellation downloads are retained in history. A later
+replacement after cancellation uses `R` with a new line number.
+
+A correction paid in a later month stays attached to its own salary payout
+batch. Its APA export is a new `R` transaction for that payout and uses the
+actual payout date and payment month. It does not revise the original month's
+transaction. The operation and cancellation behavior follows the vendored
+developer guide and cancellation example listed in
+[`payroll_corrections_validation.md`](payroll_corrections_validation.md).

@@ -76,6 +76,12 @@ class PushService:
         payload = {'doc_no': f"PAY-{run['period']}" if object_type == 'pay_runs' else batch['voucher_code'],
                    'posting_date': batch['posting_date'], 'currency': 'EUR',
                    'comment': batch['voucher_code'], 'lines': lines}
+        if object_type == 'pay_runs':
+            from payroll import PayrollService
+            # Retain the frozen per-person detail and component flags alongside
+            # the balanced journal used by the existing Merit/SmartAccounts push.
+            with self.db.transaction() as tx:
+                payload['items'] = PayrollService(self.db)._run(tx, organisation_id, run['id'])['items']
         return payload, (run['id'] if object_type == 'pay_runs' else batch['id']), batch['id']
 
     def prepare(self, organisation_id, provider, object_type, local_ref, actor):

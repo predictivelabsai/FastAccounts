@@ -669,6 +669,248 @@ class BambooHRProvider(HTTPProvider):
         )
 
 
+def _merit_signed_params(api_id: str, api_key: str, timestamp: str, body: bytes) -> dict:
+    signed = api_id.encode("utf-8") + timestamp.encode("ascii") + body
+    signature = base64.b64encode(hmac.new(api_key.encode("ascii"), signed, hashlib.sha256).digest()).decode()
+    return {"apiId": api_id, "timestamp": timestamp, "signature": signature}
+
+
+class MeritPalkProvider(HTTPProvider):
+    """Pull-only Merit Palk contracts, separate from Merit Aktiva.
+
+    Reviewed 2026-10-24: https://api.merit.ee/merit-palk-api/palk-reference-manual/
+    Request field names and response envelopes come from the linked pages below.
+    No live verification has been performed. No undocumented pagination is sent.
+    """
+
+    key = "merit_palk"
+    base_url = "https://palk.merit.ee/api/v1"
+    PULL_OBJECT_TYPES = ("employee", "salary_agreement", "gl_entry", "salary_hours", "vacation_balance")
+    PRO_ERROR = "Merit Palk requires the PRO licence and valid API credentials (HTTP 401)"
+    MAX_LIST_RESULTS = 100  # Documented in the Merit Palk FAQ, Request limits.
+
+    def __init__(self, api_id: str, api_key: str, *, config=None, clock=None, **kwargs):
+        super().__init__(**kwargs)
+        self.api_id, self.api_key = str(api_id).strip(), str(api_key).strip()
+        self.config = dict(config or {})
+        self.clock = clock or (lambda: datetime.now(timezone.utc))
+
+    def post(self, endpoint: str, payload: dict):
+        if not self.api_id or not self.api_key:
+            raise ValueError("Merit Palk API ID and API key are required")
+        if not self.api_key.isascii():
+            raise ValueError("Merit Palk API key must contain ASCII characters")
+        # https://api.merit.ee/merit-palk-api/palk-reference-manual/authentication/
+        # ASCII key bytes, UTF-8 ApiId+UTC timestamp+exact body; httpx escapes '+' as %2B.
+        instant = self.clock()
+        if instant.tzinfo is None:
+            raise ValueError("Merit Palk clock must include a timezone")
+        body = json.dumps(payload, ensure_ascii=False, separators=(",", ":"), allow_nan=False).encode("utf-8")
+        params = _merit_signed_params(self.api_id, self.api_key,
+                                     instant.astimezone(timezone.utc).strftime("%Y%m%d%H%M%S"), body)
+        try:
+            response = self.request("POST", f"{self.base_url}/{endpoint}", params=params, content=body,
+                                    headers={"Content-Type": "application/json", "Accept": "application/json"})
+        except httpx.RequestError as error:
+            raise ProviderError("Merit Palk API connection error or timeout") from error
+        except ProviderError as error:
+            status = self._status_code(error)
+            message = self.PRO_ERROR if status == 401 else f"Merit Palk API returned HTTP {status}"
+            if status == 400:
+                message = "Merit Palk rejected the request data (HTTP 400)"
+            raise ProviderError(message) from error
+        try:
+            return response.json(parse_float=Decimal)
+        except ValueError as error:
+            raise ProviderError("Merit Palk returned invalid JSON") from error
+
+    @staticmethod
+    def _rows(payload, *, envelope=False) -> list[dict]:
+        rows = payload.get("EntryRow") if envelope and isinstance(payload, dict) else payload
+        if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
+            raise ProviderError("Merit Palk returned an invalid data response")
+        return rows
+
+    def check(self) -> ConnectorResult:
+        try:
+            self._rows(self.post("getemployees", {}))
+        except (ProviderError, ValueError) as error:
+            return ConnectorResult(self.key, "check", False,
+                                   isinstance(error, ProviderError) and not isinstance(error.__cause__, httpx.RequestError), str(error))
+        return ConnectorResult(self.key, "check", True, True, "Merit Palk API reachable; employee list succeeded")
+
+    def _month(self) -> str:
+        month = str(self.config.get("month") or self.clock().astimezone(timezone.utc).strftime("%Y%m"))
+        if not re.fullmatch(r"\d{6}", month):
+            raise ValueError("Merit Palk month must use YYYYMM")
+        try:
+            datetime.strptime(month, "%Y%m")
+        except ValueError as error:
+            raise ValueError("Merit Palk month must use YYYYMM") from error
+        return month
+
+    def _employees(self) -> list[dict]:
+        # https://api.merit.ee/merit-palk-api/palk-reference-manual/requesting-data-from-merit-palk/getting-employees-list/
+        body = {"Month6": self._month()}
+        if self.config.get("personal_code"):
+            body["PersonalCode"] = str(self.config["personal_code"])
+        rows = self._rows(self.post("getemployees", body))
+        # The FAQ caps growing lists at 100. PersonalCode is an exact filter:
+        # no ranges, offset or continuation token are documented. Larger companies
+        # must pull each PersonalCode separately; never invent pagination fields.
+        # Fail closed at the ceiling to avoid presenting a truncated import as complete.
+        if len(rows) >= self.MAX_LIST_RESULTS:
+            raise ProviderError("Merit Palk employee result reached 100 records; filter by personal code")
+        return rows
+
+    def _employee(self, row: dict) -> dict:
+        personal = str(row.get("PersonalCode") or "").strip()
+        external = str(row.get("ImportCode") or personal).strip()
+        if not external:
+            raise ProviderError("Merit Palk employee has no ImportCode or PersonalCode")
+        kind = str(row.get("TypeId", ""))
+        record = {"external_id": external, "personal_id": personal,
+                  "name": " ".join(str(row.get(k) or "").strip() for k in ("FirstName", "SurName")).strip(),
+                  "email": row.get("Email") or "", "board_member": kind == "2",
+                  "merit_palk_source": dict(row), "merit_palk_income_basis": "income_line" if kind == "5" else "salary",
+                  "pay_basis": "board_fee" if kind == "2" else "monthly"}
+        if not personal:
+            record.pop("personal_id")
+        if row.get("Email") in (None, ""):
+            record.pop("email")
+        for source, target in (("StartDate", "employment_start_date"), ("EndDate", "employment_end_date")):
+            if row.get(source):
+                record[target] = MeritProvider._date(row[source]).isoformat()
+        today = self.clock().astimezone(timezone.utc).date().isoformat()
+        # A historical-month import must not reactivate an ended contract.
+        record["active"] = ((not record.get("employment_start_date") or record["employment_start_date"] <= today)
+                            and (not record.get("employment_end_date") or record["employment_end_date"] >= today))
+        if kind == "5":
+            record["pay_basis"] = "income_line"
+        elif kind not in {"1", "2"}:
+            record["import_warning"] = "Merit Palk contract type is unsupported for employee apply"
+        return record
+
+    def _with_salary(self, record: dict, rows: list[dict]) -> dict:
+        if record.get("pay_basis") == "income_line":
+            # Services are paid through reviewed run components, never a monthly rate.
+            return record
+        month = self._month()
+        first = date(int(month[:4]), int(month[4:]), 1)
+        following = (first.replace(day=28) + timedelta(days=4)).replace(day=1)
+        last = following - timedelta(days=1)
+        relevant = [row for row in rows if record.get("personal_id")
+                    and str(row.get("PersonalCode") or "") == record["personal_id"]
+                    and (not row.get("StartDate") or MeritProvider._date(row["StartDate"]) <= last)
+                    and (not row.get("EndDate") or MeritProvider._date(row["EndDate"]) >= first)]
+        record["merit_palk_salary_agreements"] = relevant
+        if len(relevant) != 1:
+            record.setdefault("import_warning", "Merit Palk needs one salary agreement for the selected month")
+        elif self.config.get("salary_amount_basis") != "monthly":
+            # The manual calls Amount a tariff/rate, without a unit. Never infer it from Hours.
+            record.setdefault("import_warning", "Confirm Merit Palk salary agreement amounts are monthly before applying")
+        return record
+
+    def pull(self, object_type: str, *, cursor: str | None = None) -> ConnectorResult:
+        del cursor  # Each on-demand request is a fresh snapshot for the selected month.
+        if object_type not in self.PULL_OBJECT_TYPES:
+            raise ValueError(f"Unsupported Merit Palk pull object type: {object_type}")
+        month = self._month()
+        if object_type in {"employee", "salary_agreement"}:
+            employees = self._employees()
+            # https://api.merit.ee/merit-palk-api/palk-reference-manual/requesting-data-from-merit-palk/getting-base-salary-agreements/
+            body = {"StartMonth": month, "EndMonth": month}
+            if self.config.get("personal_code"):
+                body["PersonalID"] = str(self.config["personal_code"])
+            agreements = self._rows(self.post("getpayterms", body), envelope=True)
+            records = []
+            if object_type == "salary_agreement":
+                # Keep agreements even if the employee-list filter did not return
+                # that contract. The agreement manual supplies its own identity/name.
+                identities = list(dict.fromkeys(str(row.get("PersonalCode") or "") for row in agreements))
+                for identity in identities:
+                    if not identity:
+                        raise ProviderError("Merit Palk salary agreement has no PersonalCode")
+                    matches = [row for row in employees if str(row.get("PersonalCode") or "") == identity]
+                    source = next(row for row in agreements if str(row.get("PersonalCode") or "") == identity)
+                    employee = matches[0] if len(matches) == 1 else {
+                        "PersonalCode": identity, "FirstName": source.get("Employee Name"),
+                        "TypeId": source.get("ContractType"), "StartDate": source.get("ContractStartDate"),
+                        "EndDate": source.get("ContractEndDate"),
+                    }
+                    record = self._with_salary(self._employee(employee), agreements)
+                    if len(matches) > 1:
+                        record["import_warning"] = "Merit Palk has multiple contracts for this personal code; review the source contracts"
+                    records.append(record)
+            else:
+                for row in employees:
+                    record = self._with_salary(self._employee(row), agreements)
+                    if sum(other.get("PersonalCode") == row.get("PersonalCode") for other in employees) > 1:
+                        record["import_warning"] = "Merit Palk has multiple contracts for this personal code; review the source contracts"
+                    records.append(record)
+        elif object_type == "gl_entry":
+            # https://api.merit.ee/merit-palk-api/palk-reference-manual/requesting-data-from-merit-palk/getting-general-ledger-transaction-details/
+            payload = self.post("getglbatch", {"Month": month})
+            batches = payload if isinstance(payload, list) else [payload]
+            records = []
+            for batch in batches:
+                if not isinstance(batch, dict):
+                    raise ProviderError("Merit Palk returned an invalid GL batch")
+                rows = self._rows(batch, envelope=True)
+                day = MeritProvider._date(batch.get("BatchDate")).isoformat()
+                doc = str(batch.get("DocNo") or month)
+                external_id = f"merit-palk:{month}:{doc}:{day}"
+                if any(record["external_id"] == external_id for record in records):
+                    raise ProviderError("Merit Palk returned duplicate GL batch references")
+                records.append({"external_id": external_id, "name": doc,
+                                "date": day, "sheet": "Merit Palk", "merit_palk_source": batch,
+                                "lines": [{"account_code": str(row.get("AccountCode") or ""),
+                                           "description": doc, "debit": MeritProvider._decimal(row.get("Debit", 0)),
+                                           "credit": MeritProvider._decimal(row.get("Credit", 0))} for row in rows]})
+        elif object_type == "salary_hours":
+            # https://api.merit.ee/merit-palk-api/palk-reference-manual/requesting-data-from-merit-palk/getting-salary-and-hours-report-data/
+            first = date(int(month[:4]), int(month[4:]), 1)
+            last = (first.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
+            rows = self._rows(self.post("getsalaryreport", {
+                "StartDate": first.isoformat(), "EndDate": last.isoformat(), "Language": "EN", "SortOption": 2}))
+            grouped = {}
+            for row in rows:
+                name = str(row.get("EmployeeFullName") or "").strip()
+                source_month = str(row.get("Month6") or "")
+                if not name or source_month != month:
+                    raise ProviderError("Merit Palk salary report has a missing employee or unexpected month")
+                record = grouped.setdefault(name, {
+                    "external_id": f"{month}:{name}", "name": name,
+                    "period": f"{month[:4]}-{month[4:]}", "gross_pay": Decimal(0),
+                    "hours": Decimal(0), "lines": [], "merit_palk_source": [],
+                })
+                amount = money(MeritProvider._decimal(row.get("Sum")))
+                hours = money(MeritProvider._decimal(row.get("Hours", 0)))
+                if not amount.is_finite() or not hours.is_finite() or hours < 0:
+                    raise ProviderError("Merit Palk salary report contains invalid amounts or hours")
+                record["gross_pay"] += amount
+                record["hours"] += hours
+                record["lines"].append({"name": str(row.get("SalaryTypeName") or "").strip(), "amount": amount})
+                record["merit_palk_source"].append(row)
+            records = list(grouped.values())
+        else:
+            # https://api.merit.ee/merit-palk-api/palk-reference-manual/requesting-data-from-merit-palk/getting-vacation-obligation-balance/
+            code = str(self.config.get("contract_code") or self.config.get("personal_code") or "").strip()
+            if not code:
+                raise ValueError("Merit Palk vacation balance requires a contract import code or personal code")
+            day = date.fromisoformat(str(self.config.get("balance_date") or self.clock().date().isoformat())).isoformat()
+            payload = self.post("getvacoblig", {"ContractCode": code, "Date": day})
+            if not isinstance(payload, dict) or "DaysUnused" not in payload:
+                raise ProviderError("Merit Palk returned an invalid vacation balance")
+            records = [{"external_id": f"{code}:{day}", "name": code, "date": day, **payload,
+                        "import_warning": "Review the unused days and snapshot date before applying this opening balance"}]
+        return ConnectorResult(self.key, f"pull:{object_type}", True, True,
+                               f"Pulled {len(records)} Merit Palk records", tuple(records))
+
+    def push(self, object_type: str, records: list[dict]) -> ConnectorResult:
+        return ConnectorResult(self.key, f"push:{object_type}", False, False, "Merit Palk is a pull-only data source")
+
+
 class MeritProvider(HTTPProvider):
     """Documented accounting contracts for one implicit Merit company.
 
@@ -691,9 +933,7 @@ class MeritProvider(HTTPProvider):
 
     def signed_params(self, body: bytes) -> dict:
         timestamp = self.clock().strftime("%Y%m%d%H%M%S")
-        signed = self.api_id.encode() + timestamp.encode() + body
-        signature = base64.b64encode(hmac.new(self.api_key.encode("ascii"), signed, hashlib.sha256).digest()).decode()
-        return {"apiId": self.api_id, "timestamp": timestamp, "signature": signature}
+        return _merit_signed_params(self.api_id, self.api_key, timestamp, body)
 
     def post(self, endpoint: str, payload: dict) -> dict:
         body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode()

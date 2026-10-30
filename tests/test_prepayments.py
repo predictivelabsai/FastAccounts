@@ -1,4 +1,7 @@
 """Synthetic prepayment posting, allocation, refund and tenancy regressions."""
+
+from tests.migration_catalogue import catalogue, catalogue_after
+
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, timedelta
 from decimal import Decimal
@@ -326,7 +329,7 @@ def test_upgrade_adds_missing_roles_preserves_chart_and_ledger(tmp_path, monkeyp
                        (new_id(), org["id"]))
     before = {table: db.rows(f"SELECT * FROM {table} ORDER BY id") for table in ["organisations", "accounts", "gl_entries", "invoices", "audit_events"]}
     monkeypatch.setattr(database, "MIGRATIONS", original)
-    assert db.migrate() == ["0017_prepayments", "0018_fixed_assets", "0019_master_data_import", "0020_quotes", "0021_periodisation", "0022_payment_links", "0023_analytical_objects", "0024_reminder_rules", "0025_fx_realised", "0026_fx_revaluations", "0027_mfa", "0028_document_settings", "0029_copilot", "0030_master_data_maintenance", "0031_master_data_groups", "0032_copilot_access"]
+    assert db.migrate() == catalogue_after('0016_bank_feed_schedules')
     assert db.migrate() == []
     after_accounts = db.rows("SELECT * FROM accounts ORDER BY id")
     assert all(r in after_accounts for r in before["accounts"])
@@ -334,6 +337,8 @@ def test_upgrade_adds_missing_roles_preserves_chart_and_ledger(tmp_path, monkeyp
         rows = db.rows(f"SELECT * FROM {table} ORDER BY id")
         if table == "organisations":
             assert all(row.pop("copilot_enabled") == 0 for row in rows)
+            for row in rows:
+                row.pop('language', None)
         assert rows == before[table]
     roles = {r["system_role"]: r for r in after_accounts if r["system_role"] and r["system_role"].endswith("PREPAYMENTS")}
     assert roles["SUPPLIER_PREPAYMENTS"]["code"] == ("1301" if country == "UK" else "1311")

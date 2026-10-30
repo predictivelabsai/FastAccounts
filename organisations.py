@@ -38,10 +38,15 @@ UK_ACCOUNTS = (
     ("6500", "Depreciation expense", "Expense", "Debit", "DEPRECIATION_EXPENSE"),
 )
 
-EE_ACCOUNTS = (
+from payroll_components import ACCOUNTS as PAYROLL_COMPONENT_ACCOUNTS
+
+EE_ACCOUNTS = tuple((code, name, 'Liability', 'Credit', role) for code, name, role in PAYROLL_COMPONENT_ACCOUNTS) + (
     ('6110', 'Palgakulu', 'Expense', 'Debit', 'PAYROLL_SALARY'),
     ('6120', 'Sotsiaalmaksu kulu', 'Expense', 'Debit', 'PAYROLL_SOCIAL'),
     ('6130', 'Tööandja töötuskindlustusmakse kulu', 'Expense', 'Debit', 'PAYROLL_UI'),
+    ('6140', 'Puhkusereservi kulu', 'Expense', 'Debit', 'PAYROLL_VACATION_RESERVE_EXPENSE'),
+    ('2260', 'Puhkusereservi kohustus', 'Liability', 'Credit', 'PAYROLL_VACATION_RESERVE_LIABILITY'),
+    ('2270', 'Nõuded töötajate vastu', 'Asset', 'Debit', 'PAYROLL_EMPLOYEE_RECEIVABLE'),
     ('2210', 'Palgavõlg töötajatele', 'Liability', 'Credit', 'PAYROLL_NET'),
     ('2220', 'Kinnipeetud tulumaksu võlg', 'Liability', 'Credit', 'PAYROLL_INCOME_TAX'),
     ('2230', 'Pensioni- ja töötuskindlustusmaksete võlg', 'Liability', 'Credit', 'PAYROLL_WITHHOLDING'),
@@ -119,11 +124,22 @@ class OrganisationService:
                  registration_no.strip() or None, vat_no.strip() or None,
                  fiscal_year_start, now, now),
             )
+            if self.db.dialect == 'sqlite':
+                has_language = bool(tx.one("PRAGMA table_info(organisations)"))
+                if has_language:
+                    has_language = any(row['name'] == 'language' for row in tx.rows("PRAGMA table_info(organisations)"))
+            else:
+                has_language = bool(tx.one("SELECT column_name FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='organisations' AND column_name='language'"))
+            if has_language:
+                tx.execute('UPDATE organisations SET language=? WHERE id=?', ('et' if country == 'EE' else 'en', organisation_id))
             tx.execute(
                 "INSERT INTO memberships(id,organisation_id,email,role,created_at) VALUES (?,?,?,?,?)",
                 (new_id(), organisation_id, email, "owner", now),
             )
             self._seed_accounts(tx, organisation_id, country)
+            if country == 'EE' and tx.one("SELECT version FROM schema_migrations WHERE version='0034_payroll_demo_fixes'"):
+                from payroll_components import seed_types
+                seed_types(tx, organisation_id)
             self._seed_taxes(tx, organisation_id, country)
             for document_type, prefix in (("invoice", "INV-"), ("credit_note", "CRN-"), ("quote", "QUO-")):
                 tx.execute(

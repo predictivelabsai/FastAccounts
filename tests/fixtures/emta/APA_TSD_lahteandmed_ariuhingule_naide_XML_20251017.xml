@@ -1,0 +1,543 @@
+<xbrli:xbrl xmlns:xbrli="http://www.xbrl.org/2003/instance"
+    xmlns:xlink="http://www.w3.org/1999/xlink"
+    xmlns:xbrll="http://www.xbrl.org/2003/linkbase" 
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:gl-usk="http://www.xbrl.org/int/gl/usk/2015-03-25"
+    xmlns:gl-cor="http://www.xbrl.org/int/gl/cor/2015-03-25"
+    xmlns:gl-ext="http://www.xbrl.org/int/gl/ext/2015-03-25"
+    xmlns:iso639="http://www.xbrl.org/2005/iso639"
+    xmlns:iso4217="http://www.xbrl.org/2003/iso4217"
+    xmlns:gl-plt="http://www.xbrl.org/int/gl/plt/2015-03-25"
+    xmlns:gl-bus="http://www.xbrl.org/int/gl/bus/2015-03-25"
+    xmlns:gl-muc="http://www.xbrl.org/int/gl/muc/2015-03-25"
+    xsi:schemaLocation="http://www.xbrl.org/int/gl/plt/2015-03-25 https://www.xbrl.org/taxonomy/int/gl/2015-03-25/plt/case-c-b-m-u-t/gl-plt-all-2015-03-25.xsd">
+    <xbrll:schemaRef xlink:href="../plt/case-c-b-m-e/gl-plt-2015-03-25.xsd" xlink:arcrole="http://www.w3.org/1999/xlink/properties/linkbase" xlink:type="simple"/>
+    <xbrli:context id="now">
+        <xbrli:entity>
+            <xbrli:identifier scheme="http://www.ariregister.rik.ee">10235688</xbrli:identifier>
+        </xbrli:entity>
+        <xbrli:period>
+            <xbrli:instant>2026-10-02</xbrli:instant>
+        </xbrli:period>
+    </xbrli:context>
+    <xbrli:unit id="eur">
+        <xbrli:measure>iso4217:EUR</xbrli:measure>
+    </xbrli:unit>
+    <xbrli:unit id="NotUsed">
+        <xbrli:measure>pure</xbrli:measure>
+    </xbrli:unit>
+    <gl-cor:accountingEntries>
+        <gl-cor:documentInfo>
+            <gl-cor:entriesType contextRef="now">other</gl-cor:entriesType>
+            <gl-cor:uniqueID contextRef="now">10235688-2026-10-02T09:36:51:554</gl-cor:uniqueID>
+            <gl-cor:language contextRef="now">iso639:et</gl-cor:language>
+            <gl-cor:creationDate contextRef="now">2026-10-02</gl-cor:creationDate>
+            <gl-bus:creator contextRef="now">Kasutaja X</gl-bus:creator>
+            <gl-cor:entriesComment contextRef="now">Andmepõhise aruandluse väljamaksete andmed MTA-le</gl-cor:entriesComment>
+            <gl-cor:periodCoveredStart contextRef="now">2026-09-01</gl-cor:periodCoveredStart>
+            <gl-cor:periodCoveredEnd contextRef="now">2026-09-30</gl-cor:periodCoveredEnd>
+            <gl-bus:sourceApplication contextRef="now">Raamatupidamistarkvara XY</gl-bus:sourceApplication>
+            <gl-muc:defaultCurrency contextRef="now">iso4217:eur</gl-muc:defaultCurrency>
+        </gl-cor:documentInfo>
+        <gl-cor:entityInformation>
+            <gl-bus:organizationIdentifiers>
+                <gl-bus:organizationIdentifier contextRef="now">10235688</gl-bus:organizationIdentifier>
+                <gl-bus:organizationDescription contextRef="now">ARIREGISTRIKOOD</gl-bus:organizationDescription>
+            </gl-bus:organizationIdentifiers>
+        </gl-cor:entityInformation>
+        <gl-cor:entryHeader>
+            <gl-cor:entryNumber contextRef="now">EE0201001</gl-cor:entryNumber>
+            <gl-cor:entryDetail>
+                <gl-cor:lineNumber contextRef="now">Tehing_2111</gl-cor:lineNumber>
+                <gl-cor:lineNumberCounter contextRef="now" unitRef="NotUsed">1</gl-cor:lineNumberCounter>
+                <gl-cor:account>
+                    <gl-cor:accountSub>
+                        <gl-cor:accountSubID contextRef="now">10</gl-cor:accountSubID>
+                        <gl-cor:accountSubType contextRef="now">VALJAMLIIK2023ap</gl-cor:accountSubType>
+                    </gl-cor:accountSub>
+                    <gl-cor:accountSub>
+                        <gl-cor:accountSubID contextRef="now">R</gl-cor:accountSubID>
+                        <gl-cor:accountSubType contextRef="now">TOIMINGUTYYP2023ap</gl-cor:accountSubType>
+                    </gl-cor:accountSub>
+                </gl-cor:account>
+                <gl-cor:amount contextRef="now" decimals="2" unitRef="eur">1000</gl-cor:amount>
+                <gl-bus:allocationCode contextRef="now">TartuOsakond</gl-bus:allocationCode>
+                <gl-cor:identifierReference>
+                    <gl-cor:identifierCode contextRef="now">EE48712219406</gl-cor:identifierCode>
+                    <gl-cor:identifierDescription contextRef="now">ISIKUKOOD</gl-cor:identifierDescription>
+                </gl-cor:identifierReference>
+                <gl-cor:documentDate contextRef="now">2026-09-10</gl-cor:documentDate>
+                <gl-bus:measurable>
+                    <gl-bus:measurableID contextRef="now">TSD01</gl-bus:measurableID>
+                    <gl-bus:measurableIDSchema contextRef="now">SYNDMUS2017ap</gl-bus:measurableIDSchema>
+                    <gl-bus:measurableStartDateTime contextRef="now">2026-08-31</gl-bus:measurableStartDateTime>
+                </gl-bus:measurable>
+                <gl-bus:measurable>
+                    <gl-bus:measurableDescription contextRef="now">MVT_610</gl-bus:measurableDescription>
+                    <gl-bus:measurableQuantity contextRef="now" decimals="2" unitRef="eur">700</gl-bus:measurableQuantity>
+                </gl-bus:measurable>
+                <gl-bus:measurable>
+                    <gl-bus:measurableDescription contextRef="now">TSD_SMVM</gl-bus:measurableDescription>
+                    <gl-bus:measurableQuantity contextRef="now" decimals="2" unitRef="eur">1000</gl-bus:measurableQuantity>
+                </gl-bus:measurable>
+                <gl-cor:taxes>
+                    <gl-cor:taxAmount contextRef="now" decimals="2" unitRef="eur">330</gl-cor:taxAmount>
+                    <gl-cor:taxCode contextRef="now">TSD_SM</gl-cor:taxCode>
+                </gl-cor:taxes>
+                <gl-cor:taxes>
+                    <gl-cor:taxAmount contextRef="now" decimals="2" unitRef="eur">20</gl-cor:taxAmount>
+                    <gl-cor:taxCode contextRef="now">TSD_KP</gl-cor:taxCode>
+                </gl-cor:taxes>
+                <gl-cor:taxes>
+                    <gl-cor:taxAmount contextRef="now" decimals="2" unitRef="eur">16</gl-cor:taxAmount>
+                    <gl-cor:taxCode contextRef="now">TSD_TK</gl-cor:taxCode>
+                </gl-cor:taxes>
+                <gl-cor:taxes>
+                    <gl-cor:taxAmount contextRef="now" decimals="2" unitRef="eur">8</gl-cor:taxAmount>
+                    <gl-cor:taxCode contextRef="now">TSD_TTK</gl-cor:taxCode>
+                </gl-cor:taxes>
+                <gl-cor:taxes>
+                    <gl-cor:taxAmount contextRef="now" decimals="2" unitRef="eur">58.08</gl-cor:taxAmount>
+                    <gl-cor:taxCode contextRef="now">TSD_KTM</gl-cor:taxCode>
+                </gl-cor:taxes>
+            </gl-cor:entryDetail>
+            <gl-cor:entryDetail>
+                <gl-cor:lineNumber contextRef="now">Tehing_2112</gl-cor:lineNumber>
+                <gl-cor:lineNumberCounter contextRef="now" unitRef="NotUsed">2</gl-cor:lineNumberCounter>
+                <gl-cor:account>
+                    <gl-cor:accountSub>
+                        <gl-cor:accountSubID contextRef="now">24</gl-cor:accountSubID>
+                        <gl-cor:accountSubType contextRef="now">VALJAMLIIK2023ap</gl-cor:accountSubType>
+                    </gl-cor:accountSub>
+                    <gl-cor:accountSub>
+                        <gl-cor:accountSubID contextRef="now">R</gl-cor:accountSubID>
+                        <gl-cor:accountSubType contextRef="now">TOIMINGUTYYP2023ap</gl-cor:accountSubType>
+                    </gl-cor:accountSub>
+                </gl-cor:account>
+                <gl-cor:amount contextRef="now" decimals="2" unitRef="eur">100</gl-cor:amount>
+                <gl-bus:allocationCode contextRef="now">TartuOsakond</gl-bus:allocationCode>
+                <gl-cor:identifierReference>
+                    <gl-cor:identifierCode contextRef="now">EE48712219406</gl-cor:identifierCode>
+                    <gl-cor:identifierDescription contextRef="now">ISIKUKOOD</gl-cor:identifierDescription>
+                </gl-cor:identifierReference>
+                <gl-cor:documentDate contextRef="now">2026-09-10</gl-cor:documentDate>
+                <gl-bus:measurable>
+                    <gl-bus:measurableID contextRef="now">TSD01</gl-bus:measurableID>
+                    <gl-bus:measurableIDSchema contextRef="now">SYNDMUS2017ap</gl-bus:measurableIDSchema>
+                    <gl-bus:measurableStartDateTime contextRef="now">2026-08-31</gl-bus:measurableStartDateTime>
+                </gl-bus:measurable>
+                <gl-cor:taxes>
+                    <gl-cor:taxAmount contextRef="now" decimals="2" unitRef="eur">22</gl-cor:taxAmount>
+                    <gl-cor:taxCode contextRef="now">TSD_KTM</gl-cor:taxCode>
+                </gl-cor:taxes>
+            </gl-cor:entryDetail>
+            <gl-cor:entryDetail>
+                <gl-cor:lineNumber contextRef="now">Tehing_21113</gl-cor:lineNumber>
+                <gl-cor:lineNumberCounter contextRef="now" unitRef="NotUsed">3</gl-cor:lineNumberCounter>
+                <gl-cor:account>
+                    <gl-cor:accountSub>
+                        <gl-cor:accountSubID contextRef="now">10</gl-cor:accountSubID>
+                        <gl-cor:accountSubType contextRef="now">VALJAMLIIK2023ap</gl-cor:accountSubType>
+                    </gl-cor:accountSub>
+                    <gl-cor:accountSub>
+                        <gl-cor:accountSubID contextRef="now">R</gl-cor:accountSubID>
+                        <gl-cor:accountSubType contextRef="now">TOIMINGUTYYP2023ap</gl-cor:accountSubType>
+                    </gl-cor:accountSub>
+                </gl-cor:account>
+                <gl-cor:amount contextRef="now" decimals="2" unitRef="eur">900</gl-cor:amount>
+                <gl-bus:allocationCode contextRef="now">TartuOsakond</gl-bus:allocationCode>
+                <gl-cor:identifierReference>
+                    <gl-cor:identifierCode contextRef="now">EE35801209997</gl-cor:identifierCode>
+                    <gl-cor:identifierDescription contextRef="now">ISIKUKOOD</gl-cor:identifierDescription>
+                </gl-cor:identifierReference>
+                <gl-cor:documentDate contextRef="now">2026-09-10</gl-cor:documentDate>
+                <gl-bus:measurable>
+                    <gl-bus:measurableID contextRef="now">TSD01</gl-bus:measurableID>
+                    <gl-bus:measurableIDSchema contextRef="now">SYNDMUS2017ap</gl-bus:measurableIDSchema>
+                    <gl-bus:measurableStartDateTime contextRef="now">2026-08-03</gl-bus:measurableStartDateTime>
+                </gl-bus:measurable>
+                <gl-bus:measurable>
+                    <gl-bus:measurableDescription contextRef="now">MVT_650</gl-bus:measurableDescription>
+                    <gl-bus:measurableQuantity contextRef="now" decimals="2" unitRef="eur">776</gl-bus:measurableQuantity>
+                </gl-bus:measurable>
+                <gl-bus:measurable>
+                    <gl-bus:measurableDescription contextRef="now">TSD_SMVM</gl-bus:measurableDescription>
+                    <gl-bus:measurableQuantity contextRef="now" decimals="2" unitRef="eur">900</gl-bus:measurableQuantity>
+                </gl-bus:measurable>
+                <gl-cor:taxes>
+                    <gl-cor:taxAmount contextRef="now" decimals="2" unitRef="eur">297</gl-cor:taxAmount>
+                    <gl-cor:taxCode contextRef="now">TSD_SM</gl-cor:taxCode>
+                </gl-cor:taxes>
+                <gl-cor:taxes>
+                    <gl-cor:taxAmount contextRef="now" decimals="2" unitRef="eur">7.2</gl-cor:taxAmount>
+                    <gl-cor:taxCode contextRef="now">TSD_TTK</gl-cor:taxCode>
+                </gl-cor:taxes>
+                <gl-cor:taxes>
+                    <gl-cor:taxAmount contextRef="now" decimals="2" unitRef="eur">27.28</gl-cor:taxAmount>
+                    <gl-cor:taxCode contextRef="now">TSD_KTM</gl-cor:taxCode>
+                </gl-cor:taxes>
+            </gl-cor:entryDetail>
+            <gl-cor:entryDetail>
+                <gl-cor:lineNumber contextRef="now">Tehing_21114</gl-cor:lineNumber>
+                <gl-cor:lineNumberCounter contextRef="now" unitRef="NotUsed">4</gl-cor:lineNumberCounter>
+                <gl-cor:account>
+                    <gl-cor:accountSub>
+                        <gl-cor:accountSubID contextRef="now">10</gl-cor:accountSubID>
+                        <gl-cor:accountSubType contextRef="now">VALJAMLIIK2023ap</gl-cor:accountSubType>
+                    </gl-cor:accountSub>
+                    <gl-cor:accountSub>
+                        <gl-cor:accountSubID contextRef="now">R</gl-cor:accountSubID>
+                        <gl-cor:accountSubType contextRef="now">TOIMINGUTYYP2023ap</gl-cor:accountSubType>
+                    </gl-cor:accountSub>
+                    <gl-cor:accountSub>
+                        <gl-cor:accountSubID contextRef="now">EE</gl-cor:accountSubID>
+                        <gl-cor:accountSubType contextRef="now">A1_RIIGID_enum</gl-cor:accountSubType>
+                        <gl-cor:segmentParentTuple>
+                            <gl-cor:parentSubaccountCode contextRef="now">RR_A1</gl-cor:parentSubaccountCode>
+                            <gl-cor:parentSubaccountType contextRef="now">RIIGIROLL2022ap</gl-cor:parentSubaccountType>
+                        </gl-cor:segmentParentTuple>
+                    </gl-cor:accountSub>
+                    <gl-cor:accountSub>
+                        <gl-cor:accountSubID contextRef="now">FI</gl-cor:accountSubID>
+                        <gl-cor:accountSubType contextRef="now">RTK2T2013ap</gl-cor:accountSubType>
+                        <gl-cor:segmentParentTuple>
+                            <gl-cor:parentSubaccountCode contextRef="now">RR_TOOKOHA_ASUKOHT</gl-cor:parentSubaccountCode>
+                            <gl-cor:parentSubaccountType contextRef="now">RIIGIROLL2022ap</gl-cor:parentSubaccountType>
+                        </gl-cor:segmentParentTuple>
+                    </gl-cor:accountSub>
+                </gl-cor:account>
+                <gl-cor:amount contextRef="now" decimals="2" unitRef="eur">1000</gl-cor:amount>
+                <gl-bus:allocationCode contextRef="now">TartuOsakond</gl-bus:allocationCode>
+                <gl-cor:identifierReference>
+                    <gl-cor:identifierCode contextRef="now">EE47911110111</gl-cor:identifierCode>
+                    <gl-cor:identifierDescription contextRef="now">ISIKUKOOD</gl-cor:identifierDescription>
+                </gl-cor:identifierReference>
+                <gl-cor:documentDate contextRef="now">2026-09-10</gl-cor:documentDate>
+                <gl-bus:measurable>
+                    <gl-bus:measurableID contextRef="now">TSD01</gl-bus:measurableID>
+                    <gl-bus:measurableIDSchema contextRef="now">SYNDMUS2017ap</gl-bus:measurableIDSchema>
+                    <gl-bus:measurableStartDateTime contextRef="now">2026-08-31</gl-bus:measurableStartDateTime>
+                </gl-bus:measurable>
+                <gl-bus:measurable>
+                    <gl-bus:measurableDescription contextRef="now">TSD_SMVM</gl-bus:measurableDescription>
+                    <gl-bus:measurableQuantity contextRef="now" decimals="2" unitRef="eur">1000</gl-bus:measurableQuantity>
+                </gl-bus:measurable>
+                <gl-cor:taxes>
+                    <gl-cor:taxAmount contextRef="now" decimals="2" unitRef="eur">330</gl-cor:taxAmount>
+                    <gl-cor:taxCode contextRef="now">TSD_SM</gl-cor:taxCode>
+                </gl-cor:taxes>
+                <gl-cor:taxes>
+                    <gl-cor:taxAmount contextRef="now" decimals="2" unitRef="eur">20</gl-cor:taxAmount>
+                    <gl-cor:taxCode contextRef="now">TSD_KP</gl-cor:taxCode>
+                </gl-cor:taxes>
+                <gl-cor:taxes>
+                    <gl-cor:taxAmount contextRef="now" decimals="2" unitRef="eur">16</gl-cor:taxAmount>
+                    <gl-cor:taxCode contextRef="now">TSD_TK</gl-cor:taxCode>
+                </gl-cor:taxes>
+                <gl-cor:taxes>
+                    <gl-cor:taxAmount contextRef="now" decimals="2" unitRef="eur">8</gl-cor:taxAmount>
+                    <gl-cor:taxCode contextRef="now">TSD_TTK</gl-cor:taxCode>
+                </gl-cor:taxes>
+            </gl-cor:entryDetail>
+            <gl-cor:entryDetail>
+                <gl-cor:lineNumber contextRef="now">Tehing_21115</gl-cor:lineNumber>
+                <gl-cor:lineNumberCounter contextRef="now" unitRef="NotUsed">5</gl-cor:lineNumberCounter>
+                <gl-cor:account>
+                    <gl-cor:accountSub>
+                        <gl-cor:accountSubID contextRef="now">10</gl-cor:accountSubID>
+                        <gl-cor:accountSubType contextRef="now">VALJAMLIIK2023ap</gl-cor:accountSubType>
+                    </gl-cor:accountSub>
+                    <gl-cor:accountSub>
+                        <gl-cor:accountSubID contextRef="now">R</gl-cor:accountSubID>
+                        <gl-cor:accountSubType contextRef="now">TOIMINGUTYYP2023ap</gl-cor:accountSubType>
+                    </gl-cor:accountSub>
+                    <gl-cor:accountSub>
+                        <gl-cor:accountSubID contextRef="now">LV</gl-cor:accountSubID>
+                        <gl-cor:accountSubType contextRef="now">A1_RIIGID_enum</gl-cor:accountSubType>
+                        <gl-cor:segmentParentTuple>
+                            <gl-cor:parentSubaccountCode contextRef="now">RR_A1</gl-cor:parentSubaccountCode>
+                            <gl-cor:parentSubaccountType contextRef="now">RR_A1</gl-cor:parentSubaccountType>
+                        </gl-cor:segmentParentTuple>
+                    </gl-cor:accountSub>
+                    <gl-cor:accountSub>
+                        <gl-cor:accountSubID contextRef="now">EE</gl-cor:accountSubID>
+                        <gl-cor:accountSubType contextRef="now">RTK2T2013ap</gl-cor:accountSubType>
+                        <gl-cor:segmentParentTuple>
+                            <gl-cor:parentSubaccountCode contextRef="now">RR_TOOKOHA_ASUKOHT</gl-cor:parentSubaccountCode>
+                            <gl-cor:parentSubaccountType contextRef="now">RIIGIROLL2022ap</gl-cor:parentSubaccountType>
+                        </gl-cor:segmentParentTuple>
+                    </gl-cor:accountSub>
+                </gl-cor:account>
+                <gl-cor:amount contextRef="now" decimals="2" unitRef="eur">1000</gl-cor:amount>
+                <gl-bus:allocationCode contextRef="now">TartuOsakond</gl-bus:allocationCode>
+                <gl-cor:identifierReference>
+                    <gl-cor:identifierCode contextRef="now">EE48911110112</gl-cor:identifierCode>
+                    <gl-cor:identifierDescription contextRef="now">ISIKUKOOD</gl-cor:identifierDescription>
+                </gl-cor:identifierReference>
+                <gl-cor:documentDate contextRef="now">2026-09-10</gl-cor:documentDate>
+                <gl-bus:measurable>
+                    <gl-bus:measurableID contextRef="now">TSD01</gl-bus:measurableID>
+                    <gl-bus:measurableIDSchema contextRef="now">SYNDMUS2017ap</gl-bus:measurableIDSchema>
+                    <gl-bus:measurableStartDateTime contextRef="now">2026-08-31</gl-bus:measurableStartDateTime>
+                </gl-bus:measurable>
+                <gl-bus:measurable>
+                    <gl-bus:measurableDescription contextRef="now">MVT_610</gl-bus:measurableDescription>
+                    <gl-bus:measurableQuantity contextRef="now" decimals="2" unitRef="eur">700</gl-bus:measurableQuantity>
+                </gl-bus:measurable>
+                <gl-cor:taxes>
+                    <gl-cor:taxAmount contextRef="now" decimals="2" unitRef="eur">66</gl-cor:taxAmount>
+                    <gl-cor:taxCode contextRef="now">TSD_KTM</gl-cor:taxCode>
+                </gl-cor:taxes>
+            </gl-cor:entryDetail>
+            <gl-cor:entryDetail>
+                <gl-cor:lineNumber contextRef="now">Tehing_21116</gl-cor:lineNumber>
+                <gl-cor:lineNumberCounter contextRef="now" unitRef="NotUsed">6</gl-cor:lineNumberCounter>
+                <gl-cor:account>
+                    <gl-cor:accountSub>
+                        <gl-cor:accountSubID contextRef="now">120</gl-cor:accountSubID>
+                        <gl-cor:accountSubType contextRef="now">VALJAMLIIK2023ap</gl-cor:accountSubType>
+                    </gl-cor:accountSub>
+                    <gl-cor:accountSub>
+                        <gl-cor:accountSubID contextRef="now">R</gl-cor:accountSubID>
+                        <gl-cor:accountSubType contextRef="now">TOIMINGUTYYP2023ap</gl-cor:accountSubType>
+                    </gl-cor:accountSub>
+                    <gl-cor:accountSub>
+                        <gl-cor:accountSubID contextRef="now">LV</gl-cor:accountSubID>
+                        <gl-cor:accountSubType contextRef="now">RTK2T2013ap</gl-cor:accountSubType>
+                        <gl-cor:segmentParentTuple>
+                            <gl-cor:parentSubaccountCode contextRef="now">RR_MAKSURESIDENTSUSE_RIIK</gl-cor:parentSubaccountCode>
+                            <gl-cor:parentSubaccountType contextRef="now">RIIGIROLL2022ap</gl-cor:parentSubaccountType>
+                        </gl-cor:segmentParentTuple>
+                    </gl-cor:accountSub>
+                </gl-cor:account>
+                <gl-cor:amount contextRef="now" decimals="2" unitRef="eur">1000</gl-cor:amount>
+                <gl-bus:allocationCode contextRef="now">TartuOsakond</gl-bus:allocationCode>
+                <gl-cor:identifierReference>
+                    <gl-cor:identifierCode contextRef="now">A0003689779</gl-cor:identifierCode>
+                    <gl-cor:identifierDescription contextRef="now">MRR_KOOD</gl-cor:identifierDescription>
+                </gl-cor:identifierReference>
+                <gl-cor:documentDate contextRef="now">2026-09-10</gl-cor:documentDate>
+                <gl-bus:measurable>
+                    <gl-bus:measurableID contextRef="now">TSD01</gl-bus:measurableID>
+                    <gl-bus:measurableIDSchema contextRef="now">SYNDMUS2017ap</gl-bus:measurableIDSchema>
+                    <gl-bus:measurableStartDateTime contextRef="now">2026-08-31</gl-bus:measurableStartDateTime>
+                </gl-bus:measurable>
+                <gl-bus:measurable>
+                    <gl-bus:measurableDescription contextRef="now">MVT_610</gl-bus:measurableDescription>
+                    <gl-bus:measurableQuantity contextRef="now" decimals="2" unitRef="eur">700</gl-bus:measurableQuantity>
+                </gl-bus:measurable>
+                <gl-bus:measurable>
+                    <gl-bus:measurableDescription contextRef="now">TSD_SMVM</gl-bus:measurableDescription>
+                    <gl-bus:measurableQuantity contextRef="now" decimals="2" unitRef="eur">1000</gl-bus:measurableQuantity>
+                </gl-bus:measurable>
+                <gl-cor:taxes>
+                    <gl-cor:taxAmount contextRef="now" decimals="2" unitRef="eur">330</gl-cor:taxAmount>
+                    <gl-cor:taxCode contextRef="now">TSD_SM</gl-cor:taxCode>
+                </gl-cor:taxes>
+                <gl-cor:taxes>
+                    <gl-cor:taxAmount contextRef="now" decimals="2" unitRef="eur">16</gl-cor:taxAmount>
+                    <gl-cor:taxCode contextRef="now">TSD_TK</gl-cor:taxCode>
+                </gl-cor:taxes>
+                <gl-cor:taxes>
+                    <gl-cor:taxAmount contextRef="now" decimals="2" unitRef="eur">8</gl-cor:taxAmount>
+                    <gl-cor:taxCode contextRef="now">TSD_TTK</gl-cor:taxCode>
+                </gl-cor:taxes>
+                <gl-cor:taxes>
+                    <gl-cor:taxAmount contextRef="now" decimals="2" unitRef="eur">62.48</gl-cor:taxAmount>
+                    <gl-cor:taxPercentageRate contextRef="now" decimals="2" unitRef="NotUsed">0.22</gl-cor:taxPercentageRate>
+                    <gl-cor:taxCode contextRef="now">TSD_KTM</gl-cor:taxCode>
+                </gl-cor:taxes>
+            </gl-cor:entryDetail>
+            <gl-cor:entryDetail>
+                <gl-cor:lineNumber contextRef="now">Tehing_21117</gl-cor:lineNumber>
+                <gl-cor:lineNumberCounter contextRef="now" unitRef="NotUsed">7</gl-cor:lineNumberCounter>
+                <gl-cor:account>
+                    <gl-cor:accountSub>
+                        <gl-cor:accountSubID contextRef="now">10</gl-cor:accountSubID>
+                        <gl-cor:accountSubType contextRef="now">VALJAMLIIK2023ap</gl-cor:accountSubType>
+                    </gl-cor:accountSub>
+                    <gl-cor:accountSub>
+                        <gl-cor:accountSubID contextRef="now">R</gl-cor:accountSubID>
+                        <gl-cor:accountSubType contextRef="now">TOIMINGUTYYP2023ap</gl-cor:accountSubType>
+                    </gl-cor:accountSub>
+                </gl-cor:account>
+                <gl-cor:amount contextRef="now" decimals="2" unitRef="eur">0</gl-cor:amount>
+                <gl-bus:allocationCode contextRef="now">TartuOsakond</gl-bus:allocationCode>
+                <gl-cor:identifierReference>
+                    <gl-cor:identifierCode contextRef="now">EE48911110122</gl-cor:identifierCode>
+                    <gl-cor:identifierDescription contextRef="now">ISIKUKOOD</gl-cor:identifierDescription>
+                </gl-cor:identifierReference>
+                <gl-cor:documentDate contextRef="now">2026-09-10</gl-cor:documentDate>
+                <gl-bus:measurable>
+                    <gl-bus:measurableID contextRef="now">TSD01</gl-bus:measurableID>
+                    <gl-bus:measurableIDSchema contextRef="now">SYNDMUS2017ap</gl-bus:measurableIDSchema>
+                    <gl-bus:measurableStartDateTime contextRef="now">2026-08-31</gl-bus:measurableStartDateTime>
+                </gl-bus:measurable>
+                <gl-bus:measurable>
+                    <gl-bus:measurableDescription contextRef="now">TSD_KUUMSUURENDUS</gl-bus:measurableDescription>
+                    <gl-bus:measurableQuantity contextRef="now" decimals="2" unitRef="eur">820</gl-bus:measurableQuantity>
+                </gl-bus:measurable>
+                <gl-cor:taxes>
+                    <gl-cor:taxAmount contextRef="now" decimals="2" unitRef="eur">270.60</gl-cor:taxAmount>
+                    <gl-cor:taxCode contextRef="now">TSD_SM</gl-cor:taxCode>
+                </gl-cor:taxes>
+            </gl-cor:entryDetail>
+            <gl-cor:entryDetail>
+                <gl-cor:lineNumber contextRef="now">Tehing_21118</gl-cor:lineNumber>
+                <gl-cor:lineNumberCounter contextRef="now" unitRef="NotUsed">8</gl-cor:lineNumberCounter>
+                <gl-cor:account>
+                    <gl-cor:accountSub>
+                        <gl-cor:accountSubID contextRef="now">70</gl-cor:accountSubID>
+                        <gl-cor:accountSubType contextRef="now">VALJAMLIIK2023ap</gl-cor:accountSubType>
+                    </gl-cor:accountSub>
+                    <gl-cor:accountSub>
+                        <gl-cor:accountSubID contextRef="now">R</gl-cor:accountSubID>
+                        <gl-cor:accountSubType contextRef="now">TOIMINGUTYYP2023ap</gl-cor:accountSubType>
+                    </gl-cor:accountSub>
+                    <gl-cor:accountSub>
+                        <gl-cor:accountSubID contextRef="now">EE</gl-cor:accountSubID>
+                        <gl-cor:accountSubType contextRef="now">RTK2T2013ap</gl-cor:accountSubType>
+                        <gl-cor:segmentParentTuple>
+                            <gl-cor:parentSubaccountCode contextRef="now">RR_LAEVAPERE_RIIK</gl-cor:parentSubaccountCode>
+                            <gl-cor:parentSubaccountType contextRef="now">RIIGIROLL2022ap</gl-cor:parentSubaccountType>
+                        </gl-cor:segmentParentTuple>
+                    </gl-cor:accountSub>
+                    <gl-cor:accountSub>
+                        <gl-cor:accountSubID contextRef="now">1</gl-cor:accountSubID>
+                        <gl-cor:accountSubType contextRef="now">TL2015ap</gl-cor:accountSubType>
+                        <gl-cor:segmentParentTuple>
+                            <gl-cor:parentSubaccountCode contextRef="now">9083043</gl-cor:parentSubaccountCode>
+                        </gl-cor:segmentParentTuple>
+                    </gl-cor:accountSub>
+                </gl-cor:account>
+                <gl-cor:amount contextRef="now" decimals="2" unitRef="eur">1000</gl-cor:amount>
+                <gl-bus:allocationCode contextRef="now">TartuOsakond</gl-bus:allocationCode>
+                <gl-cor:identifierReference>
+                    <gl-cor:identifierCode contextRef="now">EE38912110100</gl-cor:identifierCode>
+                    <gl-cor:identifierDescription contextRef="now">ISIKUKOOD</gl-cor:identifierDescription>
+                </gl-cor:identifierReference>
+                <gl-cor:documentDate contextRef="now">2026-09-10</gl-cor:documentDate>
+                <gl-bus:measurable>
+                    <gl-bus:measurableID contextRef="now">TSD01</gl-bus:measurableID>
+                    <gl-bus:measurableIDSchema contextRef="now">SYNDMUS2017ap</gl-bus:measurableIDSchema>
+                    <gl-bus:measurableStartDateTime contextRef="now">2026-08-31</gl-bus:measurableStartDateTime>
+                </gl-bus:measurable>
+                <gl-bus:measurable>
+                    <gl-bus:measurableDescription contextRef="now">TSD_SMVM</gl-bus:measurableDescription>
+                    <gl-bus:measurableQuantity contextRef="now" decimals="2" unitRef="eur">750</gl-bus:measurableQuantity>
+                </gl-bus:measurable>
+                <gl-cor:taxes>
+                    <gl-cor:taxAmount contextRef="now" decimals="2" unitRef="eur">150</gl-cor:taxAmount>
+                    <gl-cor:taxCode contextRef="now">TSD_SM</gl-cor:taxCode>
+                </gl-cor:taxes>
+                <gl-cor:taxes>
+                    <gl-cor:taxAmount contextRef="now" decimals="2" unitRef="eur">15</gl-cor:taxAmount>
+                    <gl-cor:taxCode contextRef="now">TSD_KP</gl-cor:taxCode>
+                </gl-cor:taxes>
+                <gl-cor:taxes>
+                    <gl-cor:taxAmount contextRef="now" decimals="2" unitRef="eur">12</gl-cor:taxAmount>
+                    <gl-cor:taxCode contextRef="now">TSD_TK</gl-cor:taxCode>
+                </gl-cor:taxes>
+                <gl-cor:taxes>
+                    <gl-cor:taxAmount contextRef="now" decimals="2" unitRef="eur">6</gl-cor:taxAmount>
+                    <gl-cor:taxCode contextRef="now">TSD_TTK</gl-cor:taxCode>
+                </gl-cor:taxes>
+                <gl-cor:taxes>
+                    <gl-cor:taxAmount contextRef="now" decimals="2" unitRef="eur">0</gl-cor:taxAmount>
+                    <gl-cor:taxCode contextRef="now">TSD_KTM</gl-cor:taxCode>
+                </gl-cor:taxes>
+            </gl-cor:entryDetail>
+            <gl-cor:entryDetail>
+                <gl-cor:lineNumber contextRef="now">Tehing_11111</gl-cor:lineNumber>
+                <gl-cor:lineNumberCounter contextRef="now" unitRef="NotUsed">9</gl-cor:lineNumberCounter>
+                <gl-cor:account>
+                    <gl-cor:accountSub>
+                        <gl-cor:accountSubID contextRef="now">10</gl-cor:accountSubID>
+                        <gl-cor:accountSubType contextRef="now">VALJAMLIIK2023ap</gl-cor:accountSubType>
+                    </gl-cor:accountSub>
+                    <gl-cor:accountSub>
+                        <gl-cor:accountSubID contextRef="now">R</gl-cor:accountSubID>
+                        <gl-cor:accountSubType contextRef="now">TOIMINGUTYYP2023ap</gl-cor:accountSubType>
+                    </gl-cor:accountSub>
+                </gl-cor:account>
+                <gl-cor:amount contextRef="now" decimals="2" unitRef="eur">-100</gl-cor:amount>
+                <gl-cor:identifierReference>
+                    <gl-cor:identifierCode contextRef="now">EE36609159911</gl-cor:identifierCode>
+                    <gl-cor:identifierDescription contextRef="now">ISIKUKOOD</gl-cor:identifierDescription>
+                </gl-cor:identifierReference>
+                <gl-cor:documentDate contextRef="now">2026-09-05</gl-cor:documentDate>
+                <gl-bus:measurable>
+                    <gl-bus:measurableID contextRef="now">TSD01</gl-bus:measurableID>
+                    <gl-bus:measurableIDSchema contextRef="now">SYNDMUS2017ap</gl-bus:measurableIDSchema>
+                    <gl-bus:measurableStartDateTime contextRef="now">2026-08-25</gl-bus:measurableStartDateTime>
+                </gl-bus:measurable>
+                <gl-bus:measurable>
+                    <gl-bus:measurableID contextRef="now">TSD02</gl-bus:measurableID>
+                    <gl-bus:measurableIDSchema contextRef="now">SYNDMUS2017ap</gl-bus:measurableIDSchema>
+                    <gl-bus:measurableStartDateTime contextRef="now">2026-07-05</gl-bus:measurableStartDateTime>
+                </gl-bus:measurable>
+                <gl-bus:measurable>
+                    <gl-bus:measurableDescription contextRef="now">TSD_SMVM</gl-bus:measurableDescription>
+                    <gl-bus:measurableQuantity contextRef="now" decimals="2" unitRef="eur">-100</gl-bus:measurableQuantity>
+                </gl-bus:measurable>
+                <gl-cor:taxes>
+                    <gl-cor:taxAmount contextRef="now" decimals="2" unitRef="eur">-33</gl-cor:taxAmount>
+                    <gl-cor:taxCode contextRef="now">TSD_SM</gl-cor:taxCode>
+                </gl-cor:taxes>
+                <gl-cor:taxes>
+                    <gl-cor:taxAmount contextRef="now" decimals="2" unitRef="eur">-2</gl-cor:taxAmount>
+                    <gl-cor:taxCode contextRef="now">TSD_KP</gl-cor:taxCode>
+                </gl-cor:taxes>
+                <gl-cor:taxes>
+                    <gl-cor:taxAmount contextRef="now" decimals="2" unitRef="eur">-1.6</gl-cor:taxAmount>
+                    <gl-cor:taxCode contextRef="now">TSD_TK</gl-cor:taxCode>
+                </gl-cor:taxes>
+                <gl-cor:taxes>
+                    <gl-cor:taxAmount contextRef="now" decimals="2" unitRef="eur">-0.8</gl-cor:taxAmount>
+                    <gl-cor:taxCode contextRef="now">TSD_TTK</gl-cor:taxCode>
+                </gl-cor:taxes>
+                <gl-cor:taxes>
+                    <gl-cor:taxAmount contextRef="now" decimals="2" unitRef="eur">-21.21</gl-cor:taxAmount>
+                    <gl-cor:taxCode contextRef="now">TSD_KTM</gl-cor:taxCode>
+                </gl-cor:taxes>
+            </gl-cor:entryDetail>
+        </gl-cor:entryHeader>
+        <gl-cor:entryHeader>
+            <gl-cor:entryNumber contextRef="now">EE0201002</gl-cor:entryNumber>
+            <gl-cor:entryDetail>
+                <gl-cor:lineNumber contextRef="now">Tehing_31111</gl-cor:lineNumber>
+                <gl-cor:lineNumberCounter contextRef="now" unitRef="NotUsed">1</gl-cor:lineNumberCounter>
+                <gl-cor:account>
+                    <gl-cor:accountSub>
+                        <gl-cor:accountSubID contextRef="now">50</gl-cor:accountSubID>
+                        <gl-cor:accountSubType contextRef="now">VALJAMLIIK2023ap</gl-cor:accountSubType>
+                    </gl-cor:accountSub>
+                    <gl-cor:accountSub>
+                        <gl-cor:accountSubID contextRef="now">R</gl-cor:accountSubID>
+                        <gl-cor:accountSubType contextRef="now">TOIMINGUTYYP2023ap</gl-cor:accountSubType>
+                    </gl-cor:accountSub>
+                </gl-cor:account>
+                <gl-cor:amount contextRef="now" decimals="2" unitRef="eur">100</gl-cor:amount>
+                <gl-bus:allocationCode contextRef="now">TartuOsakond</gl-bus:allocationCode>
+                <gl-cor:identifierReference>
+                    <gl-cor:identifierCode contextRef="now">EE45703203227</gl-cor:identifierCode>
+                    <gl-cor:identifierDescription contextRef="now">ISIKUKOOD</gl-cor:identifierDescription>
+                </gl-cor:identifierReference>
+                <gl-cor:documentDate contextRef="now">2026-09-05</gl-cor:documentDate>
+                <gl-bus:measurable>
+                    <gl-bus:measurableID contextRef="now">TSD01</gl-bus:measurableID>
+                    <gl-bus:measurableIDSchema contextRef="now">SYNDMUS2017ap</gl-bus:measurableIDSchema>
+                    <gl-bus:measurableStartDateTime contextRef="now">2026-08-31</gl-bus:measurableStartDateTime>
+                </gl-bus:measurable>
+                <gl-bus:measurable>
+                    <gl-bus:measurableDescription contextRef="now">MVT_650</gl-bus:measurableDescription>
+                    <gl-bus:measurableQuantity contextRef="now" decimals="2" unitRef="eur">50</gl-bus:measurableQuantity>
+                </gl-bus:measurable>
+                <gl-cor:taxes>
+                    <gl-cor:taxAmount contextRef="now" decimals="2" unitRef="eur">11</gl-cor:taxAmount>
+                    <gl-cor:taxCode contextRef="now">TSD_KTM</gl-cor:taxCode>
+                </gl-cor:taxes>
+            </gl-cor:entryDetail>
+        </gl-cor:entryHeader>
+    </gl-cor:accountingEntries>
+</xbrli:xbrl>

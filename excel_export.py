@@ -67,6 +67,36 @@ def _total_row(ws, label_column: int, money_columns: tuple[int, ...], totals: di
         ws.cell(row=row, column=column).font = Font(bold=True)
 
 
+def payroll_withholding_workbook(organisation: dict, report: dict, *, payouts=False) -> bytes:
+    title = 'Payroll withholding payouts' if payouts else 'Payroll withholdings'
+    workbook = _book(organisation, title)
+    ws = workbook.active
+    ws.title = 'Withholding payouts' if payouts else 'Withholdings'
+    ws.append([title, f"{report['start']} to {report['end']}"])
+    ws['A1'].font = Font(bold=True, size=14)
+    if payouts:
+        headers = ('Payroll period', 'Payout date', 'Status', 'Recipient', 'Payment description', 'Amount (EUR)')
+        _header_row(ws, headers)
+        for row in report['rows']:
+            ws.append([row['period'], row['payout_date'], row['status'], row['recipient_name'], row['description'], None])
+            _put(ws, ws.max_row, 6, Decimal(str(row['amount'])))
+        _total_row(ws, 5, (6,), {6: Decimal(str(report['total']))})
+        ws.auto_filter.ref = f'A2:F{ws.max_row - 1}'
+    else:
+        headers = ('Employee', 'Recipient', 'Withholding type', 'Amount (EUR)')
+        _header_row(ws, headers)
+        for row in report['rows']:
+            ws.append([row['employee_name'], row['recipient_name'], row['component_type'], None])
+            _put(ws, ws.max_row, 4, Decimal(str(row['amount'])))
+        _total_row(ws, 3, (4,), {4: Decimal(str(report['total']))})
+        ws.auto_filter.ref = f'A2:D{ws.max_row - 1}'
+    ws.freeze_panes = 'A3'
+    for column in ws.columns:
+        letter = column[0].column_letter
+        ws.column_dimensions[letter].width = min(max(max(len(str(cell.value or '')) for cell in column) + 2, 12), 48)
+    return _finish(workbook)
+
+
 def pay_run_workbook(organisation: dict, run: dict, items: list[dict],
                      journal_lines: list[dict] | None = None) -> bytes:
     workbook = _book(organisation, "Payroll pay run")
@@ -114,6 +144,24 @@ def pay_run_workbook(organisation: dict, run: dict, items: list[dict],
             _put(item_sheet, row, column, amount)
             item_totals[column] += amount
     _total_row(item_sheet, 1, tuple(item_money), item_totals)
+
+    if any(item.get('components') for item in items):
+        from web import i18n
+        from payroll_components import FLAGS, FLAG_LABELS
+        language = 'et' if organisation.get('country_code') == 'EE' else 'en'
+        def label(key):
+            return i18n.catalog(language)['workspace'].get(key, key)
+        components = workbook.create_sheet(label('Payment components')[:31])
+        _header_row(components, [label(key) for key in ('Employee', 'Payment type', 'Direction', 'Amount', *FLAG_LABELS)])
+        for item in items:
+            for line in item.get('components', []):
+                row = components.max_row + 1
+                values = [item['employee_name'], label(line['name']), label('Income' if line['direction'] == 'income' else 'Deduction'),
+                          _from_decimal(line['amount']), *(label('Yes' if line[key] else 'No') for key in FLAGS)]
+                for column, value in enumerate(values, 1):
+                    _put(components, row, column, value)
+                    if isinstance(value, str):
+                        components.cell(row, column).data_type = 's'
 
     if journal_lines is not None:
         accounting = workbook.create_sheet("Accounting")
@@ -184,7 +232,7 @@ def employees_workbook(organisation: dict, employees: list[dict]) -> bytes:
     _header_row(sheet, (
         "Name", "Personal ID", "Email", "Country code", "Pay basis", "Gross salary",
         "Hourly rate", "Funded pension percent", "FTE", "Employment start date",
-        "Employment end date",
+        "Employment end date", "Phone", "IBAN", "Bank account owner", "Address", "Date of birth",
     ))
     for employee in employees:
         row = sheet.max_row + 1
@@ -195,6 +243,8 @@ def employees_workbook(organisation: dict, employees: list[dict]) -> bytes:
             _from_decimal(employee.get("hourly_rate")),
             _from_decimal(employee.get("funded_pension_percent")), _from_decimal(employee.get("fte")),
             employee.get("employment_start_date"), employee.get("employment_end_date"),
+            employee.get("phone"), employee.get("iban"), employee.get("bank_account_owner"),
+            employee.get("address"), employee.get("date_of_birth"),
         )
         for column, value in enumerate(values, 1):
             _put(sheet, row, column, value)
@@ -252,4 +302,30 @@ def document_list_workbook(organisation: dict, documents: list[dict], kind: str)
             if isinstance(value, str):
                 sheet.cell(row=row, column=column).data_type = "s"
     # Currency is retained on each row; mixed currencies are never summed.
+    return _finish(workbook)
+
+
+def leave_liability_workbook(organisation: dict, report: dict) -> bytes:
+    workbook = _book(organisation, 'Leave liability')
+    sheet = workbook.active
+    sheet.title = 'Leave liability'
+    _header_row(sheet, ('Employee', 'Remaining days', 'Average daily pay', 'Wage liability',
+                        'Social tax', 'Employer unemployment', 'Total liability', 'As at'))
+    for employee in report['employees']:
+        sheet.append([employee['employee_name'], Decimal(employee['remaining_days']),
+                      Decimal(employee['average_daily_pay']), Decimal(employee['wage_liability']),
+                      Decimal(employee['social_tax']), Decimal(employee['employer_unemployment']),
+                      Decimal(employee['total_liability']), report['as_at']])
+    sheet.append(['Total', Decimal(report['totals']['remaining_days']), None,
+                  Decimal(report['totals']['wage_liability']), Decimal(report['totals']['social_tax']),
+                  Decimal(report['totals']['employer_unemployment']), Decimal(report['totals']['total_liability']),
+                  report['as_at']])
+    for cell in sheet[sheet.max_row]:
+        cell.font = Font(bold=True)
+    detail = workbook.create_sheet('Movements')
+    _header_row(detail, ('Employee', 'Movement', 'Date', 'Kind', 'Days', 'Expiry date', 'Absence reference'))
+    for employee in report['employees']:
+        for movement in employee['movements']:
+            detail.append([employee['employee_name'], movement['type'], movement['date'], movement['kind'],
+                           Decimal(movement['days']), movement.get('expires_on') or '', movement.get('absence_id') or ''])
     return _finish(workbook)

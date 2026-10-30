@@ -609,13 +609,13 @@ def workspace_page(user: dict, lang: str = "en"):
     T = lambda key: i18n.t(key, lang)
     display_name = user.get("name") or user.get("email") or ""
     groups = [
-        ("bureau", [("overview", "overview")]),
+        ("bureau", [("overview", "overview"), ("bureau-overview", "bureau_overview"), ("bureau-memberships", "bureau_memberships")]),
         ("documents", [("invoices", "invoices"), ("quotes", "quotes"), ("bills", "bills"), ("periodised", "periodised"), ("contacts", "contacts")]),
         ("automation", [("recurring", "recurring")]),
         ("money", [("banking", "banking")]),
         ("accounting", [("accounting", "accounting"), ("cash-flow", "cash_flow"), ("fixed-assets", "fixed_assets"), ("periods", "periods"), ("tax", "tax")]),
         ("payroll", [("payroll", "payroll")]),
-        ("settings", [("integrations", "integrations"), ("imports", "data_import"), ("payment-methods", "payment_methods"), ("reminder-rules", "reminder_rules"), ("exchange-rates", "fx_rates"), ("objects", "objects"), ("groups", "groups"), ("documents", "document_settings"), ("maintenance", "maintenance")]),
+        ("settings", [("integrations", "integrations"), ("imports", "data_import"), ("payment-methods", "payment_methods"), ("payment-types", "payment_types"), ("reminder-rules", "reminder_rules"), ("exchange-rates", "fx_rates"), ("objects", "objects"), ("groups", "groups"), ("documents", "document_settings"), ("maintenance", "maintenance")]),
     ]
     # Escape script delimiters even when catalogue copy contains HTML punctuation.
     dictionary = {**i18n.catalog("en"), **i18n.catalog(lang)}

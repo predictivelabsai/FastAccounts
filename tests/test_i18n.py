@@ -13,6 +13,155 @@ from web.public import integrations_page, landing_page
 from web_app import app
 
 
+def test_payroll_preset_names_descriptions_and_settings_in_all_locales():
+    from payroll_components import PRESETS, PRESET_DESCRIPTIONS
+    for language in i18n.LANGUAGES:
+        catalogue = i18n.catalog(language)
+        assert catalogue['nav']['payment_types']
+        for key, name, *_ in PRESETS:
+            for label in (name, PRESET_DESCRIPTIONS[key]):
+                assert catalogue['workspace'][label].strip()
+                assert '\u2014' not in catalogue['workspace'][label]
+    assert i18n.catalog('et')['nav']['payment_types'] == 'Makseliigid'
+
+
+def test_payroll_bureau_labels_exist_in_all_locales():
+    labels = ('Departments', 'Positions', 'Position groups', 'Cost centres', 'Companies overview',
+              'Unpaid net pay', 'Last TSD date', 'User management', 'Dimension costs', 'Payroll settings',
+              'Invitation status', 'Member')
+    for language in ('en', 'et', 'lv', 'lt'):
+        workspace = i18n.catalog(language)['workspace']
+        assert all(workspace.get(label, '').strip() for label in labels)
+    estonian = i18n.catalog('et')
+    assert estonian['workspace']['Departments'] == 'Osakonnad'
+    assert estonian['workspace']['Positions'] == 'Ametid'
+    assert estonian['workspace']['Position groups'] == 'Ametigrupid'
+    assert estonian['workspace']['Cost centres'] == 'Kulukohad'
+    assert estonian['workspace']['Companies overview'] == 'Ettevõtete koondvaade'
+    assert estonian['workspace']['Unpaid net pay'] == 'Väljamaksmata tasud'
+    assert estonian['workspace']['Last TSD date'] == 'Viimase TSD kuupäev'
+    assert estonian['workspace']['User management'] == 'Kasutajate haldamine'
+    assert estonian['workspace']['Payroll settings'] == 'Palgaarvestuse seadistused'
+
+
+def test_absence_pay_workspace_labels_exist_in_all_supported_locales():
+    labels = ('Vacation pay', 'Average', 'Unchanged salary', 'Best of', 'Fixed sum',
+              'Sick benefit', 'Unused leave compensation', 'Add to payout', 'In payout',
+              'Not calculated', 'Calculation')
+    for language in ('en', 'et', 'lv', 'lt'):
+        workspace = i18n.catalog(language)['workspace']
+        assert all(workspace.get(label, '').strip() for label in labels)
+    estonian = i18n.catalog('et')['workspace']
+    assert estonian['Vacation pay'] == 'Puhkusetasu'
+    assert estonian['Average'] == 'Keskmine töötasu'
+    assert estonian['Unchanged salary'] == 'Muutumatu tasu'
+    assert estonian['Best of'] == 'Parima valiku alusel'
+    assert estonian['Fixed sum'] == 'Summa'
+    assert estonian['Sick benefit'] == 'Haigushüvitis'
+    assert estonian['Unused leave compensation'] == 'Kasutamata puhkuse hüvitis'
+    assert estonian['Add to payout'] == 'Lisa väljamaksesse'
+    assert estonian['Calculation'] == 'Arvutuskäik'
+
+
+def test_payroll_withholding_workspace_labels_exist_in_all_supported_locales():
+    labels = ('Withholdings', 'Withholding recipients', 'Withholding agreements', 'Cap',
+              'Withheld amount', 'Payment description', 'Alimony', 'Bailiff', 'Union fee',
+              'Third pillar contribution', 'Withholding report', 'Withholding payouts report',
+              'Withholding type', 'Withheld amount / cap', 'Create withholding payout')
+    for language in ('en', 'et', 'lv', 'lt'):
+        workspace = i18n.catalog(language)['workspace']
+        assert all(workspace.get(label, '').strip() for label in labels)
+    estonian = i18n.catalog('et')['workspace']
+    assert estonian['Withholdings'] == 'Kinnipidamised'
+    assert estonian['Withholding recipients'] == 'Kinnipidamiste saajad'
+    assert estonian['Withholding agreements'] == 'Kinnipidamiste kokkulepped'
+    assert estonian['Cap'] == 'Piirsumma'
+    assert estonian['Withheld amount'] == 'Kinnipeetud summa'
+    assert estonian['Payment description'] == 'Makse selgitus'
+    assert estonian['Alimony'] == 'Elatis'
+    assert estonian['Bailiff'] == 'Kohtutäitur'
+    assert estonian['Union fee'] == 'Ametiühingumaks'
+    assert estonian['Third pillar contribution'] == 'III samba sissemakse'
+    assert estonian['Withholding report'] == 'Kinnipidamiste aruanne'
+    assert estonian['Withholding payouts report'] == 'Kinnipidamiste väljamaksete aruanne'
+
+
+def test_payroll_contracts_and_tor_workspace_labels_exist_in_all_locales():
+    labels = ('Contracts', 'Employment contract', 'Board member contract', 'Services contract',
+              'Other contract', 'No contract', 'Salary agreement history', 'Position history',
+              'Monthly advance', 'Workplace address', 'TÖR import from file', 'Add contract',
+              'Edit contract', 'Add salary agreement', 'Add position', 'Payday override')
+    for language in ('en', 'et', 'lv', 'lt'):
+        workspace = i18n.catalog(language)['workspace']
+        assert all(workspace.get(label, '').strip() for label in labels)
+    estonian = i18n.catalog('et')['workspace']
+    assert estonian['Contracts'] == 'Lepingud'
+    assert estonian['Employment contract'] == 'Tööleping'
+    assert estonian['Board member contract'] == 'Juhatuse liikme leping'
+    assert estonian['Services contract'] == 'Töövõtuleping'
+    assert estonian['Other contract'] == 'Muu leping'
+    assert estonian['No contract'] == 'Leping puudub'
+    assert estonian['Salary agreement history'] == 'Palgakokkulepe'
+    assert estonian['Position history'] == 'Ametikoha ajalugu'
+    assert estonian['Monthly advance'] == 'Igakuine avanss'
+    assert estonian['Workplace address'] == 'Töökoha aadress'
+    assert estonian['TÖR import from file'] == 'TÖR import failist'
+
+
+def test_tsd_workpaper_labels_exist_in_all_locales():
+    labels = ('Income tax withheld', 'Social tax', 'UI', 'II pillar', 'Total payable',
+              'Record count', 'Payment month', 'List', 'Group by payment type',
+              'Group by recipient', 'Legacy Annex 1 CSV upload (through 2027)', 'TSD workpaper XLSX')
+    for language in ('en', 'et', 'lv', 'lt'):
+        workspace = i18n.catalog(language)['workspace']
+        assert all(workspace.get(label, '').strip() for label in labels)
+    estonian = i18n.catalog('et')['workspace']
+    assert estonian['Income tax withheld'] == 'Kinnipeetud tulumaks'
+    assert estonian['Social tax'] == 'Sotsiaalmaks'
+    assert estonian['UI'] == 'Töötuskindlustusmakse'
+    assert estonian['II pillar'] == 'Kohustusliku kogumispensioni makse'
+    assert estonian['Total payable'] == 'Kokku'
+    assert estonian['List'] == 'Loetelu'
+    assert estonian['Group by payment type'] == 'Koonda väljamakse liigi järgi'
+    assert estonian['Group by recipient'] == 'Koonda saaja järgi'
+
+
+def test_apa_declaration_labels_exist_in_all_locales():
+    labels = ('Business rules', 'Validation errors', 'Warnings', 'Export XML',
+              'ZIP for month', 'Export cancellation', 'Upload feedback report',
+              'Export history', 'Accepted', 'Rejected', 'Partially rejected')
+    for language in ('en', 'et', 'lv', 'lt'):
+        workspace = i18n.catalog(language)['workspace']
+        assert all(workspace.get(label, '').strip() for label in labels)
+    estonian = i18n.catalog('et')['workspace']
+    assert estonian['Business rules'] == 'Ärireeglid'
+    assert estonian['Validation errors'] == 'Veateated'
+    assert estonian['Warnings'] == 'Hoiatused'
+    assert estonian['Export XML'] == 'Ekspordi XML'
+    assert estonian['Export cancellation'] == 'Tühistamise fail'
+    assert estonian['Upload feedback report'] == 'Laadi tagasisideraport'
+    assert estonian['Export history'] == 'Ekspordiajalugu'
+    assert estonian['Accepted'] == 'Vastu võetud'
+    assert estonian['Rejected'] == 'Tagasi lükatud'
+    assert estonian['Partially rejected'] == 'Osaliselt tagasi lükatud'
+
+
+def test_payroll_correction_workspace_labels_exist_in_all_locales():
+    labels = ('Create correction', 'Add supplementary run', 'Create supplementary run',
+              'Correction', 'Supplementary run', 'Original', 'Corrected', 'Difference',
+              'Employee receivable', 'Offset', 'Confirm offsets', 'Receivable offsets',
+              'Related runs', 'Taxes')
+    for language in ('en', 'et', 'lv', 'lt'):
+        workspace = i18n.catalog(language)['workspace']
+        assert all(workspace.get(label, '').strip() for label in labels)
+    estonian = i18n.catalog('et')['workspace']
+    assert {key: estonian[key] for key in ('Correction', 'Supplementary run', 'Original',
+        'Corrected', 'Difference', 'Employee receivable', 'Offset')} == {
+        'Correction': 'Parandus', 'Supplementary run': 'Täiendav palgaleht',
+        'Original': 'Algne', 'Corrected': 'Parandatud', 'Difference': 'Vahe',
+        'Employee receivable': 'Töötaja nõue', 'Offset': 'Tasaarvestus'}
+
+
 def test_workspace_literal_labels_and_table_headers_are_translated():
     source = (Path(__file__).resolve().parents[1] / "static/app.js").read_text(encoding="utf-8")
     literal = r'''(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')'''

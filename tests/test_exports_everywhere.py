@@ -1,4 +1,7 @@
 """Offline CSV contracts, report parity, access and workspace downloads."""
+
+from tests.migration_catalogue import catalogue, catalogue_after
+
 import csv
 from decimal import Decimal
 from io import StringIO
@@ -203,7 +206,7 @@ def test_report_date_filters_and_read_only(env, tab):
     for kind in LIST_HEADERS:
         assert download(d, kind + '/export.csv').status_code == 200
     assert {t['name']: d['db'].rows('SELECT * FROM "' + t['name'] + '"') for t in tables} == before
-    assert d['db'].scalar('SELECT COUNT(*) FROM schema_migrations') == 32
+    assert d['db'].scalar('SELECT COUNT(*) FROM schema_migrations') == len(catalogue())
 
 
 @pytest.mark.parametrize('tab', ['trial-balance', 'profit-and-loss', 'general-ledger'])

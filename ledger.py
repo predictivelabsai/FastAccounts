@@ -70,6 +70,8 @@ class PostingLine:
     projects_location_id: str | None = None
     projects_person_id: str | None = None
     projects_object_id: str | None = None
+    payroll_department_id: str | None = None
+    payroll_cost_centre_id: str | None = None
 
 
 class LedgerService:
@@ -113,6 +115,14 @@ class LedgerService:
                 return existing
             for line in lines:
                 validate_dimensions(objects, line, active=not (allow_inactive_objects or bool(line.reverses_entry_id)))
+                for field, kind in (('payroll_department_id', 'department'),
+                                    ('payroll_cost_centre_id', 'cost_centre')):
+                    dimension_id = getattr(line, field)
+                    if dimension_id:
+                        dimension = work.one('SELECT kind,active FROM payroll_dimensions WHERE organisation_id=? AND id=?',
+                                             (organisation_id, dimension_id))
+                        if not dimension or dimension['kind'] != kind or (not dimension['active'] and not allow_inactive_objects):
+                            raise ValueError('Payroll dimension must match its type and belong to this organisation')
             self._validate_period(work, organisation_id, posting_date)
             account_ids = {row["id"] for row in work.rows(
                 "SELECT id FROM accounts WHERE organisation_id=? AND active=1", (organisation_id,)
@@ -147,7 +157,10 @@ class LedgerService:
                      db_number(decimal(exchange_rate)), line.contact_id, line.due_date,
                      line.memo, line.source_line_type, line.source_line_id, line.reverses_entry_id),
                 )
-                objects.save_dimensions('gl', batch_id, entry_id, dimensions(line))
+                objects.save_dimensions('gl', batch_id, entry_id, dimensions(line), {
+                    'payroll_department_id': line.payroll_department_id,
+                    'payroll_cost_centre_id': line.payroll_cost_centre_id,
+                })
             work.execute(
                 "UPDATE posting_batches SET status='Posted',posted_at=?,posted_by=? WHERE id=?",
                 (now, actor, batch_id),
@@ -163,8 +176,9 @@ class LedgerService:
             return perform(own_tx)
 
     def reverse(self, batch_id: str, *, reversal_date: str, actor: str,
-                reason: str = "") -> dict:
-        with self.db.transaction() as tx:
+                reason: str = "", tx=None) -> dict:
+        def perform(transaction):
+            tx = transaction
             batch = tx.one("SELECT * FROM posting_batches WHERE id=?", (batch_id,))
             if not batch or batch["status"] != "Posted":
                 raise ValueError("Only a posted, unreversed batch can be reversed")
@@ -193,6 +207,10 @@ class LedgerService:
             audit(tx, batch["organisation_id"], actor, "ledger.reversed", "posting_batch", batch_id,
                   {"reversal_batch_id": reversal["id"], "reason": reason})
             return reversal
+        if tx is not None:
+            return perform(tx)
+        with self.db.transaction() as own_tx:
+            return perform(own_tx)
 
     def lock_period(self, period_id: str, *, actor: str, reason: str) -> None:
         if not reason.strip():

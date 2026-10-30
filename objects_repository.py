@@ -46,13 +46,17 @@ class ObjectRepository:
     def delete(self, object_id):
         self.tx.execute('DELETE FROM objects WHERE organisation_id=? AND id=?', (self.oid, object_id))
 
-    def save_dimensions(self, kind, parent_id, line_id, values):
-        if not any(values.values()):
+    def save_dimensions(self, kind, parent_id, line_id, values, payroll_values=None):
+        payroll_values = payroll_values or {}
+        if not any(values.values()) and not any(payroll_values.values()):
             return
         table = {'invoice': 'invoice_line_objects', 'bill': 'bill_line_objects', 'gl': 'gl_entry_objects'}[kind]
-        columns = ','.join(DIMENSIONS)
-        self.tx.execute(f'INSERT INTO {table}(organisation_id,parent_id,line_id,{columns}) VALUES (?,?,?,?,?,?,?)',
-                        (self.oid, parent_id, line_id, *(values[k] for k in DIMENSIONS)))
+        extra = tuple(payroll_values) if kind == 'gl' else ()
+        columns = ','.join((*DIMENSIONS, *extra))
+        self.tx.execute(f'INSERT INTO {table}(organisation_id,parent_id,line_id,{columns}) VALUES (' +
+                        ','.join('?' for _ in range(3 + len(DIMENSIONS) + len(extra))) + ')',
+                        (self.oid, parent_id, line_id, *(values[k] for k in DIMENSIONS),
+                         *(payroll_values[key] for key in extra)))
 
     def document_lines(self, kind, parent_id):
         table, parent = {'invoice': ('invoice_lines', 'invoice_id'), 'bill': ('bill_lines', 'bill_id')}[kind]

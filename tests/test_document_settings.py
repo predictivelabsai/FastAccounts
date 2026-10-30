@@ -1,4 +1,7 @@
 """Offline document appearance, tenant access, PDF and workspace regressions."""
+
+from tests.migration_catalogue import catalogue, catalogue_after
+
 import json
 import socket
 import sqlite3
@@ -228,7 +231,7 @@ def test_migration_rerun_preserves_data_and_checks(env):
     upload(d)
     original = d['db'].rows('SELECT * FROM document_settings')
     attachments = d['db'].rows('SELECT * FROM attachments')
-    assert d['db'].scalar('SELECT COUNT(*) FROM schema_migrations') == 32
+    assert d['db'].scalar('SELECT COUNT(*) FROM schema_migrations') == len(catalogue())
     for _ in range(2):
         with d['db'].transaction() as tx:
             tx.execute("DELETE FROM schema_migrations WHERE version='0028_document_settings'")
@@ -236,7 +239,7 @@ def test_migration_rerun_preserves_data_and_checks(env):
     assert d['db'].rows('SELECT * FROM document_settings') == original
     assert d['db'].rows('SELECT * FROM attachments') == attachments
     assert d['db'].rows('PRAGMA foreign_key_check') == []
-    assert "'0027_mfa', '0028_document_settings', '0029_copilot', '0030_master_data_maintenance', '0031_master_data_groups', '0032_copilot_access']" in (ROOT / '.github/workflows/ci.yml').read_text()
+    assert f"'{catalogue()[-1]}'" in (ROOT / ".github/workflows/ci.yml").read_text()
     for column, value in [('accent_colour', '#GG0000'), ('accent_colour', '#1234567'), ('footer_text', 'a' * 501)]:
         with pytest.raises(sqlite3.IntegrityError), d['db'].transaction() as tx:
             tx.execute(f'UPDATE document_settings SET {column}=? WHERE organisation_id=?', (value, d['org']['id']))
@@ -246,7 +249,9 @@ def test_migration_rerun_preserves_data_and_checks(env):
 def test_locale_tail_keys_merge_and_nav(language):
     raw = json.loads((i18n.LOCALES_DIR / f'{language}.json').read_text(encoding='utf-8'))
     english = json.loads((i18n.LOCALES_DIR / 'en.json').read_text(encoding='utf-8'))
-    assert list(raw)[-(7):] == ['invoice_exports', 'bulk_sending', 'reminder_rules', 'fx_rates', 'document_settings', 'copilot', 'periods']
+    sections = ['invoice_exports', 'bulk_sending', 'reminder_rules', 'fx_rates', 'document_settings', 'copilot', 'periods', 'payroll_corrections']
+    start = list(raw).index('invoice_exports')
+    assert list(raw)[start:start + len(sections)] == sections
     assert set(raw['document_settings']) == set(english['document_settings']) == {'nav', 'views', 'workspace'}
     for section in ['nav', 'views', 'workspace']:
         assert set(raw['document_settings'][section]) == set(english['document_settings'][section])

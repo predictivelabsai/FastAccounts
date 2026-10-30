@@ -75,7 +75,13 @@ def test_demo_seed_creates_encrypted_connections_and_offline_import_runs(db, mon
     batch = db.one('SELECT posted_batch_id FROM pay_runs WHERE organisation_id=? AND period=?', (ee['id'], '2026-09'))
     assert push['local_ref'] == batch['posted_batch_id'] and push['reviewed_at'] is None
     payload = json.loads(push['payload_json'])
-    assert payload['currency'] == 'EUR' and len(payload['lines']) == 7
+    assert payload['currency'] == 'EUR'
+    # Payroll now posts gross salary payable and separate accrued levies.
+    # The reviewable export must retain every line of that source journal.
+    assert len(payload['lines']) == db.scalar(
+        'SELECT COUNT(*) FROM gl_entries WHERE organisation_id=? AND posting_batch_id=?',
+        (ee['id'], batch['posted_batch_id']),
+    )
     assert sum((Decimal(line['debit']) for line in payload['lines']), Decimal(0)) == sum((Decimal(line['credit']) for line in payload['lines']), Decimal(0))
     assert all(db.one("SELECT id FROM account_mappings WHERE organisation_id=? AND provider='smartaccounts' "
                       "AND local_account_code=? AND status='Confirmed'", (ee['id'], line['account_code'])) for line in payload['lines'])

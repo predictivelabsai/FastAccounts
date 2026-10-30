@@ -177,8 +177,12 @@ def test_upsert_audit_and_idempotent_migration(sending):
 def test_locale_appended_and_merged(language):
     from web import i18n
     raw = json.loads((i18n.LOCALES_DIR / f'{language}.json').read_text(encoding='utf-8'))
-    assert list(raw)[-(7):] == ['invoice_exports', 'bulk_sending', 'reminder_rules', 'fx_rates', 'document_settings', 'copilot', 'periods']
+    english = json.loads((i18n.LOCALES_DIR / 'en.json').read_text(encoding='utf-8'))
+    sections = ['invoice_exports', 'bulk_sending', 'reminder_rules', 'fx_rates', 'document_settings', 'copilot', 'periods', 'payroll_corrections']
+    start = list(raw).index('invoice_exports')
+    assert list(raw)[start:start + len(sections)] == sections
     assert set(raw['reminder_rules']) == {'nav', 'views', 'workspace'}
+    assert set(raw['reminder_rules']) == set(english['reminder_rules'])
     for key, value in raw['reminder_rules']['workspace'].items():
         assert i18n.catalog(language)['workspace'][key] == value
         assert '\u2014' not in value

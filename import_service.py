@@ -2,6 +2,9 @@
 from __future__ import annotations
 
 import json
+import base64
+import binascii
+from datetime import date
 import sqlite3
 from collections.abc import Mapping
 from decimal import Decimal, InvalidOperation
@@ -10,7 +13,7 @@ from typing import Any
 from psycopg.errors import UniqueViolation
 
 import connectors.registry as connector_registry
-from connectors.providers import FASTHR_NO_PAY_AMOUNT
+from connectors.providers import FASTHR_NO_PAY_AMOUNT, ProviderError
 from core_utils import (
     audit,
     canonical_json,
@@ -24,6 +27,8 @@ from database import Database, get_database
 from documents import DocumentService
 from integration_service import AccountMappingService, IntegrationService
 from payroll import PayrollConflict, PayrollService
+from ledger import LedgerService, PostingLine
+from journal_import_repository import JournalImportRepository
 from master_data_import import MasterDataImportService
 
 EMPLOYEE_FIELDS = {
@@ -48,6 +53,12 @@ STAGED_STATUSES = ("Pending", "Approved", "Rejected", "Applied", "Failed")
 FILE_IMPORT_PROVIDER = "file_import"
 MAX_FILE_IMPORT_CHARS = 2_000_000
 OBJECT_TYPES = {
+    "salary_agreement": "employee",
+    "salary_hours": "salary_hours",
+    "vacation_balance": "vacation_balance",
+    "payroll_opening_leave": "payroll_opening_leave",
+    "historical_earnings": "historical_earnings",
+    "journal": "journal",
     "employee": "employee",
     "employees": "employee",
     "contact": "contact",
@@ -75,12 +86,17 @@ class ImportService:
         self.account_mappings = AccountMappingService(self.db)
         self.APPLY_HANDLERS = {
             "employee": self._apply_employee,
+            "salary_hours": self._apply_salary_hours,
+            "payroll_opening_leave": self._apply_payroll_opening_leave,
+            "historical_earnings": self._apply_historical_earnings,
+            "vacation_balance": self._apply_merit_vacation_balance,
             "contact": self._apply_contact,
             "purchase_invoice": self._apply_purchase_invoice,
             "sales_invoice": self._apply_sales_invoice,
             "payment": self._apply_payment,
             "account": self._apply_account,
             "gl_entry": self._apply_gl_entry,
+            "journal": self._apply_journal,
         }
 
     def _connection_material(
@@ -97,9 +113,20 @@ class ImportService:
             raise ValueError("Unknown integration provider") from error
         if key == FILE_IMPORT_PROVIDER:
             resolved_credentials = dict(credentials or {})
+            if "xlsx_base64" in resolved_credentials:
+                encoded = resolved_credentials.pop("xlsx_base64")
+                if not isinstance(encoded, str) or len(encoded) > 2_666_668:
+                    raise ValueError("Journal workbook must be an XLSX file under 2 MB")
+                try:
+                    resolved_credentials["workbook_content"] = base64.b64decode(encoded, validate=True)
+                except (ValueError, binascii.Error) as error:
+                    raise ValueError("Journal workbook is not a valid XLSX file") from error
             csv_content = resolved_credentials.get("csv_content", "")
             if not isinstance(csv_content, str):
                 raise ValueError("CSV content must be text")
+            workbook_content = resolved_credentials.get("workbook_content", b"")
+            if not isinstance(workbook_content, bytes) or len(workbook_content) > 2_000_000:
+                raise ValueError("Payroll import file must be under 2 MB")
             if len(csv_content) > MAX_FILE_IMPORT_CHARS:
                 raise ValueError(
                     f"CSV content exceeds the {MAX_FILE_IMPORT_CHARS} character limit"
@@ -121,7 +148,7 @@ class ImportService:
         return (
             key,
             dict(stored_credentials if credentials is None else credentials),
-            dict(stored_config if config is None else config),
+            dict(stored_config) | dict(config or {}),
         )
 
     def _last_cursor(self, organisation_id: str, provider: str, object_type: str) -> str | None:
@@ -146,8 +173,10 @@ class ImportService:
         key, resolved_credentials, resolved_config = self._connection_material(
             organisation_id, provider, credentials, config
         )
-        if key == FILE_IMPORT_PROVIDER and object_type not in {"employee", "employees"}:
-            raise ValueError("The reviewed import pipeline currently supports employees only")
+        if key == FILE_IMPORT_PROVIDER and object_type not in {
+            "employee", "employees", "journal", "payroll_opening_leave", "historical_earnings"
+        }:
+            raise ValueError("File import supports employees, journals and payroll history only")
         requested_type = object_type.strip().lower()
         canonical_type = OBJECT_TYPES.get(requested_type)
         if canonical_type is None:
@@ -205,7 +234,8 @@ class ImportService:
                 actor,
             )
         except Exception as error:
-            safe_error = str(error) if isinstance(error, (ValueError, KeyError)) else "Connector pull failed"
+            safe_error = (str(error) if isinstance(error, (ValueError, KeyError))
+                          or (key == "merit_palk" and isinstance(error, ProviderError)) else "Connector pull failed")
             self.integration.complete_sync(sync_id, error=safe_error)
             with self.db.transaction() as tx:
                 audit(
@@ -235,6 +265,8 @@ class ImportService:
         now = utc_now()
         staged_ids: list[str] = []
         canonical_type = OBJECT_TYPES.get(object_type, object_type)
+        if provider == "merit_palk" and object_type == "gl_entry":
+            canonical_type = object_type = "journal"
         with self.db.transaction() as tx:
             for payload in records:
                 external_id = self._external_id(payload)
@@ -244,6 +276,10 @@ class ImportService:
                 warning = payload.get("import_warning")
                 if not review_note and isinstance(warning, str) and warning:
                     review_note = warning
+                if canonical_type == "journal":
+                    review_note = self._journal_review(tx, organisation_id, payload, provider)["warning"]
+                if canonical_type == "salary_hours":
+                    matched_id, review_note, match = self._salary_hours_review(tx, organisation_id, payload)
                 existing = None
                 if external_id:
                     existing = tx.one(
@@ -374,6 +410,31 @@ class ImportService:
         external_id: str | None, payload: Mapping[str, Any]
     ) -> tuple[str | None, str | None, dict | None]:
         canonical_type = OBJECT_TYPES.get(object_type, object_type)
+        if canonical_type == "salary_hours":
+            return self._salary_hours_review(tx, organisation_id, payload)
+        if canonical_type in {"payroll_opening_leave", "historical_earnings", "vacation_balance"}:
+            row_error = str(payload.get("import_error") or "") or None
+            if not row_error:
+                try:
+                    self._validate_payroll_import_payload(canonical_type, payload)
+                except ValueError as error:
+                    row_error = str(error)
+            if canonical_type == "vacation_balance" and not row_error:
+                row_error = str(payload.get("import_warning") or "") or None
+            personal_code = str(payload.get("personal_code") or payload.get("personal_id") or "").strip()
+            if canonical_type == "vacation_balance" and not personal_code and external_id:
+                personal_code = external_id.split(":", 1)[0]
+            if not personal_code:
+                return None, row_error or "Personal code is required to match an employee", None
+            matches = tx.rows(
+                "SELECT id,name FROM employees WHERE organisation_id=? AND personal_id=? ORDER BY id",
+                (organisation_id, personal_code),
+            )
+            if len(matches) == 1:
+                return matches[0]["id"], row_error, {"strategy": "personal_code", "personal_code": personal_code}
+            if len(matches) > 1:
+                return None, row_error or "Personal code matches more than one employee", None
+            return None, row_error or "No employee in this organisation matches the personal code", None
         if external_id:
             mapping = tx.one(
                 "SELECT local_id FROM external_mappings WHERE organisation_id=? AND provider=? "
@@ -384,6 +445,17 @@ class ImportService:
                 return mapping["local_id"], None, {
                     "strategy": "external_mapping", "external_id": external_id
                 }
+            if provider == "merit_palk" and canonical_type == "employee":
+                # Both pulls describe the same Merit Palk contract. Reuse its
+                # identity when the other pull established the mapping first.
+                other_type = "employee" if object_type == "salary_agreement" else "salary_agreement"
+                mapping = tx.one(
+                    "SELECT local_id FROM external_mappings WHERE organisation_id=? AND provider=? "
+                    "AND object_type=? AND external_id=? AND direction IN ('import','bidirectional')",
+                    (organisation_id, provider, other_type, external_id),
+                )
+                if mapping:
+                    return mapping["local_id"], None, {"strategy": "external_mapping", "external_id": external_id}
         if canonical_type == "employee":
             return self._employee_match(tx, organisation_id, payload, match_name=provider == "smartaccounts")
         if canonical_type == "contact":
@@ -456,7 +528,7 @@ class ImportService:
             "CASE WHEN s.object_type='contact' THEN c.name "
             "WHEN s.object_type='purchase_invoice' THEN bc.name||' / '||b.supplier_number "
             "WHEN s.object_type='sales_invoice' THEN ic.name||' / '||COALESCE(i.number,'Draft') "
-            "WHEN s.object_type IN ('employee','employees') THEN e.name END AS matched_local_name "
+            "WHEN s.object_type IN ('employee','employees','salary_agreement') THEN e.name END AS matched_local_name "
             "FROM import_staged_records s "
             "LEFT JOIN employees e ON e.organisation_id=s.organisation_id "
             "AND e.id=s.matched_local_employee_id "
@@ -478,6 +550,11 @@ class ImportService:
         for record in records:
             record["external_payload"] = json.loads(record.pop("external_payload_json"))
             record["match"] = json.loads(record["match_json"]) if record.get("match_json") else None
+            if record["object_type"] == "journal":
+                record["journal_review"] = self._journal_review(self.db, organisation_id, record["external_payload"], record["provider"])
+            record["display_only"] = (
+                record["object_type"] == "vacation_balance" and record["provider"] != "merit_palk"
+            )
         summary = self._sync_summary(organisation_id, sync_run_id) if sync_run_id else None
         return {"summary": summary, "records": records}
 
@@ -533,6 +610,7 @@ class ImportService:
         decisions: Mapping[str, str],
         *,
         actor: str,
+        posting_date: str | None = None,
     ) -> dict:
         key = provider.strip().lower()
         sync = self.db.one(
@@ -542,7 +620,14 @@ class ImportService:
         if not sync:
             raise KeyError("Sync run not found")
         object_type = OBJECT_TYPES.get(sync["object_type"], sync["object_type"])
-        handler = self.APPLY_HANDLERS.get(object_type)
+        if key == "merit_palk" and sync["object_type"] == "gl_entry":
+            object_type = "journal"
+        if object_type == "vacation_balance":
+            if key != "merit_palk":
+                raise ValueError("Only a Merit Palk vacation snapshot can be applied as an opening balance")
+            handler = self._apply_merit_vacation_balance
+        else:
+            handler = self.APPLY_HANDLERS.get(object_type)
         if handler is None:
             raise ValueError(f"Staged {sync['object_type']} records cannot be applied")
         invalid = {value for value in decisions.values() if value not in {"apply", "reject"}}
@@ -554,6 +639,8 @@ class ImportService:
             (organisation_id, key, sync_run_id),
         )
         by_id = {row["id"]: row for row in rows}
+        if object_type == "salary_hours":
+            sync = dict(sync, salary_selected_ids={identity for identity, decision in decisions.items() if decision == "apply"})
         unknown = sorted(set(decisions) - set(by_id))
         if unknown:
             raise KeyError("Staged record not found")
@@ -565,7 +652,10 @@ class ImportService:
                 outcomes.append(self._reject(organisation_id, row, actor))
                 continue
             try:
-                outcomes.append(handler(organisation_id, sync, row, actor))
+                if object_type == "journal":
+                    outcomes.append(handler(organisation_id, sync, row, actor, posting_date))
+                else:
+                    outcomes.append(handler(organisation_id, sync, row, actor))
             except (
                 ValueError,
                 KeyError,
@@ -589,6 +679,213 @@ class ImportService:
             "summary": self._sync_summary(organisation_id, sync_run_id),
         }
 
+    def _journal_review(self, tx, organisation_id: str, payload: dict, provider: str = FILE_IMPORT_PROVIDER) -> dict:
+        repository = JournalImportRepository(tx, organisation_id, provider)
+        lines = []
+        debit = credit = Decimal("0")
+        warning = payload.get("import_warning")
+        for source in payload.get("lines", []):
+            line = dict(source)
+            account = repository.resolve_account(str(line.get("account_code") or ""))
+            line["account_id"] = account["id"] if account else None
+            line["local_account_code"] = account["code"] if account else None
+            line["warning"] = None if account else "Journal account is unmapped"
+            if not account:
+                warning = warning or "Journal account is unmapped"
+            try:
+                dr, cr = money(line.get("debit") or "0"), money(line.get("credit") or "0")
+                if (not dr.is_finite() or not cr.is_finite() or dr < 0 or cr < 0 or (dr > 0 and cr > 0)
+                        or dr != Decimal(str(line.get("debit") or "0"))
+                        or cr != Decimal(str(line.get("credit") or "0"))):
+                    raise ValueError("Invalid journal amounts")
+                debit += dr
+                credit += cr
+            except (ValueError, InvalidOperation):
+                warning = "Journal line contains an invalid amount, date or formula"
+            lines.append(line)
+        balanced = debit == credit
+        if not balanced:
+            warning = "Journal block is unbalanced"
+        elif debit <= 0 or not lines:
+            warning = warning or "Journal block must contain a positive balanced posting"
+        return {"lines": lines, "debit_total": str(debit), "credit_total": str(credit),
+                "balanced": balanced, "warning": warning, "valid": not warning}
+
+    def _apply_journal(self, organisation_id, sync, row, actor, posting_date=None):
+        payload = json.loads(row["external_payload_json"])
+        with self.db.transaction() as tx:
+            repository = JournalImportRepository(tx, organisation_id, sync["provider"])
+            repository.lock()
+            current = repository.staged(row["id"])
+            if current and current["status"] == "Rejected":
+                return {"staged_id": row["id"], "outcome": "failed",
+                        "reason": "Only pending or failed journal proposals can be applied"}
+            if not current or current["status"] not in {"Pending", "Failed", "Applied"}:
+                raise ValueError("Only pending or failed journal proposals can be applied")
+            existing = repository.posted(row["external_id"])
+            if existing:
+                if sync["provider"] == "merit_palk":
+                    mapping = tx.one(
+                        "SELECT last_hash FROM external_mappings WHERE organisation_id=? AND provider=? "
+                        "AND object_type='journal' AND external_id=?",
+                        (organisation_id, sync["provider"], row["external_id"]),
+                    )
+                    if not mapping or mapping["last_hash"] != self._mapping_values(payload)[1]:
+                        raise ValueError("Merit Palk journal changed after posting; reverse the original batch before correcting it")
+                return self._mark_applied(tx, organisation_id, sync, row, actor, existing["id"], "unchanged")
+            if current["status"] == "Applied":
+                raise ValueError("Only pending or failed journal proposals can be applied")
+            review = self._journal_review(tx, organisation_id, payload, sync["provider"])
+            if not review["valid"]:
+                raise ValueError(review["warning"])
+            day = payload.get("date") or posting_date
+            if not day:
+                raise ValueError("Set a posting date before applying the journal")
+            day = date.fromisoformat(day).isoformat()
+            lines = [PostingLine(account_id=line["account_id"],
+                                 debit=money(line.get("debit") or "0"), credit=money(line.get("credit") or "0"),
+                                 memo=line.get("description") or payload["name"])
+                     for line in review["lines"] if money(line.get("debit") or "0") or money(line.get("credit") or "0")]
+            batch = LedgerService(self.db).post(
+                organisation_id=organisation_id, voucher_type=repository.voucher_type, voucher_id=row["external_id"],
+                voucher_code=payload["name"], posting_date=day, lines=lines, actor=actor,
+                currency=repository.currency(), tx=tx)
+            self._upsert_external_mapping(tx, organisation_id, sync["provider"], "journal", batch["id"], row["external_id"], payload)
+            return self._mark_applied(tx, organisation_id, sync, row, actor, batch["id"])
+
+    # Merit permits renaming salary types and reports no employee ID. Names must
+    # therefore match uniquely within this tenant, and types must be recognised
+    # explicitly. Preserve the original report in staging for accountant review.
+    SALARY_BASE_NAMES = {"base salary", "monthly salary", "hourly salary", "põhipalk", "kuupalk", "tunnipalk"}
+
+    def _salary_hours_review(self, tx, organisation_id, payload):
+        employee_id, warning, match = self._employee_match(tx, organisation_id, payload, match_name=True)
+        if not employee_id:
+            return None, warning or "Merit Palk salary report needs a unique local employee name", match
+        types = tx.rows("SELECT * FROM pay_component_types WHERE organisation_id=?", (organisation_id,))
+        for line in payload.get("lines", []):
+            name = str(line.get("name") or "").casefold()
+            if name not in self.SALARY_BASE_NAMES and sum(t["name"].casefold() == name for t in types) != 1:
+                return employee_id, "Merit Palk salary type is unmapped; review the source report", match
+        return employee_id, None, match
+
+    def _apply_salary_hours(self, organisation_id, sync, row, actor):
+        if sync["provider"] != "merit_palk":
+            raise ValueError("Salary and hours apply requires Merit Palk")
+        payload = json.loads(row["external_payload_json"])
+        with self.db.transaction() as tx:
+            # Organisation lock also serialises first-run creation. Payroll's
+            # draft-only conditional write serialises this with approval.
+            tx.execute("UPDATE organisations SET name=name WHERE id=?", (organisation_id,))
+            current = tx.one("SELECT * FROM import_staged_records WHERE organisation_id=? AND id=?", (organisation_id, row["id"]))
+            if not current or current["status"] not in {"Pending", "Failed", "Applied"}:
+                raise ValueError("Only pending or failed salary proposals can be applied")
+            employee_id, warning, _ = self._salary_hours_review(tx, organisation_id, payload)
+            if warning:
+                raise ValueError(warning)
+            period = payload["period"]
+            existing = tx.one("SELECT * FROM pay_runs WHERE organisation_id=? AND period=?", (organisation_id, period))
+            if existing and existing["status"] != "Draft":
+                if current["status"] == "Applied":
+                    return {"staged_id": row["id"], "outcome": "failed", "reason": "Only draft pay runs can be edited"}
+                raise PayrollConflict("Only draft pay runs can be edited")
+            if existing:
+                claimed = tx.execute("UPDATE pay_runs SET notes=notes WHERE organisation_id=? AND id=? AND status='Draft'", (organisation_id, existing["id"]))
+                if claimed.rowcount != 1:
+                    raise PayrollConflict("Only draft pay runs can be edited")
+                run = self.payroll._run(tx, organisation_id, existing["id"])
+            else:
+                # create_run requires hours for every hourly employee. Only use
+                # this reviewed sync's report, never assume missing hours are zero.
+                hours = {}
+                for staged in tx.rows("SELECT id,external_payload_json FROM import_staged_records WHERE organisation_id=? AND sync_run_id=? AND status<>'Rejected'", (organisation_id, sync["id"])):
+                    if staged["id"] not in sync["salary_selected_ids"]:
+                        continue
+                    other = json.loads(staged["external_payload_json"])
+                    identity, issue, _ = self._salary_hours_review(tx, organisation_id, other)
+                    if identity and not issue:
+                        hours[identity] = money(other["hours"])
+                run = self.payroll.create_run(organisation_id, period=period, actor=actor, hours=hours, tx=tx)
+            item = next((i for i in run["items"] if i["employee_id"] == employee_id), None)
+            if not item:
+                raise ValueError("Merit Palk employee is absent from the draft pay run")
+            mapping = tx.one("SELECT * FROM external_mappings WHERE organisation_id=? AND provider='merit_palk' AND object_type='salary_hours' AND external_id=?", (organisation_id, row["external_id"]))
+            previous = None
+            if mapping:
+                if mapping["local_id"] != item["id"]:
+                    raise ValueError("Merit Palk salary report changed; review the draft manually before importing again")
+                if mapping["last_hash"] == self._mapping_values(payload)[1]:
+                    return self._mark_applied(tx, organisation_id, sync, row, actor, item["id"], "unchanged")
+                for applied in tx.rows("SELECT external_payload_json FROM import_staged_records WHERE organisation_id=? AND provider='merit_palk' AND object_type='salary_hours' AND external_id=? AND status='Applied'", (organisation_id, row["external_id"])):
+                    candidate = json.loads(applied["external_payload_json"])
+                    if self._mapping_values(candidate)[1] == mapping["last_hash"]:
+                        previous = candidate
+                        break
+                if previous is None:
+                    raise ValueError("Merit Palk salary report changed; review the draft manually before importing again")
+            types = tx.rows("SELECT * FROM pay_component_types WHERE organisation_id=?", (organisation_id,))
+            components = [{key: c[key] for key in ("type_id", "name", "amount", "direction", "liability_role", "income_tax", "social_tax", "ui_employee", "ui_employer", "funded_pension", "social_minimum")} for c in item["components"]]
+            if previous:
+                # Replace this source's prior components on a reviewed correction,
+                # retaining unrelated manual lines. The applied payload is the
+                # source ownership evidence, never merely a matching current type.
+                expected = {}
+                old_base = Decimal(0)
+                for line in previous["lines"]:
+                    if line["name"].casefold() in self.SALARY_BASE_NAMES:
+                        old_base += money(line["amount"])
+                    else:
+                        ids = {c["type_id"] for c in components if c["name"].casefold() == line["name"].casefold()}
+                        if len(ids) != 1 and money(line["amount"]):
+                            raise ValueError("Merit Palk payment type already exists in the draft; review components before importing")
+                        for identity in ids:
+                            expected[identity] = expected.get(identity, Decimal(0)) + money(line["amount"])
+                if any(line["name"].casefold() in self.SALARY_BASE_NAMES for line in previous["lines"]):
+                    preset = {"hourly": "base_adjustment", "income_line": "contract"}.get(item["pay_basis"])
+                    if preset:
+                        old_amount = (money(old_base - money(Decimal(str(item["hourly_rate"])) * money(previous["hours"])))
+                                      if preset == "base_adjustment" else old_base)
+                        for kind in types:
+                            if kind["preset_key"] == preset and old_amount:
+                                expected[kind["id"]] = expected.get(kind["id"], Decimal(0)) + old_amount
+                for identity, amount in expected.items():
+                    if sum((money(c["amount"]) for c in components if c["type_id"] == identity), Decimal(0)) != amount:
+                        raise ValueError("Merit Palk payment type already exists in the draft; review components before importing")
+                components = [c for c in components if c["type_id"] not in expected]
+            occupied_types = {c["type_id"] for c in components}
+            def add_component(kind, amount):
+                if kind["id"] in occupied_types:
+                    raise ValueError("Merit Palk payment type already exists in the draft; review components before importing")
+                components.append({"type_id": kind["id"], "amount": db_number(amount)})
+            base = Decimal(0)
+            has_base = False
+            for line in payload["lines"]:
+                amount = money(line["amount"])
+                if line["name"].casefold() in self.SALARY_BASE_NAMES:
+                    base += amount
+                    has_base = True
+                elif amount:
+                    kind = next(t for t in types if t["name"].casefold() == line["name"].casefold())
+                    add_component(kind, amount)
+            worked = money(payload["hours"]) if item["pay_basis"] == "hourly" else None
+            gross_override = None
+            if has_base:
+                if item["pay_basis"] == "income_line":
+                    kind = next(t for t in types if t["preset_key"] == "contract")
+                    if base:
+                        add_component(kind, base)
+                elif item["pay_basis"] == "hourly":
+                    adjustment = money(base - money(Decimal(str(item["hourly_rate"])) * worked))
+                    if adjustment:
+                        kind = next(t for t in types if t["preset_key"] == "base_adjustment")
+                        add_component(kind, adjustment)
+                else:
+                    gross_override = base
+            self.payroll.update_item(organisation_id, run["id"], item["id"], actor=actor,
+                                     hours=worked, components=components, gross_salary=gross_override, tx=tx)
+            self._upsert_external_mapping(tx, organisation_id, sync["provider"], "salary_hours", item["id"], row["external_id"], payload)
+            return self._mark_applied(tx, organisation_id, sync, row, actor, item["id"], "updated" if previous else "applied")
+
     def _reject(self, organisation_id: str, row: dict, actor: str) -> dict:
         if row["status"] == "Applied":
             return {
@@ -598,6 +895,18 @@ class ImportService:
             }
         now = utc_now()
         with self.db.transaction() as tx:
+            if row["object_type"] == "salary_hours":
+                tx.execute("UPDATE organisations SET name=name WHERE id=?", (organisation_id,))
+                current = tx.one("SELECT status FROM import_staged_records WHERE organisation_id=? AND id=?", (organisation_id, row["id"]))
+                if current and current["status"] == "Applied":
+                    return {"staged_id": row["id"], "outcome": "failed", "reason": "An applied record cannot be rejected"}
+            if row["object_type"] == "journal":
+                repository = JournalImportRepository(tx, organisation_id)
+                repository.lock()
+                current = repository.staged(row["id"])
+                if current and current["status"] == "Applied":
+                    return {"staged_id": row["id"], "outcome": "failed",
+                            "reason": "An applied record cannot be rejected"}
             tx.execute(
                 "UPDATE import_staged_records SET status='Rejected',review_note=NULL,updated_at=? "
                 "WHERE organisation_id=? AND id=?",
@@ -620,6 +929,12 @@ class ImportService:
         if not external_id:
             raise ValueError("External ID is required to apply an employee record")
         changes = {field: payload[field] for field in EMPLOYEE_FIELDS if field in payload}
+        merit_contract = sync["provider"] == "merit_palk"
+        if merit_contract:
+            # Merit Palk salary terms belong in dated contract history. Keep the
+            # employee's legacy pay fields untouched while applying identity data.
+            for field in ("gross_salary", "pay_basis", "fte", "hourly_rate", "board_member"):
+                changes.pop(field, None)
         if not isinstance(changes.get("name"), str) or not changes["name"].strip():
             raise ValueError("Employee name is required")
         warning = payload.get("import_warning")
@@ -645,11 +960,25 @@ class ImportService:
             ):
                 raise ValueError(warning)
             if (
-                not existing
+                not merit_contract
+                and not existing
                 and "gross_salary" not in changes
-                and changes.get("pay_basis", "monthly") != "hourly"
+                and changes.get("pay_basis", "monthly") not in {"hourly", "income_line"}
             ):
                 raise ValueError("Gross salary is required")
+            if merit_contract and not existing:
+                # New employee rows still require a valid legacy fallback. Existing
+                # employee salary fields are never overwritten by Merit imports.
+                initial = (payload.get("merit_palk_salary_agreements") or [{}])[0]
+                if payload.get("merit_palk_income_basis") == "income_line":
+                    changes["pay_basis"] = "income_line"
+                elif payload.get("board_member"):
+                    changes["pay_basis"] = "board_fee"
+                    changes["board_member"] = True
+                    changes["gross_salary"] = money(Decimal(str(initial.get("Amount"))))
+                else:
+                    changes["pay_basis"] = "monthly"
+                    changes["gross_salary"] = money(Decimal(str(initial.get("Amount"))))
             self._assert_name_available(tx, organisation_id, changes["name"].strip(), employee_id)
             outcome = "applied"
             if existing and self._employee_unchanged(existing, changes):
@@ -685,6 +1014,9 @@ class ImportService:
                         utc_now(),
                     ),
                 )
+            if merit_contract:
+                if self._apply_merit_contract_history(tx, organisation_id, employee["id"], payload):
+                    outcome = "updated" if existing else "applied"
             tx.execute(
                 "UPDATE import_staged_records SET status='Applied',matched_local_employee_id=?,"
                 "matched_local_id=?,review_note=NULL,updated_at=? WHERE organisation_id=? AND id=?",
@@ -708,6 +1040,247 @@ class ImportService:
             "outcome": outcome,
             "employee_id": employee["id"],
         }
+
+    @staticmethod
+    def _apply_merit_contract_history(tx, organisation_id, employee_id, payload):
+        contract_type = "board_member" if payload.get("board_member") else (
+            "services" if payload.get("merit_palk_income_basis") == "income_line" else "employment"
+        )
+        agreements = payload.get("merit_palk_salary_agreements") or []
+        starts = [str(item.get("StartDate") or payload.get("employment_start_date") or "")
+                  for item in agreements]
+        starts = [value for value in starts if value]
+        start_date = min(starts) if starts else str(payload.get("employment_start_date") or "")
+        if not start_date:
+            raise ValueError("Merit Palk contract start date is required")
+        end_date = payload.get("employment_end_date")
+        contract = tx.one(
+            "SELECT * FROM payroll_contracts WHERE organisation_id=? AND employee_id=? AND contract_type=? "
+            "ORDER BY start_date,id LIMIT 1", (organisation_id, employee_id, contract_type)
+        )
+        changed = False
+        if contract is None:
+            contract_id = new_id()
+            tx.execute(
+                "INSERT INTO payroll_contracts(id,organisation_id,employee_id,contract_type,start_date,end_date,created_at) "
+                "VALUES (?,?,?,?,?,?,?)", (contract_id, organisation_id, employee_id, contract_type, start_date, end_date, utc_now())
+            )
+            changed = True
+        else:
+            contract_id = contract["id"]
+            # Refresh imported dates without changing unrelated local contract settings.
+            changed = contract["start_date"] != start_date or contract["end_date"] != end_date
+            tx.execute("UPDATE payroll_contracts SET start_date=?,end_date=? WHERE organisation_id=? AND id=?",
+                       (start_date, end_date, organisation_id, contract_id))
+        for item in agreements:
+            agreement_start = str(item.get("StartDate") or start_date)
+            try:
+                rate = money(Decimal(str(item.get("Amount"))))
+            except (InvalidOperation, TypeError) as exc:
+                raise ValueError("Merit Palk salary agreement amount is invalid") from exc
+            if not rate.is_finite() or rate < 0:
+                raise ValueError("Merit Palk salary agreement amount is invalid")
+            existing = tx.one(
+                "SELECT id,rate FROM payroll_salary_agreements WHERE organisation_id=? AND contract_id=? AND start_date=?",
+                (organisation_id, contract_id, agreement_start),
+            )
+            if existing:
+                if Decimal(str(existing["rate"])) != rate:
+                    tx.execute("UPDATE payroll_salary_agreements SET rate=? WHERE organisation_id=? AND id=?",
+                               (format(rate, "f"), organisation_id, existing["id"]))
+                    changed = True
+                continue
+            tx.execute(
+                "INSERT INTO payroll_salary_agreements(id,organisation_id,contract_id,start_date,base_pay_type,hours_per_day,rate,fte,is_full_time,automatic_working_time,created_at) "
+                "VALUES (?,?,?,?,'monthly',8,?,1,1,1,?)",
+                (new_id(), organisation_id, contract_id, agreement_start, format(rate, "f"), utc_now()),
+            )
+            changed = True
+        return changed
+
+    def _payroll_import_employee(self, tx, organisation_id: str, row: dict, payload: dict) -> dict:
+        employee_id = row.get("matched_local_id") or row.get("matched_local_employee_id")
+        if employee_id:
+            employee = tx.one(
+                "SELECT id,personal_id FROM employees WHERE organisation_id=? AND id=?",
+                (organisation_id, employee_id),
+            )
+            if employee:
+                return employee
+        personal_code = str(payload.get("personal_code") or "").strip()
+        if not personal_code and row.get("provider") == "merit_palk":
+            personal_code = str(row.get("external_id") or "").split(":", 1)[0]
+        if not personal_code:
+            raise ValueError("Personal code is required to match an employee")
+        matches = tx.rows(
+            "SELECT id,personal_id FROM employees WHERE organisation_id=? AND personal_id=?",
+            (organisation_id, personal_code),
+        )
+        if len(matches) != 1:
+            raise ValueError("No unique employee in this organisation matches the personal code")
+        return matches[0]
+
+    @staticmethod
+    def _import_decimal(value: Any, label: str) -> Decimal:
+        try:
+            result = Decimal(str(value).strip().replace(" ", "").replace(",", "."))
+        except (InvalidOperation, ValueError, AttributeError) as error:
+            raise ValueError(f"{label} must be a decimal number") from error
+        if not result.is_finite() or result < 0:
+            raise ValueError(f"{label} must be a non-negative decimal number")
+        return result
+
+    def _validate_payroll_import_payload(self, object_type: str, payload: dict) -> None:
+        if object_type == "payroll_opening_leave":
+            for label in ("effective date", "cutover date"):
+                try:
+                    date.fromisoformat(str(payload.get(label.replace(" ", "_"), "")).strip())
+                except ValueError as error:
+                    raise ValueError(f"{label.title()} must use YYYY-MM-DD") from error
+            self._import_decimal(payload.get("days_per_year"), "Days per year")
+            self._import_decimal(payload.get("basic_unused_days"), "Basic unused days")
+            self._import_decimal(payload.get("extended_unused_days"), "Extended unused days")
+        elif object_type == "historical_earnings":
+            period = str(payload.get("earning_month") or "").strip()
+            try:
+                year, month = (int(value) for value in period.split("-", 1))
+                date(year, month, 1)
+            except (ValueError, TypeError) as error:
+                raise ValueError("Earning month must use YYYY-MM") from error
+            if len(period) != 7:
+                raise ValueError("Earning month must use YYYY-MM")
+            self._import_decimal(payload.get("wage_total"), "Wage total")
+            unpaid = self._import_decimal(payload.get("unpaid_absence_days"), "Unpaid absence days")
+            if unpaid != unpaid.to_integral_value():
+                raise ValueError("Unpaid absence calendar days must be a whole number")
+        elif object_type == "vacation_balance":
+            try:
+                date.fromisoformat(str(payload.get("date") or "").strip())
+            except ValueError as error:
+                raise ValueError("Merit Palk snapshot date must use YYYY-MM-DD") from error
+            self._import_decimal(payload.get("DaysUnused"), "Merit Palk unused days")
+
+    def _apply_payroll_opening_leave(self, organisation_id: str, sync: dict, row: dict, actor: str) -> dict:
+        payload = json.loads(row["external_payload_json"])
+        if payload.get("import_error"):
+            raise ValueError(str(payload["import_error"]))
+        employee_id = None
+        with self.db.transaction() as tx:
+            employee = self._payroll_import_employee(tx, organisation_id, row, payload)
+            employee_id = employee["id"]
+            try:
+                effective = date.fromisoformat(str(payload.get("effective_date", "")).strip()).isoformat()
+                cutover = date.fromisoformat(str(payload.get("cutover_date", "")).strip()).isoformat()
+            except ValueError as error:
+                raise ValueError("Effective date and cutover date must use YYYY-MM-DD") from error
+            entitlement = self._import_decimal(payload.get("days_per_year"), "Days per year")
+            basic = self._import_decimal(payload.get("basic_unused_days"), "Basic unused days")
+            extended = self._import_decimal(payload.get("extended_unused_days"), "Extended unused days")
+            source_key = str(payload.get("source_key") or "").strip()
+            if not source_key:
+                raise ValueError("Import source key is missing")
+            existing_entitlement = tx.one(
+                "SELECT days_per_year,effective_from FROM payroll_leave_entitlements "
+                "WHERE organisation_id=? AND employee_id=? AND source_key=?",
+                (organisation_id, employee_id, source_key),
+            )
+            existing_opening = tx.one(
+                "SELECT cutover_date,unused_days,extended_unused_days FROM payroll_leave_openings "
+                "WHERE organisation_id=? AND employee_id=? AND source_key=?",
+                (organisation_id, employee_id, source_key),
+            )
+            if (existing_entitlement and existing_opening
+                    and existing_entitlement["effective_from"] == effective
+                    and Decimal(str(existing_entitlement["days_per_year"])) == entitlement
+                    and existing_opening["cutover_date"] == cutover
+                    and Decimal(str(existing_opening["unused_days"])) == basic
+                    and Decimal(str(existing_opening["extended_unused_days"])) == extended):
+                return self._mark_applied(tx, organisation_id, sync, row, actor, employee_id, "unchanged")
+            now = utc_now()
+            tx.execute(
+                "INSERT INTO payroll_leave_entitlements(id,organisation_id,employee_id,effective_from,days_per_year,created_at,source_key) "
+                "VALUES (?,?,?,?,?,?,?) ON CONFLICT(organisation_id,employee_id,effective_from) DO UPDATE SET "
+                "days_per_year=excluded.days_per_year,source_key=excluded.source_key",
+                (new_id(), organisation_id, employee_id, effective, db_number(entitlement), now, source_key),
+            )
+            tx.execute(
+                "INSERT INTO payroll_leave_openings(organisation_id,employee_id,cutover_date,unused_days,extended_unused_days,source,reviewed_at,reviewed_by,source_key) "
+                "VALUES (?,?,?,?,?,'file_import',?,?,?) ON CONFLICT(organisation_id,employee_id,cutover_date) DO UPDATE SET "
+                "unused_days=excluded.unused_days,extended_unused_days=excluded.extended_unused_days,source=excluded.source,"
+                "reviewed_at=excluded.reviewed_at,reviewed_by=excluded.reviewed_by,source_key=excluded.source_key",
+                (organisation_id, employee_id, cutover, db_number(basic), db_number(extended), now, actor, source_key),
+            )
+            return self._mark_applied(tx, organisation_id, sync, row, actor, employee_id)
+
+    def _apply_historical_earnings(self, organisation_id: str, sync: dict, row: dict, actor: str) -> dict:
+        payload = json.loads(row["external_payload_json"])
+        if payload.get("import_error"):
+            raise ValueError(str(payload["import_error"]))
+        with self.db.transaction() as tx:
+            employee = self._payroll_import_employee(tx, organisation_id, row, payload)
+            period = str(payload.get("earning_month") or "").strip()
+            try:
+                year, month = (int(value) for value in period.split("-", 1))
+                date(year, month, 1)
+            except (ValueError, TypeError) as error:
+                raise ValueError("Earning month must use YYYY-MM") from error
+            if len(period) != 7:
+                raise ValueError("Earning month must use YYYY-MM")
+            wage = money(self._import_decimal(payload.get("wage_total"), "Wage total"))
+            unpaid = self._import_decimal(payload.get("unpaid_absence_days"), "Unpaid absence days")
+            if unpaid != unpaid.to_integral_value():
+                raise ValueError("Unpaid absence calendar days must be a whole number")
+            source_key = str(payload.get("source_key") or "").strip()
+            if not source_key:
+                raise ValueError("Import source key is missing")
+            existing = tx.one(
+                "SELECT employee_id,earning_month,wage_total,unpaid_absence_days FROM payroll_historical_earnings "
+                "WHERE organisation_id=? AND source_key=?", (organisation_id, source_key),
+            )
+            if existing:
+                same = (existing["employee_id"] == employee["id"] and existing["earning_month"] == period
+                        and money(existing["wage_total"]) == wage
+                        and Decimal(str(existing["unpaid_absence_days"])) == unpaid)
+                if not same:
+                    raise ValueError("This file row was already imported with different values")
+                return self._mark_applied(tx, organisation_id, sync, row, actor, employee["id"], "unchanged")
+            now = utc_now()
+            tx.execute(
+                "INSERT INTO payroll_historical_earnings(id,organisation_id,employee_id,earning_month,wage_total,"
+                "unpaid_absence_days,source_key,status,reviewed_at,reviewed_by,created_at) "
+                "VALUES (?,?,?,?,?,?,?,'Approved',?,?,?)",
+                (new_id(), organisation_id, employee["id"], period, db_number(wage), db_number(unpaid), source_key, now, actor, now),
+            )
+            return self._mark_applied(tx, organisation_id, sync, row, actor, employee["id"])
+
+    def _apply_merit_vacation_balance(self, organisation_id: str, sync: dict, row: dict, actor: str) -> dict:
+        payload = json.loads(row["external_payload_json"])
+        with self.db.transaction() as tx:
+            employee = self._payroll_import_employee(tx, organisation_id, row, payload)
+            try:
+                cutover = date.fromisoformat(str(payload.get("date") or "").strip()).isoformat()
+            except ValueError as error:
+                raise ValueError("Merit Palk snapshot date must use YYYY-MM-DD") from error
+            basic = self._import_decimal(payload.get("DaysUnused"), "Merit Palk unused days")
+            source_key = f"merit-palk:{row['external_id']}"
+            existing = tx.one(
+                "SELECT cutover_date,unused_days,extended_unused_days FROM payroll_leave_openings "
+                "WHERE organisation_id=? AND employee_id=? AND source_key=?",
+                (organisation_id, employee["id"], source_key),
+            )
+            if (existing and existing["cutover_date"] == cutover
+                    and Decimal(str(existing["unused_days"])) == basic
+                    and Decimal(str(existing["extended_unused_days"])) == Decimal(0)):
+                return self._mark_applied(tx, organisation_id, sync, row, actor, employee["id"], "unchanged")
+            now = utc_now()
+            tx.execute(
+                "INSERT INTO payroll_leave_openings(organisation_id,employee_id,cutover_date,unused_days,extended_unused_days,source,reviewed_at,reviewed_by,source_key) "
+                "VALUES (?,?,?,?,?,'merit_palk',?,?,?) ON CONFLICT(organisation_id,employee_id,cutover_date) DO UPDATE SET "
+                "unused_days=excluded.unused_days,extended_unused_days=excluded.extended_unused_days,source=excluded.source,"
+                "reviewed_at=excluded.reviewed_at,reviewed_by=excluded.reviewed_by,source_key=excluded.source_key",
+                (organisation_id, employee["id"], cutover, db_number(basic), "0", now, actor, source_key),
+            )
+            return self._mark_applied(tx, organisation_id, sync, row, actor, employee["id"])
 
     def _mapping_values(self, payload: Mapping[str, Any]) -> tuple[str | None, str]:
         payload_hash = self._text(payload, "payload_hash", "hash")
@@ -1184,6 +1757,11 @@ class ImportService:
     ) -> dict:
         conflict_id, now = new_id(), utc_now()
         with self.db.transaction() as tx:
+            if row["object_type"] == "salary_hours":
+                tx.execute("UPDATE organisations SET name=name WHERE id=?", (organisation_id,))
+                current = tx.one("SELECT status FROM import_staged_records WHERE organisation_id=? AND id=?", (organisation_id, row["id"]))
+                if current and current["status"] in {"Applied", "Rejected"}:
+                    return {"staged_id": row["id"], "outcome": "failed", "reason": reason}
             tx.execute(
                 "UPDATE import_staged_records SET status='Failed',review_note=?,updated_at=? "
                 "WHERE organisation_id=? AND id=?",

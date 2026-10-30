@@ -4,12 +4,487 @@ Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as
 delivered.
 
+## 2026-10-29: Payroll dimensions and bureau overview (Build 10 complete; UAT pending)
+
+- Added migration 0070 for frozen employee-level dimensions on payroll run
+  items, and updated both explicit migration catalogues. Employee, contract,
+  agreement and component inputs validate active, same-organisation dimension
+  references.
+- Added a dimension cost report API and Excel export selector. Approved payroll
+  expense postings use frozen employee dimensions for salary, social tax and
+  employer unemployment insurance; liability postings remain aggregated.
+- Added reviewed CSV/XLSX imports, a membership-filtered bureau overview, an
+  owner/admin membership matrix and invitation workflow, grouped payroll
+  settings, dimension register editing, and dimension selectors on employee,
+  contract, agreement and component editors.
+- Added workspace labels in en, et, lv and lt and updated the validation record.
+  Focused bureau, workspace, i18n and migration/tenancy suites pass. Production
+  payroll UAT remains pending. See `payroll_dimensions_bureau_validation.md`.
+
+## 2026-10-29: Payroll contracts and TÖR import (Build 9 implementation complete)
+
+- Added migration 0067 with tenant-scoped employee contracts, dated salary
+  agreements, position history and idempotent TÖR CSV staging. Existing salary
+  fields are backfilled without rewriting employee or payroll records.
+- Added contract list, create and update services, dated agreement and position
+  history, and role/CSRF-protected APIs. The employee card exposes contract
+  terms, history, payday override and monthly advance controls.
+- Reviewed Merit Palk pulls now update contract and dated salary agreement
+  history while preserving existing employee salary fields and provider source
+  mappings.
+- TÖR review rows can create or update employees and contracts using
+  organisation-local personal-code matches. Duplicate matches remain visible as
+  conflicts. Row application is retry-safe and never deletes employees or
+  contract history. The payroll workspace includes upload, review and apply.
+- Added the requested en, et, lv and lt workspace labels. Workspace, payroll,
+  contracts, TÖR, locale and migration acceptance checks are recorded in
+  `payroll_contracts_validation.md`. The full Merit Palk file exceeded the
+  per-file test limit; focused sections passed. A redacted official TÖR export
+  remains necessary to confirm exact source aliases and contract type values.
+
+## 2026-10-29: Payroll withholdings (Build 7 complete)
+
+- Added migration 0064 for tenant-scoped withholding recipients, agreements,
+  run-line snapshots and payout records. Added Decimal method/cap helpers and
+  recipient/agreement services with IBAN validation and audit entries.
+- Added role-checked, CSRF-protected recipient and agreement API endpoints and a
+  period report query.
+- Draft runs generate capped, net-limited withholding lines and expose reduced
+  garnishment warnings. Recipient payouts post the liability and support SEPA
+  pain.001 download. Added period reports with Excel export.
+- Added recipient/agreement management, payout actions, run previews and report
+  exports to the workspace, with en/et/lv/lt labels and browser coverage.
+  Focused workspace, locale, payout, report, integration and migration suites
+  pass. Accountant confirmation remains open for garnishment exceptions and
+  third-pillar TSD treatment. See `payroll_withholdings_validation.md`.
+
+## 2026-10-28: Payroll pay-type methods (Build 6 complete)
+
+- Added migration 0063 for calculation methods, optional type defaults, frozen
+  line inputs and Statistics Estonia PALK row designation. Existing entries
+  default to fixed sums and preserve their stored amounts.
+- Added Decimal calculation helpers, Merit-style component presets and TSD
+  payment codes. The payment-type editor exposes method, defaults and PALK row.
+- Added method-driven run-line inputs with immediate previews and server-side
+  recalculation. Added 2026 private-car limit parameters, preset translations,
+  and PALK row snapshots. All requested offline acceptance files pass
+  individually.
+- The private-car preset stores EUR 0.30/km and EUR 335/month reference limits;
+  it does not split tax-free and taxable amounts. Accountant confirmation of
+  limits, payment classifications and the PALK mapping remains open.
+
+## 2026-10-28: Payroll correction payouts and APA history
+
+- Completed payroll corrections Build 5. Migrations 0060 and 0062 enforce
+  organisation-safe run lineage; migration 0061 preserves payout-month TSD
+  calculation lines.
+- Later-month positive corrections recalculate tax against the selected payout
+  month and remaining exemption, post a balanced tax-liability adjustment, and
+  export as `R`. Negative corrections remain employee receivables and amend the
+  original declaration period as `M`.
+- Added correction and supplementary actions, original/corrected/difference
+  workpaper values, links between related runs, payout date selection and
+  accountant confirmation of receivable offsets. Added en/et/lv/lt copy.
+- All eight requested offline pytest files pass individually. Accountant UAT and
+  e-MTA acceptance remain external validation.
+
+- Added migrations 0057-0059 for tenant-scoped employee payroll receivables,
+  salary payout offset proposals, correction net deltas, receivable account
+  mappings and APA `R`/`M` operation plus cancellation history.
+- Approved negative correction net deltas post Dr employee receivable / Cr salary
+  payable. Salary payout creation proposes FIFO offsets; accountant confirmation
+  posts Dr salary payable / Cr employee receivable and reduces the positive bank
+  payout. Fully offset payouts create no bank line.
+- Positive correction deltas use normal payout batches and partial payout rules
+  applied to the delta. Same-month correction deltas feed the original workpaper
+  and legacy CSV, and changed APA payloads use `M`. Explicit cancellation uses
+  `T`; future replacement lines use `R` and a fresh line number. A correction
+  paid later uses its own payout date and transaction.
+- Full test commands and results are recorded in
+  `payroll_corrections_validation.md`.
+
+## 2026-10-28: Payroll APA TSD exports and workpaper
+
+- Added a separate resident Annex 1 legacy CSV upload from frozen TSD lines,
+  with codes 1000-1170, UTF-8 semicolon format and two-place dot decimals. Upload
+  is refused after December 2027; the internal review CSV remains available.
+- Added an accountant workpaper on screen and in XLSX with a summary and payment list,
+  payment-type and recipient views, month filter, frozen levy totals, count and
+  legacy-run validation warnings. Labels are available in en/et/lv/lt.
+- No migration was needed. The Annex 1 delimiter and decimal format are
+  assumptions pending confirmation with e-MTA. These outputs are not live
+  verified and direct filing remains disabled.
+- Focused test results are recorded in `payroll_tsd_validation.md`.
+- Started scope 4b step 5 with a pure offline APA validator for frozen payout
+  data. Its implemented rule subset and offline data gaps are recorded in
+  `payroll_tsd_validation.md`.
+- Added payout-level findings, blocked XML/ZIP controls, feedback upload,
+  cancellation downloads and export history to the accountant preparation
+  view in en/et/lv/lt. The offline rule subset and unavailable-data conditions
+  are documented; schema validation and live e-MTA acceptance remain pending.
+
+## 2026-10-28: Payroll leave liability and payslip balances
+
+- Added migration 0051 for basic and extended expiry policies, optional reserve
+  posting, reserve posting records and the payslip balance option. Entitlement,
+  reviewed opening snapshots and annual leave records are replayed by event date
+  to derive lots and FIFO consumption without editable balance state.
+- Added owner/administrator policy controls and a payroll liability report with
+  employee movements, average daily pay, employer social tax, unemployment
+  insurance and totals. The report exports to XLSX in two sheets.
+- Added optional, audited monthly reserve postings using mapped expense and
+  liability accounts, immutable balanced ledger batches, one-posting-per-month
+  refusal and reversal through `LedgerService.reverse`.
+- Pay runs can opt to include period-end remaining leave days on payslips.
+  Labels are translated in en/et/lv/lt. Validation and accountant review status
+  are recorded in `payroll_absences_validation.md`.
+
+## 2026-10-28: Payroll opening balances and historical earnings
+
+- Added migration 0050 for separate extended opening days and source keys on
+  imported entitlement and opening rows. CSV and XLSX imports reuse the existing
+  staging, review, apply and row-error flow, matching employee personal codes
+  within the organisation. Exact file re-imports are idempotent.
+- Added Absences-area upload, review and apply screens in en/et/lv/lt for
+  entitlement/opening balances and historical monthly earnings. The Estonian
+  labels include `Puhkuse algsaldo`, `Ajaloolised töötasud` and
+  `Puhkusepäevi aastas`.
+- Merit Palk vacation snapshots can now be reviewed and applied as opening
+  balances. Imported historic wages and unpaid calendar-day counts contribute
+  to average pay when the period has no approved FastAccounts run. Vacation
+  averages use the payout date to select the earning months.
+- The validation record lists individual payroll, staging import, Merit,
+  migration and public-page test results. Production UAT and accountant review
+  remain pending.
+
+## 2026-10-28: Payroll absences series started
+
+- Added migration 0042 with editable wage eligibility and active status for
+  payment types. Existing component lines snapshot the wage flag during upgrade,
+  preserving the rule used for later average-pay calculations. Inactive types
+  remain available on stored history but are excluded from new line choices.
+- Documented the preset defaults and the governing Estonian leave and average-pay
+  sources in `payroll_rules.md`. Absence calculations and related workflows
+  remain in progress.
+- Added migration 0043 and the organisation-scoped absence register with
+  inclusive calendar-day counts, holiday-excluded annual leave days, payroll
+  calendar working days, overlap checks, audited collective annual leave, and
+  payroll-role/CSRF protected APIs. The workspace offers list filters, add/edit/
+  delete actions and a collective-leave dialog in all four locales. Approved-run
+  absence snapshots are reserved for the payroll calculation unit.
+- Validation is recorded in `payroll_absences_validation.md`; accountant UAT and
+  PostgreSQL execution remain outstanding.
+- Added migration 0044 for frozen run-level worked, norm and interrupted absence
+  days. Monthly salary and its minimum threshold prorate by worked/norm days;
+  hourly pay remains based on entered hours. The run breakdown and payslip show
+  worked/norm days. See the validation record for test commands and the
+  employee-specific work-schedule assumption.
+- Added `payroll_average.py` with versioned six-month wage-only daily,
+  working-day and hourly averages. The pure calculation returns a detailed
+  source and denominator breakdown, requires explicit absence wage-paid status,
+  accepts reviewed historical earnings, and describes its agreed-salary
+  fallback. Short-service, stable-salary and schedule-specific legal cases are
+  listed for accountant confirmation in `payroll_absences_validation.md`.
+- Added `payroll_absence_pay.py` with Decimal vacation-pay method breakdowns,
+  the explicit `EE-SICK-2026-v1` sick-benefit rule, unused-leave compensation
+  calculation and previous-working-day payout date. Four pure calculation
+  tests passed. Absence save, payout and payroll-run integration was completed
+  in Unit 5, as recorded below.
+- Added migration 0045 for effective-dated leave entitlements, reviewed opening
+  balances and reviewed historical earning rows with tenant/employee keys and
+  idempotent source keys. This is the storage foundation only: staged import,
+  review/apply routes and UI, plus Merit vacation-snapshot application, remain
+  outstanding.
+- Added `payroll_leave_liability.py` pure functions for calendar-day entitlement
+  accrual, configurable expiry dates, FIFO consumption and liability valuation
+  including 2026 social tax and employer unemployment. Four tests pass. Persistent
+  leave lots, org settings, reports and immutable reserve journals remain open.
+- Payslips now list absence dates and leave-day counts from approved run
+  snapshots; the overview adds employees currently on annual leave and sick
+  leave KPIs. Dashboard labels are translated in en/et/lv/lt. Remaining leave
+  balances are not yet calculated in the payslip.
+- Completed Unit 5 with migration 0048 for stored component breakdowns,
+  draft-run employer sick benefit and termination unused-leave compensation.
+  Draft edits recalculate generated amounts; accountant overrides are retained
+  for termination compensation, and approved runs stay frozen. The Absences tab
+  displays vacation-pay methods and breakdowns and links pending records to new
+  or existing Draft payouts. Labels cover en, et, lv and lt; viewer and approver
+  roles have read-only access. Targeted results are in
+  `payroll_absences_validation.md`. The series remains in progress because
+  historical import, persistent liability workflows, reserve posting and
+  accountant UAT are outstanding.
+
+## 2026-10-28: Payroll calendar and payouts
+
+- Added the Estonian public-holiday calendar, Easter computation, working-day
+  helpers and monthly full-time hours with shortened pre-holiday days.
+- Added effective-dated company payday settings and the payroll start date.
+  Configured day paydays clamp to month end and shift back over weekends and
+  public holidays. The first working day rule moves forward. The settings view
+  supports four languages and applies owner/administrator write access.
+- Added partial run-linked payroll payouts with frozen employee bank details,
+  paid/unpaid summaries, audited Draft, Paid and Cancelled transitions, balanced
+  salary-payable to bank posting, and ledger reversal when a paid payout is
+  cancelled.
+- Tax calculations now freeze their selected payment date. Approved salary
+  payouts cannot change the payment month; prior approved items share the
+  employee's remaining monthly tax-free exemption. The TSD due date follows the
+  payment month and moves forward to the next working day when needed.
+- Added downloadable pain.001.001.03 credit-transfer XML for payroll payout
+  batches, including totals, stable end-to-end IDs, optional debtor BIC,
+  organisation-language remittance text and a list of missing or invalid
+  employee IBANs. No vendored XSD or live bank validation is available.
+- Validation records exact targeted pytest commands and outcomes in
+  `payroll_payouts_validation.md`. The full test suite and live bank/e-MTA UAT
+  were not run.
+
+## 2026-10-28: Payroll tax settings and employee details
+
+- Fixed the TSD export crash for approved `income_line` services-contract runs.
+  XML and CSV use `CONTRACTOR_FEE` as an internal label; official e-MTA payment
+  code mapping remains pending.
+- Moved 2026 tax, social-tax, UI, exemption and minimum-wage values into immutable
+  date-selected rules. Existing figures and rounding are unchanged. Unsupported
+  years fail translated validation instead of inheriting 2026 rates.
+- Added additive migration 0037 for tax-free income application, funded-pension
+  and employee UI histories, backfilled from existing employee settings. New
+  drafts resolve at calendar month end and freeze the values and source IDs.
+  Existing approved pay and ledger amounts are preserved. Used source rows are
+  protected against updates/deletion in services and both database dialects.
+- Added audited, tenant-scoped history CRUD for owner/administrator/accountant
+  roles with CSRF checks, viewer read-only access, translated 409 conflicts and
+  employee-dialog controls in all four languages. Legacy employee fields remain
+  available with an explicit `tax_settings_period` compatibility option.
+- Added optional employee phone, validated IBAN, bank-account owner, address and
+  date of birth to the API, employee dialog and XLSX export. Estonian personal
+  codes supply a birth date when no manual date is provided.
+- Verified the EUR 2,000 Merit calculation, all application modes and pension
+  rates, date boundaries, UI exclusion, frozen runs, migration preservation,
+  access/CSRF gates and offline mobile/desktop workflows. Commands and limits
+  are in `payroll_tax_settings_validation.md`. Production accountant UAT,
+  official TSD classification mapping and actual payout dates remain pending.
+
+## 2026-10-25: Expanded Estonian payroll payment categories
+
+- Expanded the Estonian payroll catalogue from five to 27 stable presets, with
+  names and treatment descriptions in English, Estonian, Latvian and Lithuanian.
+  Includes leave pay, unused leave compensation, qualifying employer sick pay,
+  ordinary pay supplements, termination compensation, documented cost
+  reimbursement, salary advances, alimony, union fees and other net deductions.
+- Added additive migration 0036 using 0034's organisation/preset uniqueness and
+  `ON CONFLICT DO NOTHING`. Existing bureau edits, custom categories, saved
+  components and posted ledger data are preserved. New EE organisations receive
+  the same catalogue through the existing organisation seeding function. UK
+  organisations receive no presets.
+- Added Payment types / Makseliigid under Settings, reusing the payroll editor's
+  management components and existing organisation-scoped routes. Users can add
+  and edit custom categories and reach payroll account mappings. New custom
+  income types start fully taxable. All four locales have mobile browser coverage.
+- Uncertain new defaults, including author and employer parental-leave payments,
+  are fully taxable. Qualifying employer sick pay is income-tax-only within
+  statutory limits; reimbursement is restricted to documented employer costs.
+  Net deductions use PAYROLL_DEDUCTION except bailiff garnishments. Accountant
+  UAT remains pending for author/parental payment basis, contract recipients,
+  severance exceptions, standby/study/average pay and social-minimum treatment.
+  Sick-pay limits and reimbursement evidence require bureau confirmation. See
+  [payroll rules](payroll_rules.md) for the full catalogue and EMTA references.
+- Validation: **221 focused tests passed**, each file run separately: payroll
+  16, part-time/hourly payroll 30, workspace payroll 13, migrations/tenancy 15,
+  Merit Palk 49, copilot 60, i18n 14 and payroll component regressions 24. Four
+  icon tests also passed. Node syntax, diff whitespace, the CI credential-pattern
+  guard and Python 3.12 grammar checks for all 160 tracked Python files passed.
+- The final full suite ran once with `.venv\Scripts\python.exe -m pytest -q`:
+  **1,645 passed, four skipped, two warnings and zero failures** in **53m 25s**
+  (3,205.21 seconds). The skips are the four PostgreSQL opt-in tests. Warnings
+  concern fastcore's deprecated coroutine detection and an existing pytest
+  parametrisation iterator in the MFA tests. No live provider calls or production
+  accounting data are used. Python 3.12 runtime and live PostgreSQL checks remain
+  unrun; the available Windows venv uses Python 3.14.6 and SQLite.
+
+## 2026-10-24: On-demand Merit Palk imports
+
+- Added a separate, pull-only `merit_palk` connector with encrypted API ID/key,
+  connection testing, UTC HMAC signing and safe PRO-licence, request, connection
+  and JSON errors. All five requesting-data endpoints were checked against the
+  [Merit Palk manual](https://api.merit.ee/merit-palk-api/palk-reference-manual/).
+  Provider access has only been tested with synthetic HTTP transports.
+- Owners and administrators can select an accounting month and optional personal
+  code for employee or salary-agreement imports. The manual describes `Amount`
+  as a tariff without its unit, so mapping to monthly `gross_salary` requires
+  explicit confirmation on each import. Multiple contracts/agreements and
+  unsupported contract types remain blocked for review. ImportCode is the
+  external identity, with PersonalCode fallback and tenant-scoped employee matching.
+- Board-member contracts use the existing board-fee basis. Services contracts
+  (TypeId 5) now apply as `income_line` employees with zero base pay. Their pay
+  comes from reviewed income components, without employment-contract monthly
+  gross or an automatic social tax minimum obligation.
+- GL batches use the existing balanced journal review and atomic ledger posting
+  destination, with provider-scoped account mappings and idempotency. Source
+  dimensions are retained in the staged payload. Changed posted batches require
+  an explicit reversal and correction instead of silently replacing ledger data.
+- Vacation balances require a personal code or contract import code and balance
+  date. Review displays the snapshot and unused days; apply is blocked in both
+  the UI and service.
+- Salary/hours reports now use the existing staged review pipeline and draft
+  pay-run editor. Unique employee-name matching stays within the organisation;
+  missing or ambiguous matches and unknown salary types stay in review. Mapped
+  base pay, hourly hours and existing component types are applied atomically to
+  the month's draft, creating it when absent. Approved runs are never changed.
+  Decimal rounding, the one-run-per-period constraint and repeat-apply
+  idempotency remain enforced.
+- Added English, Estonian, Latvian and Lithuanian copy. Requests reaching the
+  100-employee ceiling fail closed and require filtering by personal code:
+  the manual provides no offset, cursor or personal-code range contract. The UI
+  explains that companies with more than 100 employees must import by exact
+  PersonalCode. Production UAT, live response envelopes, salary units and
+  unpaid-salary report effects remain to be verified with Merit Palk PRO access.
+- Validation: **183 focused tests passed**, each file run separately under five
+  minutes: Merit Palk 49, payroll 16, part-time/hourly payroll 30, workspace
+  payroll 9, workspace integrations 6, copilot 60 and i18n 13. Includes offline
+  Playwright review-to-payroll flow, draft correction, concurrent apply, approval
+  protection, component collision, tenant isolation and migration preservation.
+- Ran the full suite once with `.venv\Scripts\python.exe -m pytest -q`, capped
+  at 45 minutes. It reached 100% in approximately 28 minutes: **1,630 passed,
+  2 failed, 4 skipped**. Both failures were stale catalogue expectations already
+  present before this completion change: file-import capabilities and Merit
+  Palk's documented-adapter status. Corrected those assertions, then reran only
+  the affected files: **29 API tests and 60 public-page tests passed**. No full
+  suite rerun was performed. The Windows log-streaming wrapper hit an encoding
+  error while printing failure details after 100%; the complete progress log
+  supplies the full-run outcome counts, and targeted reruns captured the details.
+- JavaScript syntax, Python 3.12 grammar and diff whitespace checks passed.
+  Tests used the existing project venv, Python 3.14.6, without modifying it.
+  The four skips are opt-in PostgreSQL checks. Live Merit Palk PRO response
+  reconciliation, salary units and accountant UAT remain pending.
+
+## 2026-10-24: Reviewed Excel bookkeeping journal import
+
+- Added deterministic, offline parsing of generic titled journal blocks across
+  all workbook sheets through `file_import` / `journal` in the existing staged
+  review and apply pipeline. Source workbooks are never stored.
+- Added Data import XLSX attachment, totals and balance review, line-level account
+  resolution, in-review confirmed mappings and a posting date for undated blocks.
+  Labels and review warnings are translated in English, Estonian, Latvian and
+  Lithuanian.
+- Apply rechecks balance, active tenant accounts and fiscal locks, then atomically
+  posts one immutable balanced batch with mapping, staged status and audit.
+  Identical reimports are idempotent, including concurrent applies. Zero lines
+  remain in review and are omitted from the posted batch. No migration is needed.
+- Added synthetic workbook, service, API authorisation/CSRF and offline Playwright
+  coverage. Production accountant UAT remains pending; payroll calculation and
+  TSD submission are outside this import feature.
+- Validation: nine files run individually, **169 passed**: file import 12,
+  journal import 23, reviewed import pipeline 10, master-data import 32,
+  import objects 4, workspace payroll 9, copilot 60, workspace integrations 6
+  and i18n 13. JavaScript syntax, diff whitespace and Python 3.12 grammar checks
+  for all seven changed/new Python files passed. The venv runs Python 3.14.6;
+  Python 3.12 runtime and PostgreSQL validation were not run. The full suite was
+  deliberately not run. Only the existing fastcore deprecation warning appeared.
+
+## 2026-10-23: Payroll bureau demo fixes
+
+- Added audited employee archive, unarchive and deletion restricted to employees
+  without run items. Archived employees retain their existing run snapshots.
+- Added organisation payment types, editable levy defaults, component snapshots
+  and hourly draft editing with atomic Decimal recalculation. PDF, Excel and
+  reviewed push payloads include component detail.
+- Finished the SPA component editor, including per-line deduction accounts and
+  preservation of saved levy flags after a type changes. Payroll account settings
+  save only changed mappings. All new labels exist in EN, ET, LV and LT.
+- Draft component adjustments preserve minimum monthly pay and minimum hourly
+  pay for the entered hours; invalid adjustments roll back the entire save.
+- Added mapped gross salary payable, separate accrued tax and deduction roles,
+  and explicit balanced TSD reclassification dated the following month's 10th.
+  Declaration preparation/settlement and overdue counts appear in the workspace.
+- Migration 0034 is additive and rerun-safe. It preserves historical postings;
+  account mappings use role-specific keys in the existing mapping table.
+- Production bureau UAT is pending. Author social tax defaults to on; author and
+  parental-leave flags remain editable assumptions. See the paired roadmap and
+  payroll rules for calculation details and remaining scope.
+- Validation on 2026-10-24: the five required files passed individually: payroll
+  16, part-time/hourly 30, workspace payroll 9, migrations/tenancy 14 and copilot
+  60 (129 total). Payroll demo checks passed 17 tests, i18n 13 and seed integration
+  1. JavaScript syntax and Python 3.12 grammar checks for all 157 tracked Python
+  files passed. The supplied venv runs Python 3.14.6; Python 3.12 runtime and live
+  PostgreSQL checks were not run.
+- Final marked full-suite validation on commit `225c203`, using the project venv
+  with `pytest -q -x --maxfail=3`, completed in 25m 18s: **1,560 passed, four
+  skipped, two warnings, no failures**. The four skips require `TEST_POSTGRES_URL`.
+- Updated the seed integration regression to compare exported payroll lines with
+  their source journal rather than pinning the old seven-line posting shape.
+  The mapped journal has ten lines; encryption, balance, mapping and rerun checks
+  pass both individually and in the full suite.
+- Isolated historical payroll migration setup from the process-wide migration
+  catalogue. A concurrent legacy/current database regression verifies that an old
+  schema setup cannot select old migrations for another database. The reported
+  full-run-only failure was not reproduced before the isolation change; the
+  upgrade test passes both individually and in the completed full run.
+
+## 2026-10-23: Streamed copilot chat
+
+- Chat replies now stream progressively using SSE, with the existing JSON send
+  path retained for older browsers and rejected streaming negotiations. The
+  composer stays disabled in flight. Access and quotas are checked before
+  provider calls; quota capacity is reserved under the organisation lock.
+- Assistant replies and usage totals persist together before the final event.
+  Interrupted text is retained with a translated note and explicit Retry;
+  incomplete replies cannot produce stage proposals. Pre-text failures retain
+  the zero-token failure behaviour. Completion audits include model and usage.
+- Added escaped lightweight Markdown, safe external links and labelled copy
+  buttons to assistant replies in all four languages. User accent bubbles,
+  staging controls, keyboard behaviour and drawer administration remain.
+- All copilot settings writes now use CSRF-protected POST; PUT returns 405.
+- Validation: project-venv `pytest tests/test_copilot.py -q` passed all 60 tests,
+  including offline Playwright checks. `node --check static/app.js`, Python 3.12
+  syntax checks and `git diff --check` passed. The supplied venv runs Python
+  3.14.6; runtime validation on Python 3.12 remains a deployment check. The final
+  full `pytest -q` run was stopped at the 30-minute limit after reaching 97%,
+  with no failures reported and four skips. It did not complete; the focused
+  suite is the completed regression result.
+
+## 2026-10-23: Organisation copilot credentials
+
+- Owners and administrators can save or clear an encrypted organisation xAI key
+  and optional model in the drawer. POST writes require CSRF; reads expose only
+  configuration status and the model. Settings audits never contain credentials.
+- Migration 0033 reuses the integration CredentialVault and records its key
+  version. Organisation credentials take precedence over the environment key
+  for chat and scans. Global and organisation switches and access grants remain.
+- Validation: offline settings tests passed; JavaScript syntax checked.
+
+## 2026-10-21: Copilot chat and provider fixes
+
+- Redesigned the workspace drawer as a scrolling chat with a pinned composer,
+  suggestion chips, document attachment chips, optimistic messages, typing dots
+  and inline errors with retry. Enter sends; Shift+Enter adds a newline. A header
+  settings button reveals administration outside the message flow. Existing
+  shortcut hints, staged imports and mobile/reduced-motion support are retained.
+- Corrected the default provider model to `grok-4-1-fast-reasoning`, preserving
+  the environment override. Provider failures return HTTP 502 with a useful
+  detail and persist an assistant error reply without tokens or stage proposals;
+  quota accounting is unchanged. API-key rejection covers both 401 and 403.
+- Added offline provider and browser regressions and translated chat controls
+  into English, Estonian, Lithuanian and Latvian.
+- Validation: `python -m pytest tests/test_copilot.py -q` (43 passed),
+  `node --check static/app.js` and `git diff --check` passed. The full
+  `python -m pytest -q` run recorded 1,522 passed, 4 skipped and one stale
+  static-asset hash failure after CSS changed during that process. A fresh
+  `python -m pytest tests/test_public.py -q` run passed all 60 public/static
+  tests. Runtime tests used the machine's default Python 3.14; Python 3.12
+  syntax checks passed, but its test dependencies are not installed.
+
 ## 2026-10-15: Copilot workspace drawer
 
 - Replaced the standalone Assistant > AI copilot page with a retractable right-side
   drawer on every authenticated workspace feature page. The floating button,
   close button and Escape support keyboard use and focus restoration; narrow
   screens use full width and reduced-motion preferences are respected.
+- Added Ctrl+/ (Windows/Linux) and ⌘/ (macOS) to toggle the drawer, including
+  from the composer. The shortcut pauses for open modals or no selected
+  organisation. Localised tooltips, shortcut metadata and a muted, dismissible
+  first-open hint make it discoverable; the hint is marked seen immediately in
+  localStorage, with a once-per-page fallback when storage is unavailable.
+- The shortcut also works on keyboard layouts where '/' requires Shift.
 - Preserved the transcript, single attachment picker, staged-import proposals,
   quota notices and owner/administrator controls for organisation settings,
   access grants/revocations and usage in a collapsible administration section.
@@ -17,6 +492,12 @@ delivered.
   cap. No autonomous accounting actions or quota changes were introduced.
 - Updated English, Estonian, Latvian and Lithuanian drawer copy and removed
   the obsolete copilot navigation strings.
+- Shortcut/hint validation: `python -m pytest tests/test_copilot.py -q`
+  (37 passed, one dependency deprecation warning). Offline browser coverage
+  includes both platform shortcuts, composer/input focus, modal and organisation
+  guards, translated hints in all four languages, dismissal, reload persistence
+  and blocked hint storage. JavaScript syntax and whitespace checks passed;
+  the full suite was not rerun for this addition.
 - Validation: `python -m pytest tests/test_copilot.py -q` (37 passed),
   `python -m pytest -q` (1,517 passed, 4 skipped),
   `node --check static/app.js` and `git diff --check` passed. Offline Chromium
@@ -363,6 +844,10 @@ follows the existing et.json precedent at line 1577).
 
 | Key | English | Estonian | Lithuanian | Latvian |
 | --- | --- | --- | --- | --- |
+| `copilot.workspace.Open AI copilot ({shortcut})` | Open AI copilot ({shortcut}) | Ava AI-kaaslane ({shortcut}) | Atverti AI asistentą ({shortcut}) | Atvērt AI asistentu ({shortcut}) |
+| `copilot.workspace.Close AI copilot ({shortcut})` | Close AI copilot ({shortcut}) | Sulge AI-kaaslane ({shortcut}) | Užverti AI asistentą ({shortcut}) | Aizvērt AI asistentu ({shortcut}) |
+| `copilot.workspace.Tip: press {shortcut} to open or close the copilot from any page.` | Tip: press {shortcut} to open or close the copilot from any page. | Vihje: vajuta {shortcut}, et avada või sulgeda kaaslane mis tahes lehel. | Patarimas: paspauskite {shortcut}, kad atvertumėte arba užvertumėte asistentą bet kuriame puslapyje. | Padoms: nospiediet {shortcut}, lai atvērtu vai aizvērtu asistentu jebkurā lapā. |
+| `copilot.workspace.Got it` | Got it | Selge | Supratau | Sapratu |
 | `copilot.workspace.AI copilot` | AI copilot | AI-kaaslane | AI asistentas | AI asistents |
 | `copilot.workspace.Ask about your books, scan documents and draft staged imports. The copilot never changes records on its own.` | Ask about your books, scan documents and draft staged imports. The copilot never changes records on its own. | Küsi oma raamatupidamise kohta, skaneeri dokumente ja koosta importimise ridade eelvaateid. Kaaslane ei muuda kunagi kirjeid iseseisvalt. | Klauskite apie savo apskaitą, skenuokite dokumentus ir rengkite importo eilučių peržiūrą. Asistentas pats niekada nekeičia įrašų. | Jautiet par savām uzskaitēm, skenējiet dokumentus un sagatavojiet importēšanas rindu priekšskatījumu. Asistents pats nekad nemaina ierakstus. |
 | `copilot.workspace.AI copilot is not configured on this service.` | AI copilot is not configured on this service. | AI-kaaslane pole selles teenuses seadistatud. | AI asistentas šioje paslaugoje nesukonfigūruotas. | AI asistents šajā servisā nav konfigurēts. |
@@ -1886,3 +2371,65 @@ the entries below, plus one connector fix:
   remain the existing PostgreSQL opt-in checks. `node --check static/app.js`,
   diff checks and preservation of existing locale sections passed. EstNLTK is
   unavailable locally; Estonian copy follows the existing valuuta terminology.
+
+## 2026-10-28: Payroll APA TSD payment-type groundwork
+
+- Added migration 0052 for tenant component payment-type codes and preset backfill, plus an editor field with EMTA code labels and a resident rule extract. Implementation and validation are tracked in payroll_tsd_validation.md.
+
+## 2026-10-28: Payroll correction schema checkpoint
+
+Migration 0056 adds `kind` (`regular`, `correction`, `supplementary`) and
+`original_run_id` to pay runs, allows multiple non-regular runs per period, and
+keeps the regular-run unique index. The migration catalogue is explicit in the
+migration test and CI workflow. This is a schema checkpoint only. Creation,
+approval deltas, receivables, payout and APA correction behaviour, and UI actions
+remain incomplete. See `payroll_corrections_validation.md` before relying on these
+run kinds.
+
+Validation: `tests/test_migrations_and_tenancy.py`, 17 passed. Full requested
+payroll acceptance suite has not yet been run.
+
+## 2026-10-29: Payroll reports and delivery (Build 8 implementation complete)
+
+- Added migration 0065 for organisation payroll email settings, employee report
+  languages and tenant-scoped delivery history.
+- Added selected employee payslip emails, reviewer packs with XLSX and optional
+  PDF attachments, send history and retry actions. Added report calculations and
+  workbook downloads for annual summaries, average pay, PALK, headcount and pay
+  lists. The workspace now includes report, settings and delivery dialogs.
+- Migration 0066 adds nullable PALK designations to component types and frozen
+  lines. Unmapped amounts are reported as a warning and excluded from mapped
+  rows. Route tests cover role access, CSRF, tenant boundaries and failed-send
+  retry. Email transport is mocked. Weekend and Estonian public-holiday due
+  dates move to the next working day.
+- Focused validation and counts are in `payroll_reports_delivery_validation.md`.
+  Confirm the due-date interpretation and bureau wording; add PALK dates to the
+  general overview in a separate dashboard follow-up.
+
+## 2026-10-29: Payroll contract run integration (Build 9 implementation complete)
+
+- Added migration 0068 for tenant-scoped frozen contract base lines. Payroll run
+  creation now resolves salary agreements over the pay period and prorates
+  mid-month changes by `payroll_calendar` working days. Each contract's base
+  line carries its type-specific TSD payment code while employee taxes remain
+  aggregated on the run item.
+- Approval creates a draft advance payout for configured monthly net advances,
+  dated the 15th of the earning month and capped at calculated net. A paid
+  advance reduces the salary payout amount; gross and payroll taxes are
+  unchanged. Single backfilled contracts retain legacy payroll amounts.
+- Fixed the payment-type editor payload after reproducing its failure at
+  baseline 7371730. The editor now sends an integer PALK designation and omits
+  the nonexistent PALK row field.
+- The explicit migration catalogue already includes migrations 0067 and 0068
+  in the migration test and CI workflow. Merit mapping, TÖR apply and workspace
+  UI are complete. Offline validation and the remaining official TÖR sample
+  check are recorded in `payroll_contracts_validation.md`.
+
+## Payroll dimensions and bureau overview (Build 10, in progress, 2026-10-29)
+
+Migration 0069 adds a tenant-scoped payroll dimension register for departments,
+position groups, positions and cost centres, and optional dimension columns on
+employees, contracts, salary agreements, component lines and frozen contract run
+lines. Projects continue to use the existing analytical object register. This
+build is not complete; see `payroll_dimensions_bureau_validation.md` for
+remaining implementation and validation.

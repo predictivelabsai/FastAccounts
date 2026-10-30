@@ -72,6 +72,7 @@
       ["monthly", "Monthly salary"],
       ["hourly", "Hourly pay"],
       ["board_fee", "Board member fee"],
+      ["income_line", "Income lines"],
     ],
     // Codes match payroll.SOCIAL_TAX_MINIMUM_EXEMPTIONS (EMTA, SMS § 2 lg 3–4).
     socialTaxExemptions = [
@@ -91,7 +92,7 @@
       ["board_member", "Board member – no minimum obligation"],
     ],
     exemptionLabel = (code) =>
-      t((socialTaxExemptions.find(([v]) => v === code) || [, code])[1]),
+      t(code === "income_line" ? "Income lines" : (socialTaxExemptions.find(([v]) => v === code) || [, code])[1]),
     partTime = (x) =>
       x.fte && Number(x.fte) < 1
         ? `<small>${tr("Part-time")} ${esc(num(x.fte))}</small>`
@@ -99,7 +100,9 @@
     hoursNote = (x) =>
       x.pay_basis === "hourly" && x.hours != null
         ? `<small>${esc(money(x.hourly_rate, "EUR"))} × ${esc(num(x.hours))} ${tr("Hours").toLowerCase()}</small>`
-        : "";
+        : x.pay_basis === "monthly" && x.worked_days != null
+          ? `<small>${tr("Worked days / norm days")}: ${num(x.worked_days)} / ${num(x.norm_days)}</small>`
+          : "";
   const payrollSupported = (organisation) =>
     organisation?.country_code === "EE" && organisation?.base_currency === "EUR";
   const today = () => {
@@ -149,12 +152,18 @@
     tag: "M3.5 11.5V4h7.5l9 9-7.5 7.5z M8 8.5h.01",
     appearance: "M4 7h9 M17 7h3 M4 17h3 M11 17h9 M15 4.5v5 M9 14.5v5",
     assistant: "M11 3.5c.6 3.9 2.6 5.9 6.5 6.5-3.9.6-5.9 2.6-6.5 6.5-.6-3.9-2.6-5.9-6.5-6.5 3.9-.6 5.9-2.6 6.5-6.5z M18.5 15.5v5 M16 18h5",
+    send: "M12 19V5 M5 12l7-7 7 7",
+    gear: "M9 3h6l.5 3 2 .9 2.5-1.4 3 5-2.5 1.5v2L23 15.5l-3 5-2.5-1.4-2 .9-.5 3H9l-.5-3-2-.9L4 20.5l-3-5L3.5 14v-2L1 10.5l3-5L6.5 7l2-.9z M15 13a3 3 0 1 1-6 0 3 3 0 0 1 6 0",
+    paperclip: "M8 12l6-6a3 3 0 0 1 4 4l-8 8a5 5 0 0 1-7-7l8-8 M6 14l8-8",
     document: "M6 3h8l4 4v14H6z M14 3v4h4",
     plus: "M12 5v14 M5 12h14",
+    "pay-types": "M4 4h16v16H4z M8 8h.01 M11 8h5 M8 12h.01 M11 12h5 M8 16h.01 M11 16h5",
     close: "M6 6l12 12 M18 6 6 18",
     menu: "M4 7h16 M4 12h16 M4 17h16",
     external: "M13.5 4H20v6.5 M20 4l-9 9 M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5",
     shield: "M12 3.5 19 6v5.5c0 4.5-3 7.6-7 9-4-1.4-7-4.5-7-9V6z M9 12l2 2 4-4",
+    "bureau-overview": "M3 20h18 M5 20V8l7-4 7 4v12 M9 20v-6h6v6 M8 9h.01 M12 9h.01 M16 9h.01",
+    "bureau-memberships": "M4 5h16v14H4z M4 10h16 M10 5v14 M15 5v14 M6.5 7.5h.01 M12.5 12.5h.01 M17.5 16.5h.01",
     check: "M5 12.5l4.5 4.5L19 7.5",
     "chevron-down": "M6 9l6 6 6-6",
   };
@@ -165,9 +174,10 @@
     "fixed-assets": "asset", tax: "tax", payroll: "payroll", integrations: "link",
     imports: "import", "payment-methods": "card", "reminder-rules": "bell",
     "exchange-rates": "exchange", objects: "tag", documents: "appearance",
-    periods: "calendar",
+    periods: "calendar", "payment-types": "pay-types",
     maintenance: "wrench",
     groups: "team",
+    "bureau-overview": "bureau-overview", "bureau-memberships": "bureau-memberships",
   };
   const icon = (name = "document") =>
     `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${ICONS[name] || ICONS.document}"/></svg>`;
@@ -239,7 +249,9 @@
     if (!r.ok) {
       const d = await r.json().catch(() => ({}));
       const e = new Error(
-        Array.isArray(d.detail)
+        Array.isArray(d.detail) && d.detail[0]?.rule_code
+          ? d.detail.map((finding) => `${finding.rule_code}: ${lang === "et" ? finding.message_et : finding.message_en}`).join("; ")
+          : Array.isArray(d.detail)
           ? d.detail
               .map((x) => `${x.loc?.slice(1).join(".")}: ${x.msg}`)
               .join("; ")
@@ -442,7 +454,7 @@
     });
     app.classList.remove("menu-open");
     document.querySelectorAll(".app-nav").forEach((a) => {
-      const disabled = a.dataset.view === "payroll" && !payrollSupported(org);
+      const disabled = ["payroll", "payment-types"].includes(a.dataset.view) && !payrollSupported(org);
       a.setAttribute("aria-disabled", String(disabled));
       a.style.opacity = disabled ? "0.45" : "";
       a.title = disabled ? t("Payroll is currently available for Estonian books.") : "";
@@ -639,6 +651,10 @@
       .join("")}</svg>`;
   }
   let copilotDrawer, copilotBody, copilotToggle, copilotOrg, copilotTicket = 0, copilotReturnFocus;
+  const copilotMac = /mac/i.test(navigator.userAgentData?.platform || navigator.platform);
+  const copilotShortcut = copilotMac ? '⌘/' : 'Ctrl+/';
+  const copilotHintKey = 'fastaccounts_copilot_shortcut_hint_seen';
+  let copilotHintSeen = false;
   const currentPage = () => {
     const key = location.hash.slice(1).split('/')[0] || 'overview';
     return Object.hasOwn(views, key) ? key : 'overview';
@@ -649,27 +665,58 @@
     copilotToggle.setAttribute('aria-expanded', 'false');
     (copilotReturnFocus?.isConnected ? copilotReturnFocus : copilotToggle).focus();
   }
+  function openCopilot() {
+    if (!org || copilotToggle.hidden || !copilotDrawer.hidden) return;
+    copilotReturnFocus = document.activeElement;
+    copilotDrawer.hidden = false;
+    copilotToggle.setAttribute('aria-expanded', 'true');
+    if (!copilotHintSeen) {
+      try { copilotHintSeen = !!localStorage.getItem(copilotHintKey); } catch {}
+      if (!copilotHintSeen) {
+        const hint = document.createElement('div');
+        hint.className = 'copilot-shortcut-hint';
+        hint.innerHTML = `<p>${tr('Tip: press {shortcut} to open or close the copilot from any page.').replace('{shortcut}', `<kbd>${copilotShortcut}</kbd>`)}</p><button type="button" class="button" data-copilot-hint-dismiss>${tr('Got it')}</button>`;
+        copilotDrawer.querySelector('.copilot-description').after(hint);
+        hint.querySelector('button').onclick = () => hint.remove();
+        copilotHintSeen = true;
+        try { localStorage.setItem(copilotHintKey, 'true'); } catch {}
+      }
+    }
+    copilotDrawer.querySelector('[data-copilot-close]').focus();
+    if (!copilotBody.childElementCount) loadCopilot();
+    else scrollCopilot();
+  }
+  function toggleCopilot() {
+    if (copilotDrawer.hidden) openCopilot();
+    else closeCopilot();
+  }
   function syncCopilot() {
     if (!copilotDrawer) {
       const shell = document.createElement('div');
       shell.innerHTML = `<button type="button" class="button primary copilot-toggle" aria-label="${tr('Open AI copilot')}" aria-controls="copilot-drawer" aria-expanded="false">${icon('assistant')}${tr('AI copilot')}</button>` +
-        `<aside id="copilot-drawer" class="copilot-drawer" role="dialog" aria-labelledby="copilot-title" hidden><header class="copilot-header"><h2 id="copilot-title">${tr('AI copilot')}</h2><button type="button" class="button" data-copilot-close aria-label="${tr('Close AI copilot')}">&times;</button></header>` +
+        `<aside id="copilot-drawer" class="copilot-drawer" role="dialog" aria-labelledby="copilot-title" hidden><header class="copilot-header"><h2 id="copilot-title">${tr('AI copilot')}</h2><button type="button" class="button" data-copilot-gear hidden aria-label="${tr('Copilot administration')}" aria-controls="copilot-admin" aria-expanded="false">${icon('gear')}</button><button type="button" class="button" data-copilot-close aria-label="${tr('Close AI copilot')}">&times;</button></header>` +
         `<p class="muted copilot-description">${tr('Ask about your books, scan documents and draft staged imports. The copilot never changes records on its own.')}</p><div class="copilot-body"></div></aside>`;
       app.append(shell);
       copilotDrawer = shell.querySelector('#copilot-drawer');
       copilotBody = shell.querySelector('.copilot-body');
       copilotToggle = shell.querySelector('.copilot-toggle');
-      copilotToggle.onclick = () => {
-        if (!copilotDrawer.hidden) return closeCopilot();
-        copilotReturnFocus = document.activeElement;
-        copilotDrawer.hidden = false;
-        copilotToggle.setAttribute('aria-expanded', 'true');
-        copilotDrawer.querySelector('[data-copilot-close]').focus();
-        if (!copilotBody.childElementCount) loadCopilot();
-      };
+      copilotToggle.setAttribute('aria-keyshortcuts', copilotMac ? 'Meta+/' : 'Control+/');
+      copilotToggle.title = t('Open AI copilot ({shortcut})').replace('{shortcut}', copilotShortcut);
+      shell.querySelector('[data-copilot-close]').title = t('Close AI copilot ({shortcut})').replace('{shortcut}', copilotShortcut);
+      copilotToggle.onclick = toggleCopilot;
       shell.querySelector('[data-copilot-close]').onclick = closeCopilot;
+      shell.querySelector('[data-copilot-gear]').onclick = () => {
+        const panel = copilotBody.querySelector('[data-copilot-admin]');
+        if (panel) panel.open = !panel.open;
+      };
       document.addEventListener('keydown', (event) => {
         if (event.key === 'Escape' && !document.querySelector('.dialog')) closeCopilot();
+        if (event.key === '/' && (copilotMac ? event.metaKey : event.ctrlKey) &&
+            !event.altKey && org && !copilotToggle.hidden &&
+            !document.querySelector('.dialog')) {
+          event.preventDefault();
+          toggleCopilot();
+        }
       });
     }
     copilotToggle.hidden = !org;
@@ -707,11 +754,104 @@
       if (ticket === copilotTicket) copilotBody.removeAttribute('aria-busy');
     }
   }
+  function scrollCopilot() {
+    const list = copilotBody.querySelector('#copilot-transcript');
+    if (list) list.scrollTop = list.scrollHeight;
+  }
+  function copilotMarkdown(source) {
+    // Escape every provider character before adding our small, fixed tag allowlist.
+    const translated = String(source).split('\n').map((line) => t(line)).join('\n');
+    const clean = translated.replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, '')
+      .replace(/<!--[\s\S]*?-->/g, '').replace(/<[^>]*>/g, '');
+    function inline(text) {
+      const pattern = /(`[^`\n]+`|\*\*[^*\n]+\*\*|\*[^*\n]+\*|\[[^\]\n]+\]\([^\s)]+\))/g;
+      let result = '', offset = 0;
+      for (const match of text.matchAll(pattern)) {
+        result += esc(text.slice(offset, match.index));
+        const token = match[0];
+        if (token.startsWith('`')) result += `<code>${esc(token.slice(1, -1))}</code>`;
+        else if (token.startsWith('**')) result += `<strong>${esc(token.slice(2, -2))}</strong>`;
+        else if (token.startsWith('*')) result += `<em>${esc(token.slice(1, -1))}</em>`;
+        else {
+          const link = /^\[([^\]]+)\]\(([^)]+)\)$/.exec(token);
+          const safe = /^https?:\/\//i.test(link[2]);
+          result += safe ? `<a href="${esc(link[2])}" target="_blank" rel="noreferrer">${esc(link[1])}</a>` : esc(link[1]);
+        }
+        offset = match.index + token.length;
+      }
+      return result + esc(text.slice(offset));
+    }
+    const blocks = clean.split(/(```[^\n]*\n[\s\S]*?(?:```|$))/g);
+    return blocks.map((block) => {
+      if (block.startsWith('```')) {
+        const code = block.slice(block.indexOf('\n') + 1).replace(/```$/, '');
+        return `<pre><code>${esc(code)}</code></pre>`;
+      }
+      let html = '', paragraph = [], list = null;
+      const flush = () => { if (paragraph.length) html += `<p>${inline(paragraph.join('\n'))}</p>`; paragraph = []; };
+      const close = () => { if (list) html += `</${list}>`; list = null; };
+      for (const line of block.split('\n')) {
+        const bullet = /^\s*(?:([-*])|\d+\.)\s+(.+)$/.exec(line);
+        if (bullet) {
+          flush();
+          const tag = bullet[1] ? 'ul' : 'ol';
+          if (list !== tag) { close(); html += `<${tag}>`; list = tag; }
+          html += `<li>${inline(bullet[2])}</li>`;
+        } else {
+          close();
+          if (!line.trim()) flush();
+          else paragraph.push(line);
+        }
+      }
+      flush(); close();
+      return html;
+    }).join('');
+  }
+  async function copilotSend(url, payload, onDelta) {
+    if (typeof ReadableStream === 'undefined' || typeof TextDecoder === 'undefined') return post(url, payload);
+    let response;
+    try {
+      response = await api(url, {method: 'POST', body: JSON.stringify(payload), headers: {Accept: 'text/event-stream'}});
+    } catch (error) {
+      // Only negotiate again when the server rejected streaming before accepting a send.
+      if ([404, 405, 406, 415, 501].includes(error.status)) return post(url, payload);
+      throw error;
+    }
+    // Older servers ignore Accept and return the existing JSON result. Do not send twice.
+    if (!(response instanceof Response)) return response;
+    if (!response.body?.getReader || !response.headers.get('content-type')?.includes('text/event-stream')) {
+      throw new Error(t('The reply was interrupted. Please retry.'));
+    }
+    const reader = response.body.getReader(), decoder = new TextDecoder();
+    let buffer = '', result = null;
+    try {
+      while (true) {
+        const {value, done} = await reader.read();
+        buffer += decoder.decode(value || new Uint8Array(), {stream: !done});
+        buffer = buffer.replace(/\r\n/g, '\n');
+        let end;
+        while ((end = buffer.indexOf('\n\n')) !== -1) {
+          const frame = buffer.slice(0, end); buffer = buffer.slice(end + 2);
+          const kind = /^event: *([^\n]+)/m.exec(frame)?.[1];
+          const raw = frame.split('\n').filter((line) => line.startsWith('data:')).map((line) => line.slice(5).trimStart()).join('\n');
+          if (!raw) continue;
+          const data = JSON.parse(raw);
+          if (kind === 'delta') onDelta(data.text);
+          if (kind === 'done') result = data;
+        }
+        if (done) break;
+      }
+      if (!result) throw new Error(t('The reply was interrupted. Please retry.'));
+      return result;
+    } finally { reader.releaseLock(); }
+  }
   function copilotTranscript(messages) {
-    if (!messages.length) return `<p class="muted">${tr('No copilot messages yet.')}</p>`;
     return messages.map((x) => {
       const stage = x.stage_proposal_json ? JSON.parse(x.stage_proposal_json) : null;
-      return `<article class="copilot-message copilot-${esc(x.role)}"><p>${esc(x.content)}</p><p class="muted">${esc(date(x.created_at))} · ${tr('Input tokens')}: ${num(x.tokens_in)} · ${tr('Output tokens')}: ${num(x.tokens_out)}</p>` +
+      return `<article class="copilot-message copilot-${esc(x.role)}" title="${esc(x.created_at)}">` +
+        (x.role === 'assistant' ? `<span class="copilot-author">${icon('assistant')}${tr('AI copilot')}</span>` : '') +
+        (x.role === 'assistant' ? `<div class="copilot-markdown">${copilotMarkdown(x.content)}</div><button type="button" class="button copilot-copy" data-copy="${esc(x.content)}" aria-label="${tr('Copy reply')}">${tr('Copy reply')}</button>` : `<p>${esc(x.content)}</p>`) +
+        (x.retryable ? `<button type="button" class="button" data-retry="${esc(x.id)}">${tr('Retry')}</button>` : '') +
         (stage ? button(tr('Stage {rows} rows for import').replace('{rows}', stage.rows ?? '?'), 'stageImport', false, `data-id="${esc(x.id)}" ${canEditMappings() ? '' : 'disabled'}`) : '') +
         `</article>`;
     }).join('');
@@ -734,9 +874,14 @@
       : accessLine || `${tr('Used today')}: ${quotaLine}`;
     const stages = Object.fromEntries((history || []).filter((x) => x.stage_proposal_json)
       .map((x) => [x.id, JSON.parse(x.stage_proposal_json)]));
-    const composer = form(`<label class="full-width">${tr('Message')}<textarea name="content" rows="3" maxlength="8000" required></textarea><span class="field-error" data-error="content"></span></label>` +
-        select('Attach document', 'attachment_id', [['', tr('No attachment')], ...docs.map((d) => [d.id, `${d.filename} ${date(d.created_at)}`])], ''),
-      'Send message');
+    const suggestions = ['Summarise overdue invoices', 'What needs my attention this week?', 'Explain my VAT position'];
+    const empty = `<div class="copilot-empty"><p>${esc(active ? t('How can I help with your books?') : notice)}</p>` +
+      (active ? `<div class="copilot-suggestions">${suggestions.map((text) => `<button type="button" class="button" data-suggestion="${tr(text)}">${tr(text)}</button>`).join('')}</div>` : '') + `</div>`;
+    const composer = `<form class="copilot-composer"><div data-copilot-attachment hidden></div><div class="copilot-compose-row">` +
+      `<button type="button" class="button copilot-attach" aria-label="${tr('Attach document')}" aria-expanded="false" aria-controls="copilot-documents">${icon('paperclip')}</button>` +
+      `<textarea name="content" rows="1" maxlength="8000" aria-label="${tr('Message')}" placeholder="${tr('Ask about your books')}" required></textarea>` +
+      `<button type="submit" class="button primary copilot-send" aria-label="${tr('Send message')}" disabled>${icon('send')}</button></div>` +
+      `<div class="copilot-attachments" hidden><select id="copilot-documents" aria-label="${tr('Attach document')}"><option value="">${tr('No attachment')}</option>${docs.map((d) => `<option value="${esc(d.id)}">${esc(d.filename)}</option>`).join('')}</select></div></form>`;
     const usageUsage = usage
       ? `<section class="section" data-copilot-usage><h2>${tr('Copilot usage')}</h2><p class="muted">${tr('Per-user daily usage counts every message, scan and token billed to this organisation.')}</p>` +
         table(['Day', 'User', 'Messages', 'Scans', 'Input tokens', 'Output tokens'],
@@ -760,15 +905,31 @@
         form(field('Grant member email', 'grant_email', '', 'email', 'required maxlength="320"'), 'Grant access') +
       `</section>` : '';
     const body = `<p class="muted" data-copilot-notice aria-live="polite">${esc(notice)}</p>` +
-      (admins ? `<details data-copilot-admin><summary>${tr('Copilot administration')}</summary><section class="section" data-copilot-settings>` +
-        form(check('Enable AI copilot for this organisation', 'copilot_enabled', !!status.enabled)) + `</section>` + grantsPanel + usageUsage + `</details>` : '') +
-      `<section class="section" data-copilot-chat><h2>${tr('Conversation')}</h2><div id="copilot-transcript" aria-live="polite">${copilotTranscript(history || [])}</div>` + composer + `</section>`;
+      (admins ? `<details id="copilot-admin" data-copilot-admin><summary>${tr('Copilot administration')}</summary><section class="section" data-copilot-settings>` +
+        form(check('Enable AI copilot for this organisation', 'copilot_enabled', !!status.enabled)) + `</section><section class="section" data-copilot-provider>` +
+        `<p class="muted">${tr(status.settings?.configured ? 'Organisation API key configured' : 'Using the service API key when available')}</p>` +
+        form(field('Organisation xAI API key', 'api_key', '', 'password', 'autocomplete="new-password" maxlength="4096"') +
+          `<p class="muted">${tr('Leave blank to keep the saved key.')}</p>` +
+          check('Clear the organisation API key', 'clear_key', false) +
+          field('Copilot model (optional)', 'model', status.settings?.model || '', 'text', 'maxlength="128"'), 'Save') +
+        `</section>` + grantsPanel + usageUsage + `</details>` : '') +
+      `<section data-copilot-chat><div id="copilot-transcript" role="log" aria-live="polite" aria-relevant="additions text">${history?.length ? copilotTranscript([...history].reverse()) : empty}</div>` + composer + `</section>`;
     if (!c.mount(body)) return;
     copilotBody.querySelectorAll('[data-action=cancel]').forEach((x) => x.remove());
     if (!active) copilotBody.querySelectorAll('[data-copilot-chat] textarea, [data-copilot-chat] select, [data-copilot-chat] button').forEach((x) => { x.disabled = true; });
     const enabledCheck = copilotBody.querySelector('[name=copilot_enabled]');
     if (enabledCheck) bindForm(copilotBody.querySelector('[data-copilot-settings]'), async () => {
-      await post(c.url('/copilot/settings'), {enabled: !!enabledCheck.checked}, 'PUT');
+      await post(c.url('/copilot/settings'), {enabled: !!enabledCheck.checked});
+      toast(t('Saved successfully'));
+      await loadCopilot();
+    });
+    const providerPanel = copilotBody.querySelector('[data-copilot-provider]');
+    if (providerPanel) bindForm(providerPanel, async (values) => {
+      const payload = {model: values.model || ''};
+      if (providerPanel.querySelector('[name=clear_key]').checked) payload.api_key = '';
+      else if (values.api_key?.trim()) payload.api_key = values.api_key.trim();
+      await post(c.url('/copilot/settings'), payload);
+      providerPanel.querySelector('[name=api_key]').value = '';
       toast(t('Saved successfully'));
       await loadCopilot();
     });
@@ -785,26 +946,181 @@
         await loadCopilot();
       })});
     }
-    bindForm(copilotBody.querySelector('[data-copilot-chat]'), async (data) => {
-      const payload = {page: currentPage(), content: data.content, attachment_ids: data.attachment_id ? [data.attachment_id] : []};
-      await post(c.url('/copilot/messages'), payload);
-      toast(t('Copilot replied'));
-      await loadCopilot();
+    const panel = copilotBody.querySelector('[data-copilot-admin]');
+    const gear = copilotDrawer.querySelector('[data-copilot-gear]');
+    gear.hidden = !admins;
+    if (panel) {
+      const syncGear = () => gear.setAttribute('aria-expanded', String(panel.open));
+      panel.addEventListener('toggle', syncGear);
+      syncGear();
+    }
+    const chat = copilotBody.querySelector('[data-copilot-chat]');
+    const list = chat.querySelector('#copilot-transcript');
+    list.addEventListener('click', async (event) => {
+      const copy = event.target.closest('[data-copy]');
+      if (!copy) return;
+      try {
+        await navigator.clipboard.writeText(copy.dataset.copy);
+        copy.textContent = t('Reply copied');
+        copy.setAttribute('aria-label', t('Reply copied'));
+      } catch (_) { toast(t('Could not copy the reply. Please select and copy the text.'), 'error'); }
     });
-    bindActions(copilotBody, {stageImport: (b) => confirmAction(tr('Stage import rows'), tr('Review these rows in Data import before they touch your books. Stage them now?'), async () => {
-      const proposal = stages[b.dataset.id] || {};
-      await post(c.url('/copilot/stage'), {kind: proposal.kind, csv_content: proposal.csv, message_id: b.dataset.id});
-      toast(t('Import batch staged. Review it under Data import.'));
-      await loadCopilot();
-    })});
+    const chatForm = chat.querySelector('form');
+    const textarea = chatForm.querySelector('textarea');
+    const send = chatForm.querySelector('[type=submit]');
+    const attach = chatForm.querySelector('.copilot-attach');
+    const picker = chatForm.querySelector('select');
+    const menu = chatForm.querySelector('.copilot-attachments');
+    const chip = chatForm.querySelector('[data-copilot-attachment]');
+    let sending = false;
+    const resize = () => {
+      textarea.style.height = 'auto';
+      textarea.style.height = `${Math.min(textarea.scrollHeight, 192)}px`;
+      send.disabled = !active || sending || !textarea.value.trim();
+    };
+    textarea.oninput = resize;
+    attach.onclick = () => {
+      menu.hidden = !menu.hidden;
+      attach.setAttribute('aria-expanded', String(!menu.hidden));
+      if (!menu.hidden) picker.focus();
+    };
+    const chooseAttachment = () => {
+      chip.hidden = !picker.value;
+      chip.innerHTML = picker.value ? `<span>${esc(picker.selectedOptions[0].textContent)}</span><button type="button" class="button" aria-label="${tr('Remove attachment')}">${icon('close')}</button>` : '';
+      const remove = chip.querySelector('button');
+      if (remove) remove.onclick = () => { picker.value = ''; chooseAttachment(); textarea.focus(); };
+      menu.hidden = true;
+      attach.setAttribute('aria-expanded', 'false');
+    };
+    picker.onchange = () => { chooseAttachment(); textarea.focus(); };
+    const sendMessage = async (draft = textarea.value, attachment = picker.value) => {
+      if (!active || sending || !draft.trim()) return;
+      sending = true;
+      list.querySelector('.copilot-empty')?.remove();
+      list.insertAdjacentHTML('beforeend', copilotTranscript([{role: 'user', content: draft, created_at: new Date().toISOString()}]));
+      const userBubble = list.lastElementChild;
+      list.insertAdjacentHTML('beforeend', `<article class="copilot-message copilot-assistant"><span class="copilot-author">${icon('assistant')}${tr('AI copilot')}</span><div class="copilot-typing" aria-label="${tr('Thinking')}"><span></span><span></span><span></span></div></article>`);
+      const pending = list.lastElementChild;
+      textarea.value = '';
+      picker.value = '';
+      chooseAttachment();
+      chatForm.querySelectorAll('textarea, button, select').forEach((x) => { x.disabled = true; });
+      resize();
+      scrollCopilot();
+      let streamedText = '';
+      try {
+        const reply = await copilotSend(c.url('/copilot/messages'), {page: currentPage(), content: draft, attachment_ids: attachment ? [attachment] : []}, (delta) => {
+          streamedText += delta;
+          if (!chat.isConnected) return;
+          let text = pending.querySelector('.copilot-markdown');
+          if (!text) {
+            pending.querySelector('.copilot-typing')?.remove();
+            text = document.createElement('div'); text.className = 'copilot-markdown'; pending.append(text);
+          }
+          text.innerHTML = copilotMarkdown(streamedText);
+          scrollCopilot();
+        });
+        if (!chat.isConnected) return;
+        if (reply.quota_consumed ?? !reply.retryable) {
+          status.quotas.user_messages++;
+          copilotBody.querySelector('[data-copilot-notice]').textContent = `${t('Used today')}: ${num(status.quotas.user_messages)} / ${num(status.quotas.messages_per_user_day)}`;
+        }
+        if (reply.retryable) {
+          streamedText = reply.assistant.content;
+          const failure = new Error(translateError(reply.error));
+          failure.partial = true;
+          throw failure;
+        }
+        if (!chat.isConnected) return;
+        userBubble.outerHTML = copilotTranscript([reply.user_message]);
+        if (reply.stage) {
+          stages[reply.assistant.id] = reply.stage;
+          reply.assistant.stage_proposal_json = JSON.stringify(reply.stage);
+        }
+        pending.outerHTML = copilotTranscript([reply.assistant]);
+        bindStages();
+      } catch (error) {
+        if (!chat.isConnected) return;
+        pending.classList.add('copilot-error');
+        pending.innerHTML = `<span class="copilot-author">${icon('assistant')}${tr('AI copilot')}</span><p>${esc(error.message)}</p><button type="button" class="button">${tr('Retry')}</button>`;
+        if (streamedText) {
+          pending.querySelector('p').outerHTML = `<div class="copilot-markdown">${copilotMarkdown(streamedText)}</div>` +
+            (error.partial ? '' : `<p role="alert">${esc(error.message)}</p>`);
+          pending.insertAdjacentHTML('beforeend', `<button type="button" class="button copilot-copy" data-copy="${esc(streamedText)}" aria-label="${tr('Copy reply')}">${tr('Copy reply')}</button>`);
+        }
+        pending.querySelector('button').onclick = () => {
+          if (sending) return;
+          pending.querySelector('button').disabled = true;
+          sendMessage(draft, attachment);
+        };
+        textarea.value = draft;
+        picker.value = attachment;
+        chooseAttachment();
+      } finally {
+        sending = false;
+        if (chat.isConnected) {
+          chatForm.querySelectorAll('textarea, button, select').forEach((x) => { x.disabled = !active; });
+          resize();
+          scrollCopilot();
+          if (!copilotDrawer.hidden) textarea.focus();
+        }
+      }
+    };
+    list.addEventListener('click', (event) => {
+      const retry = event.target.closest('[data-retry]');
+      if (!retry || sending) return;
+      const ordered = [...history].reverse();
+      const index = ordered.findIndex((message) => message.id === retry.dataset.retry);
+      const question = ordered.slice(0, index).reverse().find((message) => message.role === 'user');
+      if (question) sendMessage(question.content, JSON.parse(question.attachment_ids_json || '[]')[0] || '');
+    });
+    chatForm.onsubmit = (event) => { event.preventDefault(); sendMessage(); };
+    textarea.onkeydown = (event) => {
+      if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
+        event.preventDefault();
+        sendMessage();
+      }
+    };
+    chat.querySelectorAll('[data-suggestion]').forEach((b) => { b.onclick = () => sendMessage(b.dataset.suggestion); });
+    resize();
+    scrollCopilot();
+    function bindStages() {
+      bindActions(copilotBody, {stageImport: (b) => confirmAction(tr('Stage import rows'), tr('Review these rows in Data import before they touch your books. Stage them now?'), async () => {
+        const proposal = stages[b.dataset.id] || {};
+        await post(c.url('/copilot/stage'), {kind: proposal.kind, csv_content: proposal.csv, message_id: b.dataset.id});
+        toast(t('Import batch staged. Review it under Data import.'));
+      })});
+    }
+    bindStages();
   }
   const views = {
+    "bureau-overview": async (c) => {
+      const companies = await api("/payroll/bureau-overview");
+      c.mount(page(t("Companies overview"), t("Companies overview"), "",
+        companies.length ? table(["Organisation", "Role", "Next payday", "Current month run", ["Unpaid net pay"], "Last APA export", "Open blocking findings", "PALK due", "TSD due"],
+          companies.map((x) => row([
+            td(`<strong>${esc(x.name)}</strong><small>${esc(x.country_code)}</small>`), td(tr(x.role)), td(esc(x.payday || "–")),
+            td(pill(x.run_status === "none" ? "No run" : x.run_status)), cash(x.unpaid_net_pay, x.base_currency),
+            td(x.last_apa_export_date ? `${esc(x.last_apa_export_date.slice(0, 10))} · ${tr(x.last_apa_export_status)}` : "–"),
+            td(num(x.open_blocking_findings), "numeric"), td(esc(x.palk_due_date)), td(esc(x.tsd_due_date)),
+          ]))) : empty("No organisations", "")));
+    },
+    "bureau-memberships": async (c) => {
+      const companies = await api("/payroll/bureau-memberships");
+      c.mount(page(t("User management"), t("Read-only membership overview for companies you administer."), "",
+        companies.length ? companies.map((company) => `<section class="section"><div class="section-head"><h2>${esc(company.name)}</h2>${button("Manage membership","manageMembership",false,`data-id="${esc(company.id)}"`)}</div>${table(["User", "Role", "Invitation status"], [
+          ...company.members.map((member) => row([td(esc(member.email)), td(tr(member.role)), td(tr("Member"))])),
+          ...company.invitations.map((invite) => row([td(esc(invite.email)), td(tr(invite.role)), td(`${tr(invite.status)}${invite.expires_at ? ` · ${esc(invite.expires_at.slice(0, 10))}` : ""}`)])),
+        ])}</section>`).join("") : empty("No administered organisations", "")));
+      bindActions(content, {manageMembership: (b) => manageBureauMembership(b.dataset.id, companies.find((x)=>x.id===b.dataset.id))});
+    },
     overview: async (c) => {
-      const [invoices, bills, bank, runs, clients] = await Promise.all([
+      const [invoices, bills, bank, runs, absences, clients] = await Promise.all([
         api(c.url("/invoices")),
         api(c.url("/bills")),
         api(c.url("/bank-transactions")),
         c.payrollSupported ? optionalPayroll(c.url("/pay-runs")) : null,
+        c.payrollSupported ? optionalPayroll(c.url(`/payroll/absences?month=${today().slice(0, 7)}`)) : null,
         Promise.all(
           organisations.map(async (o) => {
             try {
@@ -817,6 +1133,7 @@
         ),
       ]);
       const review = bank.filter((x) => x.status !== "Reconciled"),
+        absentToday = (absences || []).filter((x) => x.start_date <= today() && x.end_date >= today()),
         monthly = runs?.filter((x) =>
           (x.period || "").startsWith(today().slice(0, 7)),
         ),
@@ -835,7 +1152,7 @@
             t("Overview"),
             t("A clear view of your client’s books."),
             button("New invoice", "newInvoice", true),
-            `<div class="kpis">${kpi("Receivables", money(outstanding(invoices, ["Issued", "Part Paid"])), "Open customer invoices")}${kpi("Payables", money(outstanding(bills, ["Approved", "Part Paid"])), "Approved supplier bills")}${kpi("Bank review", num(review.length), "Transactions awaiting review")}${kpi("Payroll this month", money(runs === null ? null : cost), !c.payrollSupported ? "Available for Estonian EUR books" : runs === null ? "Payroll is not available yet." : "Employer cost · draft and approved")}</div><section class="section"><div class="section-head"><h2>${tr("Client books")}</h2><span class="muted">${num(organisations.length)} ${tr("organisations")}</span></div><div class="client-strip">${clients.map(({ o, rows }) => `<button class="client-book ${o.id === c.oid ? "selected" : ""}" data-client="${esc(o.id)}"><span class="country-badge">${esc(o.country_code)}</span><strong>${esc(o.name)}</strong><small>${tr("Receivables")}</small><b>${esc(money(rows ? outstanding(rows, ["Issued", "Part Paid"]) : null, o.base_currency))}</b></button>`).join("")}</div></section><section class="card section"><div class="section-head"><h2>${tr("Revenue & cash")}</h2><span class="muted">${tr("Last six months")}</span></div>${chart(invoices, bank)}</section><div class="dashboard-lists"><section><div class="section-head"><h2>${tr("Recent invoices")}</h2><a href="#invoices">${tr("View all")}</a></div>${table(["Number", "Customer", "Date", "Status", ["Total"]], invoiceRows([...invoices].sort((a, b) => String(b.issue_date).localeCompare(a.issue_date)).slice(0, 5)), button("New invoice", "newInvoice"))}</section><section><div class="section-head"><h2>${tr("Ready for review")}</h2><a href="#banking">${tr("View all")}</a></div>${table(
+            `<div class="kpis">${kpi("Receivables", money(outstanding(invoices, ["Issued", "Part Paid"])), "Open customer invoices")}${kpi("Payables", money(outstanding(bills, ["Approved", "Part Paid"])), "Approved supplier bills")}${kpi("Bank review", num(review.length), "Transactions awaiting review")}${kpi("Payroll this month", money(runs === null ? null : cost), !c.payrollSupported ? "Available for Estonian EUR books" : runs === null ? "Payroll is not available yet." : "Employer cost · draft and approved")}${c.payrollSupported ? kpi("Employees on leave today", num(absentToday.filter((x) => x.absence_type === "annual_leave" || x.absence_type === "extended_leave").length), "Current annual leave") + kpi("Sick leave today", num(absentToday.filter((x) => x.absence_type === "sick_leave").length), "Current sick leave") : ""}</div>${runs?.some((r) => r.declaration_overdue) ? `<p class="notice declaration-overdue"><a href="#payroll">${tr("Overdue payroll declarations")}: ${num(runs.filter((r) => r.declaration_overdue).length)}</a></p>` : ""}<section class="section"><div class="section-head"><h2>${tr("Client books")}</h2><span class="muted">${num(organisations.length)} ${tr("organisations")}</span></div><div class="client-strip">${clients.map(({ o, rows }) => `<button class="client-book ${o.id === c.oid ? "selected" : ""}" data-client="${esc(o.id)}"><span class="country-badge">${esc(o.country_code)}</span><strong>${esc(o.name)}</strong><small>${tr("Receivables")}</small><b>${esc(money(rows ? outstanding(rows, ["Issued", "Part Paid"]) : null, o.base_currency))}</b></button>`).join("")}</div></section><section class="card section"><div class="section-head"><h2>${tr("Revenue & cash")}</h2><span class="muted">${tr("Last six months")}</span></div>${chart(invoices, bank)}</section><div class="dashboard-lists"><section><div class="section-head"><h2>${tr("Recent invoices")}</h2><a href="#invoices">${tr("View all")}</a></div>${table(["Number", "Customer", "Date", "Status", ["Total"]], invoiceRows([...invoices].sort((a, b) => String(b.issue_date).localeCompare(a.issue_date)).slice(0, 5)), button("New invoice", "newInvoice"))}</section><section><div class="section-head"><h2>${tr("Ready for review")}</h2><a href="#banking">${tr("View all")}</a></div>${table(
               ["Counterparty", ["Amount"]],
               review
                 .slice(0, 5)
@@ -1025,6 +1342,17 @@
           await render();
         }),
       });
+    },
+    "payment-types": async (c) => {
+      if (!c.payrollSupported) {
+        c.mount(page(t("Payment types"), t("Payroll is available only for Estonian organisations with EUR books. Switch to an Estonian EUR organisation to manage payroll."), "", ""));
+        return;
+      }
+      const types = await api(c.url("/payroll/component-types"));
+      if (!c.mount(page(t("Payment types"), t("Manage payroll payment types and their default levy flags."),
+        button("Payroll accounts", "payrollAccounts", false, canExecutePush() ? "" : "disabled"), paymentTypesContent(types)))) return;
+      bindPaymentTypeActions(c, types, content);
+      bindActions(content, {payrollAccounts: () => payrollAccountsDialog(c)});
     },
     documents: async (c) => {
       const settings = await api(c.url('/document-settings'));
@@ -1519,8 +1847,8 @@
     imports: async (c) => {
       if (!c.route[0]) {
         if (c.mount(page(t("Data import"), t("Upload CSV, review each row, then import valid rows."),
-          button("Import", "masterImport", true), "")))
-          bindActions(content, { masterImport: () => masterDataImportDialog() });
+          button("Import", "masterImport", true) + (canEditMappings() ? button("Import journal workbook", "journalImport") + link("Import runs", "#integrations/runs/file_import") : ""), "")))
+          bindActions(content, { masterImport: () => masterDataImportDialog(), journalImport: () => journalImportDialog(c) });
         return;
       }
       const base = c.url(`/imports/${encodeURIComponent(c.route[0])}`);
@@ -1906,17 +2234,22 @@
           `<div class="notice" role="status">${tr("Payroll is available only for Estonian organisations with EUR books. Switch to an Estonian EUR organisation to manage payroll.")}</div>`));
         return;
       }
-      const [employees, runs, connections, tsdPreparations] = await Promise.all([
+      const [employees, runs, connections, tsdPreparations, componentTypes, payouts, bankAccounts, payoutSummary] = await Promise.all([
         optionalPayroll(c.url("/employees")),
         optionalPayroll(c.url("/pay-runs")),
         api(c.url("/integrations")),
         optionalPayroll(c.url("/payroll/tsd-preparations")),
+        optionalPayroll(c.url("/payroll/component-types")),
+        optionalPayroll(c.url("/payroll/payouts")),
+        optionalPayroll(c.url("/bank-accounts")),
+        optionalPayroll(c.url("/payroll/payouts/summary")),
       ]);
       const accountingProviders = connections.filter((entry) => ["merit", "smartaccounts"].includes(entry.provider) && entry.status !== "Disconnected");
       await Promise.all((runs || []).map(async (run) => {
         run.pushes = await api(c.url(`/pay-runs/${run.id}/pushes`));
       }));
       const unavailable = employees === null || runs === null;
+      (runs || []).forEach((run) => run.payouts = (payouts || []).filter((payout) => payout.pay_run_id === run.id));
       const tsdByRun = Object.fromEntries(
         [...(tsdPreparations || [])].reverse().map((preparation) => [
           String(preparation.pay_run_id),
@@ -1928,9 +2261,13 @@
           page(
             t("Payroll"),
             t("People, payslips and postings for this client."),
-            button("Add employee", "employee") +
+            button("Add employee", "employee") + button("Payout summary", "payoutSummary") +
+            button("Reports", "payrollReports") + button("Withholdings", "withholdings") + button("Absences", "absences") + button("Leave liability", "leaveLiability") + button("TÖR import from file", "torImport") +
+              button("Dimension registers", "payrollDimensions") + button("Payroll settings", "payrollSettings") +
+              (['owner','administrator'].includes(org?.role) ? button("Leave settings", "leaveSettings") : "") +
+              button("Payment types", "paymentTypes") + button("Payroll accounts", "payrollAccounts") + button("Payday settings", "paydaySettings") +
               button("Run payroll for month", "run", true),
-            `${unavailable ? `<div class="notice">${tr("Payroll is not available yet.")}</div>` : ""}<section class="section"><div class="section-head"><h2>${tr("Employees")}</h2><span class="muted">${num(employees?.length)} ${tr("employees")}</span>${employees === null ? '' : link('Export Excel', `/api${c.url('/reports/employees.xlsx')}`)}</div>${table(
+            `${unavailable ? `<div class="notice">${tr("Payroll is not available yet.")}</div>` : ""}<section class="section"><div class="section-head"><h2>${tr("Employees")}</h2><span class="muted">${num(employees?.filter((x) => x.active).length)} ${tr("employees")}</span>${employees === null ? '' : link('Export Excel', `/api${c.url('/reports/employees.xlsx')}`)}</div>${table(
               [
                 "Name",
                 ["Gross salary"],
@@ -1939,7 +2276,7 @@
                 "Status",
                 "Actions",
               ],
-              (employees || []).map((x) =>
+              (employees || []).filter((x) => x.active).map((x) =>
                 row([
                   td(
                     `<strong>${esc(x.name)}</strong>${x.board_member ? `<small>${pill("Board member")}</small>` : ""}${partTime(x)}${x.social_tax_minimum_exemption ? `<small>${tr("Social tax minimum exemption")}: ${esc(exemptionLabel(x.social_tax_minimum_exemption))}</small>` : ""}`,
@@ -1953,11 +2290,11 @@
                   td(num(x.funded_pension_percent) + "%", "numeric"),
                   td(tr(x.apply_tax_free_minimum ? "Yes" : "No")),
                   td(pill(x.active ? "Active" : "Inactive")),
-                  td(button("Edit", "edit", false, `data-id="${x.id}"`)),
+                  td(button("Edit", "edit", false, `data-id="${x.id}"`) + button("Archive", "archiveEmployee", false, `data-id="${esc(x.id)}"`) + button("Delete", "deleteEmployee", false, `data-id="${esc(x.id)}"`)),
                 ]),
               ),
               button("Add employee", "employee"),
-            )}</section><section class="section"><h2>${tr("Pay runs")}</h2>${
+            )}</section>${(employees || []).some((x) => !x.active) ? `<section class="section archived-employees"><h2>${tr("Archived employees")}</h2>${table(["Name", "Actions"], employees.filter((x) => !x.active).map((x) => row([td(esc(x.name)), td(button("Unarchive", "unarchiveEmployee", false, `data-id="${esc(x.id)}"`) + button("Delete", "deleteEmployee", false, `data-id="${esc(x.id)}"`))])))}</section>` : ""}${declarationPanel(runs || [])}<section class="section"><h2>${tr("Pay runs")}</h2>${
               (runs || []).length
                 ? table(
                     [
@@ -1973,6 +2310,7 @@
                         { ...r, tsd_preparation: tsdByRun[String(r.id)] },
                         c,
                         accountingProviders,
+                        runs,
                       ),
                     ),
                   )
@@ -1992,6 +2330,43 @@
           await render();
         },
         employee: () => employeeDialog(),
+        paymentTypes: () => paymentTypesDialog(c, componentTypes || []),
+        absences: () => payrollAbsencesDialog(c, employees || []),
+        leaveLiability: () => payrollLeaveLiabilityDialog(c),
+        torImport: () => payrollTORImportDialog(c),
+        leaveSettings: () => payrollLeaveSettingsDialog(c),
+        payrollAccounts: () => payrollAccountsDialog(c),
+        paydaySettings: () => paydaySettingsDialog(c),
+        withholdings: () => payrollWithholdingsDialog(c, employees || []),
+        payrollReports: () => payrollReportsDialog(c),
+        payrollDimensions: () => payrollDimensionsDialog(c),
+        payrollSettings: () => payrollSettingsDialog(c),
+        sendPayslips: (b) => payrollDeliveryDialog(c, runs.find((run) => run.id === b.dataset.id)),
+        managePayouts: (b) => payrollPayoutsDialog(c, runs.find((run) => run.id === b.dataset.id), bankAccounts || []),
+        createCorrection: async (b) => { await post(c.url(`/pay-runs/${b.dataset.id}/corrections`), {}); await render(); },
+        createSupplementary: async (b) => {
+          const original = runs.find((run) => run.id === b.dataset.id);
+          const options = (original?.items || []).map((item) => `<label class="check-row"><input type="checkbox" name="employee_ids" value="${esc(item.employee_id)}" checked> ${esc(item.employee_name)}</label>`).join('');
+          const d = dialog('Add supplementary run', `<p>${tr('Choose employees for the supplementary run.')}</p><div class="full-width">${options}</div><button class="fs-btn fs-btn-ink" data-action="saveSupplementary">${tr('Create supplementary run')}</button>`);
+          d.querySelector('[data-action="saveSupplementary"]').onclick = async () => {
+            const employee_ids = [...d.querySelectorAll('[name="employee_ids"]:checked')].map((input) => input.value);
+            if (!employee_ids.length) { toast(tr('Choose at least one employee.'), 'error'); return; }
+            await post(c.url(`/pay-runs/${b.dataset.id}/supplementary`), {employee_ids}); closeDialog(d); await render();
+          };
+        },
+        payoutSummary: () => payrollPayoutSummaryDialog(payoutSummary || []),
+        archiveEmployee: async (b) => { await post(c.url(`/employees/${b.dataset.id}`), {active: false}, "PATCH"); await render(); },
+        unarchiveEmployee: async (b) => { await post(c.url(`/employees/${b.dataset.id}`), {active: true}, "PATCH"); await render(); },
+        deleteEmployee: (b) => confirmAction("Delete employee", tr("Delete this employee permanently? Employees with pay run history must be archived instead."), async () => {
+          await post(c.url(`/employees/${b.dataset.id}`), undefined, "DELETE"); await render();
+        }),
+        editRunItem: (b) => {
+          const run = runs.find((r) => r.id === b.dataset.run);
+          payrollItemDialog(c, run, run.items.find((i) => i.id === b.dataset.id), componentTypes || []);
+        },
+        settleDeclaration: (b) => confirmAction("Reclassify TSD liabilities", tr("Post the TSD liability reclassification dated the 10th of the following month? This does not record a bank payment or submit a declaration."), async () => {
+          await post(c.url(`/pay-runs/${b.dataset.id}/tsd/settle`)); await render();
+        }),
         edit: (b) =>
           employeeDialog(employees.find((x) => String(x.id) === b.dataset.id)),
         run: () => payrollWizard(employees || []),
@@ -2026,14 +2401,15 @@
           const preparation = await post(
             c.url(`/pay-runs/${r.id}/tsd/prepare`),
           );
-          tsdPreparationDialog(c, r, preparation);
+          await render();
+          await tsdPreparationDialog(c, r, preparation);
         },
         tsd_review: async (b) => {
           const r = runs.find((x) => String(x.id) === b.dataset.id);
           const preparation = await api(
             c.url(`/pay-runs/${r.id}/tsd/${b.dataset.preparationId}`),
           );
-          tsdPreparationDialog(c, r, preparation);
+          await tsdPreparationDialog(c, r, preparation);
         },
       });
     },
@@ -2050,12 +2426,14 @@
       catalog.integrations?.items?.[item.key]?.direction || item.direction || "",
     integrationUrl = (c, provider, suffix = "") =>
       c.url(`/integrations/${encodeURIComponent(provider)}${suffix}`),
-    readyProviderOrder = ["file_import", "fasthr", "quickbooks", "xero", "merit", "smartaccounts", "open_banking"];
+    readyProviderOrder = ["file_import", "fasthr", "quickbooks", "xero", "merit", "merit_palk", "smartaccounts", "open_banking"];
 
   const importTypeLabel = (objectType) => t({
     employee: "Employees", employees: "Employees", account: "Chart of accounts",
     contact: "Contacts", sales_invoice: "Sales invoices", purchase_invoice: "Purchase invoices",
-    payment: "Payments", gl_entry: "General ledger entries",
+    payment: "Payments", gl_entry: "General ledger entries", journal: "Bookkeeping journal",
+    salary_agreement: "Merit Palk salary agreements", salary_hours: "Merit Palk salary and hours",
+    vacation_balance: "Merit Palk vacation balances",
   }[objectType] || objectType);
 
   function integrationCard(c, item, connection) {
@@ -2063,7 +2441,7 @@
       name = integrationName(item),
       fileImport = provider === "file_import",
       status = fileImport ? "No connection needed" : connection?.status || "Not configured",
-      accountingImport = ["merit", "smartaccounts"].includes(provider),
+      accountingImport = ["merit", "smartaccounts", "merit_palk"].includes(provider),
       canImport = status === "Connected",
       actions = fileImport
         ? button("Recent runs", "integrationRuns", false, `data-provider="${esc(provider)}"`) +
@@ -2135,13 +2513,13 @@
       ]),
       byProvider = new Map(connections.map((connection) => [connection.provider, connection])),
       ready = catalogue
-        .filter((entry) => entry.registry_status === "Adapter ready" || ["merit", "smartaccounts"].includes(entry.key))
+        .filter((entry) => entry.registry_status === "Adapter ready" || ["merit", "smartaccounts", "merit_palk"].includes(entry.key))
         .sort((left, right) => {
           const leftIndex = readyProviderOrder.indexOf(left.key),
             rightIndex = readyProviderOrder.indexOf(right.key);
           return (leftIndex < 0 ? 999 : leftIndex) - (rightIndex < 0 ? 999 : rightIndex);
         }),
-      planned = catalogue.filter((entry) => entry.registry_status !== "Adapter ready" && !["merit", "smartaccounts"].includes(entry.key));
+      planned = catalogue.filter((entry) => entry.registry_status !== "Adapter ready" && !["merit", "smartaccounts", "merit_palk"].includes(entry.key));
     if (
       !c.mount(
         page(
@@ -2210,9 +2588,15 @@
   }
 
   function integrationImportDialog(c, item) {
+    const palk = item.key === "merit_palk";
     const d = dialog("Import data", form(
       select("Object type", "object_type", (item.pull_object_types || []).map((type) =>
-        [type, importTypeLabel(type)])) +
+        [type, palk && type === "employee" ? t("Merit Palk employees") : importTypeLabel(type)])) +
+      (palk ? `<label>${tr("Accounting month")}<input type="month" name="month" required value="${new Date().toISOString().slice(0, 7)}"></label>` +
+        field("Personal code", "personal_code", "", "text", `title="${tr("Employee lists are limited to 100 results. For larger companies, import each PersonalCode separately; ranges and pagination are not supported.")}"`) + field("Contract import code (vacation balance)", "contract_code") +
+        `<label>${tr("Balance date")}<input type="date" name="balance_date" value="${new Date().toISOString().slice(0, 10)}"></label>` +
+        `<label class="check full-width"><input type="checkbox" name="monthly_amounts">${tr("I confirm the selected salary agreement rates are monthly amounts")}</label>` +
+        `<p class="full-width">${tr("Salary and hours fill draft pay runs. Review employee names and salary types; unpaid salaries may affect the report.")}</p>` : "") +
       `<p class="full-width">${tr("Records are staged for review. Nothing changes until decisions are applied.")}</p>`,
       "Import data",
     ));
@@ -2223,6 +2607,9 @@
       try {
         summary = await post(integrationUrl(c, item.key, "/sync"), {
           object_type: data.object_type,
+          ...(palk ? {config: {month: data.month.replace("-", ""), personal_code: data.personal_code,
+            contract_code: data.contract_code, balance_date: data.balance_date,
+            salary_amount_basis: d.querySelector('[name="monthly_amounts"]').checked ? "monthly" : ""}} : {}),
         });
       } finally {
         d.dataset.pending = "false";
@@ -2452,17 +2839,35 @@
   }
 
   const stagedDecisionEligible = (record) =>
-    ["Pending", "Failed"].includes(record.status);
+    !record.display_only && ["Pending", "Failed"].includes(record.status);
 
   function stagedRecordRow(record, objectType) {
     const payload = record.external_payload || {};
+    if (objectType === "journal") {
+      const review = record.journal_review || {}, eligible = stagedDecisionEligible(record);
+      return row([
+        td(`<strong>${esc(payload.name)}</strong><small>${esc(payload.sheet)} · ${esc(payload.date || t("Posting date required"))}</small>` +
+          `<p>${tr("Debit total")}: ${esc(review.debit_total)} · ${tr("Credit total")}: ${esc(review.credit_total)} · ${tr(review.balanced ? "Balanced" : "Unbalanced")}</p>` +
+          table(["Account", "Description", "Debit", "Credit", "Account mapping"], (review.lines || []).map((line) => row([
+            td(esc(line.account_code)), td(esc(line.description)), td(esc(line.debit ?? "")), td(esc(line.credit ?? "")),
+            td(line.account_id ? esc(line.local_account_code) : tr("Journal account is unmapped") + button("Map journal account", "mapJournalAccount", false, `data-code="${esc(line.account_code)}"`)),
+          ])))),
+        td(pill(record.status)), td(esc(record.matched_local_id || t("No local match"))),
+        td(review.warning ? tr(review.warning) : "–"),
+        td(eligible ? `<div class="decision-options"><label class="check"><input type="checkbox" data-decision="apply" data-id="${esc(record.id)}" ${review.valid ? "" : "disabled"}>${tr("Approve")}</label><label class="check"><input type="checkbox" data-decision="reject" data-id="${esc(record.id)}">${tr("Reject")}</label></div>` : tr("Decision recorded")),
+      ]);
+    }
     let displayName =
         payload.name ||
         [payload.first_name, payload.last_name].filter(Boolean).join(" ") ||
         record.external_id ||
         "–",
       details = [payload.email, payload.personal_id];
-    if (objectType === "contact") {
+    if (objectType === "vacation_balance") {
+      details = [payload.date, `${t("Unused vacation days")}: ${payload.DaysUnused}`];
+    } else if (objectType === "salary_hours") {
+      details = [payload.period, `${t("Gross")}: ${payload.gross_pay}`, `${t("Hours worked")}: ${payload.hours}`];
+    } else if (objectType === "contact") {
       details = [payload.registration_no || payload.registry_code, payload.email];
     } else if (["sales_invoice", "purchase_invoice"].includes(objectType)) {
       displayName = payload.external_number || payload.number || payload.supplier_number || record.external_id;
@@ -2489,7 +2894,7 @@
       td(
         eligible
           ? `<div class="decision-options" role="group" aria-label="${tr("Decision")}"><label class="check"><input type="checkbox" data-decision="apply" data-id="${esc(record.id)}">${tr(record.status === "Failed" ? "Retry apply" : "Approve")}</label><label class="check"><input type="checkbox" data-decision="reject" data-id="${esc(record.id)}">${tr("Reject")}</label></div>`
-          : `<span class="muted">${tr("Decision recorded")}</span>`,
+          : `<span class="muted">${tr(record.display_only ? "Display-only snapshot" : "Decision recorded")}</span>`,
       ),
     ]);
   }
@@ -2515,8 +2920,8 @@
         ),
       ),
       records = review.records || [],
-      objectType = review.summary.object_type || "employee",
-      employeeRun = ["employee", "employees"].includes(objectType),
+      objectType = provider === "merit_palk" && review.summary.object_type === "gl_entry" ? "journal" : review.summary.object_type || "employee",
+      employeeRun = ["employee", "employees", "salary_agreement"].includes(objectType),
       eligible = records.filter(stagedDecisionEligible),
       stagedBody = records.length
         ? table(
@@ -2546,6 +2951,10 @@
     const applyButton = content.querySelector(
       '[data-action="applyImportDecisions"]',
     );
+    if (objectType === "journal") {
+      applyButton.closest("section").insertAdjacentHTML("afterbegin",
+        `<div class="form-grid"><label>${tr("Posting date for undated blocks")}<input type="date" name="journal_posting_date"></label></div>`);
+    }
     content.querySelectorAll("[data-decision]").forEach((input) => {
       input.onchange = () => {
         if (input.checked)
@@ -2562,6 +2971,18 @@
       };
     });
     bindActions(content, {
+      mapJournalAccount: async (button) => {
+        const accounts = await api(c.url('/accounts'));
+        const d = dialog("Map journal account", form(
+          select("Local account", "local_account_code", accounts.filter((a) => a.active).map((a) => [a.code, `${a.code} ${a.name}`])), "Confirm mapping"));
+        bindForm(d, async (data) => {
+          await post(integrationUrl(c, provider, '/account-mappings'), {
+            local_account_code: data.local_account_code, external_account_code: button.dataset.code, status: "Confirmed",
+          });
+          closeDialog(d);
+          await integrationReview(c, item, provider, syncRunId);
+        });
+      },
       applyImportDecisions: async () => {
         const decisions = Object.fromEntries(
           [...content.querySelectorAll("[data-decision]:checked")].map(
@@ -2580,7 +3001,7 @@
               provider,
               `/sync/${encodeURIComponent(syncRunId)}/apply`,
             ),
-            { decisions },
+            { decisions, ...(objectType === "journal" ? {posting_date: content.querySelector('[name=journal_posting_date]').value || null} : {}) },
           );
           toast(t("Import decisions applied"));
           await integrationReview(c, item, provider, syncRunId, applied);
@@ -2593,7 +3014,7 @@
 
   async function integrationRuns(c, item, provider) {
     const runs = await api(integrationUrl(c, provider, "/syncs")),
-      employeeOnly = ["fasthr", "file_import", "personio", "bamboohr"].includes(provider);
+      employeeOnly = ["fasthr", "personio", "bamboohr"].includes(provider);
     if (
       !c.mount(
         page(
@@ -3230,6 +3651,7 @@
             'required pattern="[A-Z]{3}"',
           ) +
           field("IBAN", "iban"),
+          field("BIC", "bic"),
         "Add account",
       ),
     );
@@ -3614,6 +4036,23 @@
     });
   }
 
+  function journalImportDialog(c) {
+    const oid = org.id, url = integrationUrl(c, "file_import", "/import");
+    const d = dialog("Import journal workbook", form(
+      `<p class="full-width">${tr("Upload titled journal blocks, then review accounts, totals and posting dates before applying.")}</p><label>${tr("Bookkeeping journal")}<input name="journal_file" type="file" accept=".xlsx" required></label>`, "Stage import"));
+    bindForm(d, async () => {
+      const file = d.querySelector('[name=journal_file]').files[0];
+      if (!file || !file.name.toLowerCase().endsWith('.xlsx') || file.size > 2000000)
+        throw new Error(t("Journal workbook must be an XLSX file under 2 MB"));
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      let binary = '';
+      for (let i = 0; i < bytes.length; i += 8192) binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
+      const result = await post(url, {object_type: "journal", xlsx_base64: btoa(binary)});
+      closeDialog(d);
+      if (org?.id === oid) location.hash = `integrations/review/file_import/${encodeURIComponent(result.id)}`;
+    });
+  }
+
   function masterDataImportDialog(kind = "contacts") {
     const base = path("/imports"), oid = org.id;
     const d = dialog("Data import", form(
@@ -3799,8 +4238,12 @@
       });
     });
   }
-  function employeeDialog(employee) {
+  async function employeeDialog(employee) {
     const url = path("/employees") + (employee ? `/${employee.id}` : "");
+    const writable = ["owner", "administrator", "accountant"].includes(org?.role);
+    let histories = employee ? await api(url + "/tax-settings") : [];
+    const dimensionRows = await api(path('/payroll/dimensions')).catch(() => []);
+    const dimensionChoices = (kind) => [['','None'],...dimensionRows.filter((x)=>x.kind===kind && (x.active || x.id===employee?.[`${kind === 'department' ? 'department' : 'position'}_id`])).map((x)=>[x.id,x.name])];
     const e = employee || {
       active: true,
       apply_tax_free_minimum: true,
@@ -3809,11 +4252,19 @@
       fte: "1",
     };
     const d = dialog(
-      employee ? "Edit employee" : "Add employee",
+      employee ? (writable ? "Edit employee" : "Employee details") : "Add employee",
       form(
         field("Name", "name", e.name || "", "text", "required") +
           field("Email", "email", e.email || "", "email") +
+          select("Reports language", "report_language", [['et','Eesti'],['en','English'],['lv','Latviešu'],['lt','Lietuvių']], e.report_language || org?.language || 'et') +
           field("Personal ID", "personal_id", e.personal_id || "") +
+          field("Phone", "phone", e.phone || "", "tel", 'maxlength="50"') +
+          field("Date of birth", "date_of_birth", e.date_of_birth || "", "date") +
+          field("Address", "address", e.address || "", "text", 'maxlength="2000"') +
+          field("IBAN", "iban", e.iban || "", "text", 'maxlength="80"') +
+          field("Bank account owner", "bank_account_owner", e.bank_account_owner || "", "text", 'maxlength="180"') +
+          select("Department", "department_id", dimensionChoices('department'), e.department_id || '') +
+          select("Position", "position_id", dimensionChoices('position'), e.position_id || '') +
           select(
             "Pay basis",
             "pay_basis",
@@ -3878,7 +4329,7 @@
             e.apply_tax_free_minimum,
           ) +
           check("Active", "active", e.active),
-      ),
+      ) + (employee ? `<section class="employee-tax-settings"><h3>${tr("Tax settings")}</h3><p class="muted">${tr("Changes apply to new pay runs using month-end settings.")}</p><div data-tax-histories></div><div data-tax-editor></div></section>` : ""),
     );
     const employeeForm = d.querySelector("form");
     const updateBasis = () => {
@@ -3891,9 +4342,9 @@
         input.disabled = !visible;
         input.required = visible && name !== "social_tax_minimum_exemption";
       };
-      show("gross_salary", !hourly);
+      show("gross_salary", !hourly && basis !== "income_line");
       show("hourly_rate", hourly);
-      show("social_tax_minimum_exemption", !board);
+      show("social_tax_minimum_exemption", !board && basis !== "income_line");
     };
     employeeForm.elements.pay_basis.onchange = updateBasis;
     updateBasis();
@@ -3909,9 +4360,191 @@
         "employment_end_date",
       ])
         if (!data[k]) data[k] = null;
+      for (const k of ['department_id','position_id']) if (!data[k]) data[k] = null;
       await post(url, data, employee ? "PATCH" : "POST");
       await saved(d);
     });
+    if (!writable) {
+      employeeForm.querySelectorAll("input,select,[type=submit]").forEach((input) => { input.disabled = true; });
+      employeeForm.querySelector("[type=submit]").hidden = true;
+    }
+    if (!employee) return;
+    d.querySelector('.dialog-card').insertAdjacentHTML('beforeend', `<section class="employee-tax-settings"><h3>${tr('Contracts')}</h3><p class="muted">${tr('Manage contract and dated pay history for this employee.')}</p><button type="button" class="fs-btn fs-btn-outline" data-action="openContracts">${tr('View contracts')}</button></section>`);
+    d.querySelector('[data-action="openContracts"]').onclick = () => employeeContractsDialog(employee, writable);
+    const labels = {tax_free: "Tax-free income application", pension: "Funded pension", unemployment: "Unemployment insurance contribution"};
+    const modes = {maximum: "Maximum", limited: "Limited amount", none: "Not applied"};
+    const panel = d.querySelector("[data-tax-histories]"), editor = d.querySelector("[data-tax-editor]");
+    const renderHistories = () => {
+      panel.innerHTML = Object.entries(labels).map(([kind, label]) => `<div class="tax-history"><h4>${tr(label)}</h4>${table(
+        ["Effective from", "Setting", "Actions"],
+        histories.filter((r) => r.kind === kind).map((r) => row([
+          td(esc(r.start_date)),
+          td(kind === "tax_free" ? `${tr(modes[r.mode])}${r.mode === "limited" ? ` (${esc(money(r.amount, "EUR"))})` : ""}` : kind === "pension" ? `${esc(r.rate)}%` : tr(r.applies ? "Yes" : "Not applied")),
+          td(r.frozen ? `<span class="muted">${tr("Used in approved payroll")}</span>` : writable ? button("Edit", "taxEdit", false, `data-id="${esc(r.id)}"`) + button("Delete", "taxDelete", false, `data-id="${esc(r.id)}"`) : ""),
+        ])),
+      )}${writable ? button("Add tax setting", "taxAdd", false, `data-kind="${kind}"`) : ""}</div>`).join("");
+    };
+    const refreshHistories = async () => {
+      histories = await api(url + "/tax-settings");
+      renderHistories();
+    };
+    const editSetting = (kind, existing) => {
+      const r = existing || {start_date: today(), mode: "maximum", rate: 2, applies: true};
+      editor.innerHTML = `<h4>${tr(labels[kind])}</h4>` + form(
+        field("Effective from", "start_date", r.start_date, "date", "required") +
+        (kind === "tax_free" ? select("Tax-free income application", "mode", Object.entries(modes).map(([v, l]) => [v, t(l)]), r.mode) + field("Monthly limit", "amount", r.amount ?? "", "number", 'min="0" step="0.01"') :
+          kind === "pension" ? select("Pension %", "rate", [0, 2, 4, 6].map((v) => [v, `${v}%`]), r.rate) : check("Employee unemployment insurance applies", "applies", r.applies)),
+        "Save tax setting",
+      );
+      const f = editor.querySelector("form"), cancel = f.querySelector("[data-action=cancel]");
+      cancel.dataset.action = "taxCancel";
+      cancel.onclick = () => { editor.innerHTML = ""; panel.querySelector("button")?.focus(); };
+      if (kind === "tax_free") {
+        const toggleLimit = () => {
+          const limited = f.elements.mode.value === "limited";
+          f.elements.amount.disabled = !limited;
+          f.elements.amount.required = limited;
+          f.elements.amount.closest("label").hidden = !limited;
+        };
+        f.elements.mode.onchange = toggleLimit;
+        toggleLimit();
+      }
+      bindForm(editor, async (data) => {
+        const payload = {kind, start_date: data.start_date};
+        if (kind === "tax_free") Object.assign(payload, {mode: data.mode, amount: data.mode === "limited" ? data.amount : null});
+        if (kind === "pension") payload.rate = data.rate;
+        if (kind === "unemployment") payload.applies = f.elements.applies.checked;
+        await post(url + "/tax-settings" + (existing ? `/${existing.id}` : ""), payload, existing ? "PUT" : "POST");
+        await refreshHistories();
+        editor.innerHTML = "";
+        panel.querySelector("button")?.focus();
+      });
+      f.elements.start_date.focus();
+    };
+    panel.onclick = async (event) => {
+      const b = event.target.closest("button[data-action]");
+      if (!b || !writable) return;
+      const r = histories.find((r) => r.id === b.dataset.id);
+      if (b.dataset.action === "taxAdd") return editSetting(b.dataset.kind);
+      if (b.dataset.action === "taxEdit") return editSetting(r.kind, r);
+      if (b.dataset.action === "taxDelete") {
+        b.disabled = true;
+        try {
+          await post(url + `/tax-settings/${r.id}`, undefined, "DELETE");
+          editor.innerHTML = "";
+          await refreshHistories();
+        } catch (error) { toast(error.message, "error"); b.disabled = false; }
+      }
+    };
+    renderHistories();
+  }
+  async function employeeContractsDialog(employee, writable) {
+    const base = path(`/employees/${employee.id}/contracts`);
+    let contracts = await api(base);
+    const contractTypes = [['employment','Employment contract'],['board_member','Board member contract'],['services','Services contract'],['other','Other contract'],['none','No contract']];
+    let currentDialog = null;
+    const render = () => {
+      if (currentDialog) closeDialog(currentDialog);
+      const content = contracts.length ? contracts.map((contract) => `<section class="employee-tax-settings"><div class="section-head"><h3>${tr(contractTypes.find(([value]) => value === contract.contract_type)?.[1] || 'Other contract')}</h3>${writable ? button('Edit contract', 'editContract', false, `data-id="${esc(contract.id)}"`) : ''}</div><p>${esc(contract.start_date)}${contract.end_date ? ` – ${esc(contract.end_date)}` : ''}${contract.document_name ? ` · ${esc(contract.document_name)}` : ''}</p><p>${tr('Payday override')}: ${esc(contract.payday_rule ? `${tr(contract.payday_rule)}${contract.payday_day ? ` ${contract.payday_day}` : ''}` : tr('Organisation default'))} · ${tr('Monthly advance')}: ${esc(money(contract.monthly_net_advance, 'EUR'))}</p>${contract.workplace_address ? `<p>${tr('Workplace address')}: ${esc(contract.workplace_address)}</p>` : ''}<h4>${tr('Salary agreement history')}</h4>${contract.agreements.length ? table(['Effective from','Pay type','Rate','FTE'], contract.agreements.map((item) => row([td(esc(item.start_date)),td(tr(item.base_pay_type)),cash(item.rate,'EUR'),td(esc(item.fte))]))) : `<p class="muted">${tr('No salary agreements yet.')}</p>`}${writable ? button('Add salary agreement', 'addAgreement', false, `data-id="${esc(contract.id)}"`) : ''}<h4>${tr('Position history')}</h4>${contract.positions.length ? table(['Effective from','Position','Occupation code'], contract.positions.map((item) => row([td(esc(item.start_date)),td(esc(item.position)),td(esc(item.occupation_code || ''))]))) : `<p class="muted">${tr('No position history yet.')}</p>`}${writable ? button('Add position', 'addPosition', false, `data-id="${esc(contract.id)}"`) : ''}</section>`).join('') : empty('No contracts yet', writable ? button('Add contract','newContract') : '');
+      const d = dialog('Contracts', `${content}${writable && contracts.length ? button('Add contract','newContract') : ''}`);
+      currentDialog = d;
+      bindActions(d, {
+        newContract: () => contractEditDialog(employee, null, refresh),
+        editContract: (b) => contractEditDialog(employee, contracts.find((item) => item.id === b.dataset.id), refresh),
+        addAgreement: (b) => agreementEditDialog(b.dataset.id, refresh),
+        addPosition: (b) => positionEditDialog(b.dataset.id, refresh),
+      });
+    };
+    const refresh = async () => { contracts = await api(base); render(); };
+    render();
+  }
+  async function contractEditDialog(employee, contract, refresh) {
+    const creating = !contract;
+    const dimensionRows = await api(path('/payroll/dimensions')).catch(() => []);
+    const objectRows = await api(path('/objects')).catch(() => []);
+    const dimensionSelect = (label,kind,key,value) => select(label,key,[['','None'],...dimensionRows.filter((x)=>x.kind===kind && (x.active || x.id===value)).map((x)=>[x.id,x.name])],value || '');
+    const contractTypeOptions = [['employment','Employment contract'],['board_member','Board member contract'],['services','Services contract'],['other','Other contract'],['none','No contract']];
+    const d = dialog(creating ? 'Add contract' : 'Edit contract', form(
+      select('Contract type','contract_type',contractTypeOptions.map(([value,label]) => [value,tr(label)]),contract?.contract_type || 'employment') +
+      field('Start date','start_date',contract?.start_date || today(),'date','required') +
+      field('End date','end_date',contract?.end_date || '','date') +
+      field('Document name','document_name',contract?.document_name || '', 'text','maxlength="180"') +
+      field('Workplace address','workplace_address',contract?.workplace_address || '', 'text','maxlength="2000"') +
+      dimensionSelect('Department','department','department_id',contract?.department_id) +
+      dimensionSelect('Position','position','position_id',contract?.position_id) +
+      field('Monthly advance','monthly_net_advance',contract?.monthly_net_advance || '0','number','min="0" step="0.01"') +
+      select('Payday override','payday_rule',[['','Organisation default'],['next_month_day','Next month, day'],['current_month_day','Current month, day'],['next_month_first_working_day','Next month, first working day']].map(([value,label]) => [value,tr(label)]),contract?.payday_rule || '') +
+      field('Payday day','payday_day',contract?.payday_day || '','number','min="1" max="31" step="1"') +
+      (creating ? `<h3 class="full-width">${tr('Initial salary agreement')}</h3>` +
+        select('Pay type','base_pay_type',[['monthly','Monthly'],['monthly_day_based','Monthly, day-based'],['hourly','Hourly'],['contract_sum','Contract sum'],['contract_sum_x_qty','Contract sum x quantity']].map(([value,label]) => [value,tr(label)]),'monthly') +
+        field('Rate','rate','','number','min="0" step="0.01"') + field('FTE','fte','1','number','min="0.0001" max="1" step="0.0001"') +
+        dimensionSelect('Agreement department','department','agreement_department_id','') +
+        dimensionSelect('Cost centre','cost_centre','agreement_cost_centre_id','') +
+        select('Project','agreement_project_id',[['','None'],...objectRows.filter((x)=>x.object_type==='project' && x.active).map((x)=>[x.id,x.name])],'') +
+        field('Position','position','','text','maxlength="180"') + field('Position start date','position_start_date',today(),'date') : '')
+    ));
+    const formEl = d.querySelector('form');
+    formEl.elements.payday_rule.addEventListener('change', () => { formEl.elements.payday_day.disabled = !['next_month_day','current_month_day'].includes(formEl.elements.payday_rule.value); });
+    formEl.elements.payday_rule.dispatchEvent(new Event('change'));
+    bindForm(d, async (data) => {
+      data.end_date = data.end_date || null;
+      data.document_name = data.document_name || null;
+      data.workplace_address = data.workplace_address || null;
+      data.payday_rule = data.payday_rule || null;
+      data.payday_day = data.payday_day ? Number(data.payday_day) : null;
+      data.monthly_net_advance = data.monthly_net_advance || '0';
+      if (creating) {
+        const agreement = data.rate ? {start_date:data.start_date,base_pay_type:data.base_pay_type,rate:data.rate,fte:data.fte || '1',department_id:data.agreement_department_id || null,cost_centre_id:data.agreement_cost_centre_id || null,project_id:data.agreement_project_id || null} : null;
+        const position = data.position ? {position:data.position,occupation_code:null} : null;
+        for (const key of ['base_pay_type','rate','fte','position','position_start_date','agreement_department_id','agreement_cost_centre_id','agreement_project_id']) delete data[key];
+        data.agreement = agreement; data.position = position;
+        await post(path(`/employees/${employee.id}/contracts`), data);
+      } else {
+        for (const key of ['base_pay_type','rate','fte','position','position_start_date','agreement_department_id','agreement_cost_centre_id','agreement_project_id']) delete data[key];
+        await post(path(`/payroll/contracts/${contract.id}`), data, 'PATCH');
+      }
+      closeDialog(d); await refresh();
+    });
+  }
+  async function agreementEditDialog(contractId, refresh) {
+    const dimensionRows = await api(path('/payroll/dimensions')).catch(() => []);
+    const objectRows = await api(path('/objects')).catch(() => []);
+    const choices = (kind) => [['','None'],...dimensionRows.filter((x)=>x.kind===kind && x.active).map((x)=>[x.id,x.name])];
+    const d = dialog('Add salary agreement', form(
+      field('Effective from','start_date',today(),'date','required') +
+      select('Pay type','base_pay_type',[['monthly','Monthly'],['monthly_day_based','Monthly, day-based'],['hourly','Hourly'],['contract_sum','Contract sum'],['contract_sum_x_qty','Contract sum x quantity']].map(([value,label]) => [value,tr(label)]),'monthly') +
+      field('Rate','rate','','number','required min="0" step="0.01"') + field('Hours per day','hours_per_day','8','number','min="0.01" max="24" step="0.01"') +
+      field('FTE','fte','1','number','min="0.0001" max="1" step="0.0001"') +
+      select('Department','department_id',choices('department')) + select('Cost centre','cost_centre_id',choices('cost_centre')) +
+      select('Project','project_id',[['','None'],...objectRows.filter((x)=>x.object_type==='project' && x.active).map((x)=>[x.id,x.name])]) +
+      check('Full time','is_full_time',true) + check('Automatic working time','automatic_working_time',true)
+    ));
+    bindForm(d, async (data, formEl) => {
+      data.is_full_time = formEl.elements.is_full_time.checked; data.automatic_working_time = formEl.elements.automatic_working_time.checked;
+      await post(path(`/payroll/contracts/${contractId}/agreements`), data); closeDialog(d); await refresh();
+    });
+  }
+  function positionEditDialog(contractId, refresh) {
+    const d = dialog('Add position', form(field('Effective from','start_date',today(),'date','required') + field('Position','position','','text','required maxlength="180"') + field('Occupation code','occupation_code','','text','maxlength="30"')));
+    bindForm(d, async (data) => { data.occupation_code = data.occupation_code || null; await post(path(`/payroll/contracts/${contractId}/positions`),data); closeDialog(d); await refresh(); });
+  }
+  async function payrollTORImportDialog(c) {
+    const d = dialog('TÖR import from file', `<p class="muted">${tr('Upload an UTF-8 TÖR CSV. Review row errors and employee matches before applying.')}</p><form><label>${tr('CSV or TSV file')}<input name="file" type="file" accept=".csv,text/csv" required></label><button class="fs-btn fs-btn-outline" type="submit">${tr('Upload for review')}</button></form><div data-tor-review></div>`);
+    d.querySelector('form').addEventListener('submit', async (event) => {
+      event.preventDefault(); const file = event.currentTarget.elements.file.files[0]; if (!file) return;
+      const body = new FormData(); body.append('file',file);
+      try { const batch = await api(c.url('/payroll/tor-imports'),{method:'POST',body}); await renderTORReview(c,d,batch.id); }
+      catch(error) { toast(error.message,'error'); }
+    });
+  }
+  async function renderTORReview(c, dialogEl, importId) {
+    const review = await api(c.url(`/payroll/tor-imports/${importId}`));
+    const rows = review.rows.map((item) => row([td(item.row_number),td(esc(item.source_name || '')),td(esc(item.personal_id || '')),td(esc(item.contract_type || '')),td(esc(item.matched_employee_name || (item.match_conflict ? tr(item.match_conflict) : tr('New employee')))),td(esc([...item.errors,...(item.match_conflict ? [item.match_conflict] : [])].join('; ')))]));
+    dialogEl.querySelector('[data-tor-review]').innerHTML = `<h3>${tr('Review TÖR rows')}</h3><p>${tr('Status')}: ${tr(review.status)} · ${num(review.rows.length)} ${tr('Rows')}</p>${table(['File row','Employee','Personal code','Contract type','Match','Errors'],rows)}<button type="button" class="fs-btn fs-btn-ink" data-action="applyTOR">${tr('Apply reviewed rows')}</button>`;
+    dialogEl.querySelector('[data-action="applyTOR"]').onclick = async () => {
+      try { const result = await post(c.url(`/payroll/tor-imports/${importId}/apply`),{}); toast(`${num(result.applied + result.updated)} ${tr('rows applied')} · ${num(result.failed)} ${tr('failed')}`); await renderTORReview(c,dialogEl,importId); }
+      catch(error) { toast(error.message,'error'); }
+    };
   }
   function payrollWizard(employees) {
     const url = path("/pay-runs"),
@@ -3925,6 +4558,7 @@
       "Run payroll for month",
       form(
         field("Month", "period", today().slice(0, 7), "month", "required") +
+          `<label class="check"><input type="checkbox" name="show_leave_balance"><span>${tr("Show remaining leave days on payslips")}</span></label>` +
           `<div class="full-width"><h3>${tr("Included employees")}</h3>${table(
             ["Name", ["Gross salary"], ["Hours worked"]],
             active.map((x) =>
@@ -3958,18 +4592,644 @@
         "Create payroll draft",
         `${tr("Month")}: ${esc(data.period)}<br>${num(active.length)} ${tr("employees")}`,
         async () => {
-          await post(url, { period: data.period, hours });
+          await post(url, { period: data.period, hours, show_leave_balance: Boolean(d.querySelector('[name="show_leave_balance"]')?.checked) });
           await saved(d);
         },
       );
     });
   }
-  function tsdPreparationDialog(c, run, preparation) {
+  const componentFlags = [
+    ["income_tax", "Income tax"], ["social_tax", "Social tax"],
+    ["ui_employee", "Employee unemployment insurance"], ["ui_employer", "Employer unemployment insurance"],
+    ["funded_pension", "Funded pension"], ["social_minimum", "Counts towards social tax minimum"],
+  ];
+  const payrollRoleLabels = {
+    PAYROLL_SALARY: "Salary expense", PAYROLL_SOCIAL: "Social tax expense", PAYROLL_UI: "Employer unemployment expense",
+    PAYROLL_VACATION_RESERVE_EXPENSE: "Vacation reserve expense", PAYROLL_VACATION_RESERVE_LIABILITY: "Vacation reserve liability",
+    PAYROLL_SALARY_PAYABLE: "Salary payable", PAYROLL_BAILIFF: "Bailiff withholding liability", PAYROLL_DEDUCTION: "Other deduction liability",
+    PAYROLL_SOCIAL_ACCRUED: "Social tax accrued", PAYROLL_INCOME_WITHHELD: "Income tax withheld", PAYROLL_PENSION_WITHHELD: "Funded pension withheld",
+    PAYROLL_UI_ACCRUED: "Unemployment insurance accrued", PAYROLL_SOCIAL_PAYABLE: "Social tax and pension payable",
+    PAYROLL_INCOME_PAYABLE: "Income tax payable", PAYROLL_UI_PAYABLE: "Unemployment insurance payable",
+  };
+  function declarationPanel(runs) {
+    const approved = runs.filter((r) => r.status === "Approved");
+    if (!approved.length) return "";
+    const labels = {none: "Not prepared", prepared: "Prepared", settled: "Settled"};
+    const palkDue = (period) => { const [year, month] = period.split('-').map(Number), nextMonth = month === 12 ? 1 : month + 1, nextYear = month === 12 ? year + 1 : year; return `${nextYear}-${String(nextMonth).padStart(2,'0')}-18`; };
+    return `<section class="section payroll-declarations"><h2>${tr("Month-end declarations")}</h2>${table(["Period", "Declaration state", "Due date", "Actions"], approved.map((r) => row([
+      td(esc(r.period)), td(tr(labels[r.declaration_state] || "Not prepared")),
+      td(`${esc(r.declaration_due_date || "")}${r.declaration_overdue ? `<small class="declaration-overdue">${tr("Overdue declaration")}</small>` : ""}<small>${tr('PALK report due date')}: ${esc(palkDue(r.period))}</small>`),
+      td(r.declaration_state === "settled" ? "" : (r.declaration_state === "prepared" ? "" : button("Prepare TSD", "tsd_prepare", false, `data-id="${esc(r.id)}"`)) + button("Reclassify TSD liabilities", "settleDeclaration", false, `data-id="${esc(r.id)}"`)),
+    ])))}</section>`;
+  }
+  function componentFlagFields(values) {
+    return componentFlags.map(([key, label]) => check(label, key, values[key])).join("");
+  }
+  function paymentTypesContent(types) {
+    return `${button("Add payment type", "newType", true, canExecutePush() ? "" : "disabled")}${table(["Name", "Description", "Direction", "Actions"], types.map((x) => row([
+      td(esc(t(x.name))), td(esc(t(x.description || ""))), td(tr(x.direction === "income" ? "Income" : "Deduction")), td(button("Edit", "editType", false, `data-id="${esc(x.id)}" ${canExecutePush() ? "" : "disabled"}`)),
+    ])))}`;
+  }
+  function paymentTypesDialog(c, types) {
+    const d = dialog("Payment types", paymentTypesContent(types));
+    bindPaymentTypeActions(c, types, d, true);
+  }
+  const absenceKinds = [
+    ["annual_leave", "Annual leave"], ["extended_leave", "Extended leave"],
+    ["child_leave", "Child leave"], ["paternity_leave", "Paternity leave"],
+    ["maternity_leave", "Maternity leave"], ["parental_leave", "Parental leave"],
+    ["study_leave", "Study leave"], ["care_leave", "Care leave"],
+    ["sick_leave", "Sick leave"], ["permitted_absence", "Permitted absence"],
+    ["truancy", "Unauthorised absence"], ["unpaid_leave", "Unpaid leave"],
+    ["alternative_service", "Alternative service"], ["other", "Other absence"],
+  ];
+  async function payrollAbsencesDialog(c, employees) {
+    const base = c.url("/payroll/absences");
+    const canWriteAbsences = ["owner", "administrator", "accountant"].includes(org?.role);
+    const monthNow = new Date().toISOString().slice(0, 7);
+    const renderList = async (month = monthNow, kind = "") => {
+      document.querySelectorAll(".dialog").forEach(closeDialog);
+      const query = new URLSearchParams();
+      if (month) query.set("month", month);
+      if (kind) query.set("absence_type", kind);
+      const [rows, typeSettings] = await Promise.all([api(base + (query.size ? `?${query}` : "")), api(c.url("/payroll/absence-types"))]);
+      const writableLeave = (absence) => ["annual_leave", "extended_leave", "study_leave"].includes(absence.absence_type);
+      const payPanel = (absence) => {
+        if (!writableLeave(absence)) return "";
+        const pay = absence.absence_pay, breakdown = pay?.breakdown || {}, average = breakdown.average || {};
+        const methods = [["average", "Average"], ["unchanged_salary", "Unchanged salary"], ["best_of", "Best of"], ["fixed_sum", "Fixed sum"]];
+        const statusLabel = pay?.status ? ({pending: "Pending", in_payout: "In payout", paid: "Paid"}[pay.status] || pay.status) : "Not calculated";
+        return `<div class="absence-pay"><strong>${tr("Vacation pay")}</strong><p>${tr("Status")}: ${tr(statusLabel)}${pay ? ` · ${esc(money(pay.gross, "EUR"))}` : ""}</p>${canWriteAbsences ? `<div class="absence-pay-controls">${select("Vacation pay method", `method-${absence.id}`, methods.map(([v,l]) => [v,tr(l)]), pay?.method || "average")}${field("Fixed amount", `fixed-${absence.id}`, pay?.fixed_amount || "", "number")}${button("Calculate vacation pay", "calculateAbsencePay", false, `data-id="${esc(absence.id)}"`)}</div>` : ""}<table><thead><tr><th>${tr("Calculation")}</th><th>${tr("Amount")}</th></tr></thead><tbody><tr><td>${tr("Six-month wages")}</td><td>${esc(money(average.wage_total || 0, "EUR"))}</td></tr><tr><td>${tr("Divisor days")}</td><td>${num(average.daily_denominator || 0)}</td></tr><tr><td>${tr("Daily rate")}</td><td>${esc(money(average.average_daily_pay || 0, "EUR"))}</td></tr><tr><td>${tr("Days")}</td><td>${num(breakdown.leave_days ?? absence.leave_days)}</td></tr><tr><td>${tr("Total")}</td><td>${esc(money(pay?.gross || 0, "EUR"))}</td></tr></tbody></table>${canWriteAbsences && pay?.status === "pending" ? button("Add to payout", "addAbsencePay", true, `data-id="${esc(absence.id)}"`) : ""}</div>`;
+      };
+      const d = dialog("Absences", `<div class="section-head">${field("Month", "month", month, "month")} ${select("Absence type", "absence_type", [["", "All types"], ...absenceKinds.map(([v, label]) => [v, tr(label)])], kind)}</div>${canWriteAbsences ? `${button("Add absence", "addAbsence", true)} ${button("Collective annual leave", "collectiveLeave")} ${button("Absence pay settings", "absenceSettings")} ${button("Opening balances and historical earnings", "payrollHistoryImports")}` : ""}${rows.length ? table(["Employee", "Type", "Start date", "End date", "Calendar days", "Leave days", "Working days", "Vacation pay", "Actions"], rows.map((absence) => row([td(esc(absence.employee_name)), td(tr(absenceKinds.find(([key]) => key === absence.absence_type)?.[1] || "Other absence")), td(esc(absence.start_date)), td(esc(absence.end_date)), td(num(absence.calendar_days)), td(num(absence.leave_days)), td(num(absence.working_days)), td(payPanel(absence)), td(canWriteAbsences ? (absence.frozen ? tr("Used in approved payroll") : button("Edit", "editAbsence", false, `data-id="${esc(absence.id)}"`) + button("Delete", "deleteAbsence", false, `data-id="${esc(absence.id)}"`)) : "" )]))) : empty("No absences", "")}`);
+      d.querySelector('[name="month"]').onchange = () => { const nextMonth = d.querySelector('[name="month"]').value; const nextKind = d.querySelector('[name="absence_type"]').value; closeDialog(d); renderList(nextMonth, nextKind); };
+      d.querySelector('[name="absence_type"]').onchange = () => { const nextMonth = d.querySelector('[name="month"]').value; const nextKind = d.querySelector('[name="absence_type"]').value; closeDialog(d); renderList(nextMonth, nextKind); };
+      bindActions(d, {
+        addAbsence: () => absenceEditDialog(c, employees, null, () => renderList(month, kind)),
+        collectiveLeave: () => collectiveLeaveDialog(c, employees, () => renderList(month, kind)),
+        absenceSettings: () => absenceSettingsDialog(c, typeSettings, () => renderList(month, kind)),
+        payrollHistoryImports: () => payrollHistoryImportDialog(c),
+        calculateAbsencePay: async (buttonEl) => {
+          const id = buttonEl.dataset.id, method = d.querySelector(`[name="method-${CSS.escape(id)}"]`).value;
+          const fixed = d.querySelector(`[name="fixed-${CSS.escape(id)}"]`).value;
+          await post(`${base}/${id}/pay`, {method, fixed_amount: method === "fixed_sum" ? fixed : null});
+          await renderList(month, kind);
+        },
+        addAbsencePay: async (buttonEl) => addAbsencePayToPayout(c, rows.find((x) => x.id === buttonEl.dataset.id), () => renderList(month, kind)),
+        editAbsence: (buttonEl) => absenceEditDialog(c, employees, rows.find((row) => row.id === buttonEl.dataset.id), () => renderList(month, kind)),
+        deleteAbsence: (buttonEl) => confirmAction("Delete absence", tr("Delete this absence?"), async () => {
+          await post(`${base}/${buttonEl.dataset.id}`, undefined, "DELETE");
+          closeDialog(d); await renderList(month, kind);
+        }),
+      });
+    };
+    await renderList();
+  }
+  async function payrollHistoryImportDialog(c) {
+    document.querySelectorAll(".dialog").forEach(closeDialog);
+    const upload = (type, label, description) => `<form class="payroll-history-upload" data-upload-type="${type}"><h3>${tr(label)}</h3><p class="muted">${tr(description)}</p><label>${tr("CSV or XLSX file")}<input name="file" type="file" accept=".csv,.xlsx" required></label><button class="fs-btn fs-btn-outline" type="submit">${tr("Upload for review")}</button></form>`;
+    const d = dialog("Opening balances and historical earnings", `<div class="payroll-history-imports">${upload("payroll_opening_leave", "Leave entitlement and opening balance", "Upload employee personal code, days per year, effective date, cutover date, basic unused days and extended unused days.")}${upload("historical_earnings", "Historical earnings", "Upload employee personal code, YYYY-MM, wage total and unpaid absence calendar days.")}</div>`);
+    d.querySelectorAll("form[data-upload-type]").forEach((formEl) => {
+      formEl.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const file = formEl.elements.file.files[0];
+        if (!file) return;
+        const body = new FormData(); body.append("file", file);
+        try {
+          const summary = await api(c.url(`/payroll/history-imports/${formEl.dataset.uploadType}`), {method: "POST", body});
+          await payrollHistoryImportReview(c, summary.id);
+        } catch (error) { toast(error.message, "error"); }
+      });
+    });
+  }
+  async function payrollHistoryImportReview(c, syncId, outcome = null) {
+    const review = await api(c.url(`/payroll/history-imports/${encodeURIComponent(syncId)}`));
+    const records = review.records || [];
+    const body = records.length ? table(
+      ["File row", "Employee", "Imported values", "Review note", "Decision"],
+      records.map((record) => {
+        const payload = record.external_payload || {};
+        return row([
+          td(num(payload.file_row)),
+          td(record.matched_local_id ? esc(record.matched_local_id) : tr("No employee matched")),
+          td(esc(JSON.stringify(payload))),
+          td(esc(record.review_note || "")),
+          td(`<select name="decision-${esc(record.id)}"><option value="apply">${tr("Apply")}</option><option value="reject">${tr("Reject")}</option></select>`),
+        ]);
+      }),
+    ) : empty("No records were staged", "");
+    const d = dialog("Review payroll import", `${outcome ? integrationOutcomeSummary(outcome) : ""}<p class="muted">${tr("Review matched employees and row errors before applying.")}</p>${body}<button class="fs-btn fs-btn-ink" data-action="applyPayrollHistoryImport">${tr("Apply reviewed rows")}</button>`);
+    d.querySelector('[data-action="applyPayrollHistoryImport"]').onclick = async () => {
+      const decisions = Object.fromEntries(records.map((record) => [record.id, d.querySelector(`[name="decision-${CSS.escape(record.id)}"]`).value]));
+      try {
+        const result = await post(c.url(`/payroll/history-imports/${encodeURIComponent(syncId)}/apply`), {decisions});
+        await payrollHistoryImportReview(c, syncId, result);
+      } catch (error) { toast(error.message, "error"); }
+    };
+  }
+  async function addAbsencePayToPayout(c, absence, refresh) {
+    if (!absence?.absence_pay || absence.absence_pay.status !== "pending") return;
+    const payoutBase = c.url("/payroll/absence-payouts"), drafts = await api(payoutBase);
+    document.querySelectorAll(".dialog").forEach(closeDialog);
+    const d = dialog("Add to payout", form(
+      select("Draft payout", "payout_id", [["new", tr("Create a new draft payout")], ...drafts.map((x) => [x.id, `${x.payout_date} · ${x.id.slice(0, 8)}`])], "new") +
+      field("Payout date", "payout_date", absence.absence_pay.payment_date || absence.start_date, "date", "required"),
+      "Add to payout"));
+    bindForm(d, async (data) => {
+      if (data.payout_id === "new") {
+        await post(payoutBase, {absence_pay_ids: [absence.absence_pay.id], payout_date: data.payout_date});
+      } else {
+        await post(`${payoutBase}/${data.payout_id}/records`, {absence_pay_ids: [absence.absence_pay.id]});
+      }
+      closeDialog(d); await refresh();
+    });
+  }
+  function absenceEditDialog(c, employees, existing, refresh) {
+    const employeeOptions = employees.filter((e) => e.active || e.id === existing?.employee_id).map((e) => [e.id, e.name]);
+    const d = dialog(existing ? "Edit absence" : "Add absence", form(
+      select("Employee", "employee_id", employeeOptions, existing?.employee_id || "") +
+      select("Absence type", "absence_type", absenceKinds.map(([v, label]) => [v, tr(label)]), existing?.absence_type || "annual_leave") +
+      field("Start date", "start_date", existing?.start_date || "", "date", "required") +
+      field("End date", "end_date", existing?.end_date || "", "date", "required") +
+      field("Document reference", "document_reference", existing?.document_reference || "") +
+      `<label class="full-width">${tr("Comment")}<textarea name="comment" maxlength="2000">${esc(existing?.comment || "")}</textarea></label>`
+    ));
+    bindForm(d, async (data) => {
+      await post(c.url(`/payroll/absences${existing ? `/${existing.id}` : ""}`), data, existing ? "PUT" : "POST");
+      closeDialog(d); await refresh();
+    });
+  }
+  function collectiveLeaveDialog(c, employees, refresh) {
+    const d = dialog("Collective annual leave", form(
+      `<label class="full-width">${tr("Employees")}<select name="employee_ids" multiple size="7" required>${employees.filter((e) => e.active).map((e) => `<option value="${esc(e.id)}">${esc(e.name)}</option>`).join("")}</select></label>` +
+      field("Start date", "start_date", "", "date", "required") + field("End date", "end_date", "", "date", "required") +
+      field("Document reference", "document_reference") + `<label class="full-width">${tr("Comment")}<textarea name="comment" maxlength="2000"></textarea></label>`
+    ));
+    bindForm(d, async (_data, f) => {
+      const data = Object.fromEntries(new FormData(f));
+      data.employee_ids = [...f.elements.employee_ids.selectedOptions].map((option) => option.value);
+      await post(c.url("/payroll/absences/collective"), data);
+      closeDialog(d); await refresh();
+    });
+  }
+  function absenceSettingsDialog(c, typeSettings, refresh) {
+    const permitted = typeSettings.find((setting) => setting.absence_type === "permitted_absence");
+    const d = dialog("Absence pay settings", form(check("Continue salary during permitted absence", "paid_salary", permitted?.paid_salary)));
+    bindForm(d, async (_data, f) => {
+      await post(c.url("/payroll/absence-types/permitted_absence"), {paid_salary: f.elements.paid_salary.checked}, "PUT");
+      closeDialog(d); await refresh();
+    });
+  }
+  function bindPaymentTypeActions(c, types, target, modal = false) {
+    const edit = (type) => {
+      if (modal) closeDialog(target);
+      const values = type || {direction: "income", liability_role: "PAYROLL_DEDUCTION", is_wage: true, active: true, ...Object.fromEntries(componentFlags.map(([key]) => [key, true]))};
+      const editor = dialog(type ? "Edit payment type" : "Add payment type", form(
+        field("Name", "name", values.name || "", "text", 'required maxlength="180"') +
+        (values.description ? `<p class="full-width muted">${tr(values.description)}</p>` : "") +
+        select("Direction", "direction", [["income", t("Income")], ["deduction", t("Deduction")]], values.direction) +
+        select("TSD payment type", "tsd_payment_type", [[10, "10 palgatulu"], [13, "13 kõrgete ametiisikute palgatulu"], [14, "14 sünnitoetus"], [15, "15 seaduse alusel tasu"], [16, "16 muu maksustatav väljamakse"], [17, "17 VÕS lepingutasu"], [21, "21 juhtorgani liikme tasu"], [24, "24 tööandja haigushüvitis"], [32, "32 tööõnnetuse hüvitis"], [33, "33 lõpetamise hüvitis"]], values.tsd_payment_type || 10) +
+        select("Calculation method", "calculation_method", [["fixed_sum","Fixed sum"],["sum_x_qty_x_coef","Sum x quantity x coefficient"],["percentage_of_base","Percentage of base salary"],["percentage_of_hourly_rate","Percentage of hourly rate"],["piece_rate","Piece rate"],["hourly","Hourly"],["average_monthly_pay","Average monthly pay"],["average_hourly_pay","Average hourly pay"],["average_working_day_pay","Average working-day pay"],["gross_up_from_net","Gross-up from net"],["monthly_salary","Monthly salary"],["monthly_salary_day_based","Monthly salary, day-based"],["contract_sum","Contract sum"],["contract_sum_x_quantity","Contract sum x quantity"],["percentage","Percentage"]].map(([value,label]) => [value,t(label)]), values.calculation_method || "fixed_sum") +
+        field("Default rate", "default_rate", values.default_rate ?? "", "number", 'step="0.0001"') +
+        field("Default percentage", "default_percentage", values.default_percentage ?? "", "number", 'step="0.0001"') +
+        field("Default coefficient", "default_coefficient", values.default_coefficient ?? "", "number", 'step="0.0001"') +
+        select("Statistics Estonia PALK row", "palk_designation", [["","Unmapped"],[5,"5 Base pay"],[6,"6 Overtime"],[7,"7 Shift, night, public holiday"],[8,"8 Irregular bonuses"],[9,"9 Non-worked time"],[10,"10 Non-monetary"],[15,"15 Benefits"],[16,"16 Benefits"],[17,"17 Benefits"],[18,"18 Benefits"]], values.palk_designation ?? values.palk_row ?? 5) +
+        select("Deduction liability", "liability_role", [["PAYROLL_DEDUCTION", t("Other deduction liability")], ["PAYROLL_BAILIFF", t("Bailiff withholding liability")]], values.liability_role) +
+        check("Counts towards average and vacation pay", "is_wage", values.is_wage) + check("Active for new payment lines", "active", values.active) +
+        `<div class="full-width component-flags">${componentFlagFields(values)}</div><p class="full-width muted">${tr("Levy flags apply to income lines. Deduction lines reduce net pay.")}</p>` + `<p class="full-width muted">${tr("Defaults can be overridden on each draft payment line. Confirm tax treatment before approval.")}</p>`,
+      ));
+      bindForm(editor, async (data, f) => {
+        data.palk_designation = data.palk_designation === "" ? null : Number(data.palk_designation);
+        componentFlags.forEach(([key]) => data[key] = f.elements[key].checked);
+        data.is_wage = f.elements.is_wage.checked;
+        data.active = f.elements.active.checked;
+        data.tsd_payment_type = Number(f.elements.tsd_payment_type.value);
+        for (const key of ['default_rate','default_percentage','default_coefficient']) data[key] = data[key] || null;
+        await post(c.url(`/payroll/component-types${type ? `/${type.id}` : ""}`), data, type ? "PUT" : "POST");
+        await saved(editor);
+      });
+    };
+    bindActions(target, {newType: () => edit(), editType: (b) => edit(types.find((x) => x.id === b.dataset.id))});
+  }
+  async function payrollAccountsDialog(c) {
+    const [mappings, accounts] = await Promise.all([api(c.url('/payroll/posting-mappings')), api(c.url('/accounts'))]);
+    const d = dialog("Payroll accounts", form(mappings.map((mapping) => {
+      const expense = ["PAYROLL_SALARY", "PAYROLL_SOCIAL", "PAYROLL_UI", "PAYROLL_VACATION_RESERVE_EXPENSE"].includes(mapping.role);
+      return select(payrollRoleLabels[mapping.role], mapping.role, accounts.filter((a) => a.active && a.account_type === (expense ? "Expense" : "Liability")).map((a) => [a.code, `${a.code} ${a.name}`]), mapping.account_code);
+    }).join("")));
+    bindForm(d, async (data) => {
+      for (const mapping of mappings) {
+        if (data[mapping.role] !== mapping.account_code)
+          await post(c.url(`/payroll/posting-mappings/${mapping.role}`), {account_code: data[mapping.role]}, "PUT");
+      }
+      await saved(d);
+    });
+  }
+  async function payrollLeaveSettingsDialog(c) {
+    const url = c.url('/payroll/leave-settings'), settings = await api(url);
+    const policy = [['none', 'No expiry'], ['1_january_year_plus_2', '1 January of year +2'], ['31_december_year_plus_1', '31 December of year +1']];
+    const d = dialog('Leave settings', form(select('Basic leave expiry', 'basic_expiry_policy', policy.map(([v,l]) => [v,tr(l)]), settings.basic_expiry_policy) +
+      select('Extended leave expiry', 'extended_expiry_policy', policy.map(([v,l]) => [v,tr(l)]), settings.extended_expiry_policy) +
+      `<label class="check"><input type="checkbox" name="reserve_posting_enabled" ${settings.reserve_posting_enabled ? 'checked' : ''}><span>${tr('Post monthly vacation reserve')}</span></label>`));
+    bindForm(d, async (data) => { data.reserve_posting_enabled = Boolean(d.querySelector('[name="reserve_posting_enabled"]')?.checked); await post(url, data, 'PUT'); await saved(d); });
+  }
+  async function payrollLeaveLiabilityDialog(c) {
+    const asAt = today();
+    const load = async (dateValue) => api(c.url('/payroll/leave-liability') + `?as_at=${encodeURIComponent(dateValue)}`);
+    let report = await load(asAt), settings = await api(c.url('/payroll/leave-settings'));
+    const renderReport = (result) => { const rows = result.employees.map((item) => row([td(esc(item.employee_name)), td(item.remaining_days), cash(item.average_daily_pay,'EUR'), cash(item.wage_liability,'EUR'), cash(item.social_tax,'EUR'), cash(item.employer_unemployment,'EUR'), cash(item.total_liability,'EUR')])); rows.push(row([td(tr('Total')),td(result.totals.remaining_days),td(''),cash(result.totals.wage_liability,'EUR'),cash(result.totals.social_tax,'EUR'),cash(result.totals.employer_unemployment,'EUR'),cash(result.totals.total_liability,'EUR')])); return `<p>${tr('As at')} ${esc(result.as_at)}</p>${settings.reserve_posting_enabled ? button('Post monthly vacation reserve', 'postLeaveReserve', true, `data-period="${esc(result.as_at.slice(0,7))}"`) : ''}${table(['Employee','Remaining days','Average daily pay','Wage liability','Social tax','Employer unemployment','Total liability'], rows)}${result.employees.map((item) => `<details><summary>${esc(item.employee_name)} · ${tr('Leave liability details')}</summary>${table(['Movement','Date','Kind','Days','Expiry date'], item.movements.map((move) => row([td(tr(move.type === 'expired' ? 'Expired' : move.type[0].toUpperCase() + move.type.slice(1))),td(esc(move.date)),td(tr(move.kind)),td(esc(move.days)),td(esc(move.expires_on || ''))])))}</details>`).join('')}`; };
+    const d = dialog('Detailed leave liability report', `<div>${field('As at','as_at',asAt,'date')}<a data-liability-xlsx href="/api${c.url('/payroll/leave-liability.xlsx')}?as_at=${encodeURIComponent(asAt)}">${tr('Export Excel')}</a></div><div data-liability-report>${renderReport(report)}</div>`);
+    const input = d.querySelector('[name="as_at"]');
+    input.addEventListener('change', async () => { try { report = await load(input.value); d.querySelector('[data-liability-report]').innerHTML = renderReport(report); d.querySelector('[data-liability-xlsx]').href = `/api${c.url('/payroll/leave-liability.xlsx')}?as_at=${encodeURIComponent(input.value)}`; } catch(error) { toast(error.message,'error'); } });
+    d.addEventListener('click', async (event) => { const b = event.target.closest('[data-action="postLeaveReserve"]'); if (!b) return; confirmAction('Post vacation reserve', `${tr('Period')}: ${esc(b.dataset.period)}`, async () => { await post(c.url('/payroll/leave-reserve-postings'), {period:b.dataset.period}); toast(tr('Vacation reserve posted'),'success'); }); });
+  }
+  async function payrollReportsDialog(c) {
+    const d = dialog('Payroll reports', `<p>${tr('Annual summary payslip')}, ${tr('Average pay report')}, ${tr('Statistics report')}, ${tr('Yearly average headcount')}, ${tr('Pay list')}, ${tr('Dimension costs')}</p>${select('Report', 'report', [['annual-summary','Annual summary payslip'],['average-pay','Average pay report'],['palk','Statistics report'],['headcount','Yearly average headcount'],['pay-list','Pay list'],['dimension-costs','Dimension costs']], 'annual-summary')}${field('Year','year',new Date().getFullYear(),'number')}${field('Period','period',new Date().toISOString().slice(0,7),'month')}${select('Average period','months',[['6','6 months'],['9','9 months'],['12','12 months']], '6')}${button('Show report','showPayrollReport',true)} <a data-payroll-report-xlsx class="button" href="#">${tr('Export Excel')}</a><pre data-payroll-report-result></pre><h3>${tr('Email settings')}</h3>${field('Sender name','sender_name','')}${field('Reply-to','reply_to','')}${field('CC','cc','')}${button('Save email settings','savePayrollEmailSettings')}</div>`);
+    const settings = await api(c.url('/payroll/report-settings'));
+    for (const key of ['sender_name','reply_to','cc']) d.querySelector(`[name="${key}"]`).value = settings[key] || '';
+    d.addEventListener('click', async (event) => {
+      const b = event.target.closest('[data-action]'); if (!b) return;
+      try {
+        if (b.dataset.action === 'showPayrollReport') {
+          const report = d.querySelector('[name="report"]').value, year = d.querySelector('[name="year"]').value;
+          const period = d.querySelector('[name="period"]').value, months = d.querySelector('[name="months"]').value;
+          const params = new URLSearchParams({report, year, period, months, start: period, end: period});
+          const result = await api(c.url(`/payroll/reports/${report}`) + `?${params}`);
+          const warning = result.warning ? `${tr('PALK unmapped warning')}\n${result.unmapped_types.map((item) => `${item.name}: ${item.amount}`).join('\n')}\n\n` : '';
+          d.querySelector('[data-payroll-report-result]').textContent = warning + JSON.stringify(result, null, 2);
+          d.querySelector('[data-payroll-report-xlsx]').href = `/api${c.url('/payroll/reports.xlsx')}?${params}`;
+        } else if (b.dataset.action === 'savePayrollEmailSettings') {
+          await post(c.url('/payroll/report-settings'), Object.fromEntries(['sender_name','reply_to','cc'].map((key) => [key, d.querySelector(`[name="${key}"]`).value])), 'PUT');
+          toast(tr('Settings saved'), 'success');
+        }
+      } catch (error) { toast(error.message, 'error'); }
+    });
+  }
+
+  async function payrollDimensionsDialog(c) {
+    const kinds = [['department','Departments'],['position_group','Position groups'],['position','Positions'],['cost_centre','Cost centres']];
+    let dimensions = await api(c.url('/payroll/dimensions'));
+    const writable = ['owner','administrator'].includes(org?.role);
+    const render = () => {
+      const sections = kinds.map(([kind,label]) => {
+        const rows = dimensions.filter((item) => item.kind === kind);
+        return `<section class="section"><div class="section-head"><h3>${tr(label)}</h3>${writable ? button('Add dimension','addDimension',false,`data-kind="${kind}"`) : ''}</div>${rows.length ? table(['Code','Name','Status','Actions'],rows.map((item) => row([td(esc(item.code)),td(esc(item.name)),td(pill(item.active ? 'Active' : 'Inactive')),td(writable ? button('Edit dimension','editDimension',false,`data-id="${item.id}"`) + (item.active ? button('Deactivate dimension','deactivateDimension',false,`data-id="${item.id}"`) : '') : '')]))) : empty('No dimensions',writable ? button('Add dimension','addDimension',false,`data-kind="${kind}"`) : '')}</section>`;
+      }).join('');
+      const d = dialog('Dimension registers', `<p>${tr('Manage departments, position groups, positions and cost centres for this company.')}</p>${writable ? button('Import dimensions','importDimensions') : ''}${sections}`);
+      bindActions(d, {
+        addDimension: (b) => edit(null,b.dataset.kind),
+        editDimension: (b) => edit(dimensions.find((item) => item.id === b.dataset.id)),
+        deactivateDimension: async (b) => { await post(c.url(`/payroll/dimensions/${b.dataset.id}/deactivate`),{}); dimensions = await api(c.url('/payroll/dimensions')); closeDialog(d); await payrollDimensionsDialog(c); },
+        importDimensions: () => importDialog(),
+      });
+    };
+    const edit = (item, kind) => {
+      const selectedKind = item?.kind || kind;
+      const groups = dimensions.filter((d) => d.kind === 'position_group' && (d.active || d.id === item?.parent_id)).map((d) => [d.id,d.name]);
+      const editor = dialog(item ? 'Edit dimension' : 'Add dimension', form(
+        select('Dimension type','kind',kinds.map(([value,label])=>[value,tr(label)]),selectedKind) +
+        field('Code','code',item?.code || '','text','required maxlength="40"') + field('Name','name',item?.name || '','text','required maxlength="180"') +
+        select('Position group','parent_id',[['','None'],...groups],item?.parent_id || '') + check('Active','active',item ? !!item.active : true)
+      ));
+      const f = editor.querySelector('form');
+      f.elements.parent_id.closest('label').hidden = selectedKind !== 'position';
+      f.elements.kind.onchange = () => { f.elements.parent_id.closest('label').hidden = f.elements.kind.value !== 'position'; };
+      bindForm(editor, async (data, formEl) => {
+        data.active = formEl.elements.active.checked; data.parent_id = data.kind === 'position' ? (data.parent_id || null) : null;
+        await post(c.url(`/payroll/dimensions${item ? `/${item.id}` : ''}`),data,item ? 'PUT' : 'POST');
+        closeDialog(editor); dimensions = await api(c.url('/payroll/dimensions')); closeDialog(document.querySelector('.dialog')); render();
+      });
+    };
+    const importDialog = () => {
+      const d = dialog('Import dimensions', `<p>${tr('Upload a CSV or XLSX for review. Accepted rows are applied only after review.')}</p>${select('Import type','kind',[['department','Departments'],['position','Positions'],['cost_centre','Cost centres'],['project','Projects']],'department')}<form><label>${tr('CSV or XLSX file')}<input name="file" type="file" accept=".csv,.xlsx" required></label><button type="submit">${tr('Upload for review')}</button></form><div data-import-review></div>`);
+      d.querySelector('form').onsubmit = async (event) => {
+        event.preventDefault(); const file = event.currentTarget.elements.file.files[0]; if (!file) return;
+        const payload = {kind:d.querySelector('[name="kind"]').value,file_name:file.name};
+        if (file.name.toLowerCase().endsWith('.xlsx')) payload.xlsx_base64 = await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result).split(',')[1]);reader.onerror=reject;reader.readAsDataURL(file);});
+        else payload.csv_content = await file.text();
+        try { const batch = await post(c.url('/payroll/dimension-imports'),payload); const review = await api(c.url(`/payroll/dimension-imports/${batch.id}`));
+          d.querySelector('[data-import-review]').innerHTML = `<p>${tr('Status')}: ${tr(review.status)} · ${num(review.total_rows)} ${tr('Rows')} · ${num(review.error_count)} ${tr('Errors')}</p>${table(['File row','Name','Errors'],review.rows.map((r)=>row([td(r.row_number),td(esc(r.parsed?.name || r.parsed_json?.name || '')),td(esc(r.error || ''))])))}${button('Apply reviewed rows','applyDimensionImport',true)}`;
+          d.querySelector('[data-action="applyDimensionImport"]').onclick = async () => { await post(c.url(`/payroll/dimension-imports/${batch.id}/commit`),{}); toast(tr('Import applied'),'success'); closeDialog(d); dimensions = await api(c.url('/payroll/dimensions')); render(); };
+        } catch(error) { toast(error.message,'error'); }
+      };
+    };
+    render();
+  }
+
+  async function payrollSettingsDialog(c) {
+    const d = dialog('Payroll settings', `<p>${tr('Payroll start, payday rules, email settings, leave expiry, reserve posting, posting accounts and dimension registers.')}</p><div class="settings-list">${[
+      ['Payroll start and payday rules','paydaySettings'],['Email settings','payrollEmailSettings'],['Leave expiry','leaveSettings'],
+      ['Reserve posting','leaveLiability'],['Posting accounts','payrollAccounts'],['Dimension registers','payrollDimensions'],
+    ].map(([label,action])=>`<section class="section"><h3>${tr(label)}</h3>${button(label,action)}</section>`).join('')}</div>`);
+    bindActions(d,{paydaySettings:()=>paydaySettingsDialog(c),payrollEmailSettings:()=>payrollReportsDialog(c),leaveSettings:()=>payrollLeaveSettingsDialog(c),leaveLiability:()=>payrollLeaveLiabilityDialog(c),payrollAccounts:()=>payrollAccountsDialog(c),payrollDimensions:()=>payrollDimensionsDialog(c)});
+  }
+
+  function manageBureauMembership(organisationId, organisation) {
+    const d = dialog('Manage membership', `<p>${esc(organisation?.name || '')}</p>${form(field('Email','email','','email','required') + select('Role','role',[['administrator','Administrator'],['accountant','Accountant'],['approver','Approver'],['viewer','Viewer']],'accountant'), 'Create invitation')}<div data-invite-result></div>`);
+    bindForm(d, async (data) => {
+      try {
+        const result = await post(`/organisations/${encodeURIComponent(organisationId)}/invitations`,data);
+        d.querySelector('[data-invite-result]').innerHTML = `<p>${tr('Invitation created')}: ${esc(result.invitation.email)} · ${tr(result.invitation.role)}</p><p>${tr('Share this one-time token over a trusted channel')} <code>${esc(result.accept_token)}</code></p>`;
+      } catch(error) { toast(error.message,'error'); }
+    });
+  }
+
+  async function payrollDeliveryDialog(c, run) {
+    if (!run) return;
+    const employees = run.items || [];
+    const options = employees.map((employee) => `<label class="check-row"><input type="checkbox" name="selected_employee" value="${esc(employee.employee_id)}" checked> ${esc(employee.employee_name)}</label>`).join('');
+    const d = dialog('Send payslips', `<p>${esc(run.period)}</p>${options}${button('Send selected payslips','sendSelectedPayslips',true)} <a class="button" data-selected-pdf href="#">${tr('Download selected PDF')}</a><h3>${tr('Send for review')}</h3>${field('Reviewer email','reviewer_email','')}<label class="check-row"><input type="checkbox" name="include_payslips" checked> ${tr('Include payslips')}</label>${button('Send for review','sendPayrollReview')}<div data-delivery-history></div>`);
+    const updatePdfLink = () => {
+      const ids = [...d.querySelectorAll('[name="selected_employee"]:checked')].map((input) => input.value);
+      d.querySelector('[data-selected-pdf]').href = `/api${c.url(`/pay-runs/${run.id}/payslips.pdf`)}?employee_ids=${encodeURIComponent(ids.join(','))}`;
+    };
+    d.addEventListener('change', (event) => { if (event.target.matches('[name="selected_employee"]')) updatePdfLink(); });
+    updatePdfLink();
+    const history = async () => {
+      const rows = await api(c.url(`/pay-runs/${run.id}/deliveries`));
+      d.querySelector('[data-delivery-history]').innerHTML = table(['Recipient','Status','Date','Actions'], rows.map((item) => row([td(esc(item.recipient)),td(pill(item.status)),td(esc(item.created_at)),td(item.status === 'Failed' ? button('Retry delivery','retryPayrollDelivery',false,`data-id="${item.id}"`) : '')])));
+    };
+    await history();
+    d.addEventListener('click', async (event) => {
+      const b = event.target.closest('[data-action]'); if (!b) return;
+      try {
+        if (b.dataset.action === 'sendSelectedPayslips') {
+          const employee_ids = [...d.querySelectorAll('[name="selected_employee"]:checked')].map((input) => input.value);
+          await post(c.url(`/pay-runs/${run.id}/deliveries/payslips`), {employee_ids});
+        } else if (b.dataset.action === 'sendPayrollReview') {
+          await post(c.url(`/pay-runs/${run.id}/deliveries/review`), {recipient:d.querySelector('[name="reviewer_email"]').value,include_payslips:d.querySelector('[name="include_payslips"]').checked});
+        } else if (b.dataset.action === 'retryPayrollDelivery') {
+          await post(c.url(`/payroll/deliveries/${b.dataset.id}/retry`), {});
+        }
+        await history();
+      } catch (error) { toast(error.message, 'error'); }
+    });
+  }
+
+  async function payrollPayoutsDialog(c, run, bankAccounts) {
+    if (!run) return;
+    const refresh = async () => api(c.url('/payroll/payouts') + `?run_id=${encodeURIComponent(run.id)}`);
+    const renderBatches = (batches) => batches.length ? table(['Payout date', 'Status', 'Employees', 'Actions'], batches.map((batch) => row([
+      td(esc(batch.payout_date)), td(pill(batch.status)), td(num(batch.payout_type === 'withholding' ? batch.withholding_lines.length : batch.lines.length)),
+      td((batch.status === 'Draft' && batch.offsets?.some((offset) => offset.status === 'Proposed') ? button('Confirm offsets', 'confirmPayoutOffsets', false, `data-id="${batch.id}"`) : '') + (batch.status === 'Draft' && !batch.offsets?.some((offset) => offset.status === 'Proposed') ? button('Mark paid', 'payPayout', false, `data-id="${batch.id}"`) : '') + (batch.status !== 'Cancelled' ? button('Cancel payout', 'cancelPayout', false, `data-id="${batch.id}"`) : '') + (['Draft','Paid'].includes(batch.status) ? link('Download SEPA file', `/api${c.url(`/payroll/payouts/${batch.id}/pain001.xml`)}`) : '')),
+    ]))) : `<p class="muted">${tr('No payouts for this run.')}</p>`;
+    const renderOffsets = (batches) => {
+      const offsets = batches.flatMap((batch) => (batch.offsets || []).map((offset) => ({...offset, payout_date: batch.payout_date})));
+      return offsets.length ? `<h3>${tr('Receivable offsets')}</h3>${table(['Employee receivable','Offset','Status','Payout date'], offsets.map((offset) => row([td(esc(offset.receivable_id)), cash(offset.amount,'EUR'), td(pill(offset.status)), td(esc(offset.payout_date))])))}` : '';
+    };
+    let batches = await refresh();
+    const bankOptions = bankAccounts.filter((bank) => bank.active).map((bank) => [bank.id, bank.name]);
+    const renderEmployeeSummary = (summary) => table(['Employee', 'Net', 'Paid', 'Pending', 'Unpaid'], (summary?.employees || []).map((item) => row([
+      td(esc(item.name)), cash(item.net, 'EUR'), cash(item.paid, 'EUR'), cash(item.pending, 'EUR'), cash(item.unpaid, 'EUR'),
+    ])));
+    const refreshSummary = async () => (await api(c.url('/payroll/payouts/summary') + `?run_id=${encodeURIComponent(run.id)}`))[0];
+    const employeeSummary = renderEmployeeSummary(await refreshSummary());
+    const d = dialog('Payroll payouts', `<p>${tr('Pay run')} ${esc(run.period)}</p><div data-payout-summary>${employeeSummary}</div><div data-payout-list>${renderBatches(batches)}${renderOffsets(batches)}</div>${field('Payout date','payout_date',run.payment_date,'date','required')}${button('Create salary payout', 'createPayout', true)} ${button('Create withholding payout', 'createWithholdingPayout')}<div data-payout-bank>${bankOptions.length ? select('Bank account', 'bank_account_id', bankOptions, bankOptions[0][0]) : `<p class="notice">${tr('Add an active bank account first.')}</p>`}</div>`);
+    d.querySelector('[data-action="createPayout"]').onclick = async () => {
+      await post(c.url(`/pay-runs/${run.id}/payouts`), {payout_type: 'salary', payout_date: d.querySelector('[name="payout_date"]').value, bank_account_id: d.querySelector('[name="bank_account_id"]')?.value || null});
+      batches = await refresh(); d.querySelector('[data-payout-list]').innerHTML = renderBatches(batches) + renderOffsets(batches);
+      d.querySelector('[data-payout-summary]').innerHTML = renderEmployeeSummary(await refreshSummary());
+      bindPayoutActions();
+    };
+    d.querySelector('[data-action="createWithholdingPayout"]').onclick = async () => {
+      await post(c.url(`/pay-runs/${run.id}/payouts`), {payout_type: 'withholding', payout_date: d.querySelector('[name="payout_date"]').value, bank_account_id: d.querySelector('[name="bank_account_id"]')?.value || null});
+      batches = await refresh(); d.querySelector('[data-payout-list]').innerHTML = renderBatches(batches) + renderOffsets(batches); bindPayoutActions();
+    };
+    const bindPayoutActions = () => {
+      d.querySelectorAll('[data-action="confirmPayoutOffsets"]').forEach((buttonEl) => buttonEl.onclick = async () => {
+        const batch = batches.find((item) => item.id === buttonEl.dataset.id);
+        const proposed = (batch?.offsets || []).filter((offset) => offset.status === 'Proposed');
+        confirmAction(tr('Confirm offsets'), `${tr('Offset')}: ${esc(money(proposed.reduce((sum, offset) => sum + Number(offset.amount), 0), 'EUR'))}`, async () => {
+          await post(c.url(`/payroll/payouts/${buttonEl.dataset.id}/confirm-offsets`), {});
+          batches = await refresh(); d.querySelector('[data-payout-list]').innerHTML = renderBatches(batches) + renderOffsets(batches); bindPayoutActions();
+        });
+      });
+      d.querySelectorAll('[data-action="payPayout"]').forEach((buttonEl) => buttonEl.onclick = async () => {
+        if (!bankOptions.length) { toast(t('Add an active bank account first.'), 'info'); return; }
+        await post(c.url(`/payroll/payouts/${buttonEl.dataset.id}/paid`), {bank_account_id: d.querySelector('[name="bank_account_id"]').value});
+        batches = await refresh(); d.querySelector('[data-payout-list]').innerHTML = renderBatches(batches) + renderOffsets(batches); bindPayoutActions();
+        d.querySelector('[data-payout-summary]').innerHTML = renderEmployeeSummary(await refreshSummary());
+      });
+      d.querySelectorAll('[data-action="cancelPayout"]').forEach((buttonEl) => buttonEl.onclick = async () => {
+        await post(c.url(`/payroll/payouts/${buttonEl.dataset.id}/cancel`));
+        batches = await refresh(); d.querySelector('[data-payout-list]').innerHTML = renderBatches(batches) + renderOffsets(batches); bindPayoutActions();
+        d.querySelector('[data-payout-summary]').innerHTML = renderEmployeeSummary(await refreshSummary());
+      });
+    };
+    bindPayoutActions();
+  }
+  function payrollPayoutSummaryDialog(summary) {
+    dialog('Payout summary', table(['Period', 'Net', 'Paid', 'Pending', 'Unpaid'], summary.map((item) => row([
+      td(esc(item.period)), cash(item.net, 'EUR'), cash(item.paid, 'EUR'), cash(item.pending, 'EUR'), cash(item.unpaid, 'EUR'),
+    ]))));
+  }
+  async function paydaySettingsDialog(c) {
+    const settings = await api(c.url('/payroll/payday-settings'));
+    const latest = settings.rules.at(-1) || {};
+    const history = settings.rules.length ? `<ul>${settings.rules.map((r) => `<li>${esc(r.start_date)}: ${tr(r.rule)}${r.day ? ` ${r.day}` : ''}</li>`).join('')}</ul>` : `<p class="muted">${tr('No payday rules have been saved.')}</p>`;
+    const d = dialog('Payday settings', form(
+      `<div class="full-width"><h3>${tr('Palgaarvestuse algus')}</h3>${history}</div>` +
+      field('Palgaarvestuse algus', 'start_date', settings.payroll_start_date || '', 'date') +
+      select('Organisation language', 'language', [['en', 'English'], ['et', 'Eesti'], ['lv', 'Latviešu'], ['lt', 'Lietuvių']], settings.language || 'en') +
+      field('Rule effective from', 'rule_start_date', latest.start_date || new Date().toISOString().slice(0, 10), 'date', 'required') +
+      select('Payday rule', 'rule', [['next_month_day', tr('Järgmisel kuul')], ['current_month_day', tr('Jooksval kuul')], ['next_month_first_working_day', tr('Järgmise kuu esimesel tööpäeval')]], latest.rule || 'next_month_day') +
+      field('Payday day', 'day', latest.day || '10', 'number', 'min="1" max="31"')
+    ));
+    const ruleSelect = d.querySelector('[name="rule"]'), dayInput = d.querySelector('[name="day"]');
+    const updateDay = () => { dayInput.disabled = ruleSelect.value === 'next_month_first_working_day'; dayInput.required = !dayInput.disabled; };
+    ruleSelect.addEventListener('change', updateDay); updateDay();
+    if (!canEditMappings()) {
+      d.querySelectorAll('input,select,button[type="submit"]').forEach((control) => control.disabled = true);
+    }
+    bindForm(d, async (data) => {
+      data.start_date = data.start_date || null;
+      data.day = data.rule === 'next_month_first_working_day' ? null : Number(data.day);
+      await post(c.url('/payroll/payday-settings'), data, 'PUT');
+      await saved(d);
+    });
+  }
+  async function payrollWithholdingsDialog(c, employees) {
+    const canWrite = ['owner', 'administrator', 'accountant'].includes(org?.role);
+    const types = [['alimony', 'Alimony'], ['bailiff', 'Bailiff'], ['union_fee', 'Union fee'],
+      ['agreed_deduction', 'Agreed deduction'], ['third_pillar', 'Third pillar contribution']];
+    const methods = [['fixed_sum', 'Fixed sum'], ['percent_of_gross', 'Percentage of gross'],
+      ['sum_x_qty', 'Sum times quantity'], ['third_pillar_net', 'Third pillar net']];
+    let d;
+    const render = async () => {
+      if (d) closeDialog(d);
+      d = dialog('Withholdings', `<p class="muted">${tr('Loading withholdings…')}</p>`);
+      const [recipients, agreements] = await Promise.all([
+        api(c.url('/payroll/withholding-recipients')),
+        api(c.url('/payroll/withholding-agreements')),
+      ]);
+      const period = new Date().toISOString().slice(0, 7);
+      const report = await api(c.url(`/payroll/withholdings?start=${period}&end=${period}`));
+      const payoutReport = await api(c.url(`/payroll/withholding-payouts?start=${period}&end=${period}`));
+      const recipientRows = recipients.map((item) => row([
+        td(`<strong>${esc(item.name)}</strong><small>${esc(item.registry_code)} · ${esc(item.iban)}</small>`),
+        td(esc(item.reference_number || '')),
+        td(pill(item.active ? 'Active' : 'Archived')),
+        td(canWrite && item.active ? button('Edit', 'editRecipient', false, `data-id="${esc(item.id)}"`) + button('Archive', 'archiveRecipient', false, `data-id="${esc(item.id)}"`) : ''),
+      ]));
+      const agreementRows = agreements.map((item) => row([
+        td(`<strong>${esc(item.employee_name)}</strong><small>${esc(item.recipient_name)}</small>`),
+        td(tr(types.find(([key]) => key === item.component_type)?.[1] || item.component_type)),
+        td(`${esc(item.withheld_to_date || '0.00')} / ${item.total_cap == null ? tr('No cap') : esc(item.total_cap)}`, 'numeric'),
+        td(pill(item.active ? 'Active' : 'Archived')),
+        td(canWrite && item.active ? button('Edit', 'editAgreement', false, `data-id="${esc(item.id)}"`) + button('Archive', 'archiveAgreement', false, `data-id="${esc(item.id)}"`) : ''),
+      ]));
+      const reportRows = (report.rows || []).map((item) => row([
+        td(esc(item.employee_name)), td(esc(item.recipient_name)),
+        td(tr(types.find(([key]) => key === item.component_type)?.[1] || item.component_type)), cash(item.amount, 'EUR'),
+      ]));
+      const payoutRows = (payoutReport.rows || []).map((item) => row([
+        td(esc(item.period)), td(esc(item.payout_date)), td(esc(item.recipient_name)),
+        td(pill(item.status)), cash(item.amount, 'EUR'),
+      ]));
+      const query = `start=${period}&end=${period}`;
+      closeDialog(d);
+      d = dialog('Withholdings', `<section class="section"><div class="section-head"><h3>${tr('Withholding recipients')}</h3>${canWrite ? button('Add recipient', 'addRecipient', true) : ''}</div>${table(['Recipient', 'Reference number', 'Status', 'Actions'], recipientRows)}</section>
+        <section class="section"><div class="section-head"><h3>${tr('Withholding agreements')}</h3>${canWrite ? button('Add agreement', 'addAgreement', true) : ''}</div>${table(['Employee and recipient', 'Withholding type', 'Withheld amount / cap', 'Status', 'Actions'], agreementRows)}</section>
+        <section class="section"><div class="section-head"><h3>${tr('Withholding report')}</h3><span>${field('Start period', 'withholding_start', period, 'month')} ${field('End period', 'withholding_end', period, 'month')}</span></div><div data-withholding-report>${table(['Employee', 'Recipient', 'Withholding type', 'Amount'], reportRows)}<p><strong>${tr('Total')}: ${esc(money(report.total, 'EUR'))}</strong></p><a class="button" data-withholding-xlsx href="/api${c.url(`/payroll/withholdings.xlsx?${query}`)}">${tr('Export Excel')}</a></div></section>
+        <section class="section"><h3>${tr('Withholding payouts report')}</h3><div data-withholding-payout-report>${table(['Period', 'Payout date', 'Recipient', 'Status', 'Amount'], payoutRows)}<p><strong>${tr('Total')}: ${esc(money(payoutReport.total, 'EUR'))}</strong></p><a class="button" data-withholding-payout-xlsx href="/api${c.url(`/payroll/withholding-payouts.xlsx?${query}`)}">${tr('Export Excel')}</a></div></section>`);
+      const refreshReports = async () => {
+        const start = d.querySelector('[name="withholding_start"]').value;
+        const end = d.querySelector('[name="withholding_end"]').value;
+        const search = `start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
+        const [withholdings, payouts] = await Promise.all([
+          api(c.url(`/payroll/withholdings?${search}`)), api(c.url(`/payroll/withholding-payouts?${search}`)),
+        ]);
+        d.querySelector('[data-withholding-report]').innerHTML = `${table(['Employee', 'Recipient', 'Withholding type', 'Amount'], (withholdings.rows || []).map((item) => row([td(esc(item.employee_name)), td(esc(item.recipient_name)), td(tr(types.find(([key]) => key === item.component_type)?.[1] || item.component_type)), cash(item.amount, 'EUR')])))}<p><strong>${tr('Total')}: ${esc(money(withholdings.total, 'EUR'))}</strong></p><a class="button" href="/api${c.url(`/payroll/withholdings.xlsx?${search}`)}">${tr('Export Excel')}</a>`;
+        d.querySelector('[data-withholding-payout-report]').innerHTML = `${table(['Period', 'Payout date', 'Recipient', 'Status', 'Amount'], (payouts.rows || []).map((item) => row([td(esc(item.period)), td(esc(item.payout_date)), td(esc(item.recipient_name)), td(pill(item.status)), cash(item.amount, 'EUR')])))}<p><strong>${tr('Total')}: ${esc(money(payouts.total, 'EUR'))}</strong></p><a class="button" href="/api${c.url(`/payroll/withholding-payouts.xlsx?${search}`)}">${tr('Export Excel')}</a>`;
+      };
+      d.querySelectorAll('[name="withholding_start"],[name="withholding_end"]').forEach((input) => input.onchange = refreshReports);
+      bindActions(d, {
+        addRecipient: () => recipientForm(),
+        editRecipient: (buttonEl) => recipientForm(recipients.find((item) => item.id === buttonEl.dataset.id)),
+        archiveRecipient: (buttonEl) => confirmAction('Archive recipient', tr('Archive this withholding recipient?'), async () => {
+          await post(c.url(`/payroll/withholding-recipients/${buttonEl.dataset.id}`), undefined, 'DELETE'); await render();
+        }),
+        addAgreement: () => agreementForm(),
+        editAgreement: (buttonEl) => agreementForm(agreements.find((item) => item.id === buttonEl.dataset.id)),
+        archiveAgreement: (buttonEl) => confirmAction('Archive agreement', tr('Archive this withholding agreement?'), async () => {
+          await post(c.url(`/payroll/withholding-agreements/${buttonEl.dataset.id}`), undefined, 'DELETE'); await render();
+        }),
+      });
+      function recipientForm(existing) {
+        const editor = dialog('Withholding recipients', form(
+          field('Name', 'name', existing?.name || '', 'text', 'required maxlength="180"') +
+          field('Registry code', 'registry_code', existing?.registry_code || '', 'text', 'required maxlength="40"') +
+          field('IBAN', 'iban', existing?.iban || '', 'text', 'required maxlength="34"') +
+          field('Reference number', 'reference_number', existing?.reference_number || '', 'text', 'maxlength="100"') +
+          field('Payment description', 'default_description', existing?.default_description || '', 'text', 'maxlength="140"'), 'Save recipient'));
+        bindForm(editor, async (data) => {
+          data.reference_number = data.reference_number || null;
+          await post(c.url(`/payroll/withholding-recipients${existing ? `/${existing.id}` : ''}`), data, existing ? 'PUT' : 'POST');
+          closeDialog(editor); await render();
+        });
+      }
+      function agreementForm(existing) {
+        const activeEmployees = employees.filter((item) => item.active);
+        const activeRecipients = recipients.filter((item) => item.active);
+        const editor = dialog('Withholding agreements', form(
+          select('Employee', 'employee_id', activeEmployees.map((item) => [item.id, item.name]), existing?.employee_id) +
+          select('Withholding recipients', 'recipient_id', activeRecipients.map((item) => [item.id, item.name]), existing?.recipient_id) +
+          select('Withholding type', 'component_type', types.map(([key, label]) => [key, tr(label)]), existing?.component_type || 'agreed_deduction') +
+          select('Method', 'method', methods.map(([key, label]) => [key, tr(label)]), existing?.method || 'fixed_sum') +
+          field('Start date', 'start_date', existing?.start_date || new Date().toISOString().slice(0, 10), 'date', 'required') +
+          field('End date', 'end_date', existing?.end_date || '', 'date') +
+          field('Monthly amount', 'monthly_amount', existing?.monthly_amount || '', 'number', 'min="0" step="0.01"') +
+          field('Percentage', 'percentage', existing?.percentage || '', 'number', 'min="0" max="100" step="0.0001"') +
+          field('Quantity', 'quantity', existing?.quantity || '', 'number', 'min="0" step="0.0001"') +
+          field('Rate', 'rate', existing?.rate || '', 'number', 'min="0" step="0.0001"') +
+          field('Cap', 'total_cap', existing?.total_cap || '', 'number', 'min="0" step="0.01"') +
+          field('Payment description', 'payment_description', existing?.payment_description || '', 'text', 'maxlength="140"'), 'Save agreement'));
+        bindForm(editor, async (data) => {
+          data.end_date = data.end_date || null;
+          for (const key of ['monthly_amount', 'percentage', 'quantity', 'rate', 'total_cap']) data[key] = data[key] === '' ? null : Number(data[key]);
+          await post(c.url(`/payroll/withholding-agreements${existing ? `/${existing.id}` : ''}`), data, existing ? 'PUT' : 'POST');
+          closeDialog(editor); await render();
+        });
+      }
+    };
+    await render();
+  }
+  async function payrollItemDialog(c, run, item, types) {
+    const dimensions = await api(c.url('/payroll/dimensions')).catch(() => []);
+    const projects = await api(c.url('/objects')).catch(() => []);
+    const choices = (kind) => [['','None'],...dimensions.filter((x)=>x.kind===kind && (x.active || x.id===item?.[kind === 'department' ? 'department_id' : 'cost_centre_id'])).map((x)=>[x.id,x.name])];
+    const d = dialog("Edit draft pay", form(
+      `<p class="full-width"><strong>${esc(item.employee_name)}</strong> · ${esc(run.period)}</p>` +
+      (item.pay_basis === "hourly" ? field("Hours worked", "hours", item.hours, "number", 'required min="0.01" max="744" step="0.01"') : `<p class="full-width">${tr("Base gross salary")}: ${esc(money(item.gross_salary, "EUR"))}</p>`) +
+      `<div class="full-width"><h3>${tr("Payment components")}</h3><p class="muted">${tr("Levy flags apply to income lines. Deduction lines reduce net pay.")}</p><p class="muted">${tr("Use an income component to adjust gross pay. Negative income amounts reduce gross pay.")}</p><div class="payment-lines"></div>${button("Add payment line", "addPayment")}</div>`, "Save draft pay",
+    ));
+    const container = d.querySelector('.payment-lines');
+    const methodLabels = {fixed_sum:'Sum',sum_x_qty_x_coef:'Sum x quantity x coefficient',percentage_of_base:'Percentage of base salary',percentage_of_hourly_rate:'Percentage of hourly rate',piece_rate:'Piece rate',hourly:'Hourly',average_monthly_pay:'Average monthly pay',average_hourly_pay:'Average hourly pay',average_working_day_pay:'Average working-day pay',gross_up_from_net:'Gross-up from net',monthly_salary:'Monthly salary',monthly_salary_day_based:'Monthly salary, day-based',contract_sum:'Contract sum',contract_sum_x_quantity:'Contract sum x quantity',percentage:'Percentage'};
+    const methodInputs = {sum_x_qty_x_coef:['rate','quantity','coefficient'],percentage_of_base:['percentage'],percentage:['percentage'],percentage_of_hourly_rate:['percentage','quantity'],piece_rate:['rate','quantity'],hourly:['rate','quantity'],average_monthly_pay:['quantity'],average_hourly_pay:['quantity'],average_working_day_pay:['quantity'],gross_up_from_net:['net_target'],contract_sum:['amount'],contract_sum_x_quantity:['rate','quantity'],monthly_salary:['amount'],monthly_salary_day_based:['amount','quantity']};
+    const preview = (method, v, base) => { const n=(k)=>Number(v[k]||0); let x=n('amount'); if(method==='sum_x_qty_x_coef')x=n('rate')*n('quantity')*n('coefficient'); else if(['percentage_of_base','percentage'].includes(method))x=base*n('percentage')/100; else if(method==='percentage_of_hourly_rate')x=(Number(item.hourly_rate||0)||base/176)*n('percentage')/100*n('quantity'); else if(['piece_rate','hourly','contract_sum_x_quantity'].includes(method))x=n('rate')*n('quantity'); else if(method==='monthly_salary_day_based')x=n('amount')*n('quantity'); else if(method==='average_monthly_pay')x=Number(v.average_monthly_pay||0)*n('quantity'); else if(method==='average_hourly_pay')x=Number(v.average_hourly_pay||0)*n('quantity'); else if(method==='average_working_day_pay')x=Number(v.average_working_day_pay||0)*n('quantity'); else if(method==='gross_up_from_net') { const target=n('net_target'), pension=Number(item.funded_pension_percent||0); let lo=0,hi=Math.max(1,Math.ceil(target*3*100)); const net=(c)=>{const g=c/100,p=Math.round(g*pension)/100,ui=Math.round(g*.016*100)/100,tax=Math.round(Math.max(0,g-p-ui)*.22*100)/100;return g-p-ui-tax;}; while(lo<hi){const mid=Math.floor((lo+hi)/2);if(net(mid)>=target)hi=mid;else lo=mid+1;} x=lo/100;} return Number.isFinite(x)?x.toFixed(2):'0.00'; };
+    const add = (line) => {
+      if (!types.length) { toast(t("Add a payment type first."), "info"); return; }
+      const value = line || {...types[0], type_id: types[0].id};
+      const el = document.createElement('fieldset'); el.className = 'payment-line';
+      const availableTypes = types.filter((x) => x.active || x.id === value.type_id);
+      const selected = types.find((x) => x.id === value.type_id) || types[0];
+      let method = value.calculation_method || selected.calculation_method || 'fixed_sum';
+      const draw = () => {
+        const input = (key) => field(key === 'net_target' ? 'Net target' : key[0].toUpperCase()+key.slice(1), key, value[key] ?? selected[`default_${key}`] ?? (key==='quantity' || key==='coefficient' ? 1 : ''), 'number', 'step="0.0001"');
+        const dynamic = (methodInputs[method] || []).map(input).join('');
+        el.innerHTML = `<legend>${tr("Payment line")}</legend><div class="form-grid">${select("Payment type", "type_id", availableTypes.map((x) => [x.id, t(x.name)]), value.type_id)}<p class="full-width muted">${tr(methodLabels[method] || 'Sum')}. ${tr('The server recalculates and validates this amount when saved.')}</p>${method==='fixed_sum' ? field("Amount", "amount", value.amount || "", "number", 'required step="0.01"') : `<output class="full-width" data-computed-amount>${esc(value.amount || '0.00')}</output>`}<div data-calc-fields class="full-width form-grid">${dynamic}</div>${select("Direction", "direction", [["income", t("Income")], ["deduction", t("Deduction")]], value.direction)}${field("Name", "name", value.name, "text", 'required maxlength="180"')}${select('Department','department_id',choices('department'),value.department_id || '')}${select('Cost centre','cost_centre_id',choices('cost_centre'),value.cost_centre_id || '')}${select('Project','project_id',[['','None'],...projects.filter((x)=>x.object_type==='project' && x.active).map((x)=>[x.id,x.name])],value.project_id || '')}<div class="full-width component-flags">${componentFlagFields(value)}</div></div>${button("Remove payment line", "removePayment")}`;
+        const liability = document.createElement('div');
+        liability.innerHTML = select("Deduction liability", "liability_role", [["PAYROLL_DEDUCTION", t("Other deduction liability")], ["PAYROLL_BAILIFF", t("Bailiff withholding liability")]], value.liability_role);
+        el.querySelector('.form-grid').append(liability.firstElementChild);
+      };
+      draw();
+      container.append(el);
+      el.addEventListener('change', (e) => {
+        if (e.target.name !== 'type_id') return;
+        const type = types.find((x) => x.id === e.target.value);
+        for (const key of ['amount','quantity','rate','coefficient','percentage','net_target']) { const input=el.querySelector(`[name="${key}"]`); if(input) value[key]=input.value; }
+        selected.name=type.name; selected.direction=type.direction; selected.liability_role=type.liability_role;
+        selected.calculation_method=type.calculation_method || 'fixed_sum';
+        method=selected.calculation_method; value.type_id=type.id; value.calculation_method=method;
+        value.name=type.name; value.direction=type.direction; value.liability_role=type.liability_role;
+        componentFlags.forEach(([key]) => value[key]=type[key]);
+        el.querySelector('[name="name"]').value = type.name;
+        componentFlags.forEach(([key]) => el.querySelector(`[name="${key}"]`).checked = type[key]);
+        draw();
+      });
+      el.addEventListener('input', () => { const output=el.querySelector('[data-computed-amount]'); if(output) { const values=Object.fromEntries([...el.querySelectorAll('input')].map((x)=>[x.name,x.value])); output.value=preview(method, values, Number(item.gross_salary||0)); } });
+      el.querySelector('[data-action="removePayment"]').onclick = () => el.remove();
+    };
+    (item.components || []).forEach(add);
+    d.querySelector('[data-action="addPayment"]').onclick = () => add();
+    bindForm(d, async () => {
+      const components = [...container.children].map((el) => {
+        const value = {};
+        for (const key of ['type_id', 'name', 'amount', 'direction', 'liability_role','quantity','rate','coefficient','percentage','net_target','department_id','cost_centre_id','project_id']) { const input=el.querySelector(`[name="${key}"]`); if(input) value[key] = input.value || null; }
+        for (const key of ['quantity','rate','coefficient','percentage','net_target']) if (value[key] === '') value[key] = null;
+        for (const [key] of componentFlags) value[key] = el.querySelector(`[name="${key}"]`).checked;
+        return value;
+      });
+      const data = {components};
+      if (item.pay_basis === 'hourly') data.hours = d.querySelector('[name="hours"]').value;
+      await post(c.url(`/pay-runs/${run.id}/items/${item.id}`), data, 'PATCH');
+      await saved(d);
+    });
+  }
+  function componentSummary(item) {
+    return (item.components || []).map((line) => `<small class="component-summary">${esc(t(line.name))}: ${esc(money(line.amount, 'EUR'))} · ${tr(line.direction === 'income' ? 'Income' : 'Deduction')}<br>${esc(componentFlags.filter(([key]) => line[key]).map(([, label]) => t(label)).join(', ') || t('No levies'))}</small>`).join('');
+  }
+  async function tsdPreparationDialog(c, run, preparation) {
+    const payableTotal = preparation.summary_totals.total_payable;
+    const apaPayouts = preparation.status === "Completed"
+      ? await api(c.url(`/pay-runs/${run.id}/tsd/${preparation.id}/apa-payouts`)).catch(() => []) : [];
+    const apaHistory = preparation.status === "Completed"
+      ? await api(c.url("/payroll/tsd-apa/history")).catch(() => []) : [];
     const reviewed = preparation.status === "Completed",
       base = c.url(`/pay-runs/${run.id}/tsd/${preparation.id}`),
       d = dialog(
         "TSD preparation for accountant",
-        `<div class="notice" role="status">${tr("NOT live-verified against e-MTA. Review the payment records before manual upload.")} ${tr("Direct e-MTA submission is disabled.")}</div><dl class="detail-grid"><div><dt>${tr("Payment date")}</dt><dd>${esc(preparation.payment_date)}</dd></div><div><dt>${tr("Filing deadline")}</dt><dd>${esc(preparation.filing_deadline)}</dd></div><div><dt>${tr("Status")}</dt><dd>${pill(preparation.status)}</dd></div></dl>${table(
+        `<div class="notice" role="status">${tr("NOT live-verified against e-MTA. Review the payment records before manual upload.")} ${tr("Direct e-MTA submission is disabled.")}</div>${(preparation.warnings || []).map((warning) => `<p class="notice">${esc(tr(warning))}</p>`).join("")}<label>${tr("Payment month")}<input type="month" data-tsd-month value="${esc(preparation.payment_date.slice(0, 7))}"></label><div class="detail-grid">${[["Income tax withheld", preparation.totals.income_tax], ["Social tax", preparation.totals.social_tax], ["UI", preparation.summary_totals.total_ui], ["II pillar", preparation.totals.funded_pension], ["Total payable", payableTotal]].map(([label, amount]) => `<div><dt>${tr(label)}</dt><dd>${esc(money(amount, "EUR"))}</dd></div>`).join("")}<div><dt>${tr("Record count")}</dt><dd>${preparation.records.length}</dd></div></div><div class="dialog-actions"><button type="button" data-tsd-view="list">${tr("List")}</button><button type="button" data-tsd-view="type">${tr("Group by payment type")}</button><button type="button" data-tsd-view="recipient">${tr("Group by recipient")}</button></div><div data-tsd-records></div>${table(
           ["Employee", "Annex", ["Gross"], ["Income tax"], ["Social tax"], ["Net"]],
           preparation.records.map((record) =>
             row([
@@ -3981,14 +5241,31 @@
               cash(record.net_amount, "EUR"),
             ]),
           ),
-        )}<div class="dialog-actions">${
+        )}${reviewed ? `<section class="section"><h3>${tr("Business rules")}</h3>${apaPayouts.length ? table(["Payment month", "Payout", "Findings", "Export XML"], apaPayouts.map((payout) => {
+          const blocking = payout.findings.filter((finding) => finding.blocking), reason = blocking.map((finding) => `${finding.rule_code}: ${lang === "et" ? finding.message_et : finding.message_en}`).join("; ");
+          const findings = payout.findings.length ? `<ul class="apa-findings">${payout.findings.map((finding) => `<li class="apa-finding apa-${esc(finding.category.toLowerCase())}"><small>${tr(finding.blocking ? "Validation errors" : "Warnings")}</small> <strong>${esc(finding.rule_code)}</strong> ${esc(lang === "et" ? finding.message_et : finding.message_en)}</li>`).join("")}</ul>` : `<ul class="apa-findings"><li>${tr("No findings")}</li></ul>`;
+          return row([td(esc(payout.payment_month)), td(esc(payout.payout_date)), td(findings), td(blocking.length ? `<button disabled title="${esc(reason)}">${tr("Export XML")}</button><small>${esc(reason)}</small>` : link("Export XML", `/api${base}/payouts/${encodeURIComponent(payout.id)}/apa.xml`))]);
+        })) : empty("No paid payouts", "")}${[...new Set(apaPayouts.map((payout) => payout.payment_month))].map((month) => {
+          const blocked = apaPayouts.some((payout) => payout.payment_month === month && payout.findings.some((finding) => finding.blocking));
+          return blocked ? `<button disabled title="${tr("Blocked by validation findings")}">${tr("ZIP for month")} ${esc(month)}</button>` : link(`${tr("ZIP for month")} ${month}`, `/api${c.url(`/payroll/tsd-apa/${month}.zip`)}`);
+        }).join(" ")}</section><section class="section"><h3>${tr("Export history")}</h3>${table(["Payment month", "Transaction", "Version", "Status", "Feedback results", "Actions"], apaHistory.map((item) => row([td(esc((item.payout_date || "").slice(0, 7))), td(esc(item.transaction_id)), td(item.version), td(tr(item.status === "Accepted" ? "Accepted" : item.status === "Rejected" ? "Rejected" : item.status === "PartiallyRejected" ? "Partially rejected" : item.status)), td((item.feedback_results || []).map((result) => `${esc(result.rule_code || result.file_result || "")}: ${esc(result.message_text || "")}`).filter(Boolean).join("; ") || tr("No feedback results")), td(item.status === "Cancelled" ? "" : button("Export cancellation", "apa_cancel", false, `data-id="${esc(item.id)}"`))])))}</section><form data-apa-feedback><h3>${tr("Upload feedback report")}</h3><label>${tr("Transaction ID")}<input name="transaction_id" required></label><label>${tr("Feedback XML")}<input name="file" type="file" accept=".xml,application/xml,text/xml" required></label><button type="submit">${tr("Upload feedback report")}</button></form>` : ""}<div class="dialog-actions">${
           reviewed
             ? link("TSD XBRL GL XML", `/api${base}/export.xbrl.xml`) +
-              link("TSD CSV (through 2027)", `/api${base}/export.csv`)
+              link("TSD CSV (through 2027)", `/api${base}/export.csv`) +
+              link("Legacy Annex 1 CSV upload (through 2027)", `/api${base}/export-annex1.csv`) +
+              link("TSD workpaper XLSX", `/api${base}/workpaper.xlsx`)
             : button("Mark TSD reviewed", "tsd_confirm_review", true)
         }</div>`,
       );
     bindActions(d, {
+      apa_cancel: async (buttonEl) => {
+        try {
+          const response = await api(c.url(`/payroll/tsd-apa/history/${encodeURIComponent(buttonEl.dataset.id)}/cancellation.xml`), {method: "POST"});
+          const objectUrl = URL.createObjectURL(await response.blob()), anchor = document.createElement("a");
+          anchor.href = objectUrl; anchor.download = `tsd-cancel-${buttonEl.dataset.id}.xml`; anchor.click(); URL.revokeObjectURL(objectUrl);
+          toast(t("Cancellation file downloaded"));
+        } catch (error) { toast(error.message, "error"); }
+      },
       tsd_confirm_review: () =>
         confirmAction(
           "Mark TSD reviewed",
@@ -4003,14 +5280,35 @@
           },
         ),
     });
+    d.querySelector("[data-apa-feedback]")?.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const form = event.currentTarget, payload = new FormData();
+      payload.append("transaction_id", form.elements.transaction_id.value);
+      payload.append("file", form.elements.file.files[0]);
+      try { const result = await api(c.url("/payroll/tsd-apa/feedback"), {method: "POST", body: payload}); toast(`${tr("Feedback status")}: ${tr(result.status)}`); }
+      catch (error) { toast(error.message, "error"); }
+    });
+    const recordsHost = d.querySelector('[data-tsd-records]'), monthInput = d.querySelector('[data-tsd-month]');
+    const drawRecords = (mode = 'list') => {
+      const records = preparation.records.filter((record) => record.payment_month === monthInput.value);
+      if (mode === 'list') { recordsHost.innerHTML = table(['Employee', 'Payment type', 'Gross', 'Income tax', 'Social tax'], records.map((record) => row([td(esc(record.recipient_name)), td(record.tsd_payment_type), cash(record.gross_amount, 'EUR'), cash(record.income_tax, 'EUR'), cash(record.social_tax, 'EUR')]))); return; }
+      const key = mode === 'type' ? 'tsd_payment_type' : 'recipient_personal_id', groups = new Map();
+      records.forEach((record) => { const value = groups.get(record[key]) || {name: mode === 'type' ? String(record[key]) : record.recipient_name, gross: 0, income: 0, social: 0}; value.gross += Math.round(Number(record.gross_amount) * 100); value.income += Math.round(Number(record.income_tax) * 100); value.social += Math.round(Number(record.social_tax) * 100); groups.set(record[key], value); });
+      recordsHost.innerHTML = table(['Employee', 'Gross', 'Income tax', 'Social tax'], [...groups.values()].map((value) => row([td(esc(value.name)), cash(value.gross / 100, 'EUR'), cash(value.income / 100, 'EUR'), cash(value.social / 100, 'EUR')])));
+    };
+    d.querySelectorAll('[data-tsd-view]').forEach((button) => button.addEventListener('click', () => drawRecords(button.dataset.tsdView)));
+    monthInput.addEventListener('change', () => drawRecords());
+    drawRecords();
   }
-  function renderRun(r, c, providers = []) {
+  function renderRun(r, c, providers = [], runs = []) {
     const draft = String(r.status).toLowerCase() === "draft",
       items = r.items || [],
+      original = r.original_run_id ? runs.find((candidate) => candidate.id === r.original_run_id) : null,
+      related = runs.filter((candidate) => candidate.original_run_id === r.id),
       preparation = r.tsd_preparation,
       tsdActions = preparation
         ? preparation.status === "Completed"
-          ? `${pill("Reviewed")}${link("TSD XBRL GL XML", `/api${c.url(`/pay-runs/${r.id}/tsd/${preparation.id}/export.xbrl.xml`)}`)}${link("TSD CSV (through 2027)", `/api${c.url(`/pay-runs/${r.id}/tsd/${preparation.id}/export.csv`)}`)}`
+          ? `${pill("Reviewed")}${link("TSD XBRL GL XML", `/api${c.url(`/pay-runs/${r.id}/tsd/${preparation.id}/export.xbrl.xml`)}`)}${link("TSD CSV (through 2027)", `/api${c.url(`/pay-runs/${r.id}/tsd/${preparation.id}/export.csv`)}`)}${link("Legacy Annex 1 CSV upload (through 2027)", `/api${c.url(`/pay-runs/${r.id}/tsd/${preparation.id}/export-annex1.csv`)}`)}${link("TSD workpaper XLSX", `/api${c.url(`/pay-runs/${r.id}/tsd/${preparation.id}/workpaper.xlsx`)}`)}`
           : `${pill("Review Required")}${button("Review TSD preparation", "tsd_review", false, `data-id="${r.id}" data-preparation-id="${preparation.id}"`)}`
         : button("Prepare TSD", "tsd_prepare", false, `data-id="${r.id}"`);
     return `${row([
@@ -4023,7 +5321,7 @@
         (draft
           ? button("Delete draft", "delete", false, `data-id="${r.id}"`) +
               button("Approve & post", "approve", true, `data-id="${r.id}"`)
-          : link(
+          : button("Send payslips", "sendPayslips", false, `data-id="${r.id}"`) + button("Payroll payouts", "managePayouts", false, `data-id="${r.id}"`) + (r.kind === 'regular' ? button('Create correction', 'createCorrection', false, `data-id="${r.id}"`) + button('Add supplementary run', 'createSupplementary', false, `data-id="${r.id}"`) : '') + link(
               "Payslips PDF",
               `/api${c.url(`/pay-runs/${r.id}/payslips.pdf`)}`,
             ) + tsdActions) +
@@ -4032,7 +5330,7 @@
             `/api${c.url(`/pay-runs/${r.id}/workbook.xlsx`)}`,
           ),
       ),
-    ])}<tr class="run-detail"><td colspan="6"><details ${draft ? "open" : ""}><summary>${tr("Employee breakdown")} (${num(items.length)})</summary>${table(
+    ])}<tr id="payroll-run-${esc(r.id)}" class="run-detail"><td colspan="6">${r.kind === 'correction' && original ? `<p>${tr('Correction')}: <a href="#payroll-run-${esc(original.id)}">${tr('Original')} ${esc(original.period)}</a></p>${table(['Employee','Original','Corrected','Difference'], items.map((item) => { const base = original.items.find((x) => x.employee_id === item.employee_id) || {}; const totals = (value) => [Number(value.gross || 0), Number(value.income_tax || 0) + Number(value.social_tax || 0) + Number(value.ui_employee || 0) + Number(value.funded_pension || 0), Number(value.net || 0)]; const before = totals(base), after = totals(item), cell = (values) => `${tr('Gross')}: ${esc(money(values[0], 'EUR'))}<br>${tr('Taxes')}: ${esc(money(values[1], 'EUR'))}<br>${tr('Net')}: ${esc(money(values[2], 'EUR'))}`; return row([td(esc(item.employee_name)), td(cell(before)), td(cell(after)), td(cell(after.map((value, index) => value - before[index])))]); }))}` : ''}${r.kind === 'regular' && related.length ? `<p>${tr('Related runs')}: ${related.map((child) => `<a href="#payroll-run-${esc(child.id)}">${tr(child.kind === 'correction' ? 'Correction' : 'Supplementary run')}</a>`).join(' · ')}</p>` : ''}<details ${draft ? "open" : ""}><summary>${tr("Employee breakdown")} (${num(items.length)})</summary>${table(
       [
         "Employee",
         ["Gross"],
@@ -4046,7 +5344,7 @@
       items.map((x, i) =>
         row([
           td(
-            `${esc(x.employee_name || x.name || x.employee?.name)}${hoursNote(x)}${partTime(x)}`,
+            `${esc(x.employee_name || x.name || x.employee?.name)}${hoursNote(x)}${partTime(x)}${componentSummary(x)}${x.withholdings?.length ? `<small>${tr('Withholdings')}: ${x.withholdings.map((line) => `${esc(line.description)} (${esc(money(line.amount, 'EUR'))})`).join('; ')}</small>` : ''}${x.withholding_warnings?.length ? `<small class="declaration-overdue">${x.withholding_warnings.map((warning) => esc(warning)).join('; ')}</small>` : ''}`,
           ),
           cash(x.gross ?? x.gross_salary, "EUR"),
           cash(x.income_tax, "EUR"),
@@ -4059,7 +5357,7 @@
           cash(x.employer_cost, "EUR"),
           td(
             draft
-              ? ""
+              ? button("Edit draft pay", "editRunItem", false, `data-run="${esc(r.id)}" data-id="${esc(x.id)}"`)
               : link(
                   "Payslip",
                   `/api${c.url(`/pay-runs/${r.id}/payslips.pdf`)}#page=${i + 1}`,

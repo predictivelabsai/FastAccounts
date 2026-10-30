@@ -1,18 +1,150 @@
 from __future__ import annotations
 
+from tests.migration_catalogue import catalogue, catalogue_after
+
 import sqlite3
 
 import pytest
 
 from database import Database
 from organisations import AccessDenied, OrganisationService
+from payroll_components import ACCOUNTS as PAYROLL_COMPONENT_ACCOUNTS
 
+
+def test_employee_tax_settings_backfill_and_preservation(tmp_path, legacy_payroll):
+    from shutil import copyfile
+    from database import MIGRATIONS
+    from payroll import PayrollService
+    old = tmp_path / 'before-tax-history' / 'sqlite'
+    old.mkdir(parents=True)
+    for path in (MIGRATIONS / 'sqlite').glob('*.sql'):
+        if path.stem < '0037':
+            copyfile(path, old / path.name)
+    db = Database(path=str(tmp_path / 'tax-backfill.sqlite'))
+    db.migrate(migrations=old.parent)
+    org = OrganisationService(db).create(name='Synthetic backfill', country_code='EE', entity_type='EE_OU',
+                                          owner_email='owner@example.test')
+    run = legacy_payroll(db, org['id'], name='Existing employee', gross='2000')
+    payroll = PayrollService(db)
+    payroll.approve(org['id'], run['id'], actor='owner@example.test')
+    with db.transaction() as tx:
+        tx.execute("UPDATE employees SET apply_tax_free_minimum=1,funded_pension_percent=6,"
+                   "employment_start_date='2025-06-15',personal_id='49001010018' WHERE id='legacy-employee'")
+        tx.execute("INSERT INTO employees(id,organisation_id,name,gross_salary,board_member,pay_basis,"
+                   "funded_pension_percent,created_at) VALUES ('board',?,'Synthetic board',500,1,'board_fee',0,'2026-01-01')",
+                   (org['id'],))
+    tables = ('employees', 'pay_run_items', 'pay_item_context', 'pay_runs', 'gl_entries', 'posting_batches')
+    before = {table: db.rows(f'SELECT * FROM {table} ORDER BY id' if table != 'pay_item_context'
+                             else 'SELECT * FROM pay_item_context ORDER BY item_id') for table in tables}
+    assert db.migrate() == catalogue_after('0036_payroll_component_catalogue')
+    for table in tables:
+        actual = db.rows(f'SELECT * FROM {table} ORDER BY id' if table != 'pay_item_context'
+                         else 'SELECT * FROM pay_item_context ORDER BY item_id')
+        assert [{key: row[key] for key in original} for row, original in zip(actual, before[table], strict=True)] == before[table]
+    rows = db.rows('SELECT * FROM employee_tax_settings WHERE organisation_id=?', (org['id'],))
+    assert len(rows) == 6
+    staff = {r['kind']: r for r in rows if r['employee_id'] == 'legacy-employee'}
+    board = {r['kind']: r for r in rows if r['employee_id'] == 'board'}
+    assert {r['start_date'] for r in staff.values()} == {'2025-06-15'}
+    assert staff['tax_free']['mode'] == 'maximum' and staff['pension']['rate'] == 6
+    assert staff['unemployment']['applies'] == 1
+    assert {r['start_date'] for r in board.values()} == {'2026-01-01'}
+    assert board['tax_free']['mode'] == 'none' and board['pension']['rate'] == 0
+    assert board['unemployment']['applies'] == 0
+    assert payroll.employees(org['id'])[0]['date_of_birth'] == '1990-01-01'
+    assert db.migrate() == [] and db.rows('PRAGMA foreign_key_check') == []
+
+
+def test_component_catalogue_upgrade_preserves_defaults_and_posted_payroll(tmp_path, legacy_payroll):
+    from shutil import copyfile
+    from database import MIGRATIONS
+    from payroll import PayrollService
+    from payroll_components import FLAGS, PRESETS, seed_types
+
+    old = tmp_path / 'old' / 'sqlite'
+    old.mkdir(parents=True)
+    for path in (MIGRATIONS / 'sqlite').glob('*.sql'):
+        if path.stem < '0036':
+            copyfile(path, old / path.name)
+    db = Database(path=str(tmp_path / 'catalogue-upgrade.sqlite'))
+    db.migrate(migrations=old.parent)
+    actor = 'owner@example.test'
+    org = OrganisationService(db).create(name='Synthetic existing EE', country_code='EE', entity_type='EE_OU', owner_email=actor)
+    uk = OrganisationService(db).create(name='Synthetic existing UK', country_code='UK', entity_type='UK_COMPANY', owner_email=actor)
+    service = PayrollService(db)
+    with db.transaction() as tx:
+        # Reproduce the five rows present before 0036, independently of current org seeding.
+        tx.execute("DELETE FROM pay_component_types WHERE preset_key NOT IN ('bailiff','author','parental','contract','base_adjustment')")
+        tx.execute("UPDATE pay_component_types SET name='Bureau author',social_tax=0,ui_employee=0,ui_employer=0,funded_pension=0 WHERE preset_key='author'")
+        tx.execute("UPDATE pay_component_types SET social_tax=0,ui_employee=0,ui_employer=0,funded_pension=0,social_minimum=0 WHERE preset_key='parental'")
+    custom = service.save_component_type(org['id'], name='Puhkusetasu', actor=actor, income_tax=True)
+    run = legacy_payroll(db, org['id'], name='Synthetic employee', gross='2000', actor=actor)
+    author = next(t for t in service.component_types(org['id']) if t['preset_key'] == 'author')
+    service.update_item(org['id'], run['id'], run['items'][0]['id'], actor=actor,
+                        components=[dict(type_id=author['id'], amount='100')])
+    service.approve(org['id'], run['id'], actor=actor)
+    tables = ('employees', 'pay_runs', 'pay_run_items', 'pay_item_components', 'pay_item_context',
+              'pay_run_posting_accounts', 'gl_entries', 'posting_batches', 'audit_events')
+    before = {t: db.rows(f'SELECT * FROM {t} ORDER BY 1') for t in tables}
+    existing = db.rows('SELECT * FROM pay_component_types ORDER BY id')
+    assert db.migrate() == catalogue_after('0035_payroll_income_line')
+    for table in tables:
+        actual = db.rows(f'SELECT * FROM {table} ORDER BY 1')
+        assert [{key: row[key] for key in original} for row, original in zip(actual, before[table], strict=True)] == before[table]
+    after = db.rows('SELECT * FROM pay_component_types ORDER BY id')
+    after_by_id = {row['id']: row for row in after}
+    assert all(all(after_by_id[row['id']][key] == value for key, value in row.items()) for row in existing)
+    assert len(after) == len(PRESETS) + 1
+    assert db.scalar('SELECT COUNT(*) FROM pay_component_types WHERE organisation_id=?', (uk['id'],)) == 0
+    assert custom['preset_key'] is None
+    for key, name, direction, flags, role in PRESETS:
+        actual = next(row for row in after if row['preset_key'] == key)
+        if key not in {'author', 'bailiff', 'parental', 'contract', 'base_adjustment'}:
+            assert (actual['name'], actual['direction'], tuple(actual[f] for f in FLAGS), actual['liability_role']) == (name, direction, flags, role)
+    with db.transaction() as tx:
+        seed_types(tx, org['id'])
+    connection = db.connect()
+    try:
+        connection.executescript((MIGRATIONS / 'sqlite' / '0036_payroll_component_catalogue.sql').read_text(encoding='utf-8'))
+    finally:
+        connection.close()
+    assert db.rows('SELECT * FROM pay_component_types ORDER BY id') == after
+    assert db.migrate() == []
+    assert db.rows('PRAGMA foreign_key_check') == []
 
 def test_empty_migration_is_idempotent(tmp_path):
     db = Database(path=str(tmp_path / "empty.sqlite"))
-    assert db.migrate() == ["0001_accounting_core", "0002_integrations", "0003_operations", "0004_document_immutability", "0005_payroll", "0006_payroll_part_time_hourly", "0007_automation", "0008_import_staging", "0009_local_accounts", "0010_tsd_export", "0011_account_mappings", "0012_external_gl", "0013_sync_review", "0014_sync_push", "0015_payment_orders", "0016_bank_feed_schedules", "0017_prepayments", "0018_fixed_assets", "0019_master_data_import", "0020_quotes", "0021_periodisation", "0022_payment_links", "0023_analytical_objects", "0024_reminder_rules", "0025_fx_realised", "0026_fx_revaluations", "0027_mfa", "0028_document_settings", "0029_copilot", "0030_master_data_maintenance", "0031_master_data_groups", "0032_copilot_access"]
+    assert db.migrate() == ["0001_accounting_core", "0002_integrations", "0003_operations", "0004_document_immutability", "0005_payroll", "0006_payroll_part_time_hourly", "0007_automation", "0008_import_staging", "0009_local_accounts", "0010_tsd_export", "0011_account_mappings", "0012_external_gl", "0013_sync_review", "0014_sync_push", "0015_payment_orders", "0016_bank_feed_schedules", "0017_prepayments", "0018_fixed_assets", "0019_master_data_import", "0020_quotes", "0021_periodisation", "0022_payment_links", "0023_analytical_objects", "0024_reminder_rules", "0025_fx_realised", "0026_fx_revaluations", "0027_mfa", "0028_document_settings", "0029_copilot", "0030_master_data_maintenance", "0031_master_data_groups", "0032_copilot_access", "0033_copilot_settings", "0034_payroll_demo_fixes", "0035_payroll_income_line", "0036_payroll_component_catalogue", "0037_employee_tax_settings", "0038_payroll_payday_rules", "0039_payroll_payouts", "0040_payroll_settlement_dates", "0041_payroll_sepa_details", "0042_payroll_component_metadata", "0043_payroll_absences", "0044_payroll_absence_day_freeze", "0045_payroll_history", "0046_payroll_absence_pay", "0047_payroll_absence_payouts", "0048_payroll_component_breakdown", "0049_payroll_component_source", "0050_payroll_history_import", "0051_payroll_leave_liability", "0052_payroll_tsd_payment_types", "0053_payroll_tsd_base_snapshot", "0054_payroll_tsd_lines", "0055_tsd_apa_history", "0056_payroll_corrections", "0057_payroll_employee_receivables", "0058_payroll_receivable_offset_accounts", "0059_tsd_apa_operation_history", "0060_payroll_run_lineage_tenancy", "0061_payroll_payout_tsd_lines", "0062_payroll_run_lineage_parent_guard", "0063_payroll_pay_type_methods", "0064_payroll_withholdings", "0065_payroll_reports_delivery", "0066_payroll_palk_unmapped", "0067_payroll_contracts", "0068_payroll_contract_run_lines", "0069_payroll_dimensions", "0070_payroll_item_dimensions", "0071_payroll_ledger_dimensions", "0072_payroll_dimension_imports"]
     assert db.migrate() == []
-    assert db.scalar("SELECT COUNT(*) FROM schema_migrations") == 32
+    assert db.scalar("SELECT COUNT(*) FROM schema_migrations") == len(catalogue())
+
+
+def test_contract_migration_backfills_pay_bases_and_preserves_employees(tmp_path, legacy_payroll):
+    from database import MIGRATIONS
+    db = Database(path=str(tmp_path / 'contracts-backfill.sqlite'))
+    old = tmp_path / 'contracts-old' / 'sqlite'
+    old.mkdir(parents=True)
+    from shutil import copyfile
+    for path in (MIGRATIONS / 'sqlite').glob('*.sql'):
+        if path.stem < '0067':
+            copyfile(path, old / path.name)
+    db.migrate(migrations=old.parent)
+    org = OrganisationService(db).create(name='Contract backfill', country_code='EE', entity_type='EE_OU',
+                                         owner_email='owner@example.test')
+    legacy_payroll(db, org['id'], name='Monthly', gross='2000')
+    with db.transaction() as tx:
+        tx.execute("INSERT INTO employees(id,organisation_id,name,gross_salary,board_member,pay_basis,funded_pension_percent,created_at) VALUES ('board',?,'Board',500,1,'board_fee',0,'2026-01-01')", (org['id'],))
+        tx.execute("INSERT INTO employees(id,organisation_id,name,gross_salary,board_member,pay_basis,funded_pension_percent,created_at) VALUES ('service',?,'Service',NULL,0,'income_line',2,'2026-01-01')", (org['id'],))
+    before = db.rows('SELECT id,organisation_id,name,pay_basis,gross_salary,hourly_rate FROM employees ORDER BY id')
+    assert db.migrate() == ['0067_payroll_contracts', '0068_payroll_contract_run_lines', '0069_payroll_dimensions', '0070_payroll_item_dimensions', '0071_payroll_ledger_dimensions', '0072_payroll_dimension_imports']
+    after = db.rows('SELECT id,organisation_id,name,pay_basis,gross_salary,hourly_rate FROM employees ORDER BY id')
+    assert after == before
+    contracts = {r['employee_id']: r for r in db.rows('SELECT * FROM payroll_contracts WHERE organisation_id=?', (org['id'],))}
+    assert {key: contracts[key]['contract_type'] for key in ('legacy-employee', 'board', 'service')} == {
+        'legacy-employee': 'employment', 'board': 'board_member', 'service': 'services'}
+    agreements = db.rows('SELECT contract_id,base_pay_type,rate FROM payroll_salary_agreements WHERE organisation_id=?', (org['id'],))
+    assert len(agreements) == 3
+    assert db.rows('PRAGMA foreign_key_check') == []
     assert db.scalar(
         "SELECT COUNT(*) FROM sqlite_master WHERE type='table' "
         "AND name IN ('account_mappings','external_gl_entries')"
@@ -23,6 +155,8 @@ def test_empty_migration_is_idempotent(tmp_path):
     assert {"matched_local_id", "match_json"} <= staged_columns
     sync_columns = {row["name"] for row in db.rows("PRAGMA table_info(sync_runs)")}
     assert {"reviewed_at", "reviewed_by"} <= sync_columns
+    component_columns = {row["name"] for row in db.rows("PRAGMA table_info(pay_item_components)")}
+    assert "breakdown_json" in component_columns
 
 
 def test_migration_preserves_existing_data(tmp_path):
@@ -33,6 +167,30 @@ def test_migration_preserves_existing_data(tmp_path):
         entity_type="UK_COMPANY", owner_email="a@example.test")
     assert db.migrate() == []
     assert db.one("SELECT name FROM organisations WHERE id=?", (org["id"],))["name"] == "Preserved"
+
+
+def test_historical_migration_catalogue_does_not_affect_other_databases(tmp_path):
+    import database
+    from concurrent.futures import ThreadPoolExecutor
+
+    historical = tmp_path / 'historical'
+    (historical / 'sqlite').mkdir(parents=True)
+    versions = []
+    for source in (database.MIGRATIONS / 'sqlite').glob('000[1-5]*.sql'):
+        (historical / 'sqlite' / source.name).write_text(source.read_text(encoding='utf-8'), encoding='utf-8')
+        versions.append(source.stem)
+    legacy = Database(path=str(tmp_path / 'legacy.sqlite'))
+    current = Database(path=str(tmp_path / 'current.sqlite'))
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        old_setup = pool.submit(legacy.migrate, migrations=historical)
+        current_setup = pool.submit(current.migrate)
+        assert old_setup.result() == sorted(versions)
+        latest = current_setup.result()
+    assert latest[-1] == '0072_payroll_dimension_imports'
+    assert legacy.scalar('SELECT COUNT(*) FROM schema_migrations') == 5
+    assert current.scalar('SELECT COUNT(*) FROM schema_migrations') == len(catalogue())
+    assert legacy.migrate() == latest[5:]
+    assert legacy.migrate() == current.migrate() == []
 
 
 def test_unsafe_postgres_schema_is_rejected():
@@ -85,9 +243,13 @@ def test_organisation_entity_country_and_seed_data(db):
         "SELECT code,name FROM accounts WHERE organisation_id=? AND system_role LIKE 'PAYROLL_%'",
         (ee["id"],),
     )} == {
+        **{code: name for code, name, role in PAYROLL_COMPONENT_ACCOUNTS},
         "6110": "Palgakulu",
         "6120": "Sotsiaalmaksu kulu",
         "6130": "Tööandja töötuskindlustusmakse kulu",
+        "6140": "Puhkusereservi kulu",
+        "2260": "Puhkusereservi kohustus",
+            "2270": "Nõuded töötajate vastu",
         "2210": "Palgavõlg töötajatele",
         "2220": "Kinnipeetud tulumaksu võlg",
         "2230": "Pensioni- ja töötuskindlustusmaksete võlg",
@@ -189,7 +351,7 @@ def test_fixed_asset_upgrade_preserves_custom_charts_and_postings(tmp_path, monk
         lines=[PostingLine(accounts["BANK"], debit=Decimal("10")), PostingLine(accounts["CAPITAL"], credit=Decimal("10"))], actor="owner@example.test")
     before = {table: db.rows(f"SELECT * FROM {table} ORDER BY id") for table in ["organisations", "accounts", "gl_entries", "posting_batches", "audit_events"]}
     monkeypatch.setattr(database, "MIGRATIONS", original)
-    assert db.migrate() == ["0018_fixed_assets", "0019_master_data_import", "0020_quotes", "0021_periodisation", "0022_payment_links", "0023_analytical_objects", "0024_reminder_rules", "0025_fx_realised", "0026_fx_revaluations", "0027_mfa", "0028_document_settings", "0029_copilot", "0030_master_data_maintenance", "0031_master_data_groups", "0032_copilot_access"]
+    assert db.migrate() == catalogue_after('0017_prepayments')
     assert db.migrate() == []
     after_accounts = db.rows("SELECT * FROM accounts ORDER BY id")
     assert all(row in after_accounts for row in before["accounts"])
@@ -197,9 +359,87 @@ def test_fixed_asset_upgrade_preserves_custom_charts_and_postings(tmp_path, monk
         rows = db.rows(f"SELECT * FROM {table} ORDER BY id")
         if table == "organisations":
             assert all(row.pop("copilot_enabled") == 0 for row in rows)
+            for row in rows:
+                row.pop('language', None)
         assert rows == before[table]
     assigned = {row["system_role"]: row for row in after_accounts if row["system_role"] in roles}
     for role, code in zip(["FIXED_ASSETS", "ACCUMULATED_DEPRECIATION", "DEPRECIATION_EXPENSE"], codes):
         assert assigned[role]["code"] == ("9998" if role == "FIXED_ASSETS" and existing_role else str(code + 2))
     assert assigned["ACCUMULATED_DEPRECIATION"]["normal_balance"] == "Credit"
     assert db.rows("SELECT * FROM asset_groups") == []
+
+
+def test_payroll_run_kinds_keep_regular_period_unique_and_allow_related_runs(tmp_path):
+    from organisations import OrganisationService
+    from database import Database
+    from core_utils import new_id, utc_now
+
+    db = Database(path=str(tmp_path / "run-kinds.sqlite"))
+    db.migrate()
+    org = OrganisationService(db).create(name="Run kinds", country_code="EE",
+        entity_type="EE_OU", owner_email="owner@example.test")
+    regular_id, correction_id, supplementary_id = new_id(), new_id(), new_id()
+    now = utc_now()
+    with db.transaction() as tx:
+        for run_id, kind, original in ((regular_id, "regular", None),
+                                       (correction_id, "correction", regular_id),
+                                       (supplementary_id, "supplementary", regular_id)):
+            tx.execute("INSERT INTO pay_runs(id,organisation_id,period,total_gross,total_net,total_employer_cost,created_by,created_at,kind,original_run_id) VALUES (?,?,?,0,0,0,?,?,?,?)",
+                       (run_id, org["id"], "2026-10", "owner@example.test", now, kind, original))
+    with pytest.raises(Exception):
+        with db.transaction() as tx:
+            tx.execute("INSERT INTO pay_runs(id,organisation_id,period,total_gross,total_net,total_employer_cost,created_by,created_at) VALUES (?,?,?,0,0,0,?,?)",
+                       (new_id(), org["id"], "2026-10", "owner@example.test", now))
+    assert db.scalar("SELECT COUNT(*) FROM pay_runs WHERE organisation_id=? AND original_run_id=?",
+                     (org["id"], regular_id)) == 2
+
+
+def test_payroll_run_lineage_cannot_cross_organisations(db, ee_org):
+    from core_utils import new_id, utc_now
+
+    other = OrganisationService(db).create(name="Other payroll organisation", country_code="EE",
+        entity_type="EE_OU", owner_email="other@example.test")
+    original_id, child_id = new_id(), new_id()
+    now = utc_now()
+    with db.transaction() as tx:
+        tx.execute("INSERT INTO pay_runs(id,organisation_id,period,total_gross,total_net,total_employer_cost,created_by,created_at) VALUES (?,?,?,0,0,0,?,?)",
+                   (original_id, ee_org["id"], "2026-10", "owner@example.test", now))
+        valid_child_id = new_id()
+        tx.execute("INSERT INTO pay_runs(id,organisation_id,period,total_gross,total_net,total_employer_cost,created_by,created_at,kind,original_run_id) VALUES (?,?,?,0,0,0,?,?,?,?)",
+                   (valid_child_id, ee_org["id"], "2026-10", "owner@example.test", now, "correction", original_id))
+        with pytest.raises(Exception, match="related runs"):
+            tx.execute("DELETE FROM pay_runs WHERE organisation_id=? AND id=?", (ee_org["id"], original_id))
+        with pytest.raises(Exception, match="same organisation"):
+            tx.execute("INSERT INTO pay_runs(id,organisation_id,period,total_gross,total_net,total_employer_cost,created_by,created_at,kind,original_run_id) VALUES (?,?,?,0,0,0,?,?,?,?)",
+                       (child_id, other["id"], "2026-10", "other@example.test", now, "correction", original_id))
+        tx.execute("INSERT INTO pay_runs(id,organisation_id,period,total_gross,total_net,total_employer_cost,created_by,created_at) VALUES (?,?,?,0,0,0,?,?)",
+                   (child_id, other["id"], "2026-10", "other@example.test", now))
+        with pytest.raises(Exception, match="same organisation"):
+            tx.execute("UPDATE pay_runs SET original_run_id=? WHERE organisation_id=? AND id=?",
+                       (original_id, other["id"], child_id))
+
+
+
+
+def test_payroll_dimensions_migration_adds_tenant_register_and_optional_links(tmp_path):
+    db = Database(path=str(tmp_path / 'payroll-dimensions.sqlite'))
+    db.migrate()
+    org = OrganisationService(db).create(name='Payroll dimensions', country_code='EE',
+        entity_type='EE_OU', owner_email='owner@example.test')
+    dimensions = {row['name'] for row in db.rows('PRAGMA table_info(payroll_dimensions)')}
+    assert {'id', 'organisation_id', 'kind', 'code', 'name', 'parent_id', 'active'} <= dimensions
+    for table, expected in {
+        'employees': {'department_id', 'position_id'},
+        'payroll_contracts': {'department_id', 'position_id'},
+        'payroll_salary_agreements': {'department_id', 'cost_centre_id', 'project_id'},
+        'pay_item_components': {'department_id', 'cost_centre_id', 'project_id'},
+        'payroll_contract_run_lines': {'department_id', 'position_id', 'cost_centre_id', 'project_id'},
+    }.items():
+        columns = {row['name'] for row in db.rows(f'PRAGMA table_info({table})')}
+        assert expected <= columns
+    other = OrganisationService(db).create(name='Other tenant', country_code='EE', entity_type='EE_OU', owner_email='other@example.test')
+    with db.transaction() as tx:
+        tx.execute("INSERT INTO payroll_dimensions(id,organisation_id,kind,code,name,created_at,updated_at) VALUES ('dept-a',?,'department','OPS','Operations','now','now')", (org['id'],))
+        tx.execute("INSERT INTO payroll_dimensions(id,organisation_id,kind,code,name,created_at,updated_at) VALUES ('dept-b',?,'department','OPS','Operations','now','now')", (other['id'],))
+    assert db.scalar('SELECT COUNT(*) FROM payroll_dimensions WHERE organisation_id=?', (org['id'],)) == 1
+    assert db.rows('PRAGMA foreign_key_check') == []

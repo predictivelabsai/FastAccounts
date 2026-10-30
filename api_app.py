@@ -2,7 +2,10 @@
 from __future__ import annotations
 
 import os
+import re
 import secrets
+import base64
+import binascii
 from datetime import date
 from decimal import Decimal
 from typing import Any, Literal
@@ -10,7 +13,7 @@ from typing import Any, Literal
 from fastapi import Depends, FastAPI, File, Header, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.encoders import jsonable_encoder
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 import integrations
@@ -24,8 +27,8 @@ from documents import DocumentService, EInvoiceAlreadyImported
 from bulk_sending import BulkSendingService, MAX_BULK_INVOICES
 from invoice_list import InvoiceListService, validate_list_dates
 from csv_exports import CsvExportService
-from copilot import (CopilotAccessDenied, CopilotDisabled, CopilotQuotaExceeded,
-                     CopilotService)
+from copilot import (CopilotAccessDenied, CopilotDisabled, CopilotProviderError,
+                     CopilotQuotaExceeded, CopilotService)
 from contact_groups import GroupService
 from list_export_repository import ListExportRepository
 from quotes import QuoteService
@@ -49,6 +52,21 @@ from integration_service import AccountMappingService, IntegrationService
 from ledger import LedgerService, PostingLine
 from organisations import APPROVE_ROLES, WRITE_ROLES, AccessDenied, OrganisationService
 from payroll import PayrollConflict, PayrollService
+from payroll_tax_settings import EmployeeTaxSettingsService, TaxSettingConflict, TaxSettingValidationError
+from payroll_payday import PaydaySettingsService
+from payroll_contracts import PayrollContractService
+from payroll_dimension_imports import PayrollDimensionImportService
+from bureau_overview import PayrollBureauOverviewService
+from payroll_dimensions import PayrollDimensionService
+from payroll_tor_import import TORImportService
+from payroll_payouts import PayoutConflict, PayoutService
+from payroll_absences import AbsenceConflict, PayrollAbsenceService, ABSENCE_TYPES
+from payroll_absence_payouts import AbsencePayoutService
+from payroll_withholdings import PayrollWithholdingService
+from payroll_reports import PayrollReportsService
+from payroll_delivery import PayrollDeliveryService
+from payroll_leave_service import PayrollLeaveLiabilityService
+from employee_details import EmployeeDetailsError
 from tax import TaxService
 from tsd import TSDExportService
 from payment_orders import PaymentOrderService
@@ -56,6 +74,25 @@ from prepayments import PrepaymentService
 from fixed_assets import FixedAssetService
 from opening_balances import OpeningBalanceService, parse_open_items_csv
 
+
+class PayrollEmailSettingsIn(BaseModel):
+    sender_name: str = ''
+    reply_to: str = ''
+    cc: str = ''
+
+class PayrollDimensionIn(BaseModel):
+    kind: Literal['department', 'position_group', 'position', 'cost_centre']
+    code: str
+    name: str
+    parent_id: str | None = None
+    active: bool = True
+
+class PayrollDeliveryIn(BaseModel):
+    employee_ids: list[str] = Field(min_length=1)
+
+class PayrollReviewIn(BaseModel):
+    recipient: str
+    include_payslips: bool = True
 
 class User(BaseModel):
     email: str
@@ -329,6 +366,7 @@ class BankAccountIn(BaseModel):
     currency: str
     iban: str = ""
     sort_code: str = ""
+    bic: str = ""
 
 
 class PaymentOrderIn(BaseModel):
@@ -435,6 +473,7 @@ class ConnectorResultOut(BaseModel):
 
 class IntegrationSyncIn(BaseModel):
     object_type: str = Field(min_length=1, max_length=80)
+    config: dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("object_type")
     @classmethod
@@ -447,12 +486,14 @@ class IntegrationSyncIn(BaseModel):
 
 class FileImportIn(BaseModel):
     object_type: str = Field(min_length=1, max_length=80)
-    csv_content: str = Field(min_length=1)
+    csv_content: str = ""
+    xlsx_base64: str | None = None
     config: dict[str, Any] = Field(default_factory=dict)
 
 
 class IntegrationApplyIn(BaseModel):
     decisions: dict[str, Literal["apply", "reject"]] = Field(default_factory=dict)
+    posting_date: date | None = None
 
 
 class AccountMappingIn(BaseModel):
@@ -530,7 +571,20 @@ if origins:
 
 @api.exception_handler(ValueError)
 async def invalid_value(_request: Request, error: ValueError):
-    return JSONResponse({"detail": str(error)}, status_code=422)
+    from payroll_rules import UnsupportedPayrollYear
+    from web import i18n
+    detail = str(error)
+    if isinstance(error, (UnsupportedPayrollYear, TaxSettingValidationError, EmployeeDetailsError)):
+        detail = i18n.catalog(i18n.get_lang(_request.scope.get('session', {}), _request)).get('workspace', {}).get(detail, detail)
+    return JSONResponse({"detail": detail}, status_code=422)
+
+
+@api.exception_handler(TaxSettingConflict)
+async def tax_setting_conflict(request: Request, error: TaxSettingConflict):
+    from web import i18n
+    detail = str(error)
+    lang = i18n.get_lang(request.scope.get('session', {}), request)
+    return JSONResponse({'detail': i18n.catalog(lang).get('workspace', {}).get(detail, detail)}, status_code=409)
 
 
 @api.exception_handler(KeyError)
@@ -546,6 +600,11 @@ async def copilot_disabled(_request: Request, error: CopilotDisabled):
 @api.exception_handler(CopilotAccessDenied)
 async def copilot_access_denied(_request: Request, error: CopilotAccessDenied):
     return JSONResponse({"detail": str(error)}, status_code=403)
+
+
+@api.exception_handler(CopilotProviderError)
+async def copilot_provider_error(_request: Request, error: CopilotProviderError):
+    return JSONResponse(status_code=502, content={"detail": str(error)})
 
 
 @api.exception_handler(CopilotQuotaExceeded)
@@ -604,6 +663,28 @@ def csrf(request: Request, user: User = Depends(current_user)):
 @api.get("/organisations")
 def list_organisations(user: User = Depends(current_user)):
     return OrganisationService().for_user(user.email)
+
+
+@api.get("/payroll/bureau-overview")
+def payroll_bureau_overview(user: User = Depends(current_user)):
+    return PayrollBureauOverviewService().for_user(user.email)
+
+
+@api.get('/payroll/bureau-memberships')
+def payroll_bureau_memberships(user: User = Depends(current_user)):
+    db = get_database()
+    organisations = db.rows(
+        "SELECT o.id,o.name,m.role FROM organisations o JOIN memberships m ON m.organisation_id=o.id "
+        "WHERE lower(m.email)=lower(?) AND m.role IN ('owner','administrator') AND o.active=1 ORDER BY o.name,o.id",
+        (user.email,))
+    result = []
+    for organisation in organisations:
+        members = db.rows("SELECT email,role FROM memberships WHERE organisation_id=? ORDER BY lower(email)",
+                          (organisation['id'],))
+        invitations = db.rows("SELECT email,role,status,expires_at FROM invitations WHERE organisation_id=? ORDER BY lower(email)",
+                              (organisation['id'],))
+        result.append({**organisation, 'members': members, 'invitations': invitations})
+    return result
 
 
 @api.get("/email-status")
@@ -801,6 +882,13 @@ class MasterDataImportIn(BaseModel):
     csv_content: str = Field(min_length=1, max_length=2_000_000)
 
 
+class PayrollDimensionImportIn(BaseModel):
+    kind: Literal['department', 'position', 'cost_centre', 'project']
+    file_name: str = Field(min_length=1, max_length=180)
+    csv_content: str | None = Field(default=None, max_length=2_000_000)
+    xlsx_base64: str | None = Field(default=None, max_length=3_000_000)
+
+
 @api.post('/organisations/{organisation_id}/imports', status_code=201)
 def stage_master_data(organisation_id: str, payload: MasterDataImportIn, user: User = Depends(require_csrf)):
     _require(organisation_id, user, WRITE_ROLES)
@@ -823,6 +911,87 @@ def commit_master_data_import(organisation_id: str, batch_id: str, user: User = 
 def discard_master_data_import(organisation_id: str, batch_id: str, user: User = Depends(require_csrf)):
     _require(organisation_id, user, WRITE_ROLES)
     return MasterDataImportService().discard(organisation_id, batch_id, actor=user.email)
+
+
+@api.get('/organisations/{organisation_id}/payroll/dimensions')
+def list_payroll_dimensions(organisation_id: str, kind: str | None = None,
+                           user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    try:
+        return PayrollDimensionService(get_database()).list(organisation_id, kind)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@api.post('/organisations/{organisation_id}/payroll/dimensions', status_code=201)
+def save_payroll_dimension(organisation_id: str, payload: PayrollDimensionIn,
+                           user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES & {'owner', 'administrator'})
+    try:
+        return PayrollDimensionService(get_database()).save(organisation_id, actor=user.email,
+            **payload.model_dump())
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@api.put('/organisations/{organisation_id}/payroll/dimensions/{dimension_id}')
+def update_payroll_dimension(organisation_id: str, dimension_id: str, payload: PayrollDimensionIn,
+                             user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES & {'owner', 'administrator'})
+    try:
+        return PayrollDimensionService(get_database()).save(organisation_id, dimension_id=dimension_id,
+            actor=user.email, **payload.model_dump())
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail='Payroll dimension not found') from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@api.post('/organisations/{organisation_id}/payroll/dimensions/{dimension_id}/deactivate')
+def deactivate_payroll_dimension(organisation_id: str, dimension_id: str,
+                                 user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES & {'owner', 'administrator'})
+    try:
+        return PayrollDimensionService(get_database()).deactivate(organisation_id, dimension_id,
+                                                                  actor=user.email)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail='Payroll dimension not found') from exc
+
+
+@api.post('/organisations/{organisation_id}/payroll/dimension-imports', status_code=201)
+def stage_payroll_dimension_import(organisation_id: str, payload: PayrollDimensionImportIn,
+                                  user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    if (payload.csv_content is None) == (payload.xlsx_base64 is None):
+        raise ValueError('Supply either csv_content or xlsx_base64')
+    if payload.xlsx_base64 is not None:
+        try:
+            content = base64.b64decode(payload.xlsx_base64, validate=True)
+        except (ValueError, binascii.Error) as exc:
+            raise ValueError('Invalid XLSX base64 content') from exc
+    else:
+        content = payload.csv_content
+    return PayrollDimensionImportService().stage(organisation_id, payload.kind, content,
+                                                  file_name=payload.file_name, actor=user.email)
+
+
+@api.get('/organisations/{organisation_id}/payroll/dimension-imports/{batch_id}')
+def get_payroll_dimension_import(organisation_id: str, batch_id: str, limit: int = 100, offset: int = 0,
+                                 user: User = Depends(current_user)):
+    _require(organisation_id, user, {'owner', 'administrator', 'accountant', 'approver', 'viewer'})
+    return PayrollDimensionImportService().get(organisation_id, batch_id, limit=limit, offset=offset)
+
+
+@api.post('/organisations/{organisation_id}/payroll/dimension-imports/{batch_id}/commit')
+def commit_payroll_dimension_import(organisation_id: str, batch_id: str, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return PayrollDimensionImportService().commit(organisation_id, batch_id, actor=user.email)
+
+
+@api.post('/organisations/{organisation_id}/payroll/dimension-imports/{batch_id}/discard')
+def discard_payroll_dimension_import(organisation_id: str, batch_id: str, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return PayrollDimensionImportService().discard(organisation_id, batch_id, actor=user.email)
 
 
 @api.post("/organisations/{organisation_id}/contacts", status_code=201)
@@ -1066,10 +1235,6 @@ class CopilotStageIn(BaseModel):
     message_id: str | None = None
 
 
-class CopilotToggleIn(BaseModel):
-    enabled: bool
-
-
 @api.get('/organisations/{organisation_id}/copilot/status')
 def copilot_status(organisation_id: str, user: User = Depends(current_user)):
     _require(organisation_id, user, READ_ROLES)
@@ -1084,9 +1249,14 @@ def copilot_messages(organisation_id: str, limit: int = 50,
 
 
 @api.post('/organisations/{organisation_id}/copilot/messages', status_code=201)
-def copilot_send(organisation_id: str, payload: CopilotMessageIn,
+def copilot_send(organisation_id: str, payload: CopilotMessageIn, request: Request,
                  user: User = Depends(require_csrf)):
     _require(organisation_id, user, READ_ROLES)
+    if 'text/event-stream' in request.headers.get('accept', ''):
+        events = CopilotService().stream(organisation_id, user.email, payload.content,
+                                         attachment_ids=payload.attachment_ids, page=payload.page)
+        return StreamingResponse(events, media_type='text/event-stream',
+                                 headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
     return CopilotService().send(organisation_id, user.email, payload.content,
                                  attachment_ids=payload.attachment_ids, page=payload.page)
 
@@ -1118,12 +1288,30 @@ def copilot_documents(organisation_id: str, user: User = Depends(current_user)):
     return CopilotService().documents(organisation_id)
 
 
-@api.put('/organisations/{organisation_id}/copilot/settings')
-def copilot_settings(organisation_id: str, payload: CopilotToggleIn,
-                     user: User = Depends(require_csrf)):
-    _require(organisation_id, user, WRITE_ROLES & {'owner', 'administrator'})
-    CopilotService().set_enabled(organisation_id, payload.enabled, actor=user.email)
-    return CopilotService().status(organisation_id, user.email)
+class CopilotProviderSettingsIn(BaseModel):
+    enabled: bool | None = None
+    api_key: Any = None  # Validated in the service without echoing secrets in validation errors.
+    model: str | None = Field(default=None, max_length=128)
+
+
+@api.get('/organisations/{organisation_id}/copilot/settings')
+def copilot_provider_settings(organisation_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, {'owner', 'administrator'})
+    return CopilotService().settings(organisation_id)
+
+
+@api.post('/organisations/{organisation_id}/copilot/settings')
+def copilot_update_provider_settings(organisation_id: str, payload: CopilotProviderSettingsIn,
+                                     user: User = Depends(require_csrf)):
+    _require(organisation_id, user, {'owner', 'administrator'})
+    service = CopilotService()
+    if payload.enabled is not None:
+        service.set_enabled(organisation_id, payload.enabled, actor=user.email)
+    if payload.api_key is not None or payload.model is not None:
+        return service.update_settings(organisation_id, api_key=payload.api_key,
+                                       model=payload.model, actor=user.email)
+    return service.status(organisation_id, user.email)
+
 
 
 class CopilotAccessIn(BaseModel):
@@ -1984,7 +2172,7 @@ def run_integration_sync(
 ):
     _require(organisation_id, user, {"owner", "administrator"})
     return ImportService().run_sync(
-        organisation_id, provider, payload.object_type, actor=user.email
+        organisation_id, provider, payload.object_type, actor=user.email, config=payload.config
     )
 
 
@@ -2000,7 +2188,8 @@ def import_employee_file(
         "file_import",
         payload.object_type,
         actor=user.email,
-        credentials={"csv_content": payload.csv_content},
+        credentials=({"xlsx_base64": payload.xlsx_base64} if payload.xlsx_base64 is not None
+                     else {"csv_content": payload.csv_content}),
         config=payload.config,
     )
 
@@ -2034,6 +2223,7 @@ def apply_integration_sync(
         sync_run_id,
         payload.decisions,
         actor=user.email,
+        posting_date=payload.posting_date.isoformat() if payload.posting_date else None,
     )
 
 
@@ -2097,14 +2287,19 @@ def suggest_account_mappings(organisation_id: str, provider: str, user: User = D
     return AccountMappingService().suggestions(organisation_id, provider)
 
 
-PayBasis = Literal['monthly', 'hourly', 'board_fee']
+PayBasis = Literal['monthly', 'hourly', 'board_fee', 'income_line']
 
 
 class EmployeeIn(BaseModel):
+    phone: str | None = Field(default=None, max_length=50)
+    iban: str | None = Field(default=None, max_length=80)
+    bank_account_owner: str | None = Field(default=None, max_length=180)
+    address: str | None = Field(default=None, max_length=2000)
+    date_of_birth: str | None = None
     name: str = Field(min_length=1, max_length=180)
     email: str | None = None
     personal_id: str | None = None
-    # Monthly salary or board fee; leave empty for hourly employees.
+    # Monthly salary or board fee; leave empty for hourly or income-line pay.
     gross_salary: Decimal | None = Field(default=None, gt=0, max_digits=12, decimal_places=2)
     funded_pension_percent: Decimal = Decimal('2')
     apply_tax_free_minimum: bool = False
@@ -2116,9 +2311,18 @@ class EmployeeIn(BaseModel):
     social_tax_minimum_exemption: str | None = None
     employment_start_date: str | None = None
     employment_end_date: str | None = None
+    tax_settings_period: str | None = None
+    report_language: Literal['et', 'en', 'lv', 'lt'] | None = None
+    department_id: str | None = None
+    position_id: str | None = None
 
 
 class EmployeePatch(BaseModel):
+    phone: str | None = Field(default=None, max_length=50)
+    iban: str | None = Field(default=None, max_length=80)
+    bank_account_owner: str | None = Field(default=None, max_length=180)
+    address: str | None = Field(default=None, max_length=2000)
+    date_of_birth: str | None = None
     name: str | None = Field(default=None, min_length=1, max_length=180)
     email: str | None = None
     personal_id: str | None = None
@@ -2133,16 +2337,270 @@ class EmployeePatch(BaseModel):
     social_tax_minimum_exemption: str | None = None
     employment_start_date: str | None = None
     employment_end_date: str | None = None
+    tax_settings_period: str | None = None
+    report_language: Literal['et', 'en', 'lv', 'lt'] | None = None
+    department_id: str | None = None
+    position_id: str | None = None
 
 
 class PayRunIn(BaseModel):
     period: str = Field(pattern=r'^\d{4}-(0[1-9]|1[0-2])$')
     # Hours worked per hourly employee id for this month.
     hours: dict[str, Decimal] | None = None
+    show_leave_balance: bool = False
+
+
+class PayrollContractIn(BaseModel):
+    model_config = {'extra': 'forbid'}
+    contract_type: Literal['employment', 'board_member', 'services', 'other', 'none']
+    start_date: str
+    end_date: str | None = None
+    document_name: str | None = Field(default=None, max_length=180)
+    workplace_address: str | None = Field(default=None, max_length=2000)
+    monthly_net_advance: Decimal = Field(default=Decimal('0'), ge=0, max_digits=12, decimal_places=2)
+    payday_rule: Literal['next_month_day', 'current_month_day', 'next_month_first_working_day'] | None = None
+    payday_day: int | None = Field(default=None, ge=1, le=31)
+    agreement: dict | None = None
+    position: dict | None = None
+    department_id: str | None = None
+    position_id: str | None = None
+
+
+class PayrollAgreementIn(BaseModel):
+    model_config = {'extra': 'forbid'}
+    start_date: str
+    base_pay_type: Literal['monthly', 'monthly_day_based', 'hourly', 'contract_sum', 'contract_sum_x_qty']
+    hours_per_day: Decimal = Field(default=Decimal('8'), gt=0, le=24, max_digits=5, decimal_places=2)
+    rate: Decimal = Field(ge=0, max_digits=12, decimal_places=2)
+    fte: Decimal = Field(default=Decimal('1'), gt=0, le=1, max_digits=5, decimal_places=4)
+    is_full_time: bool = True
+    automatic_working_time: bool = True
+    account_override: str | None = Field(default=None, max_length=30)
+    department_id: str | None = None
+    cost_centre_id: str | None = None
+    project_id: str | None = None
+
+
+class TORImportApplyIn(BaseModel):
+    model_config = {'extra': 'forbid'}
+    row_ids: list[str] | None = None
+
+
+class PayrollContractPatchIn(BaseModel):
+    model_config = {'extra': 'forbid'}
+    contract_type: Literal['employment', 'board_member', 'services', 'other', 'none'] | None = None
+    start_date: str | None = None
+    end_date: str | None = None
+    document_name: str | None = Field(default=None, max_length=180)
+    workplace_address: str | None = Field(default=None, max_length=2000)
+    monthly_net_advance: Decimal | None = Field(default=None, ge=0, max_digits=12, decimal_places=2)
+    payday_rule: Literal['next_month_day', 'current_month_day', 'next_month_first_working_day'] | None = None
+    payday_day: int | None = Field(default=None, ge=1, le=31)
+    department_id: str | None = None
+    position_id: str | None = None
+
+
+class PayrollPositionIn(BaseModel):
+    model_config = {'extra': 'forbid'}
+    start_date: str
+    position: str = Field(min_length=1, max_length=180)
+    occupation_code: str | None = Field(default=None, max_length=30)
+
+
+class PaySupplementaryIn(BaseModel):
+    model_config = {'extra': 'forbid'}
+    employee_ids: list[str] = Field(min_length=1, max_length=500)
+
+
+class EmployeeTaxSettingIn(BaseModel):
+    model_config = {'extra': 'forbid'}
+    kind: Literal['tax_free', 'pension', 'unemployment']
+    start_date: str
+    mode: Literal['maximum', 'limited', 'none'] | None = None
+    amount: Decimal | None = Field(default=None, ge=0, max_digits=12, decimal_places=2)
+    rate: Decimal | None = None
+    applies: bool | None = None
+
+
+class PayComponentIn(BaseModel):
+    model_config = {'extra': 'forbid'}
+    name: str = Field(min_length=1, max_length=180)
+    direction: Literal['income', 'deduction'] = 'income'
+    income_tax: bool = False
+    social_tax: bool = False
+    ui_employee: bool = False
+    ui_employer: bool = False
+    funded_pension: bool = False
+    social_minimum: bool = False
+    liability_role: Literal['PAYROLL_BAILIFF', 'PAYROLL_DEDUCTION'] = 'PAYROLL_DEDUCTION'
+    is_wage: bool = True
+    active: bool = True
+    tsd_payment_type: Literal[10, 11, 12, 13, 14, 15, 16, 17, 21, 24, 32, 33] = 10
+    calculation_method: Literal['fixed_sum','sum_x_qty_x_coef','percentage_of_base','percentage_of_hourly_rate','piece_rate','hourly','average_monthly_pay','average_hourly_pay','average_working_day_pay','gross_up_from_net','monthly_salary','monthly_salary_day_based','contract_sum','contract_sum_x_quantity','percentage'] = 'fixed_sum'
+    default_rate: Decimal | None = None
+    default_percentage: Decimal | None = None
+    default_coefficient: Decimal | None = None
+    palk_row: Literal[5,6,7,8,9,10,15,16,17,18] = 5
+    palk_designation: Literal[5,6,7,8,9,10,15,16,17,18] | None = None
+
+
+class PayComponentLine(BaseModel):
+    model_config = {'extra': 'forbid'}
+    type_id: str
+    amount: Decimal | None = Field(default=None, max_digits=12, decimal_places=2)
+    quantity: Decimal | None = None
+    rate: Decimal | None = None
+    coefficient: Decimal | None = None
+    percentage: Decimal | None = None
+    net_target: Decimal | None = Field(default=None, ge=0, max_digits=12, decimal_places=2)
+    name: str | None = Field(default=None, min_length=1, max_length=180)
+    direction: Literal['income', 'deduction'] | None = None
+    income_tax: bool | None = None
+    social_tax: bool | None = None
+    ui_employee: bool | None = None
+    ui_employer: bool | None = None
+    funded_pension: bool | None = None
+    social_minimum: bool | None = None
+    liability_role: Literal['PAYROLL_BAILIFF', 'PAYROLL_DEDUCTION'] | None = None
+    department_id: str | None = None
+    cost_centre_id: str | None = None
+    project_id: str | None = None
+
+
+class PayItemPatch(BaseModel):
+    model_config = {'extra': 'forbid'}
+    hours: Decimal | None = None
+    gross_salary: Decimal | None = Field(default=None, ge=0, max_digits=12, decimal_places=2)
+    components: list[PayComponentLine] | None = Field(default=None, max_length=100)
+
+
+class PayrollMappingIn(BaseModel):
+    account_code: str = Field(min_length=1)
+
+
+class PaydaySettingsIn(BaseModel):
+    start_date: str | None = None
+    language: Literal['en', 'et', 'lv', 'lt'] | None = None
+    rule_start_date: str
+    rule: Literal['next_month_day', 'current_month_day', 'next_month_first_working_day']
+    day: int | None = Field(default=None, ge=1, le=31)
+
+
+class PayrollLeaveSettingsIn(BaseModel):
+    model_config = {'extra': 'forbid'}
+    basic_expiry_policy: Literal['none', '1_january_year_plus_2', '31_december_year_plus_1']
+    extended_expiry_policy: Literal['none', '1_january_year_plus_2', '31_december_year_plus_1']
+    reserve_posting_enabled: bool = Field(strict=True)
+
+
+class PayrollLeaveReserveIn(BaseModel):
+    model_config = {'extra': 'forbid'}
+    period: str = Field(pattern=r'^\d{4}-(0[1-9]|1[0-2])$')
+
+
+class PayrollLeaveReserveReversalIn(BaseModel):
+    model_config = {'extra': 'forbid'}
+    reversal_date: str = Field(pattern=r'^\d{4}-\d{2}-\d{2}$')
+    reason: str = Field(default='', max_length=500)
+
+    @field_validator('reversal_date')
+    @classmethod
+    def validate_reversal_date(cls, value):
+        date.fromisoformat(value)
+        return value
+
+
+class PayoutCreateIn(BaseModel):
+    payout_date: str | None = None
+    payout_type: Literal['salary', 'advance', 'absence_pay', 'bonus', 'withholding'] = 'salary'
+    amounts: dict[str, Decimal] | None = None
+    bank_account_id: str | None = None
+
+
+class PayoutPaidIn(BaseModel):
+    bank_account_id: str
+
+
+class WithholdingRecipientIn(BaseModel):
+    model_config = {'extra': 'forbid'}
+    name: str = Field(min_length=1, max_length=180)
+    registry_code: str = Field(min_length=1, max_length=40)
+    iban: str = Field(min_length=15, max_length=34)
+    reference_number: str | None = Field(default=None, max_length=100)
+    default_description: str = Field(default='', max_length=140)
+
+
+class WithholdingAgreementIn(BaseModel):
+    model_config = {'extra': 'forbid'}
+    employee_id: str
+    recipient_id: str
+    component_type: Literal['alimony','bailiff','union_fee','agreed_deduction','third_pillar']
+    method: Literal['fixed_sum','percent_of_gross','sum_x_qty','third_pillar_net']
+    start_date: str = Field(pattern=r'^\d{4}-\d{2}-\d{2}$')
+    end_date: str | None = Field(default=None, pattern=r'^\d{4}-\d{2}-\d{2}$')
+    monthly_amount: Decimal | None = Field(default=None, ge=0)
+    percentage: Decimal | None = Field(default=None, ge=0, le=100)
+    quantity: Decimal | None = Field(default=None, ge=0)
+    rate: Decimal | None = Field(default=None, ge=0)
+    total_cap: Decimal | None = Field(default=None, ge=0)
+    payment_description: str = Field(default='', max_length=140)
+
+
+class AbsencePayoutCreateIn(BaseModel):
+    absence_pay_ids: list[str] = Field(min_length=1)
+    payout_date: str | None = None
+
+
+class AbsencePayoutAddIn(BaseModel):
+    absence_pay_ids: list[str] = Field(min_length=1)
+
+
+class AbsencePayoutPaidIn(BaseModel):
+    bank_account_id: str
+
+
+class PayrollAbsenceIn(BaseModel):
+    model_config = {'extra': 'forbid'}
+    employee_id: str
+    absence_type: Literal['annual_leave','extended_leave','child_leave','paternity_leave','maternity_leave','parental_leave','study_leave','care_leave','sick_leave','permitted_absence','truancy','unpaid_leave','alternative_service','other']
+    start_date: str
+    end_date: str
+    document_reference: str = Field(default='', max_length=180)
+    comment: str = Field(default='', max_length=2000)
+
+
+class AbsencePayMethodIn(BaseModel):
+    model_config = {'extra': 'forbid'}
+    method: Literal['average','unchanged_salary','best_of','fixed_sum']
+    fixed_amount: Decimal | None = Field(default=None, ge=0)
+
+
+class CollectiveAnnualLeaveIn(BaseModel):
+    model_config = {'extra': 'forbid'}
+    employee_ids: list[str] = Field(min_length=1, max_length=500)
+    start_date: str
+    end_date: str
+    document_reference: str = Field(default='', max_length=180)
+    comment: str = Field(default='', max_length=2000)
+
+
+class AbsenceTypeSettingIn(BaseModel):
+    model_config = {'extra': 'forbid'}
+    paid_salary: bool
 
 
 @api.exception_handler(PayrollConflict)
 async def payroll_conflict(_request: Request, error: PayrollConflict):
+    return JSONResponse({'detail': str(error)}, status_code=409)
+
+
+@api.exception_handler(PayoutConflict)
+async def payout_conflict(_request: Request, error: PayoutConflict):
+    return JSONResponse({'detail': str(error)}, status_code=409)
+
+
+@api.exception_handler(AbsenceConflict)
+async def payroll_absence_conflict(_request: Request, error: AbsenceConflict):
     return JSONResponse({'detail': str(error)}, status_code=409)
 
 
@@ -2164,6 +2622,527 @@ def payroll_update_employee(organisation_id: str, employee_id: str, payload: Emp
     return PayrollService().save_employee(organisation_id, employee_id=employee_id, actor=user.email, **payload.model_dump(exclude_unset=True))
 
 
+@api.get('/organisations/{organisation_id}/employees/{employee_id}/contracts')
+def payroll_employee_contracts(organisation_id: str, employee_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    return PayrollContractService(get_database()).list(organisation_id, employee_id)
+
+
+@api.post('/organisations/{organisation_id}/employees/{employee_id}/contracts', status_code=201)
+def payroll_create_contract(organisation_id: str, employee_id: str, payload: PayrollContractIn,
+                           user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    data = payload.model_dump()
+    agreement = data.pop('agreement')
+    position = data.pop('position')
+    return PayrollContractService(get_database()).create(
+        organisation_id, employee_id, actor=user.email, agreement=agreement, position=position, **data)
+
+
+@api.post('/organisations/{organisation_id}/payroll/contracts/{contract_id}/agreements', status_code=201)
+def payroll_create_salary_agreement(organisation_id: str, contract_id: str, payload: PayrollAgreementIn,
+                                   user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    data = payload.model_dump()
+    start_date = data.pop('start_date')
+    return PayrollContractService(get_database()).add_agreement(
+        organisation_id, contract_id, start_date=start_date, actor=user.email, **data)
+
+
+@api.patch('/organisations/{organisation_id}/payroll/contracts/{contract_id}')
+def payroll_update_contract(organisation_id: str, contract_id: str, payload: PayrollContractPatchIn,
+                            user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return PayrollContractService(get_database()).update(
+        organisation_id, contract_id, actor=user.email, **payload.model_dump(exclude_unset=True))
+
+
+@api.post('/organisations/{organisation_id}/payroll/contracts/{contract_id}/positions', status_code=201)
+def payroll_save_contract_position(organisation_id: str, contract_id: str, payload: PayrollPositionIn,
+                                   user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    data = payload.model_dump()
+    return PayrollContractService(get_database()).add_position(
+        organisation_id, contract_id, actor=user.email, **data)
+
+
+@api.post('/organisations/{organisation_id}/payroll/tor-imports', status_code=201)
+async def payroll_stage_tor_import(organisation_id: str, file: UploadFile = File(...),
+                                  user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    content = await file.read(5_000_001)
+    if len(content) > 5_000_000:
+        raise HTTPException(status_code=413, detail='TÖR CSV must be 5 MB or smaller')
+    return TORImportService(get_database()).stage(organisation_id, content, actor=user.email)
+
+
+@api.get('/organisations/{organisation_id}/payroll/tor-imports/{import_id}')
+def payroll_get_tor_import(organisation_id: str, import_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    return TORImportService(get_database()).get(organisation_id, import_id)
+
+
+@api.post('/organisations/{organisation_id}/payroll/tor-imports/{import_id}/apply')
+def payroll_apply_tor_import(organisation_id: str, import_id: str, payload: TORImportApplyIn,
+                             user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return TORImportService(get_database()).apply(organisation_id, import_id, actor=user.email,
+                                                   row_ids=payload.row_ids)
+
+
+@api.delete('/organisations/{organisation_id}/employees/{employee_id}', status_code=204)
+def payroll_delete_employee(organisation_id: str, employee_id: str, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    PayrollService().delete_employee(organisation_id, employee_id, actor=user.email)
+    return Response(status_code=204)
+
+
+@api.get('/organisations/{organisation_id}/employees/{employee_id}/tax-settings')
+def employee_tax_settings(organisation_id: str, employee_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    return EmployeeTaxSettingsService(get_database()).list(organisation_id, employee_id)
+
+
+@api.post('/organisations/{organisation_id}/employees/{employee_id}/tax-settings', status_code=201)
+def create_employee_tax_setting(organisation_id: str, employee_id: str, payload: EmployeeTaxSettingIn,
+                                user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return EmployeeTaxSettingsService(get_database()).save(organisation_id, employee_id, actor=user.email, **payload.model_dump())
+
+
+@api.put('/organisations/{organisation_id}/employees/{employee_id}/tax-settings/{setting_id}')
+def update_employee_tax_setting(organisation_id: str, employee_id: str, setting_id: str,
+                                payload: EmployeeTaxSettingIn, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return EmployeeTaxSettingsService(get_database()).save(organisation_id, employee_id, setting_id=setting_id,
+                                                           actor=user.email, **payload.model_dump())
+
+
+@api.delete('/organisations/{organisation_id}/employees/{employee_id}/tax-settings/{setting_id}', status_code=204)
+def delete_employee_tax_setting(organisation_id: str, employee_id: str, setting_id: str,
+                                user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    EmployeeTaxSettingsService(get_database()).delete(organisation_id, employee_id, setting_id, actor=user.email)
+    return Response(status_code=204)
+
+
+@api.get('/organisations/{organisation_id}/payroll/component-types')
+def payroll_component_types(organisation_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    return PayrollService().component_types(organisation_id)
+
+
+@api.get('/organisations/{organisation_id}/payroll/withholding-recipients')
+def payroll_withholding_recipients(organisation_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    return PayrollWithholdingService(get_database()).recipients(organisation_id)
+
+
+@api.post('/organisations/{organisation_id}/payroll/withholding-recipients', status_code=201)
+def payroll_create_withholding_recipient(organisation_id: str, payload: WithholdingRecipientIn,
+                                         user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return PayrollWithholdingService(get_database()).save_recipient(
+        organisation_id, actor=user.email, **payload.model_dump())
+
+
+@api.put('/organisations/{organisation_id}/payroll/withholding-recipients/{recipient_id}')
+def payroll_update_withholding_recipient(organisation_id: str, recipient_id: str,
+                                         payload: WithholdingRecipientIn, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return PayrollWithholdingService(get_database()).save_recipient(
+        organisation_id, actor=user.email, recipient_id=recipient_id, **payload.model_dump())
+
+
+@api.delete('/organisations/{organisation_id}/payroll/withholding-recipients/{recipient_id}', status_code=204)
+def payroll_delete_withholding_recipient(organisation_id: str, recipient_id: str,
+                                         user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    PayrollWithholdingService(get_database()).delete_recipient(organisation_id, recipient_id, actor=user.email)
+    return Response(status_code=204)
+
+
+@api.get('/organisations/{organisation_id}/payroll/withholding-agreements')
+def payroll_withholding_agreements(organisation_id: str, employee_id: str | None = None,
+                                   user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    return PayrollWithholdingService(get_database()).agreements(organisation_id, employee_id=employee_id)
+
+
+@api.post('/organisations/{organisation_id}/payroll/withholding-agreements', status_code=201)
+def payroll_create_withholding_agreement(organisation_id: str, payload: WithholdingAgreementIn,
+                                         user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return PayrollWithholdingService(get_database()).save_agreement(
+        organisation_id, actor=user.email, **payload.model_dump())
+
+
+@api.put('/organisations/{organisation_id}/payroll/withholding-agreements/{agreement_id}')
+def payroll_update_withholding_agreement(organisation_id: str, agreement_id: str,
+                                         payload: WithholdingAgreementIn, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return PayrollWithholdingService(get_database()).save_agreement(
+        organisation_id, actor=user.email, agreement_id=agreement_id, **payload.model_dump())
+
+
+@api.delete('/organisations/{organisation_id}/payroll/withholding-agreements/{agreement_id}', status_code=204)
+def payroll_delete_withholding_agreement(organisation_id: str, agreement_id: str,
+                                         user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    PayrollWithholdingService(get_database()).delete_agreement(organisation_id, agreement_id, actor=user.email)
+    return Response(status_code=204)
+
+
+@api.get('/organisations/{organisation_id}/payroll/withholdings')
+def payroll_withholding_report(organisation_id: str, start: str, end: str,
+                               user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    if not re.fullmatch(r'\d{4}-(0[1-9]|1[0-2])', start) or not re.fullmatch(r'\d{4}-(0[1-9]|1[0-2])', end) or start > end:
+        raise HTTPException(status_code=422, detail='Choose a valid payroll period range')
+    return PayrollWithholdingService(get_database()).report(organisation_id, start=start, end=end)
+
+
+@api.get('/organisations/{organisation_id}/payroll/withholdings.xlsx')
+def payroll_withholding_report_xlsx(organisation_id: str, start: str, end: str,
+                                    user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    if not re.fullmatch(r'\d{4}-(0[1-9]|1[0-2])', start) or not re.fullmatch(r'\d{4}-(0[1-9]|1[0-2])', end) or start > end:
+        raise HTTPException(status_code=422, detail='Choose a valid payroll period range')
+    content = PayrollWithholdingService(get_database()).report_xlsx(organisation_id, start=start, end=end)
+    return Response(content, media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        headers={'Content-Disposition': f'attachment; filename="payroll-withholdings-{start}-{end}.xlsx"'})
+
+
+@api.get('/organisations/{organisation_id}/payroll/withholding-payouts')
+def payroll_withholding_payout_report(organisation_id: str, start: str, end: str,
+                                     user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    if not re.fullmatch(r'\d{4}-(0[1-9]|1[0-2])', start) or not re.fullmatch(r'\d{4}-(0[1-9]|1[0-2])', end) or start > end:
+        raise HTTPException(status_code=422, detail='Choose a valid payroll period range')
+    return PayrollWithholdingService(get_database()).payout_report(organisation_id, start=start, end=end)
+
+
+@api.get('/organisations/{organisation_id}/payroll/withholding-payouts.xlsx')
+def payroll_withholding_payout_report_xlsx(organisation_id: str, start: str, end: str,
+                                           user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    if not re.fullmatch(r'\d{4}-(0[1-9]|1[0-2])', start) or not re.fullmatch(r'\d{4}-(0[1-9]|1[0-2])', end) or start > end:
+        raise HTTPException(status_code=422, detail='Choose a valid payroll period range')
+    content = PayrollWithholdingService(get_database()).report_xlsx(organisation_id, start=start, end=end, payouts=True)
+    return Response(content, media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        headers={'Content-Disposition': f'attachment; filename="withholding-payouts-{start}-{end}.xlsx"'})
+
+
+@api.get('/organisations/{organisation_id}/payroll/payday-settings')
+def payroll_payday_settings(organisation_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    return PaydaySettingsService(get_database()).get(organisation_id)
+
+
+@api.put('/organisations/{organisation_id}/payroll/payday-settings')
+def save_payroll_payday_settings(organisation_id: str, payload: PaydaySettingsIn,
+                                 user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES & {'owner', 'administrator'})
+    return PaydaySettingsService(get_database()).save(organisation_id, actor=user.email, **payload.model_dump())
+
+
+@api.get('/organisations/{organisation_id}/payroll/payouts')
+def payroll_payouts(organisation_id: str, run_id: str | None = None, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    return PayoutService(get_database()).list(organisation_id, run_id=run_id)
+
+
+@api.get('/organisations/{organisation_id}/payroll/absence-types')
+def payroll_absence_types(organisation_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    return PayrollAbsenceService(get_database()).types(organisation_id)
+
+
+@api.put('/organisations/{organisation_id}/payroll/absence-types/{absence_type}')
+def payroll_save_absence_type(organisation_id: str, absence_type: str, payload: AbsenceTypeSettingIn,
+                              user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return PayrollAbsenceService(get_database()).set_type_paid(
+        organisation_id, absence_type, payload.paid_salary, actor=user.email)
+
+
+@api.get('/organisations/{organisation_id}/payroll/absences')
+def payroll_absences(organisation_id: str, month: str | None = None, absence_type: str | None = None,
+                     user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    return PayrollAbsenceService(get_database()).list(organisation_id, month=month, kind=absence_type)
+
+
+@api.post('/organisations/{organisation_id}/payroll/history-imports/{object_type}', status_code=201)
+async def upload_payroll_history_import(organisation_id: str, object_type: Literal['payroll_opening_leave', 'historical_earnings'],
+                                       file: UploadFile = File(...), user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    filename = (file.filename or '').strip()
+    if not filename.casefold().endswith(('.csv', '.xlsx')):
+        raise ValueError('Payroll import files must be CSV or XLSX')
+    content = await file.read(2_000_001)
+    if not content or len(content) > 2_000_000:
+        raise ValueError('Payroll import file must be non-empty and under 2 MB')
+    return ImportService(get_database()).run_sync(
+        organisation_id, 'file_import', object_type, actor=user.email,
+        credentials={'workbook_content': content}, config={'filename': filename},
+    )
+
+
+@api.get('/organisations/{organisation_id}/payroll/history-imports/{sync_run_id}')
+def payroll_history_import_review(organisation_id: str, sync_run_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    sync = get_database().one('SELECT provider,object_type FROM sync_runs WHERE organisation_id=? AND id=?',
+                              (organisation_id, sync_run_id))
+    if not sync or sync['provider'] != 'file_import' or sync['object_type'] not in {'payroll_opening_leave', 'historical_earnings'}:
+        raise KeyError('Payroll import run not found')
+    return ImportService(get_database()).get_staged(organisation_id, sync_run_id=sync_run_id)
+
+
+@api.post('/organisations/{organisation_id}/payroll/history-imports/{sync_run_id}/apply')
+def apply_payroll_history_import(organisation_id: str, sync_run_id: str, payload: IntegrationApplyIn,
+                                 user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    sync = get_database().one('SELECT provider FROM sync_runs WHERE organisation_id=? AND id=?',
+                              (organisation_id, sync_run_id))
+    if not sync or sync['provider'] != 'file_import':
+        raise KeyError('Import run not found')
+    return ImportService(get_database()).apply_staged(
+        organisation_id, 'file_import', sync_run_id, payload.decisions, actor=user.email,
+    )
+
+
+@api.get('/organisations/{organisation_id}/payroll/absence-pay/pending')
+def pending_payroll_absence_pay(organisation_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    return AbsencePayoutService(get_database()).pending(organisation_id)
+
+
+@api.post('/organisations/{organisation_id}/payroll/absence-payouts', status_code=201)
+def create_absence_pay_payout(organisation_id: str, payload: AbsencePayoutCreateIn,
+                              user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return AbsencePayoutService(get_database()).create(
+        organisation_id, payload.absence_pay_ids, payout_date=payload.payout_date, actor=user.email)
+
+
+@api.get('/organisations/{organisation_id}/payroll/absence-payouts')
+def list_absence_pay_payouts(organisation_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    return AbsencePayoutService(get_database()).drafts(organisation_id)
+
+
+@api.post('/organisations/{organisation_id}/payroll/absence-payouts/{payout_id}/records')
+def add_absence_pay_records(organisation_id: str, payout_id: str, payload: AbsencePayoutAddIn,
+                            user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return AbsencePayoutService(get_database()).add(
+        organisation_id, payout_id, payload.absence_pay_ids, actor=user.email)
+
+
+@api.get('/organisations/{organisation_id}/payroll/absence-payouts/{payout_id}')
+def get_absence_pay_payout(organisation_id: str, payout_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    return AbsencePayoutService(get_database()).get(organisation_id, payout_id)
+
+
+@api.post('/organisations/{organisation_id}/payroll/absence-payouts/{payout_id}/approve')
+def approve_absence_pay_payout(organisation_id: str, payout_id: str, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return AbsencePayoutService(get_database()).approve(organisation_id, payout_id, actor=user.email)
+
+
+@api.post('/organisations/{organisation_id}/payroll/absence-payouts/{payout_id}/paid')
+def mark_absence_pay_payout_paid(organisation_id: str, payout_id: str, payload: AbsencePayoutPaidIn,
+                                 user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return AbsencePayoutService(get_database()).paid(
+        organisation_id, payout_id, payload.bank_account_id, actor=user.email)
+
+
+@api.post('/organisations/{organisation_id}/payroll/absence-payouts/{payout_id}/cancel')
+def cancel_absence_pay_payout(organisation_id: str, payout_id: str, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return AbsencePayoutService(get_database()).cancel(organisation_id, payout_id, actor=user.email)
+
+
+@api.post('/organisations/{organisation_id}/payroll/absences', status_code=201)
+def payroll_create_absence(organisation_id: str, payload: PayrollAbsenceIn, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    values = payload.model_dump()
+    employee_id = values.pop('employee_id')
+    return PayrollAbsenceService(get_database()).save(
+        organisation_id, employee_id, actor=user.email, **values)
+
+
+@api.put('/organisations/{organisation_id}/payroll/absences/{absence_id}')
+def payroll_update_absence(organisation_id: str, absence_id: str, payload: PayrollAbsenceIn,
+                           user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    values = payload.model_dump()
+    employee_id = values.pop('employee_id')
+    return PayrollAbsenceService(get_database()).save(
+        organisation_id, employee_id, actor=user.email, absence_id=absence_id, **values)
+
+
+@api.delete('/organisations/{organisation_id}/payroll/absences/{absence_id}', status_code=204)
+def payroll_delete_absence(organisation_id: str, absence_id: str, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    PayrollAbsenceService(get_database()).delete(organisation_id, absence_id, actor=user.email)
+    return Response(status_code=204)
+
+
+@api.post('/organisations/{organisation_id}/payroll/absences/{absence_id}/pay', status_code=201)
+def payroll_calculate_absence_pay(organisation_id: str, absence_id: str,
+                                 payload: AbsencePayMethodIn, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return PayrollAbsenceService(get_database()).set_pay_method(
+        organisation_id, absence_id, payload.method, actor=user.email,
+        fixed_amount=payload.fixed_amount)
+
+
+@api.post('/organisations/{organisation_id}/payroll/absences/collective', status_code=201)
+def payroll_collective_absence(organisation_id: str, payload: CollectiveAnnualLeaveIn,
+                               user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    values = payload.model_dump()
+    employee_ids = values.pop('employee_ids')
+    return PayrollAbsenceService(get_database()).collective_annual_leave(
+        organisation_id, employee_ids, actor=user.email, **values)
+
+
+@api.get('/organisations/{organisation_id}/payroll/payouts/summary')
+def payroll_payout_summary(organisation_id: str, run_id: str | None = None, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    return PayoutService(get_database()).summary(organisation_id, run_id=run_id)
+
+
+@api.get('/organisations/{organisation_id}/payroll/receivables')
+def payroll_open_receivables(organisation_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    return PayoutService(get_database()).open_receivables(organisation_id)
+
+
+@api.get('/organisations/{organisation_id}/payroll/payouts/{payout_id}')
+def payroll_payout(organisation_id: str, payout_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    return PayoutService(get_database()).get(organisation_id, payout_id)
+
+
+@api.post('/organisations/{organisation_id}/pay-runs/{run_id}/payouts', status_code=201)
+def create_payroll_payout(organisation_id: str, run_id: str, payload: PayoutCreateIn,
+                          user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return PayoutService(get_database()).create(organisation_id, run_id, actor=user.email, **payload.model_dump())
+
+
+@api.post('/organisations/{organisation_id}/payroll/payouts/{payout_id}/paid')
+def mark_payroll_payout_paid(organisation_id: str, payout_id: str, payload: PayoutPaidIn,
+                             user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return PayoutService(get_database()).mark_paid(organisation_id, payout_id, payload.bank_account_id, actor=user.email)
+
+
+@api.post('/organisations/{organisation_id}/payroll/payouts/{payout_id}/confirm-offsets')
+def confirm_payroll_payout_offsets(organisation_id: str, payout_id: str, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return PayoutService(get_database()).confirm_offsets(organisation_id, payout_id, actor=user.email)
+
+
+@api.post('/organisations/{organisation_id}/payroll/payouts/{payout_id}/cancel')
+def cancel_payroll_payout(organisation_id: str, payout_id: str, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return PayoutService(get_database()).cancel(organisation_id, payout_id, actor=user.email)
+
+
+@api.get('/organisations/{organisation_id}/payroll/payouts/{payout_id}/pain001.xml')
+def export_payroll_payout_sepa(organisation_id: str, payout_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    content = PaymentOrderService(get_database()).payroll_payout_xml(organisation_id, payout_id)
+    return Response(content=content, media_type='application/xml',
+                    headers={'Content-Disposition': f'attachment; filename="salary-payout-{payout_id}.xml"'})
+
+
+@api.post('/organisations/{organisation_id}/payroll/component-types', status_code=201)
+def payroll_create_component_type(organisation_id: str, payload: PayComponentIn, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return PayrollService().save_component_type(organisation_id, actor=user.email, **payload.model_dump(exclude_unset=True))
+
+
+@api.put('/organisations/{organisation_id}/payroll/component-types/{type_id}')
+def payroll_save_component_type(organisation_id: str, type_id: str, payload: PayComponentIn, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return PayrollService().save_component_type(organisation_id, type_id=type_id, actor=user.email, **payload.model_dump(exclude_unset=True))
+
+
+@api.get('/organisations/{organisation_id}/payroll/posting-mappings')
+def payroll_posting_mappings(organisation_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    return PayrollService().posting_mappings(organisation_id)
+
+
+@api.get('/organisations/{organisation_id}/payroll/leave-settings')
+def payroll_leave_settings(organisation_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    return PayrollLeaveLiabilityService().settings(organisation_id)
+
+
+@api.put('/organisations/{organisation_id}/payroll/leave-settings')
+def payroll_save_leave_settings(organisation_id: str, payload: PayrollLeaveSettingsIn, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES & {'owner', 'administrator'})
+    return PayrollLeaveLiabilityService().save_settings(organisation_id, actor=user.email, **payload.model_dump())
+
+
+@api.get('/organisations/{organisation_id}/payroll/leave-liability')
+def payroll_leave_liability(organisation_id: str, as_at: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    return PayrollLeaveLiabilityService().report(organisation_id, as_at)
+
+
+@api.get('/organisations/{organisation_id}/payroll/leave-liability.xlsx')
+def payroll_leave_liability_xlsx(organisation_id: str, as_at: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    return Response(PayrollLeaveLiabilityService().workbook_xlsx(organisation_id, as_at),
+        media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        headers={'Content-Disposition': 'attachment; filename="leave-liability.xlsx"'})
+
+
+@api.post('/organisations/{organisation_id}/payroll/leave-reserve-postings', status_code=201)
+def payroll_post_leave_reserve(organisation_id: str, payload: PayrollLeaveReserveIn, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, APPROVE_ROLES)
+    return PayrollLeaveLiabilityService().post_reserve(organisation_id, payload.period, actor=user.email)
+
+
+@api.post('/organisations/{organisation_id}/payroll/leave-reserve-postings/{period}/reverse')
+def payroll_reverse_leave_reserve(organisation_id: str, period: str, payload: PayrollLeaveReserveReversalIn,
+                                 user: User = Depends(require_csrf)):
+    _require(organisation_id, user, APPROVE_ROLES)
+    return PayrollLeaveLiabilityService().reverse_reserve(organisation_id, period,
+        reversal_date=payload.reversal_date, actor=user.email, reason=payload.reason)
+
+
+@api.put('/organisations/{organisation_id}/payroll/posting-mappings/{role}')
+def payroll_save_mapping(organisation_id: str, role: str, payload: PayrollMappingIn, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, APPROVE_ROLES)
+    PayrollService().save_posting_mapping(organisation_id, role, payload.account_code, actor=user.email)
+    return PayrollService().posting_mappings(organisation_id)
+
+
+@api.patch('/organisations/{organisation_id}/pay-runs/{run_id}/items/{item_id}')
+def payroll_update_item(organisation_id: str, run_id: str, item_id: str, payload: PayItemPatch, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    values = payload.model_dump(exclude_unset=True)
+    if any(value is None for value in values.values()):
+        raise ValueError('Draft item fields cannot be null')
+    return PayrollService().update_item(organisation_id, run_id, item_id, actor=user.email, **values)
+
+
+@api.post('/organisations/{organisation_id}/pay-runs/{run_id}/tsd/settle')
+def payroll_settle(organisation_id: str, run_id: str, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, APPROVE_ROLES)
+    return PayrollService().settle_declaration(organisation_id, run_id, actor=user.email)
+
+
 @api.get('/organisations/{organisation_id}/pay-runs')
 def payroll_runs(organisation_id: str, user: User = Depends(current_user)):
     _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
@@ -2173,7 +3152,22 @@ def payroll_runs(organisation_id: str, user: User = Depends(current_user)):
 @api.post('/organisations/{organisation_id}/pay-runs', status_code=201)
 def payroll_create_run(organisation_id: str, payload: PayRunIn, user: User = Depends(require_csrf)):
     _require(organisation_id, user, WRITE_ROLES)
-    return PayrollService().create_run(organisation_id, period=payload.period, actor=user.email, hours=payload.hours)
+    return PayrollService().create_run(organisation_id, period=payload.period, actor=user.email, hours=payload.hours,
+                                      show_leave_balance=payload.show_leave_balance)
+
+
+@api.post('/organisations/{organisation_id}/pay-runs/{run_id}/corrections', status_code=201)
+def payroll_create_correction(organisation_id: str, run_id: str, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return PayrollService().create_correction(organisation_id, run_id, actor=user.email)
+
+
+@api.post('/organisations/{organisation_id}/pay-runs/{run_id}/supplementary', status_code=201)
+def payroll_create_supplementary(organisation_id: str, run_id: str, payload: PaySupplementaryIn,
+                                 user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return PayrollService().create_supplementary(
+        organisation_id, run_id, payload.employee_ids, actor=user.email)
 
 
 @api.post('/organisations/{organisation_id}/pay-runs/{run_id}/approve')
@@ -2190,9 +3184,11 @@ def payroll_delete(organisation_id: str, run_id: str, user: User = Depends(requi
 
 
 @api.get('/organisations/{organisation_id}/pay-runs/{run_id}/payslips.pdf')
-def payroll_payslips(organisation_id: str, run_id: str, user: User = Depends(current_user)):
+def payroll_payslips(organisation_id: str, run_id: str, employee_ids: str | None = None,
+                    user: User = Depends(current_user)):
     _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
-    return Response(PayrollService().payslips_pdf(organisation_id, run_id), media_type='application/pdf',
+    selected = [item for item in (employee_ids or '').split(',') if item] or None
+    return Response(PayrollService().payslips_pdf(organisation_id, run_id, selected), media_type='application/pdf',
                     headers={'Content-Disposition': 'attachment; filename="payslips.pdf"'})
 
 
@@ -2206,10 +3202,160 @@ def payroll_workbook(organisation_id: str, run_id: str, user: User = Depends(cur
     )
 
 
+@api.get('/organisations/{organisation_id}/payroll/reports/annual-summary')
+def payroll_annual_summary(organisation_id: str, year: int, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    return PayrollReportsService().annual_summary(organisation_id, year)
+
+
+@api.get('/organisations/{organisation_id}/payroll/reports/dimensions')
+def payroll_dimension_cost_report(organisation_id: str, start: str, end: str,
+                                  user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    try:
+        return PayrollReportsService().dimension_costs(organisation_id, start, end)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@api.get('/organisations/{organisation_id}/payroll/reports/dimension-costs')
+def payroll_dimension_cost_report_ui(organisation_id: str, start: str, end: str,
+                                     user: User = Depends(current_user)):
+    return payroll_dimension_cost_report(organisation_id, start, end, user)
+
+@api.get('/organisations/{organisation_id}/payroll/reports.xlsx')
+def payroll_report_xlsx(organisation_id: str, report: str, year: int | None = None,
+                        period: str | None = None, months: int = 6,
+                        start: str | None = None, end: str | None = None,
+                        user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    service = PayrollReportsService()
+    if report == 'annual-summary':
+        rows = [{'employee_name': employee['employee_name'], 'employee_id': employee['employee_id'],
+                 'month': month, **values, 'gross_by_type': values['types']}
+                for employee in service.annual_summary(organisation_id, year or 2026)
+                for month, values in employee['months'].items()]
+    elif report == 'average-pay': rows = service.average_pay(organisation_id, period or '2026-01', months)
+    elif report == 'palk':
+        result = service.statistics_palk(organisation_id, period or '2026-01')
+        rows = [{'row': key, **value} for key, value in result['rows'].items()]
+    elif report == 'headcount':
+        result = service.yearly_headcount(organisation_id, year or 2026)
+        rows = [{'year': result['year'], 'month': index + 1, **month}
+                for index, month in enumerate(result['months'])]
+    elif report == 'pay-list': rows = service.pay_list(organisation_id, start or period or '2026-01', end or period or '2026-01')
+    elif report == 'dimension-costs': rows = service.dimension_costs(organisation_id, start or period or '2026-01', end or period or '2026-12')
+    else: raise HTTPException(status_code=422, detail='Choose a supported payroll report')
+    content = PayrollReportsService.workbook(report, rows)
+    return Response(content, media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        headers={'Content-Disposition': f'attachment; filename="payroll-{report}.xlsx"'})
+
+@api.get('/organisations/{organisation_id}/payroll/reports/average-pay')
+def payroll_average_report(organisation_id: str, period: str, months: int = 6, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    return PayrollReportsService().average_pay(organisation_id, period, months)
+
+@api.get('/organisations/{organisation_id}/payroll/reports/palk')
+def payroll_palk_report(organisation_id: str, period: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    return PayrollReportsService().statistics_palk(organisation_id, period)
+
+@api.get('/organisations/{organisation_id}/payroll/reports/headcount')
+def payroll_headcount_report(organisation_id: str, year: int, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    return PayrollReportsService().yearly_headcount(organisation_id, year)
+
+@api.get('/organisations/{organisation_id}/payroll/reports/pay-list')
+def payroll_pay_list(organisation_id: str, start: str, end: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    return PayrollReportsService().pay_list(organisation_id, start, end)
+
+@api.get('/organisations/{organisation_id}/pay-runs/{run_id}/deliveries')
+def payroll_delivery_history(organisation_id: str, run_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    return PayrollDeliveryService().history(organisation_id, run_id)
+
+@api.post('/organisations/{organisation_id}/payroll/deliveries/{delivery_id}/retry')
+def payroll_retry_delivery(organisation_id: str, delivery_id: str, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return PayrollDeliveryService().retry(organisation_id, delivery_id, actor=user.email)
+@api.get('/organisations/{organisation_id}/payroll/report-settings')
+def payroll_report_settings(organisation_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES)
+    return PayrollDeliveryService().settings(organisation_id)
+
+@api.put('/organisations/{organisation_id}/payroll/report-settings')
+def payroll_save_report_settings(organisation_id: str, payload: PayrollEmailSettingsIn, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return PayrollDeliveryService().save_settings(organisation_id, payload.model_dump())
+
+@api.post('/organisations/{organisation_id}/pay-runs/{run_id}/deliveries/payslips')
+def payroll_send_payslips(organisation_id: str, run_id: str, payload: PayrollDeliveryIn, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return PayrollDeliveryService().send_payslips(organisation_id, run_id, payload.employee_ids, actor=user.email)
+
+@api.post('/organisations/{organisation_id}/pay-runs/{run_id}/deliveries/review')
+def payroll_send_for_review(organisation_id: str, run_id: str, payload: PayrollReviewIn, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    return PayrollDeliveryService().send_for_review(organisation_id, run_id, payload.recipient,
+        include_payslips=payload.include_payslips, actor=user.email)
 @api.get('/organisations/{organisation_id}/payroll/tsd-preparations')
 def payroll_tsd_preparations(organisation_id: str, user: User = Depends(current_user)):
     _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
     return TSDExportService().preparations(organisation_id)
+
+
+@api.get('/organisations/{organisation_id}/payroll/tsd-apa/history')
+def payroll_tsd_apa_history(organisation_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    from tsd_apa_history import APAHistoryService
+    history = APAHistoryService(get_database())
+    rows = history.exports(organisation_id)
+    for row in rows:
+        row['feedback_results'] = history.feedback_results(organisation_id, row['id'])
+    return rows
+
+
+@api.get('/organisations/{organisation_id}/pay-runs/{run_id}/tsd/{preparation_id}/apa-payouts')
+def payroll_tsd_apa_payouts(organisation_id: str, run_id: str, preparation_id: str,
+                            user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    service = TSDExportService()
+    preparation = service.get(organisation_id, preparation_id)
+    if preparation['pay_run_id'] != run_id:
+        raise KeyError('TSD preparation not found')
+    return service.apa_payouts_for_review(organisation_id, preparation_id)
+
+
+@api.post('/organisations/{organisation_id}/payroll/tsd-apa/history/{export_id}/cancellation.xml')
+def payroll_tsd_apa_cancellation(organisation_id: str, export_id: str, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    from tsd_apa_history import APAHistoryService
+    payload = APAHistoryService(get_database()).cancellation(organisation_id, export_id, actor=user.email)
+    return Response(payload, media_type='application/xml', headers={
+        'Content-Disposition': f'attachment; filename="tsd-cancel-{export_id}.xml"'})
+
+
+@api.post('/organisations/{organisation_id}/payroll/tsd-apa/feedback')
+async def payroll_tsd_apa_feedback(organisation_id: str, request: Request, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, WRITE_ROLES)
+    form = await request.form()
+    upload = form.get('file')
+    transaction_id = str(form.get('transaction_id', '')).strip()
+    if upload is None or not hasattr(upload, 'read') or not transaction_id:
+        raise ValueError('Feedback XML and transaction_id are required')
+    payload = await upload.read(2_000_001)
+    if len(payload) > 2_000_000:
+        raise ValueError('Feedback XML exceeds 2 MB')
+    from tsd_apa_history import APAHistoryService
+    return APAHistoryService(get_database()).import_feedback(organisation_id, transaction_id, payload, actor=user.email)
+
+
+@api.get('/organisations/{organisation_id}/payroll/tsd-apa/history/{export_id}/feedback')
+def payroll_tsd_apa_feedback_results(organisation_id: str, export_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, APPROVE_ROLES | {'viewer'})
+    from tsd_apa_history import APAHistoryService
+    return APAHistoryService(get_database()).feedback_results(organisation_id, export_id)
 
 
 @api.post('/organisations/{organisation_id}/pay-runs/{run_id}/tsd/prepare')
@@ -2252,6 +3398,42 @@ def payroll_export_tsd_xbrl(organisation_id: str, run_id: str, preparation_id: s
     })
 
 
+@api.get('/organisations/{organisation_id}/pay-runs/{run_id}/tsd/{preparation_id}/payouts/{payout_id}/apa.xml')
+def payroll_export_tsd_apa_payout(organisation_id: str, run_id: str, preparation_id: str,
+                                  payout_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, WRITE_ROLES)
+    service = TSDExportService()
+    prepared = service.get(organisation_id, preparation_id)
+    if prepared['pay_run_id'] != run_id:
+        raise KeyError('TSD preparation not found')
+    try:
+        payload = service.export_apa_payout(organisation_id, preparation_id, payout_id, actor=user.email)
+    except ValueError as exc:
+        from tsd_apa_rules import APAValidationError
+        if isinstance(exc, APAValidationError):
+            raise HTTPException(status_code=409, detail=exc.findings) from exc
+        raise
+    return Response(payload, media_type='application/xml', headers={
+        'Content-Disposition': f'attachment; filename="tsd-{payout_id}.xml"'
+    })
+
+
+@api.get('/organisations/{organisation_id}/payroll/tsd-apa/{payment_month}.zip')
+def payroll_export_tsd_apa_month_zip(organisation_id: str, payment_month: str,
+                                     user: User = Depends(current_user)):
+    _require(organisation_id, user, WRITE_ROLES)
+    try:
+        payload = TSDExportService().export_apa_month_zip(organisation_id, payment_month, actor=user.email)
+    except ValueError as exc:
+        from tsd_apa_rules import APAValidationError
+        if isinstance(exc, APAValidationError):
+            raise HTTPException(status_code=409, detail=exc.findings) from exc
+        raise
+    return Response(payload, media_type='application/zip', headers={
+        'Content-Disposition': f'attachment; filename="tsd-{payment_month}-payouts.zip"'
+    })
+
+
 @api.get('/organisations/{organisation_id}/pay-runs/{run_id}/tsd/{preparation_id}/export.csv')
 def payroll_export_tsd_csv(organisation_id: str, run_id: str, preparation_id: str,
                            user: User = Depends(current_user)):
@@ -2262,4 +3444,32 @@ def payroll_export_tsd_csv(organisation_id: str, run_id: str, preparation_id: st
     payload = TSDExportService().export_csv(organisation_id, preparation_id, actor=user.email)
     return Response(payload, media_type='text/csv', headers={
         'Content-Disposition': f'attachment; filename="tsd-{prepared["period"]}.csv"'
+    })
+
+
+@api.get('/organisations/{organisation_id}/pay-runs/{run_id}/tsd/{preparation_id}/export-annex1.csv')
+def payroll_export_tsd_annex1_csv(organisation_id: str, run_id: str, preparation_id: str,
+                                  user: User = Depends(current_user)):
+    _require(organisation_id, user, WRITE_ROLES)
+    service = TSDExportService()
+    prepared = service.get(organisation_id, preparation_id)
+    if prepared['pay_run_id'] != run_id:
+        raise KeyError('TSD preparation not found')
+    payload = service.export_legacy_annex1_csv(organisation_id, preparation_id, actor=user.email)
+    return Response(payload, media_type='text/csv; charset=utf-8', headers={
+        'Content-Disposition': f'attachment; filename="tsd-annex1-{prepared["period"]}.csv"'
+    })
+
+
+@api.get('/organisations/{organisation_id}/pay-runs/{run_id}/tsd/{preparation_id}/workpaper.xlsx')
+def payroll_tsd_workpaper_xlsx(organisation_id: str, run_id: str, preparation_id: str,
+                               user: User = Depends(current_user)):
+    _require(organisation_id, user, WRITE_ROLES)
+    service = TSDExportService()
+    prepared = service.get(organisation_id, preparation_id)
+    if prepared['pay_run_id'] != run_id:
+        raise KeyError('TSD preparation not found')
+    payload = service.workpaper_xlsx(organisation_id, preparation_id)
+    return Response(payload, media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', headers={
+        'Content-Disposition': f'attachment; filename="tsd-workpaper-{prepared["period"]}.xlsx"'
     })
