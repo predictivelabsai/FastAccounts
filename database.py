@@ -256,12 +256,24 @@ FROM pay_component_types t WHERE t.organisation_id=c.organisation_id AND t.id=c.
                 elif path.stem == "0054_payroll_tsd_lines":
                     script = script.split("CREATE TRIGGER guard_pay_item_tsd_lines_update", 1)[0]
                     script += _POSTGRES_TSD_LINE_TRIGGERS
-                elif path.stem in {"0052_payroll_tsd_payment_types", "0063_payroll_pay_type_methods", "0066_payroll_palk_unmapped"}:
+                elif path.stem in {
+                    "0049_payroll_component_source",
+                    "0052_payroll_tsd_payment_types",
+                    "0063_payroll_pay_type_methods",
+                    "0066_payroll_palk_unmapped",
+                }:
                     # These SQLite migrations temporarily drop and recreate the
-                    # component update guard around backfills. Keep the DDL and
-                    # data updates, then install the equivalent PostgreSQL guard.
+                    # component update guard around backfills. Drop only the
+                    # PostgreSQL component guard for the matching UPDATE, then
+                    # reinstall the equivalent component and context guards.
                     script = script.replace("DROP TRIGGER guard_pay_item_components_update;", "")
                     script = script.split("CREATE TRIGGER guard_pay_item_components_update", 1)[0]
+                    script = script.replace(
+                        "UPDATE pay_item_components",
+                        "DROP TRIGGER IF EXISTS guard_pay_item_components ON pay_item_components;\n"
+                        "UPDATE pay_item_components",
+                        1,
+                    )
                     script += _postgres_payroll_component_triggers()
                 elif path.stem == "0055_tsd_apa_history":
                     script = script.replace("file_xml BLOB", "file_xml BYTEA")
