@@ -19,6 +19,7 @@ from core_utils import (
     canonical_json,
     db_number,
     money,
+    parse_decimal_ee,
     new_id,
     sha256_bytes,
     utc_now,
@@ -975,10 +976,10 @@ class ImportService:
                 elif payload.get("board_member"):
                     changes["pay_basis"] = "board_fee"
                     changes["board_member"] = True
-                    changes["gross_salary"] = money(Decimal(str(initial.get("Amount"))))
+                    changes["gross_salary"] = money(parse_decimal_ee(initial.get("Amount")))
                 else:
                     changes["pay_basis"] = "monthly"
-                    changes["gross_salary"] = money(Decimal(str(initial.get("Amount"))))
+                    changes["gross_salary"] = money(parse_decimal_ee(initial.get("Amount")))
             self._assert_name_available(tx, organisation_id, changes["name"].strip(), employee_id)
             outcome = "applied"
             if existing and self._employee_unchanged(existing, changes):
@@ -1075,7 +1076,7 @@ class ImportService:
         for item in agreements:
             agreement_start = str(item.get("StartDate") or start_date)
             try:
-                rate = money(Decimal(str(item.get("Amount"))))
+                rate = money(parse_decimal_ee(item.get("Amount")))
             except (InvalidOperation, TypeError) as exc:
                 raise ValueError("Merit Palk salary agreement amount is invalid") from exc
             if not rate.is_finite() or rate < 0:
@@ -1123,7 +1124,7 @@ class ImportService:
     @staticmethod
     def _import_decimal(value: Any, label: str) -> Decimal:
         try:
-            result = Decimal(str(value).strip().replace(" ", "").replace(",", "."))
+            result = parse_decimal_ee(value)
         except (InvalidOperation, ValueError, AttributeError) as error:
             raise ValueError(f"{label} must be a decimal number") from error
         if not result.is_finite() or result < 0:

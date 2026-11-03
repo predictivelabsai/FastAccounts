@@ -1,5 +1,39 @@
 from payroll_tor_import import TORImportService, parse_tor_csv
+from core_utils import parse_decimal_ee
+from decimal import Decimal
 import pytest
+
+
+@pytest.mark.parametrize(("raw", "expected"), [
+    ("1234.56", "1234.56"), ("1234,56", "1234.56"),
+    ("1 234,56", "1234.56"), ("1\u00a0234,56", "1234.56"),
+    ("1\u202f234,56", "1234.56"), ("1.234,56", "1234.56"),
+    ("1,234.56", "1234.56"), (" 1 234,56 EUR ", "1234.56"),
+    ("1234,56 €", "1234.56"),
+    ("0,75", "0.75"),
+])
+def test_estonian_decimal_parser(raw, expected):
+    assert parse_decimal_ee(raw) == Decimal(expected)
+
+
+@pytest.mark.parametrize("raw", ["", "1,2,3", "12abc", "1.234.56 EURx"])
+def test_estonian_decimal_parser_rejects_garbage(raw):
+    with pytest.raises(ValueError, match="Invalid decimal value"):
+        parse_decimal_ee(raw)
+
+
+def test_tor_semicolon_decimal_comma_and_estonian_names():
+    content = ("Isikukood;Nimi;Alguskuupäev;Töölepingu liik;Koormus\n"
+               "49001010018;Õnne Ülemõisa;2026-01-01;Tööleping;0,75\n"
+               "49001010019;Šarlota Žukova;2026-01-01;Tööleping;0,5\n").encode("utf-8-sig")
+    rows = parse_tor_csv(content)
+    assert [(row["name"], row["fte"]) for row in rows] == [
+        ("Õnne Ülemõisa", "0.75"), ("Šarlota Žukova", "0.5")]
+
+
+def test_tor_reads_windows_1257_csv():
+    content = "Isikukood;Nimi;Alguskuupäev;Töölepingu liik\n49001010018;Õnne Ülemõisa;2026-01-01;Tööleping\n".encode("cp1257")
+    assert parse_tor_csv(content)[0]["name"] == "Õnne Ülemõisa"
 
 
 def test_tor_header_aliases_errors_and_decimal_workload():

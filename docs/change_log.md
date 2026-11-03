@@ -1,5 +1,15 @@
 # FastAccounts Change Log
 
+## 2026-11-03: Estonian CSV and workbook number formats
+
+- Added a shared strict decimal parser for decimal commas, grouped thousands,
+  Unicode spacing and EUR suffixes. Applied it to employee, payroll, master
+  data and journal file imports while preserving the existing `money()` rules.
+- TÖR and master-data CSV imports detect comma, semicolon or tab separators;
+  TÖR accepts UTF-8 BOM and Windows-1257/1252 files and decimal-comma workload.
+- Added regression coverage for Estonian names, BOM files and the supported
+  decimal forms.
+
 Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as
 delivered.
