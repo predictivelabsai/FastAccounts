@@ -972,6 +972,7 @@
     "mail_reset_body": "Kasuta seda linki FastAccountsi uue parooli määramiseks:",
     "mail_welcome_subject": "Määra oma FastAccountsi parool",
     "mail_welcome_body": "Kasuta seda linki oma FastAccountsi konto parooli määramiseks:",
+    "mail_welcome_expiry": "Link kehtib 72 tundi (3 päeva) ja töötab ühe korra.",
     "account_title": "Konto",
     "account_name_title": "Kuvatav nimi",
     "account_password_title": "Parool",

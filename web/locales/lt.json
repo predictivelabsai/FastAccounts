@@ -987,6 +987,7 @@
     "password_changed_subject": "Jūsų FastAccounts slaptažodis pakeistas",
     "password_changed_body": "Jūsų FastAccounts slaptažodis pakeistas. Jei to nepadarėte, susisiekite su palaikymo komanda.",
     "mail_reset_expiry": "Nuoroda galioja vieną valandą ir veikia vieną kartą.",
+    "mail_welcome_expiry": "Nuoroda galioja 72 valandas (3 dienas) ir veikia vieną kartą.",
     "mail_ignore": "Jei to neprašėte, šį laišką galite ignoruoti.",
     "mfa_title": "Dviejų veiksnių autentifikavimas",
     "mfa_code": "Autentifikavimo arba atkūrimo kodas",

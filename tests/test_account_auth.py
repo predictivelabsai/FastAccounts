@@ -549,7 +549,10 @@ def test_reset_mail_uses_welcome_copy_for_account_without_password(env):
     mail = env["mails"][-1]
     assert mail["subject"] == "Set your FastAccounts password"
     assert "set a password" in mail["text"]
+    assert "72 hours" in mail["text"]
     assert "/auth/local/reset/" in mail["text"]
+    row = env["db"].one("SELECT * FROM auth_tokens WHERE purpose='reset' AND used_at IS NULL")
+    assert abs(int(row["expires_at"]) - (int(time.time()) + 72 * 60 * 60)) < 30
 
 
 def test_reset_mail_uses_reset_copy_for_existing_password(env):

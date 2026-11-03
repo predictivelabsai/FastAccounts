@@ -987,6 +987,7 @@
     "password_changed_subject": "Jūsu FastAccounts parole ir mainīta",
     "password_changed_body": "Jūsu FastAccounts parole ir mainīta. Ja jūs to nedarījāt, sazinieties ar atbalsta dienestu.",
     "mail_reset_expiry": "Saite ir derīga vienu stundu un darbojas vienu reizi.",
+    "mail_welcome_expiry": "Saite ir derīga 72 stundas (3 dienas) un darbojas vienu reizi.",
     "mail_ignore": "Ja jūs to nepieprasījāt, varat ignorēt šo e-pastu.",
     "mfa_title": "Divfaktoru autentifikācija",
     "mfa_code": "Autentifikācijas vai atkopšanas kods",

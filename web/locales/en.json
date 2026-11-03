@@ -972,6 +972,7 @@
     "mail_reset_body": "Use this link to set a new FastAccounts password:",
     "mail_welcome_subject": "Set your FastAccounts password",
     "mail_welcome_body": "Use this link to set a password for your FastAccounts account:",
+    "mail_welcome_expiry": "The link expires in 72 hours (3 days) and works once.",
     "account_title": "Account",
     "account_name_title": "Display name",
     "account_password_title": "Password",

@@ -40,6 +40,7 @@ log = logging.getLogger("fastaccounts.auth")
 PASSWORD_MIN = 10
 PASSWORD_MAX = 1024
 RESET_TTL = 60 * 60
+WELCOME_TTL = 72 * 60 * 60
 VERIFY_TTL = 24 * 60 * 60
 
 # action: (attempts, window seconds)
@@ -189,7 +190,7 @@ def _send_link(email: str, name: str, purpose: str, token: str, lang: str) -> bo
             mail_purpose = "welcome"
     subject = T(f"mail_{mail_purpose}_subject")
     lines = [T("mail_greeting").format(name=name or email), T(f"mail_{mail_purpose}_body"),
-             T(f"mail_{purpose}_expiry"), T("mail_ignore")]
+             T(f"mail_{mail_purpose}_expiry"), T("mail_ignore")]
     text = "\n\n".join([lines[0], lines[1], link, *lines[2:]])
     body = (f"<p>{html.escape(lines[0])}</p><p>{html.escape(lines[1])}</p>"
             f"<p><a href=\"{html.escape(link, quote=True)}\">{html.escape(subject)}</a></p>"
@@ -345,7 +346,7 @@ class AccountStore:
         return account
 
     def request_reset(self, email: str, lang: str = "en") -> None:
-        """Send a one-hour reset link; Google-only members may set a password this way."""
+        """Send reset links for one hour or welcome links for 72 hours."""
         email = normalize_email(email)
         if not email:
             return
@@ -359,7 +360,8 @@ class AccountStore:
                            "VALUES (?,?,'',0,?,?) ON CONFLICT(email) DO NOTHING", (new_id(), email, now, now))
             account = self.get(email)
         with self.db.transaction() as tx:
-            token = self._issue(tx, account["id"], "reset", RESET_TTL)
+            ttl = WELCOME_TTL if not account["password_hash"] else RESET_TTL
+            token = self._issue(tx, account["id"], "reset", ttl)
         _send_link(email, account["name"], "reset", token, lang)
 
     def change_password(self, email: str, current_password: str, new_password: str) -> dict | None:
