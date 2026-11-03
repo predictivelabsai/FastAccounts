@@ -6,9 +6,17 @@ import sqlite3
 
 import pytest
 
-from database import Database
+from database import Database, Transaction
 from organisations import AccessDenied, OrganisationService
 from payroll_components import ACCOUNTS as PAYROLL_COMPONENT_ACCOUNTS
+
+
+def test_transaction_sql_escapes_postgres_literals_before_parameter_conversion():
+    query = "SELECT value FROM records WHERE value LIKE '%x%' AND id=?"
+    assert Transaction(None, "postgres")._sql(query) == (
+        "SELECT value FROM records WHERE value LIKE '%%x%%' AND id=%s"
+    )
+    assert Transaction(None, "sqlite")._sql(query) == query
 
 
 def test_employee_tax_settings_backfill_and_preservation(tmp_path, legacy_payroll):
