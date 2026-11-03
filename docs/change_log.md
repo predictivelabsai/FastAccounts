@@ -22,6 +22,12 @@
   the persistent drawer notice remains the single source of that message.
 - Added a browser assertion that the unavailable notice appears once.
 
+## 2026-11-03: Update default Grok model
+
+- Changed the provider default to `grok-4.3`, replacing the retired xAI model.
+  The `FASTACCOUNTS_GROK_MODEL` override remains supported.
+- Updated provider tests and the copilot specification.
+
 Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as
 delivered.
@@ -481,7 +487,7 @@ delivered.
   and inline errors with retry. Enter sends; Shift+Enter adds a newline. A header
   settings button reveals administration outside the message flow. Existing
   shortcut hints, staged imports and mobile/reduced-motion support are retained.
-- Corrected the default provider model to `grok-4-1-fast-reasoning`, preserving
+- Corrected the default provider model, preserving
   the environment override. Provider failures return HTTP 502 with a useful
   detail and persist an assistant error reply without tokens or stage proposals;
   quota accounting is unchanged. API-key rejection covers both 401 and 403.

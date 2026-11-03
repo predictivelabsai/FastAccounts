@@ -201,7 +201,7 @@
   and inline errors with retry. Enter sends; Shift+Enter adds a newline. A header
   settings button reveals administration outside the message flow. Existing
   shortcut hints, staged imports and mobile/reduced-motion support are retained.
-- Corrected the default provider model to `grok-4-1-fast-reasoning`, preserving
+- Corrected the default provider model, preserving
   the environment override. Provider failures return HTTP 502 with a useful
   detail and persist an assistant error reply without tokens or stage proposals;
   quota accounting is unchanged. API-key rejection covers both 401 and 403.

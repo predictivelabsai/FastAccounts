@@ -14,7 +14,7 @@ import time
 import httpx
 
 BASE_URL = "https://api.x.ai/v1/chat/completions"
-DEFAULT_MODEL = "grok-4-1-fast-reasoning"
+DEFAULT_MODEL = "grok-4.3"
 MAX_OUTPUT_TOKENS = 2048
 TIMEOUT_SECONDS = 60
 

@@ -10,8 +10,8 @@ uploaded documents, and prepare staged imports from document content. The
 copilot assists; it never writes accounting data on its own authority.
 
 Provider: xAI Grok API, OpenAI-compatible
-(`https://api.x.ai/v1/chat/completions`, bearer key, models such as
-`grok-4-1-fast-reasoning`, usage token counts in the response). A dedicated API key is
+(`https://api.x.ai/v1/chat/completions`, bearer key, model `grok-4.3` by default,
+usage token counts in the response). A dedicated API key is
 carried in `FASTACCOUNTS_GROK_API_KEY` so usage is tracked per product.
 An organisation may override the environment key using encrypted settings.
 Keys never enter the repository,
@@ -184,7 +184,7 @@ Stage proposals remain available beneath assistant replies. A header settings
 button toggles administration outside the message flow. Mobile width, reduced
 motion, keyboard shortcuts and the first-open shortcut hint remain supported.
 
-The default model is `grok-4-1-fast-reasoning`; `FASTACCOUNTS_GROK_MODEL` still
+The default model is `grok-4.3`; `FASTACCOUNTS_GROK_MODEL` still
 overrides it. Provider 401/403 responses report a rejected configured API key;
 other HTTP failures retain the generic provider error. `CopilotProviderError`
 returns HTTP 502 with a JSON `detail`. The service persists the same error as an

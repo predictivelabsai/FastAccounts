@@ -310,11 +310,11 @@ def test_quota_burst_and_size_limits(env, monkeypatch):
 
 
 def test_provider_default_model_and_override(env, monkeypatch):
-    assert copilot_provider.model() == "grok-4-1-fast-reasoning"
+    assert copilot_provider.model() == "grok-4.3"
     monkeypatch.setenv("FASTACCOUNTS_GROK_MODEL", "fleet-test-model")
     assert copilot_provider.model() == "fleet-test-model"
     monkeypatch.setenv("FASTACCOUNTS_GROK_MODEL", "  ")
-    assert copilot_provider.model() == "grok-4-1-fast-reasoning"
+    assert copilot_provider.model() == "grok-4.3"
 
 
 @pytest.mark.parametrize("status,detail", [
