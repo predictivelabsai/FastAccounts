@@ -2757,6 +2757,11 @@
   "copilot": {
     "workspace": {
       "How can I help with your books?": "Kuidas saan sind raamatupidamises aidata?",
+      "New chat": "Uus vestlus",
+      "Conversation history": "Vestluste ajalugu",
+      "Delete conversation": "Kustuta vestlus",
+      "Delete this copilot conversation?": "Kas kustutada see AI-kaaslase vestlus?",
+      "Conversation deleted": "Vestlus kustutati",
       "Summarise overdue invoices": "Tee kokkuvõte tähtaja ületanud arvetest",
       "What needs my attention this week?": "Mis vajab sel nädalal minu tähelepanu?",
       "Explain my VAT position": "Selgita minu käibemaksuarvestuse seisu",

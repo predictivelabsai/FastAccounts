@@ -1805,6 +1805,11 @@ input::placeholder,textarea::placeholder{color:var(--text-muted)}
 .copilot-body .table-wrap{overflow-x:auto}
 .copilot-header h2{margin-right:auto}
 .copilot-header{gap:8px;flex-shrink:0}
+.copilot-conversation-controls{display:flex;align-items:center;gap:6px;min-width:0}
+.copilot-conversation-controls .button{font-size:.85rem;padding:6px 9px;white-space:nowrap}
+.copilot-conversation-controls select{min-width:0;max-width:170px;height:40px;padding:4px 8px;border:1px solid var(--line);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);text-overflow:ellipsis}
+.copilot-conversation-controls select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.copilot-conversation-controls [data-copilot-delete]{font-size:18px}
 .copilot-description{font-size:.85rem;flex-shrink:0}
 .copilot-body [data-copilot-notice]{font-size:.8rem;margin:0 0 8px;flex-shrink:0}
 .copilot-body [data-copilot-admin]{flex-shrink:0;max-height:55%;overflow:auto;border-bottom:1px solid var(--line)}
@@ -1842,7 +1847,7 @@ input::placeholder,textarea::placeholder{color:var(--text-muted)}
 @keyframes copilot-dot{0%,60%,100%{opacity:.3;transform:translateY(0)}30%{opacity:1;transform:translateY(-3px)}}
 @keyframes copilot-enter{from{transform:translateX(100%)}to{transform:translateX(0)}}
 @media (prefers-reduced-motion:reduce){.copilot-drawer,.copilot-typing span{animation:none}}
-@media (max-width:600px){.copilot-drawer{width:100%}.copilot-toggle{right:16px;bottom:16px}.copilot-header{padding:16px}.copilot-description{padding:0 16px}.copilot-body{padding:0 16px 16px}.copilot-shortcut-hint{margin-left:16px;margin-right:16px}}
+@media (max-width:600px){.copilot-drawer{width:100%}.copilot-toggle{right:16px;bottom:16px}.copilot-header{padding:12px;gap:4px;flex-wrap:wrap}.copilot-header h2{font-size:1rem}.copilot-conversation-controls{flex:1 1 100%;order:3}.copilot-conversation-controls select{flex:1;max-width:none}.copilot-header button{min-width:40px;min-height:40px}.copilot-description{padding:0 16px}.copilot-body{padding:0 16px 16px}.copilot-shortcut-hint{margin-left:16px;margin-right:16px}}
 
 input[type="checkbox"],
 input[type="radio"] {

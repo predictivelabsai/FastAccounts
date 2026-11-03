@@ -651,6 +651,7 @@
       .join("")}</svg>`;
   }
   let copilotDrawer, copilotBody, copilotToggle, copilotOrg, copilotTicket = 0, copilotReturnFocus;
+  let copilotConversationId = null;
   const copilotMac = /mac/i.test(navigator.userAgentData?.platform || navigator.platform);
   const copilotShortcut = copilotMac ? '⌘/' : 'Ctrl+/';
   const copilotHintKey = 'fastaccounts_copilot_shortcut_hint_seen';
@@ -694,7 +695,7 @@
     if (!copilotDrawer) {
       const shell = document.createElement('div');
       shell.innerHTML = `<button type="button" class="button primary copilot-toggle" aria-label="${tr('Open AI copilot')}" aria-controls="copilot-drawer" aria-expanded="false">${icon('assistant')}${tr('AI copilot')}</button>` +
-        `<aside id="copilot-drawer" class="copilot-drawer" role="dialog" aria-labelledby="copilot-title" hidden><header class="copilot-header"><h2 id="copilot-title">${tr('AI copilot')}</h2><button type="button" class="button" data-copilot-gear hidden aria-label="${tr('Copilot administration')}" aria-controls="copilot-admin" aria-expanded="false">${icon('gear')}</button><button type="button" class="button" data-copilot-close aria-label="${tr('Close AI copilot')}">&times;</button></header>` +
+        `<aside id="copilot-drawer" class="copilot-drawer" role="dialog" aria-labelledby="copilot-title" hidden><header class="copilot-header"><h2 id="copilot-title">${tr('AI copilot')}</h2><div class="copilot-conversation-controls"><button type="button" class="button" data-copilot-new>${tr('New chat')}</button><select data-copilot-conversation aria-label="${tr('Conversation history')}"></select><button type="button" class="button" data-copilot-delete aria-label="${tr('Delete conversation')}" title="${tr('Delete conversation')}">${icon('close')}</button></div><button type="button" class="button" data-copilot-gear hidden aria-label="${tr('Copilot administration')}" aria-controls="copilot-admin" aria-expanded="false">${icon('gear')}</button><button type="button" class="button" data-copilot-close aria-label="${tr('Close AI copilot')}">&times;</button></header>` +
         `<p class="muted copilot-description">${tr('Ask about your books, scan documents and draft staged imports. The copilot never changes records on its own.')}</p><div class="copilot-body"></div></aside>`;
       app.append(shell);
       copilotDrawer = shell.querySelector('#copilot-drawer');
@@ -725,6 +726,7 @@
       copilotOrg = org?.id;
       copilotTicket++;
       copilotBody.replaceChildren();
+      copilotConversationId = null;
     }
   }
   async function loadCopilot() {
@@ -858,12 +860,18 @@
   }
   async function renderCopilot(c) {
     const admins = canEditMappings();
-    const [status, history, usage, docs] = await Promise.all([
+    const [status, conversations, usage, docs] = await Promise.all([
       api(c.url('/copilot/status')),
-      api(c.url('/copilot/messages')),
+      api(c.url('/copilot/conversations')),
       admins ? api(c.url('/copilot/usage')) : Promise.resolve(null),
       api(c.url('/copilot/documents')),
     ]);
+    if (!conversations.some((item) => item.id === copilotConversationId)) {
+      copilotConversationId = conversations[0]?.id || null;
+    }
+    const history = copilotConversationId
+      ? await api(c.url(`/copilot/conversations/${encodeURIComponent(copilotConversationId)}/messages`))
+      : [];
     const active = status.available && status.enabled && status.access?.granted !== false;
     const quotaLine = `${num(status.quotas.user_messages)} / ${num(status.quotas.messages_per_user_day)}`;
     const accessLine = status.access && !status.access.granted
@@ -915,6 +923,33 @@
         `</section>` + grantsPanel + usageUsage + `</details>` : '') +
       `<section data-copilot-chat><div id="copilot-transcript" role="log" aria-live="polite" aria-relevant="additions text">${history?.length ? copilotTranscript([...history].reverse()) : empty}</div>` + composer + `</section>`;
     if (!c.mount(body)) return;
+    const conversationSelect = copilotDrawer.querySelector('[data-copilot-conversation]');
+    const updateConversationSelect = (items = conversations) => {
+      conversationSelect.innerHTML = items.map((item) =>
+        `<option value="${esc(item.id)}">${esc(item.title === 'New chat' ? t('New chat') : item.title)}</option>`).join('');
+      conversationSelect.value = copilotConversationId || '';
+      conversationSelect.disabled = !items.length;
+      copilotDrawer.querySelector('[data-copilot-delete]').disabled = !items.length;
+    };
+    updateConversationSelect();
+    copilotDrawer.querySelector('[data-copilot-new]').disabled = !active;
+    copilotDrawer.querySelector('[data-copilot-delete]').disabled = !active || !conversations.length;
+    conversationSelect.onchange = () => {
+      copilotConversationId = conversationSelect.value || null;
+      loadCopilot();
+    };
+    copilotDrawer.querySelector('[data-copilot-new]').onclick = async () => {
+      const created = await post(c.url('/copilot/conversations'), {});
+      copilotConversationId = created.id;
+      await loadCopilot();
+    };
+    copilotDrawer.querySelector('[data-copilot-delete]').onclick = async () => {
+      if (!copilotConversationId || !window.confirm(t('Delete this copilot conversation?'))) return;
+      await post(c.url(`/copilot/conversations/${encodeURIComponent(copilotConversationId)}`), {}, 'DELETE');
+      copilotConversationId = null;
+      toast(t('Conversation deleted'));
+      await loadCopilot();
+    };
     copilotBody.querySelectorAll('[data-action=cancel]').forEach((x) => x.remove());
     if (!active) copilotBody.querySelectorAll('[data-copilot-chat] textarea, [data-copilot-chat] select, [data-copilot-chat] button').forEach((x) => { x.disabled = true; });
     const enabledCheck = copilotBody.querySelector('[name=copilot_enabled]');
@@ -996,6 +1031,9 @@
     const sendMessage = async (draft = textarea.value, attachment = picker.value) => {
       if (!active || sending || !draft.trim()) return;
       sending = true;
+      copilotDrawer.querySelector('[data-copilot-new]').disabled = true;
+      conversationSelect.disabled = true;
+      copilotDrawer.querySelector('[data-copilot-delete]').disabled = true;
       list.querySelector('.copilot-empty')?.remove();
       list.insertAdjacentHTML('beforeend', copilotTranscript([{role: 'user', content: draft, created_at: new Date().toISOString()}]));
       const userBubble = list.lastElementChild;
@@ -1009,7 +1047,7 @@
       scrollCopilot();
       let streamedText = '';
       try {
-        const reply = await copilotSend(c.url('/copilot/messages'), {page: currentPage(), content: draft, attachment_ids: attachment ? [attachment] : []}, (delta) => {
+        const reply = await copilotSend(c.url('/copilot/messages'), {page: currentPage(), content: draft, attachment_ids: attachment ? [attachment] : [], ...(copilotConversationId ? {conversation_id: copilotConversationId} : {})}, (delta) => {
           streamedText += delta;
           if (!chat.isConnected) return;
           let text = pending.querySelector('.copilot-markdown');
@@ -1021,6 +1059,9 @@
           scrollCopilot();
         });
         if (!chat.isConnected) return;
+        copilotConversationId = reply.conversation_id;
+        const updatedConversations = await api(c.url('/copilot/conversations'));
+        updateConversationSelect(updatedConversations);
         if (reply.quota_consumed ?? !reply.retryable) {
           status.quotas.user_messages++;
           copilotBody.querySelector('[data-copilot-notice]').textContent = `${t('Used today')}: ${num(status.quotas.user_messages)} / ${num(status.quotas.messages_per_user_day)}`;
@@ -1058,6 +1099,9 @@
         chooseAttachment();
       } finally {
         sending = false;
+        copilotDrawer.querySelector('[data-copilot-new]').disabled = !active;
+        conversationSelect.disabled = !active || !conversationSelect.options.length;
+        copilotDrawer.querySelector('[data-copilot-delete]').disabled = !active || !copilotConversationId;
         if (chat.isConnected) {
           chatForm.querySelectorAll('textarea, button, select').forEach((x) => { x.disabled = !active; });
           resize();

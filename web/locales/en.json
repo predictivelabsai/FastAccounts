@@ -2757,6 +2757,11 @@
   "copilot": {
     "workspace": {
       "How can I help with your books?": "How can I help with your books?",
+      "New chat": "New chat",
+      "Conversation history": "Conversation history",
+      "Delete conversation": "Delete conversation",
+      "Delete this copilot conversation?": "Delete this copilot conversation?",
+      "Conversation deleted": "Conversation deleted",
       "Summarise overdue invoices": "Summarise overdue invoices",
       "What needs my attention this week?": "What needs my attention this week?",
       "Explain my VAT position": "Explain my VAT position",

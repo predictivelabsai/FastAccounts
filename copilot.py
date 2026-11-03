@@ -83,20 +83,21 @@ def _day() -> str:
 
 
 def _insert_message(db, organisation_id, user_email, role, content, *,
-                    attachment_ids=None, stage=None, reply=None, tx=None):
+                    attachment_ids=None, stage=None, reply=None, tx=None,
+                    conversation_id=None):
     from contextlib import nullcontext
     with (nullcontext(tx) if tx is not None else db.transaction()) as tx:
         message_id = new_id()
         tx.execute(
             "INSERT INTO copilot_messages(id,organisation_id,user_email,role,content,"
-            "attachment_ids_json,stage_proposal_json,tokens_in,tokens_out,model,created_at) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            "attachment_ids_json,stage_proposal_json,tokens_in,tokens_out,model,created_at,conversation_id) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
             (message_id, organisation_id, user_email, role, content[:MAX_REPLY_CHARS],
              json.dumps(attachment_ids) if attachment_ids else None,
              json.dumps(stage) if stage else None,
              reply["tokens_in"] if reply else 0, reply["tokens_out"] if reply else 0,
              reply["model"] if reply else "",
-             datetime.now(timezone.utc).isoformat(timespec="microseconds")))
+             datetime.now(timezone.utc).isoformat(timespec="microseconds"), conversation_id))
         return one_message(tx, message_id)
 
 
@@ -198,7 +199,45 @@ class CopilotService:
 
     # reads ---------------------------------------------------------------
 
-    def messages(self, organisation_id, user_email, limit=HISTORY_MESSAGES):
+    def conversations(self, organisation_id, user_email):
+        return self.db.rows(
+            "SELECT id,title,created_at,updated_at FROM copilot_conversations "
+            "WHERE organisation_id=? AND user_email=? AND deleted_at IS NULL "
+            "ORDER BY updated_at DESC,id DESC", (organisation_id, user_email))
+
+    def create_conversation(self, organisation_id, user_email):
+        conversation_id = new_id()
+        now = utc_now()
+        with self.db.transaction() as tx:
+            tx.execute("UPDATE organisations SET name=name WHERE id=?", (organisation_id,))
+            if not tx.one("SELECT id FROM memberships WHERE organisation_id=? AND lower(email)=lower(?)",
+                          (organisation_id, user_email)):
+                raise KeyError("Organisation not found")
+            tx.execute("INSERT INTO copilot_conversations(id,organisation_id,user_email,title,created_at,updated_at) "
+                       "VALUES (?,?,?,?,?,?)",
+                       (conversation_id, organisation_id, user_email, "New chat", now, now))
+        return {"id": conversation_id, "title": "New chat", "created_at": now, "updated_at": now}
+
+    def delete_conversation(self, organisation_id, user_email, conversation_id):
+        with self.db.transaction() as tx:
+            result = tx.execute(
+                "UPDATE copilot_conversations SET deleted_at=? WHERE id=? AND organisation_id=? "
+                "AND user_email=? AND deleted_at IS NULL",
+                (utc_now(), conversation_id, organisation_id, user_email))
+            if not result.rowcount:
+                raise KeyError("Conversation not found")
+
+    def messages(self, organisation_id, user_email, limit=HISTORY_MESSAGES, *, conversation_id=None):
+        if conversation_id is not None and not self.db.one(
+                "SELECT id FROM copilot_conversations WHERE id=? AND organisation_id=? "
+                "AND user_email=? AND deleted_at IS NULL",
+                (conversation_id, organisation_id, user_email)):
+            raise KeyError("Conversation not found")
+        conversation_filter = (" AND conversation_id=?" if conversation_id is not None else
+                               " AND conversation_id IN (SELECT id FROM copilot_conversations "
+                               "WHERE organisation_id=? AND user_email=? AND deleted_at IS NULL)")
+        params = ((organisation_id, user_email, conversation_id, int(limit)) if conversation_id is not None else
+                  (organisation_id, user_email, organisation_id, user_email, int(limit)))
         return self.db.rows(
             "SELECT id,role,content,attachment_ids_json,stage_proposal_json,"
             "tokens_in,tokens_out,model,created_at, EXISTS(SELECT 1 FROM audit_events a "
@@ -206,8 +245,8 @@ class CopilotService:
             "AND a.actor=copilot_messages.user_email AND a.object_id=copilot_messages.id "
             "AND a.action='copilot.message' AND a.details_json LIKE '%\"outcome\":\"interrupted\"%') retryable "
             "FROM copilot_messages "
-            "WHERE organisation_id=? AND user_email=? ORDER BY created_at DESC "
-            "LIMIT ?", (organisation_id, user_email, int(limit)))
+            "WHERE organisation_id=? AND user_email=?" + conversation_filter +
+            " ORDER BY created_at DESC LIMIT ?", params)
 
     def usage(self, organisation_id, days=14):
         since = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
@@ -325,7 +364,8 @@ class CopilotService:
 
     # send ----------------------------------------------------------------
 
-    def _prepare_send(self, organisation_id, user_email, content, *, attachment_ids=None, page=None):
+    def _prepare_send(self, organisation_id, user_email, content, *, attachment_ids=None, page=None,
+                      conversation_id=None):
         self._gate(organisation_id, user_email)
         content = self._check_text(content)
         if page is not None and (not isinstance(page, str) or len(page) > 64
@@ -333,23 +373,30 @@ class CopilotService:
             raise ValueError("Invalid workspace page")
         attachments = self._attachments(organisation_id, attachment_ids or [])
         evidence = [self._load_evidence(organisation_id, a) for a in attachments]
-        history = list(reversed(self.messages(organisation_id, user_email)))
+        if conversation_id is not None:
+            history = list(reversed(self.messages(organisation_id, user_email,
+                                                  conversation_id=conversation_id)))
+        else:
+            history = []
         prompt = self._compose(organisation_id, content, history, evidence, page=page)
         prompt_chars = len(json.dumps(prompt, ensure_ascii=False))
         if prompt_chars > 280000:
             raise CopilotQuotaExceeded("Your copilot volume allowance is used up for today.")
         options = self._provider_options(organisation_id)
-        user_message, quota_day = self._consume_quota(organisation_id, user_email,
+        user_message, quota_day, conversation_id = self._consume_quota(organisation_id, user_email,
                             scans=len(evidence), prompt_chars=prompt_chars,
-                            content=content, attachment_ids=[a["id"] for a in attachments])
+                            content=content, attachment_ids=[a["id"] for a in attachments],
+                            conversation_id=conversation_id)
         return {"prompt": prompt, "user_message": user_message, "options": options,
-                "scans": len(evidence), "prompt_chars": prompt_chars, "day": quota_day}
+                "scans": len(evidence), "prompt_chars": prompt_chars, "day": quota_day,
+                "conversation_id": conversation_id}
 
     def _finish_reply(self, organisation_id, user_email, prepared, reply, *, error=None):
         stage = None if error else extract_stage(reply["content"])
         with self.db.transaction() as tx:
             assistant = _insert_message(self.db, organisation_id, user_email, "assistant",
-                                        reply["content"], reply=reply, stage=stage, tx=tx)
+                                        reply["content"], reply=reply, stage=stage, tx=tx,
+                                        conversation_id=prepared["conversation_id"])
             if error and reply["content"] == error:
                 # Preserve the existing zero-token failure/retry accounting.
                 tx.execute("UPDATE copilot_usage SET messages=messages-1,scans=scans-?,"
@@ -367,12 +414,14 @@ class CopilotService:
         assistant["retryable"] = bool(error)
         return {"user_message": prepared["user_message"], "assistant": assistant, "stage": stage,
                 "retryable": bool(error), "error": error,
-                "quota_consumed": not error or reply["content"] != error}
+                "quota_consumed": not error or reply["content"] != error,
+                "conversation_id": prepared["conversation_id"]}
 
     def send(self, organisation_id, user_email, content, *,
-             attachment_ids=None, page=None, client=None):
+             attachment_ids=None, page=None, client=None, conversation_id=None):
         prepared = self._prepare_send(organisation_id, user_email, content,
-                                      attachment_ids=attachment_ids, page=page)
+                                      attachment_ids=attachment_ids, page=page,
+                                      conversation_id=conversation_id)
         try:
             reply = chat_completion(prepared["prompt"], client=client, **prepared["options"])
         except CopilotProviderError as error:
@@ -383,10 +432,11 @@ class CopilotService:
         return self._finish_reply(organisation_id, user_email, prepared, reply)
 
     def stream(self, organisation_id, user_email, content, *,
-               attachment_ids=None, page=None, client=None):
+               attachment_ids=None, page=None, client=None, conversation_id=None):
         # Preflight is eager: HTTP errors happen before StreamingResponse sends headers.
         prepared = self._prepare_send(organisation_id, user_email, content,
-                                      attachment_ids=attachment_ids, page=page)
+                                      attachment_ids=attachment_ids, page=page,
+                                      conversation_id=conversation_id)
         return self._stream_reply(organisation_id, user_email, prepared, client=client)
 
     def _stream_reply(self, organisation_id, user_email, prepared, *, client=None):
@@ -550,7 +600,8 @@ class CopilotService:
             "quotes_awaiting_decision": int(quotes.get("n", 0)),
         }
 
-    def _consume_quota(self, organisation_id, user_email, *, scans, prompt_chars, content, attachment_ids):
+    def _consume_quota(self, organisation_id, user_email, *, scans, prompt_chars, content,
+                       attachment_ids, conversation_id=None):
         """Atomic pre-spend check; raises before any provider cost is incurred."""
         quota_day = _day()
         with self.db.transaction() as tx:
@@ -599,13 +650,31 @@ class CopilotService:
                 raise CopilotQuotaExceeded("The organisation has reached today's "
                                            "copilot volume. Try again tomorrow.")
 
+            if conversation_id is None:
+                conversation_id = new_id()
+                now = utc_now()
+                title = content[:80]
+                tx.execute(
+                    "INSERT INTO copilot_conversations(id,organisation_id,user_email,title,created_at,updated_at) "
+                    "VALUES (?,?,?,?,?,?)",
+                    (conversation_id, organisation_id, user_email, title, now, now))
+            elif not tx.one(
+                    "SELECT id FROM copilot_conversations WHERE id=? AND organisation_id=? "
+                    "AND user_email=? AND deleted_at IS NULL",
+                    (conversation_id, organisation_id, user_email)):
+                raise KeyError("Conversation not found")
             self._record_usage(organisation_id, user_email, messages=1, scans=scans,
                                prompt_chars=prompt_chars, tokens_in=0, tokens_out=0, tx=tx, day=quota_day)
             user_message = _insert_message(self.db, organisation_id, user_email, "user", content,
-                                           attachment_ids=attachment_ids, tx=tx)
+                                           attachment_ids=attachment_ids, tx=tx,
+                                           conversation_id=conversation_id)
+            tx.execute(
+                "UPDATE copilot_conversations SET title=CASE WHEN title='New chat' THEN ? ELSE title END, "
+                "updated_at=? WHERE id=? AND organisation_id=? AND user_email=? AND deleted_at IS NULL",
+                (content[:80], utc_now(), conversation_id, organisation_id, user_email))
             audit(tx, organisation_id, user_email, "copilot.message", "copilot", organisation_id,
                   {"attachments": len(attachment_ids), "prompt_chars": prompt_chars, "outcome": "started"})
-            return user_message, quota_day
+            return user_message, quota_day, conversation_id
 
     def _record_usage(self, organisation_id, user_email, *, messages, scans,
                       prompt_chars, tokens_in, tokens_out, tx=None, day=None):
