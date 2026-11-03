@@ -845,7 +845,7 @@
       return html;
     }).join('');
   }
-  async function copilotSend(url, payload, onDelta, signal) {
+  async function copilotSend(url, payload, onDelta, signal, onConversation) {
     if (typeof ReadableStream === 'undefined' || typeof TextDecoder === 'undefined') return post(url, payload);
     let response;
     try {
@@ -874,6 +874,7 @@
           const raw = frame.split('\n').filter((line) => line.startsWith('data:')).map((line) => line.slice(5).trimStart()).join('\n');
           if (!raw) continue;
           const data = JSON.parse(raw);
+          if (kind === 'start') onConversation(data.conversation_id);
           if (kind === 'delta') onDelta(data.text);
           if (kind === 'done') result = data;
         }
@@ -1101,7 +1102,17 @@
           }
           text.innerHTML = copilotMarkdown(streamedText);
           scrollCopilot();
-        }, requestController.signal);
+        }, requestController.signal, (conversationId) => {
+          copilotConversationId = conversationId;
+          if (![...conversationSelect.options].some((option) => option.value === conversationId)) {
+            const option = document.createElement('option');
+            option.value = conversationId;
+            option.textContent = draft.slice(0, 80);
+            conversationSelect.append(option);
+          }
+          conversationSelect.value = conversationId;
+          copilotDrawer.querySelector('[data-copilot-delete]').disabled = false;
+        });
         if (!chat.isConnected) return;
         copilotConversationId = reply.conversation_id;
         const updatedConversations = await api(c.url('/copilot/conversations'));
