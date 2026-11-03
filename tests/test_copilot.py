@@ -640,11 +640,22 @@ def test_workspace_copilot_drawer_offline(language, role, monkeypatch, tmp_path)
             markdown = ('**First** *part* `code`\n\n- One\n- Two\n\n1. Numbered\n\n'
                         '```python\nprint(1)\n```\n'
                         '[Safe](https://example.test) [Bad](javascript:alert) '
-                        '<script>window.injected=true</script><img src=x onerror="window.injected=true">')
+                        '<script>window.injected=true</script><img src=x onerror="window.injected=true">\n\n'
+                        '| Name | **Amount** | Note |\n| :--- | ---: | :---: |\n'
+                        '| Rent | 12 | *monthly* |\n| <img src=x onerror="window.injected=true"> | 8 | ok |')
             page.evaluate("text => window.pushCopilot('delta', {text})", markdown[len('**First** *part* `code`'):])
             playwright.expect(drawer.locator('.copilot-markdown ul').last.locator('li')).to_have_count(2)
             playwright.expect(drawer.locator('.copilot-markdown ol').last.locator('li')).to_have_count(1)
             playwright.expect(drawer.locator('.copilot-markdown pre code').last).to_contain_text('print(1)')
+            table = drawer.locator('.copilot-markdown table').last
+            playwright.expect(table.locator('thead th')).to_have_count(3)
+            playwright.expect(table.locator('thead th').nth(1).locator('strong')).to_have_text('Amount')
+            playwright.expect(table.locator('tbody tr')).to_have_count(2)
+            playwright.expect(table.locator('tbody tr').first.locator('td').nth(2).locator('em')).to_have_text('monthly')
+            playwright.expect(table.locator('thead th').nth(0)).to_have_class('align-left')
+            playwright.expect(table.locator('thead th').nth(1)).to_have_class('align-right')
+            playwright.expect(table.locator('thead th').nth(2)).to_have_class('align-center')
+            playwright.expect(drawer.locator('.copilot-table-wrap')).to_be_visible()
             assert drawer.locator('.copilot-markdown script, .copilot-markdown img').count() == 0
             assert page.evaluate('window.injected') is None
             safe = drawer.locator('.copilot-markdown a').last

@@ -7,8 +7,14 @@
   re-enables the composer. The streaming service already persists partial
   replies when the client disconnects.
 - Added localised stop labels to the en, et, lt and lv copilot dictionaries.
-- Validation: `tests/test_copilot.py -q -p no:cacheprovider` (59 passed,
-  1 failed because the lt/lv translation keys were initially missing; fixed).
+- Validation: `tests/test_copilot.py -q -p no:cacheprovider` (60 passed).
+
+## 2026-11-03: Copilot Markdown tables
+
+- The safe Markdown renderer now displays pipe tables with inline formatting,
+  left, centre and right alignment, and escaped cell content. Tables scroll
+  horizontally when needed and follow the workspace table styling.
+- Added browser assertions for rendered cells, alignment and unsafe markup.
 
 Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as

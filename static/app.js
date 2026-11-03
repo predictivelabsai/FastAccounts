@@ -790,7 +790,38 @@
       let html = '', paragraph = [], list = null;
       const flush = () => { if (paragraph.length) html += `<p>${inline(paragraph.join('\n'))}</p>`; paragraph = []; };
       const close = () => { if (list) html += `</${list}>`; list = null; };
-      for (const line of block.split('\n')) {
+      const lines = block.split('\n');
+      const cells = (line) => {
+        let value = line.trim();
+        if (value.startsWith('|')) value = value.slice(1);
+        if (value.endsWith('|') && !value.endsWith('\\|')) value = value.slice(0, -1);
+        return value.split(/(?<!\\)\|/).map((cell) => cell.trim().replace(/\\\|/g, '|'));
+      };
+      for (let index = 0; index < lines.length; index++) {
+        const line = lines[index];
+        const header = line.includes('|') ? cells(line) : [];
+        const separator = lines[index + 1]?.includes('|') ? cells(lines[index + 1]) : [];
+        const isSeparator = separator.length === header.length && separator.length > 0 &&
+          separator.every((cell) => /^:?-{3,}:?$/.test(cell));
+        if (header.length && isSeparator) {
+          flush(); close();
+          const alignments = separator.map((cell) => cell.startsWith(':') && cell.endsWith(':') ? 'center'
+            : cell.endsWith(':') ? 'right' : cell.startsWith(':') ? 'left' : '');
+          const cellHtml = (cell, tag, column) => {
+            const alignment = alignments[column];
+            return `<${tag}${alignment ? ` class="align-${alignment}"` : ''}>${inline(cell)}</${tag}>`;
+          };
+          html += '<div class="copilot-table-wrap"><table><thead><tr>' +
+            header.map((cell, column) => cellHtml(cell, 'th', column)).join('') +
+            '</tr></thead><tbody>';
+          index++;
+          while (index + 1 < lines.length && lines[index + 1].includes('|')) {
+            const row = cells(lines[++index]);
+            html += '<tr>' + header.map((_, column) => cellHtml(row[column] || '', 'td', column)).join('') + '</tr>';
+          }
+          html += '</tbody></table></div>';
+          continue;
+        }
         const bullet = /^\s*(?:([-*])|\d+\.)\s+(.+)$/.exec(line);
         if (bullet) {
           flush();
