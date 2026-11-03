@@ -62,6 +62,17 @@ delivered.
   without an existing password. Added translated copy to the locale catalogues.
 - Focused account, MFA, browser and localisation tests pass: 132 passed. One
   existing pytest parametrisation deprecation warning remains.
+## 2026-11-03: Email invitations and acceptance
+
+- New organisation invitations are emailed using the configured public URL and
+  inviter language, with the manual token retained only when delivery cannot be
+  sent. Pending invitations can be resent or revoked by organisation owners and
+  administrators, with audit events for both actions.
+- Added a public invitation page with sign-in and registration hand-off, invited
+  email prefill, matching-account acceptance, CSRF protection, and throttled
+  token lookups. Acceptance selects the joined organisation in the workspace.
+- Added focused invitation and auth coverage. Targeted governance, account auth,
+  migration and tenancy checks are recorded for this change.
 
 ## 2026-10-29: Payroll dimensions and bureau overview (Build 10 complete; UAT pending)
 

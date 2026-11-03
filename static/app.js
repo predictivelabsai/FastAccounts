@@ -435,6 +435,11 @@
   async function boot() {
     ({ csrf_token: csrf } = await api("/csrf"));
     organisations = await api("/organisations");
+    const invitedOrganisation = new URLSearchParams(location.search).get("organisation_id");
+    if (invitedOrganisation && organisations.some((o) => String(o.id) === invitedOrganisation)) {
+      localStorage.setItem("fastaccounts_org", invitedOrganisation);
+      history.replaceState(null, "", location.pathname + location.hash);
+    }
     org =
       organisations.find(
         (o) => String(o.id) === localStorage.getItem("fastaccounts_org"),
@@ -1204,9 +1209,16 @@
       c.mount(page(t("User management"), t("Read-only membership overview for companies you administer."), "",
         companies.length ? companies.map((company) => `<section class="section"><div class="section-head"><h2>${esc(company.name)}</h2>${button("Manage membership","manageMembership",false,`data-id="${esc(company.id)}"`)}</div>${table(["User", "Role", "Invitation status"], [
           ...company.members.map((member) => row([td(esc(member.email)), td(tr(member.role)), td(tr("Member"))])),
-          ...company.invitations.map((invite) => row([td(esc(invite.email)), td(tr(invite.role)), td(`${tr(invite.status)}${invite.expires_at ? ` · ${esc(invite.expires_at.slice(0, 10))}` : ""}`)])),
+          ...company.invitations.map((invite) => {
+            const controls = invite.status === "Pending"
+              ? ` ${button("Resend invitation", "resendInvitation", false, `data-org="${esc(company.id)}" data-id="${esc(invite.id)}"`)} ${button("Revoke invitation", "revokeInvitation", false, `data-org="${esc(company.id)}" data-id="${esc(invite.id)}"`)}`
+              : "";
+            return row([td(esc(invite.email)), td(tr(invite.role)), td(`${tr(invite.status)}${invite.expires_at ? ` · ${esc(invite.expires_at.slice(0, 10))}` : ""}${controls}`)]);
+          }),
         ])}</section>`).join("") : empty("No administered organisations", "")));
-      bindActions(content, {manageMembership: (b) => manageBureauMembership(b.dataset.id, companies.find((x)=>x.id===b.dataset.id))});
+      bindActions(content, {manageMembership: (b) => manageBureauMembership(b.dataset.id, companies.find((x)=>x.id===b.dataset.id)),
+        resendInvitation: async (b) => { const result = await post(`/organisations/${encodeURIComponent(b.dataset.org)}/invitations/${encodeURIComponent(b.dataset.id)}/resend`,{}); toast(result.mail_sent ? tr('Invitation emailed') : `${tr('Share this one-time token over a trusted channel')}: ${result.accept_token}`,'success'); render(); },
+        revokeInvitation: async (b) => { await post(`/organisations/${encodeURIComponent(b.dataset.org)}/invitations/${encodeURIComponent(b.dataset.id)}/revoke`,{}); toast(tr('Invitation revoked'),'success'); render(); }});
     },
     overview: async (c) => {
       const [invoices, bills, bank, runs, absences, clients] = await Promise.all([
@@ -5023,7 +5035,9 @@
     bindForm(d, async (data) => {
       try {
         const result = await post(`/organisations/${encodeURIComponent(organisationId)}/invitations`,data);
-        d.querySelector('[data-invite-result]').innerHTML = `<p>${tr('Invitation created')}: ${esc(result.invitation.email)} · ${tr(result.invitation.role)}</p><p>${tr('Share this one-time token over a trusted channel')} <code>${esc(result.accept_token)}</code></p>`;
+        d.querySelector('[data-invite-result]').innerHTML = result.mail_sent
+          ? `<p>${tr('Invitation emailed to')} ${esc(result.invitation.email)}</p>`
+          : `<p>${tr('Invitation created')}: ${esc(result.invitation.email)} · ${tr(result.invitation.role)}</p><p>${tr('Share this one-time token over a trusted channel')} <code>${esc(result.accept_token)}</code></p>`;
       } catch(error) { toast(error.message,'error'); }
     });
   }

@@ -54,6 +54,7 @@ LIMITS: dict[str, tuple[int, int]] = {
     "forgot_ip": (20, 60 * 60),
     "token_ip": (20, 15 * 60),     # verify/reset form submissions per client
     "password_change": (5, 15 * 60),
+    "invite_token_ip": (20, 15 * 60),
 }
 
 # OWASP-equivalent scrypt cost (N=2^14, r=8, p=5) with a modest 16 MiB footprint.
@@ -194,6 +195,34 @@ def _send_link(email: str, name: str, purpose: str, token: str, lang: str) -> bo
             f"<p><a href=\"{html.escape(link, quote=True)}\">{html.escape(subject)}</a></p>"
             + "".join(f"<p>{html.escape(line)}</p>" for line in lines[2:]))
     return send_email(email, subject, body, text)
+
+
+def send_invitation_email(invitation: dict, token: str, inviter: str, lang: str = "en") -> bool:
+    """Send an organisation invitation using the configured public URL."""
+    base = public_base_url()
+    if not base:
+        return False
+    organisation = get_database().one("SELECT name FROM organisations WHERE id=?",
+                                      (invitation["organisation_id"],)) or {}
+    org_name = str(organisation.get("name") or "")
+    inviter_account = accounts.get(inviter)
+    inviter_name = (inviter_account or {}).get("name") or inviter
+    lang = lang if lang in {"en", "et"} else "en"
+    roles = {"en": {"owner": "owner", "administrator": "administrator", "accountant": "accountant",
+                     "approver": "approver", "viewer": "viewer"},
+             "et": {"owner": "omanik", "administrator": "haldur", "accountant": "raamatupidaja",
+                    "approver": "kinnitaja", "viewer": "vaataja"}}
+    role, expiry = roles[lang].get(str(invitation["role"]), str(invitation["role"])), str(invitation["expires_at"])
+    link = f"{base}/invite/{token}"
+    mail_copy = i18n.catalog(lang).get("invitation_mail", i18n.catalog("en")["invitation_mail"])
+    subject = mail_copy["subject"]
+    intro = mail_copy["body"].format(inviter=inviter_name, organisation=org_name, role=role)
+    link_line = mail_copy["accept"].format(link=link)
+    expiration = mail_copy["expiry"].format(expires=expiry)
+    text = f"{intro}\n\n{link_line}\n\n{expiration}"
+    body = (f"<p>{html.escape(intro)}</p><p><a href=\"{html.escape(link, quote=True)}\">"
+            f"{html.escape(subject)}</a></p><p>{html.escape(expiration)}</p>")
+    return send_email(invitation["email"], subject, body, text)
 
 
 # ---------------------------------------------------------------- store

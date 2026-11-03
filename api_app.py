@@ -681,7 +681,7 @@ def payroll_bureau_memberships(user: User = Depends(current_user)):
     for organisation in organisations:
         members = db.rows("SELECT email,role FROM memberships WHERE organisation_id=? ORDER BY lower(email)",
                           (organisation['id'],))
-        invitations = db.rows("SELECT email,role,status,expires_at FROM invitations WHERE organisation_id=? ORDER BY lower(email)",
+        invitations = db.rows("SELECT id,email,role,status,expires_at FROM invitations WHERE organisation_id=? ORDER BY lower(email)",
                               (organisation['id'],))
         result.append({**organisation, 'members': members, 'invitations': invitations})
     return result
@@ -713,14 +713,36 @@ def list_accounts(organisation_id: str, user: User = Depends(current_user)):
 
 @api.post("/organisations/{organisation_id}/invitations", status_code=201)
 def create_invitation(organisation_id: str, payload: InvitationIn,
-                      user: User = Depends(require_csrf)):
+                      request: Request, user: User = Depends(require_csrf)):
     _require(organisation_id, user, {"owner", "administrator"})
     invitation, token = GovernanceService().invite(
         organisation_id, email=payload.email, role=payload.role,
         valid_days=payload.valid_days, actor=user.email,
     )
-    return {"invitation": invitation, "accept_token": token,
-            "warning": "Deliver this one-time token over a trusted channel"}
+    from web.account_auth import send_invitation_email
+    mail_sent = send_invitation_email(invitation, token, user.email,
+                                      request.session.get("lang", "en"))
+    return {"invitation": invitation, "accept_token": None if mail_sent else token,
+            "mail_sent": mail_sent,
+            "warning": "Deliver this one-time token over a trusted channel" if not mail_sent else None}
+
+
+@api.post("/organisations/{organisation_id}/invitations/{invitation_id}/revoke")
+def revoke_invitation(organisation_id: str, invitation_id: str, user: User = Depends(require_csrf)):
+    GovernanceService().revoke_invitation(organisation_id, invitation_id, actor=user.email)
+    return {"revoked": True}
+
+
+@api.post("/organisations/{organisation_id}/invitations/{invitation_id}/resend")
+def resend_invitation(organisation_id: str, invitation_id: str, request: Request,
+                      user: User = Depends(require_csrf)):
+    service = GovernanceService()
+    invitation, token = service.resend_invitation(organisation_id, invitation_id, actor=user.email)
+    from web.account_auth import send_invitation_email
+    mail_sent = send_invitation_email(invitation, token, user.email,
+                                      request.session.get("lang", "en"))
+    return {"invitation": invitation, "accept_token": None if mail_sent else token,
+            "mail_sent": mail_sent}
 
 
 @api.post("/invitations/accept")

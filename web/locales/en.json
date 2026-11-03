@@ -2960,8 +2960,32 @@
       "Payroll start, payday rules, email settings, leave expiry, reserve posting, posting accounts and dimension registers.":"Payroll start, payday rules, email settings, leave expiry, reserve posting, posting accounts and dimension registers.",
       "Position group":"Position group","Role":"Role","TSD due":"TSD due",
       "Upload a CSV or XLSX for review. Accepted rows are applied only after review.":"Upload a CSV or XLSX for review. Accepted rows are applied only after review.",
-      "Invitation created":"Invitation created","Share this one-time token over a trusted channel":"Share this one-time token over a trusted channel"
+      "Invitation created":"Invitation created",
+      "Share this one-time token over a trusted channel": "Share this one-time token over a trusted channel",
+      "Resend invitation": "Resend invitation",
+      "Revoke invitation": "Revoke invitation",
+      "Invitation emailed": "Invitation emailed",
+      "Invitation emailed to": "Invitation emailed to",
+      "Invitation revoked": "Invitation revoked"
     },
     "nav": {"bureau_overview": "Companies overview", "bureau_memberships": "User management"}
+  },
+  "invitation": {
+    "title": "Organisation invitation",
+    "invalid": "This invitation is expired, revoked, already used, or invalid.",
+    "wrong_account": "This invitation is for {email}. Sign out and sign in with that address to accept it.",
+    "sign_out": "Sign out",
+    "details": "You are invited to join {organisation} as {role}.",
+    "expires": "This invitation expires on {expires}.",
+    "accept": "Accept invitation",
+    "sign_in": "Sign in",
+    "create_account": "Create account",
+    "rate_limited": "Too many invitation checks. Please try again later."
+  },
+  "invitation_mail": {
+    "subject": "You are invited to FastAccounts",
+    "body": "{inviter} invited you to join {organisation} as {role}.",
+    "accept": "Accept invitation: {link}",
+    "expiry": "This invitation expires on {expires}."
   }
 }

@@ -638,6 +638,35 @@ def password_token_page(purpose: str, token: str, lang: str = i18n.DEFAULT_LANG,
     )
 
 
+def invitation_page(invitation: dict | None, lang: str, *, token: str, csrf: str = "",
+                    user_email: str = "", error: str = ""):
+    T = lambda key: i18n.t(f"invitation.{key}", lang)
+    content = [H1(T("title")), P(error, role="alert", cls="error") if error else None]
+    if not invitation or invitation.get("status") != "Pending":
+        content.append(P(T("invalid")))
+    elif user_email and user_email.lower() != invitation["email"].lower():
+        content.extend([P(T("wrong_account").format(email=invitation["email"])),
+                        A(T("sign_out"), href="/logout", cls="fs-btn fs-btn-outline")])
+    else:
+        roles = {"en": {"owner": "owner", "administrator": "administrator", "accountant": "accountant",
+                         "approver": "approver", "viewer": "viewer"},
+                 "et": {"owner": "omanik", "administrator": "haldur", "accountant": "raamatupidaja",
+                        "approver": "kinnitaja", "viewer": "vaataja"}}
+        role = roles.get(lang, roles["en"]).get(invitation["role"], invitation["role"])
+        content.extend([P(T("details").format(organisation=invitation["organisation_name"], role=role)),
+                        P(T("expires").format(expires=invitation["expires_at"]))])
+        if user_email:
+            content.append(Form(Input(type="hidden", name="csrf_token", value=csrf),
+                                Button(T("accept"), type="submit", cls="fs-btn fs-btn-primary"),
+                                method="post", action=f"/invite/{token}", cls="auth-form"))
+        else:
+            next_path = quote(f"/invite/{token}", safe="")
+            content.extend([A(T("sign_in"), href=f"/login?next={next_path}", cls="fs-btn fs-btn-primary"),
+                            A(T("create_account"), href=f"/login?tab=register&next={next_path}", cls="fs-btn fs-btn-outline")])
+    return public_page(Section(Div(*content, cls="auth-card"), cls="auth-wrap"),
+                       title=T("title"), current=f"/invite/{token}", lang=lang)
+
+
 def workspace_page(user: dict, lang: str = "en"):
     T = lambda key: i18n.t(key, lang)
     display_name = user.get("name") or user.get("email") or ""
