@@ -2763,6 +2763,8 @@
       "Ask about your books": "Jautā par savu grāmatvedību",
       "Remove attachment": "Noņemt pielikumu",
       "Thinking": "Domā",
+      "Stop": "Apturēt",
+      "Stopped": "Apturēts",
       "Retry": "Mēģināt vēlreiz",
       "The AI provider rejected the configured API key.": "MI pakalpojuma sniedzējs noraidīja konfigurēto API atslēgu.",
       "The AI provider returned an error. Try again later.": "MI pakalpojuma sniedzējs atgrieza kļūdu. Mēģini vēlāk.",

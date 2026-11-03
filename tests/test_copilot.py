@@ -626,6 +626,7 @@ def test_workspace_copilot_drawer_offline(language, role, monkeypatch, tmp_path)
                         window.pushCopilot = (kind, data) => controller.enqueue(new TextEncoder().encode(
                             'event: ' + kind + '\\ndata: ' + JSON.stringify(data) + '\\n\\n'));
                         window.endCopilot = () => controller.close();
+                        options.signal.addEventListener('abort', () => controller.error(new DOMException('Aborted', 'AbortError')));
                     }}), {headers: {'Content-Type': 'text/event-stream'}}))
                     : window.originalCopilotFetch(url, options);
             }""")
@@ -658,6 +659,15 @@ def test_workspace_copilot_drawer_offline(language, role, monkeypatch, tmp_path)
             drawer.locator('[data-copy]').last.click()
             assert page.evaluate('window.copiedReply') == markdown
             playwright.expect(drawer.locator('[data-copy]').last).to_have_text('Reply copied')
+            composer.fill('Stop this reply')
+            composer.press('Enter')
+            playwright.expect(drawer.locator('.copilot-stop')).to_be_visible()
+            page.evaluate("window.pushCopilot('delta', {text: 'Keep this partial text'})")
+            drawer.locator('.copilot-stop').click()
+            playwright.expect(drawer.locator('.copilot-stopped')).to_contain_text('Keep this partial text')
+            playwright.expect(drawer.locator('.copilot-stop-status')).to_have_text('Stopped')
+            playwright.expect(composer).to_be_enabled()
+            playwright.expect(drawer.locator('.copilot-stop')).to_be_hidden()
             composer.fill('Interrupted stream')
             composer.press('Enter')
             playwright.expect(composer).to_be_disabled()

@@ -807,11 +807,11 @@
       return html;
     }).join('');
   }
-  async function copilotSend(url, payload, onDelta) {
+  async function copilotSend(url, payload, onDelta, signal) {
     if (typeof ReadableStream === 'undefined' || typeof TextDecoder === 'undefined') return post(url, payload);
     let response;
     try {
-      response = await api(url, {method: 'POST', body: JSON.stringify(payload), headers: {Accept: 'text/event-stream'}});
+      response = await api(url, {method: 'POST', body: JSON.stringify(payload), signal, headers: {Accept: 'text/event-stream'}});
     } catch (error) {
       // Only negotiate again when the server rejected streaming before accepting a send.
       if ([404, 405, 406, 415, 501].includes(error.status)) return post(url, payload);
@@ -880,7 +880,8 @@
     const composer = `<form class="copilot-composer"><div data-copilot-attachment hidden></div><div class="copilot-compose-row">` +
       `<button type="button" class="button copilot-attach" aria-label="${tr('Attach document')}" aria-expanded="false" aria-controls="copilot-documents">${icon('paperclip')}</button>` +
       `<textarea name="content" rows="1" maxlength="8000" aria-label="${tr('Message')}" placeholder="${tr('Ask about your books')}" required></textarea>` +
-      `<button type="submit" class="button primary copilot-send" aria-label="${tr('Send message')}" disabled>${icon('send')}</button></div>` +
+      `<button type="submit" class="button primary copilot-send" aria-label="${tr('Send message')}" disabled>${icon('send')}</button>` +
+      `<button type="button" class="button copilot-stop" hidden>${tr('Stop')}</button></div>` +
       `<div class="copilot-attachments" hidden><select id="copilot-documents" aria-label="${tr('Attach document')}"><option value="">${tr('No attachment')}</option>${docs.map((d) => `<option value="${esc(d.id)}">${esc(d.filename)}</option>`).join('')}</select></div></form>`;
     const usageUsage = usage
       ? `<section class="section" data-copilot-usage><h2>${tr('Copilot usage')}</h2><p class="muted">${tr('Per-user daily usage counts every message, scan and token billed to this organisation.')}</p>` +
@@ -968,11 +969,13 @@
     const chatForm = chat.querySelector('form');
     const textarea = chatForm.querySelector('textarea');
     const send = chatForm.querySelector('[type=submit]');
+    const stop = chatForm.querySelector('.copilot-stop');
     const attach = chatForm.querySelector('.copilot-attach');
     const picker = chatForm.querySelector('select');
     const menu = chatForm.querySelector('.copilot-attachments');
     const chip = chatForm.querySelector('[data-copilot-attachment]');
     let sending = false;
+    let requestController = null;
     const resize = () => {
       textarea.style.height = 'auto';
       textarea.style.height = `${Math.min(textarea.scrollHeight, 192)}px`;
@@ -996,6 +999,7 @@
     const sendMessage = async (draft = textarea.value, attachment = picker.value) => {
       if (!active || sending || !draft.trim()) return;
       sending = true;
+      requestController = new AbortController();
       list.querySelector('.copilot-empty')?.remove();
       list.insertAdjacentHTML('beforeend', copilotTranscript([{role: 'user', content: draft, created_at: new Date().toISOString()}]));
       const userBubble = list.lastElementChild;
@@ -1005,6 +1009,10 @@
       picker.value = '';
       chooseAttachment();
       chatForm.querySelectorAll('textarea, button, select').forEach((x) => { x.disabled = true; });
+      send.hidden = true;
+      stop.hidden = false;
+      stop.disabled = false;
+      stop.onclick = () => requestController?.abort();
       resize();
       scrollCopilot();
       let streamedText = '';
@@ -1019,7 +1027,7 @@
           }
           text.innerHTML = copilotMarkdown(streamedText);
           scrollCopilot();
-        });
+        }, requestController.signal);
         if (!chat.isConnected) return;
         if (reply.quota_consumed ?? !reply.retryable) {
           status.quotas.user_messages++;
@@ -1041,6 +1049,14 @@
         bindStages();
       } catch (error) {
         if (!chat.isConnected) return;
+        if (error.name === 'AbortError') {
+          pending.classList.add('copilot-stopped');
+          pending.innerHTML = `<span class="copilot-author">${icon('assistant')}${tr('AI copilot')}</span>` +
+            (streamedText ? `<div class="copilot-markdown">${copilotMarkdown(streamedText)}</div>` : '') +
+            `<p class="copilot-stop-status">${tr('Stopped')}</p>`;
+          if (streamedText) pending.insertAdjacentHTML('beforeend', `<button type="button" class="button copilot-copy" data-copy="${esc(streamedText)}" aria-label="${tr('Copy reply')}">${tr('Copy reply')}</button>`);
+          return;
+        }
         pending.classList.add('copilot-error');
         pending.innerHTML = `<span class="copilot-author">${icon('assistant')}${tr('AI copilot')}</span><p>${esc(error.message)}</p><button type="button" class="button">${tr('Retry')}</button>`;
         if (streamedText) {
@@ -1058,8 +1074,11 @@
         chooseAttachment();
       } finally {
         sending = false;
+        requestController = null;
         if (chat.isConnected) {
           chatForm.querySelectorAll('textarea, button, select').forEach((x) => { x.disabled = !active; });
+          stop.hidden = true;
+          send.hidden = false;
           resize();
           scrollCopilot();
           if (!copilotDrawer.hidden) textarea.focus();

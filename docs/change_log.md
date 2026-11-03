@@ -1,5 +1,15 @@
 # FastAccounts Change Log
 
+## 2026-11-03: Copilot reply stop control
+
+- Added a Stop control while an AI reply streams. Stopping aborts the browser
+  request, keeps received text in the thread with a stopped label, and
+  re-enables the composer. The streaming service already persists partial
+  replies when the client disconnects.
+- Added localised stop labels to the en, et, lt and lv copilot dictionaries.
+- Validation: `tests/test_copilot.py -q -p no:cacheprovider` (59 passed,
+  1 failed because the lt/lv translation keys were initially missing; fixed).
+
 Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as
 delivered.

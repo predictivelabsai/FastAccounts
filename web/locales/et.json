@@ -2763,6 +2763,8 @@
       "Ask about your books": "Küsi oma raamatupidamise kohta",
       "Remove attachment": "Eemalda manus",
       "Thinking": "Mõtleb",
+      "Stop": "Peata",
+      "Stopped": "Peatatud",
       "Retry": "Proovi uuesti",
       "The AI provider rejected the configured API key.": "Tehisintellekti teenusepakkuja lükkas seadistatud API-võtme tagasi.",
       "The AI provider returned an error. Try again later.": "Tehisintellekti teenusepakkuja tagastas vea. Proovi hiljem uuesti.",

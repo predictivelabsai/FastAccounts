@@ -2763,6 +2763,8 @@
       "Ask about your books": "Ask about your books",
       "Remove attachment": "Remove attachment",
       "Thinking": "Thinking",
+      "Stop": "Stop",
+      "Stopped": "Stopped",
       "Retry": "Retry",
       "The AI provider rejected the configured API key.": "The AI provider rejected the configured API key.",
       "The AI provider returned an error. Try again later.": "The AI provider returned an error. Try again later.",

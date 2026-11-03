@@ -2763,6 +2763,8 @@
       "Ask about your books": "Klausk apie savo apskaitą",
       "Remove attachment": "Pašalinti priedą",
       "Thinking": "Galvoju",
+      "Stop": "Stabdyti",
+      "Stopped": "Sustabdyta",
       "Retry": "Bandyti dar kartą",
       "The AI provider rejected the configured API key.": "DI paslaugos teikėjas atmetė nustatytą API raktą.",
       "The AI provider returned an error. Try again later.": "DI paslaugos teikėjas grąžino klaidą. Bandyk vėliau.",
