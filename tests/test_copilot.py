@@ -487,7 +487,7 @@ def test_workspace_copilot_drawer_offline(language, role, monkeypatch, tmp_path)
     from web_app import app
 
     monkeypatch.setenv("FASTACCOUNTS_DEFAULT_LANG", language)
-    with TestClient(app) as client:
+    with TestClient(app, base_url="https://testserver") as client:
         response = client.get("/auth/test")
         assert response.status_code == 200
         html = response.text

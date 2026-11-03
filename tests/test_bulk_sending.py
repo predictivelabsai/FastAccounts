@@ -217,7 +217,7 @@ def test_csrf_required(sending):
     invoice = d['create']()
     api.dependency_overrides[current_user] = lambda: User(email=ACTOR)
     try:
-        with TestClient(app) as client:
+        with TestClient(app, base_url='https://testserver') as client:
             token = client.get('/api/csrf').json()['csrf_token']
             for headers in [{}, {'X-CSRF-Token': 'wrong'}]:
                 assert client.post('/api' + d['url'], json={'invoice_ids': [invoice['id']]}, headers=headers).status_code == 403
@@ -256,7 +256,7 @@ def test_workspace_confirmation_results_and_history(monkeypatch, language):
     from web import i18n
     from web_app import app
     monkeypatch.setenv('FASTACCOUNTS_DEFAULT_LANG', language)
-    html = TestClient(app).get('/auth/test').text
+    html = TestClient(app, base_url='https://testserver').get('/auth/test').text
     words = i18n.catalog(language)['workspace']
     calls, errors = [], []
     invoices = [dict(id=str(i), number=f'INV-{i}', contact_name='Synthetic <customer>',

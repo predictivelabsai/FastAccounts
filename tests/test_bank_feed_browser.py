@@ -10,12 +10,17 @@ playwright = pytest.importorskip('playwright.sync_api')
 
 @pytest.mark.parametrize('language', ['en', 'et', 'lt', 'lv'])
 @pytest.mark.parametrize('connection_status', ['Connected', 'Reauth Required', 'Expired while loading'])
-def test_daily_feed_status_and_renewal_warning(monkeypatch, language, connection_status):
+def test_daily_feed_status_and_renewal_warning(monkeypatch, tmp_path, language, connection_status):
+    import database
     from web import i18n
     from web_app import app
+    monkeypatch.setenv('FASTACCOUNTS_DB', str(tmp_path / 'bank-feed-browser.sqlite'))
+    monkeypatch.delenv('DB_URL', raising=False)
+    database.reset_database_cache()
+    database.get_database().migrate()
     monkeypatch.setenv('FASTACCOUNTS_ALLOW_TEST_AUTH', 'true')
     monkeypatch.setenv('FASTACCOUNTS_DEFAULT_LANG', language)
-    html = TestClient(app).get('/auth/test').text
+    html = TestClient(app, base_url='https://testserver').get('/auth/test').text
     words = i18n.catalog(language)['workspace']
     root = Path(__file__).resolve().parents[1]
     state = {'connection_status': connection_status, 'worker_enabled': True,

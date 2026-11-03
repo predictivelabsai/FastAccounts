@@ -13,6 +13,7 @@ from starlette.testclient import TestClient
 from web import account_auth
 from web.account_auth import accounts, hash_password, needs_rehash, normalize_email, verify_password
 
+REAL_SEND_EMAIL = account_auth.send_email
 OWNER = "owner@example.test"
 PASSWORD = "correct horse battery"
 CSRF = re.compile(r'name="csrf_token" value="([^"]+)"')
@@ -42,7 +43,8 @@ def env(tmp_path, monkeypatch):
         return True
 
     monkeypatch.setattr(account_auth, "send_email", fake_send)
-    yield {"db": db, "org": org, "mails": mails}
+    yield {"db": db, "org": org, "mails": mails, "real_send_email": REAL_SEND_EMAIL}
+    monkeypatch.undo()
     database.reset_database_cache()
 
 
@@ -78,9 +80,7 @@ def notice(text):
 
 
 def use_real_unconfigured_mail(env, monkeypatch):
-    monkeypatch.undo()
-    monkeypatch.setenv("FASTACCOUNTS_DB", str(env["db"].path))
-    monkeypatch.delenv("DB_URL", raising=False)
+    monkeypatch.setattr(account_auth, "send_email", env["real_send_email"])
     monkeypatch.setenv("FASTACCOUNTS_PUBLIC_URL", "https://books.example.test")
     monkeypatch.delenv("POSTMARK_API_TOKEN", raising=False)
     monkeypatch.delenv("FROM_EMAIL", raising=False)
