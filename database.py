@@ -79,7 +79,7 @@ class Transaction:
         self.dialect = dialect
 
     def _sql(self, query: str) -> str:
-        return query.replace("?", "%s") if self.dialect == "postgres" else query
+        return query.replace("%", "%%").replace("?", "%s") if self.dialect == "postgres" else query
 
     def execute(self, query: str, params: Sequence[Any] = ()):
         values = tuple(params)

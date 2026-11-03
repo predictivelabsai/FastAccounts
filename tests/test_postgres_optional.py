@@ -22,6 +22,40 @@ def test_postgres_migrations_and_tenant_bootstrap():
 
 
 @pytest.mark.skipif(not os.getenv("TEST_POSTGRES_URL"), reason="set TEST_POSTGRES_URL for PostgreSQL integration")
+def test_postgres_wrapper_escapes_like_percent_with_parameters():
+    schema = "fast_accounts_test_" + uuid4().hex[:10]
+    db = Database(url=os.environ["TEST_POSTGRES_URL"], schema=schema)
+    db.migrate()
+    assert db.scalar("SELECT 'xylophone' LIKE '%x%' AND ?::integer=1", (1,)) is True
+
+
+@pytest.mark.skipif(not os.getenv("TEST_POSTGRES_URL"), reason="set TEST_POSTGRES_URL for PostgreSQL integration")
+def test_postgres_copilot_messages_with_interrupted_literal():
+    from copilot import CopilotService
+
+    schema = "fast_accounts_test_" + uuid4().hex[:10]
+    db = Database(url=os.environ["TEST_POSTGRES_URL"], schema=schema)
+    db.migrate()
+    org = OrganisationService(db).create(
+        name="Postgres Copilot", country_code="UK", entity_type="UK_COMPANY",
+        owner_email="copilot@example.test",
+    )
+    with db.transaction() as tx:
+        tx.execute(
+            "INSERT INTO copilot_conversations(id,organisation_id,user_email,title,created_at,updated_at) "
+            "VALUES (?,?,?,?,?,?)",
+            ("pg-conversation", org["id"], "copilot@example.test", "Synthetic", "2026-11-03", "2026-11-03"),
+        )
+        tx.execute(
+            "INSERT INTO copilot_messages(id,organisation_id,user_email,role,content,created_at,conversation_id) "
+            "VALUES (?,?,?,?,?,?,?)",
+            ("pg-message", org["id"], "copilot@example.test", "user", "Hello", "2026-11-03", "pg-conversation"),
+        )
+    messages = CopilotService(db).messages(org["id"], "copilot@example.test")
+    assert [message["id"] for message in messages] == ["pg-message"]
+
+
+@pytest.mark.skipif(not os.getenv("TEST_POSTGRES_URL"), reason="set TEST_POSTGRES_URL for PostgreSQL integration")
 def test_postgres_prepayment_events():
     from decimal import Decimal
     from documents import DocumentService

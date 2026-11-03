@@ -1,5 +1,12 @@
 # FastAccounts Change Log
 
+## 2026-11-03: PostgreSQL literal percent handling
+
+- Escaped literal percent signs in parameterised PostgreSQL wrapper queries before
+  converting `?` placeholders to `%s`, fixing copilot message reads with LIKE.
+- Added unit coverage and opt-in PostgreSQL checks for LIKE parameters and copilot
+  message retrieval.
+
 ## 2026-11-03: Copilot reply stop control
 
 - Added a Stop control while an AI reply streams. Stopping aborts the browser
