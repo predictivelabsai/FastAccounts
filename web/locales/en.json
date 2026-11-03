@@ -2535,7 +2535,25 @@
     "hosted_price": "€1 / month",
     "hosted_body": "We run the product for you on FastSME-managed infrastructure. €1 per product per month."
   },
-  "periodisation": {
+  "invitation": {
+    "title": "Organisation invitation",
+    "invalid": "This invitation is expired, revoked, already used, or invalid.",
+    "wrong_account": "This invitation is for {email}. Sign out and sign in with that address to accept it.",
+    "sign_out": "Sign out",
+    "details": "You are invited to join {organisation} as {role}.",
+    "expires": "This invitation expires on {expires}.",
+    "accept": "Accept invitation",
+    "sign_in": "Sign in",
+    "create_account": "Create account",
+    "rate_limited": "Too many invitation checks. Please try again later."
+  },
+  "invitation_mail": {
+    "subject": "You are invited to FastAccounts",
+    "body": "{inviter} invited you to join {organisation} as {role}.",
+    "accept": "Accept invitation: {link}",
+    "expiry": "This invitation expires on {expires}."
+  },
+    "periodisation": {
     "nav": {
       "periodised": "Periodised"
     },
@@ -2970,23 +2988,5 @@
       "Invitation revoked": "Invitation revoked"
     },
     "nav": {"bureau_overview": "Companies overview", "bureau_memberships": "User management"}
-  },
-  "invitation": {
-    "title": "Organisation invitation",
-    "invalid": "This invitation is expired, revoked, already used, or invalid.",
-    "wrong_account": "This invitation is for {email}. Sign out and sign in with that address to accept it.",
-    "sign_out": "Sign out",
-    "details": "You are invited to join {organisation} as {role}.",
-    "expires": "This invitation expires on {expires}.",
-    "accept": "Accept invitation",
-    "sign_in": "Sign in",
-    "create_account": "Create account",
-    "rate_limited": "Too many invitation checks. Please try again later."
-  },
-  "invitation_mail": {
-    "subject": "You are invited to FastAccounts",
-    "body": "{inviter} invited you to join {organisation} as {role}.",
-    "accept": "Accept invitation: {link}",
-    "expiry": "This invitation expires on {expires}."
   }
 }

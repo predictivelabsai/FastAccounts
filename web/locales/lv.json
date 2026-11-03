@@ -2535,7 +2535,25 @@
     "hosted_price": "1 € / mēnesī",
     "hosted_body": "Mēs darbinām produktu jūsu vietā FastSME pārvaldītā infrastruktūrā. 1 € par produktu mēnesī."
   },
-  "periodisation": {
+  "invitation": {
+    "title": "Uzaicinājums pievienoties organizācijai",
+    "invalid": "Šis uzaicinājums ir beidzies, atsaukts, jau izmantots vai nederīgs.",
+    "wrong_account": "Šis uzaicinājums ir paredzēts {email}. Lai to pieņemtu, izrakstieties un pierakstieties ar šo adresi.",
+    "sign_out": "Izrakstīties",
+    "details": "Jūs esat uzaicināts pievienoties organizācijai {organisation} kā {role}.",
+    "expires": "Šī uzaicinājuma termiņš beidzas {expires}.",
+    "accept": "Pieņemt uzaicinājumu",
+    "sign_in": "Pierakstīties",
+    "create_account": "Izveidot kontu",
+    "rate_limited": "Pārāk daudz uzaicinājuma pārbaudes mēģinājumu. Lūdzu, mēģiniet vēlāk."
+  },
+  "invitation_mail": {
+    "subject": "Jūs esat uzaicināts uz FastAccounts",
+    "body": "{inviter} uzaicina jūs pievienoties organizācijai {organisation} kā {role}.",
+    "accept": "Pieņemt uzaicinājumu: {link}",
+    "expiry": "Šī uzaicinājuma termiņš beidzas {expires}."
+  },
+    "periodisation": {
     "nav": {
       "periodised": "Periodizēts"
     },
@@ -2961,7 +2979,7 @@
       "Payroll start, payday rules, email settings, leave expiry, reserve posting, posting accounts and dimension registers.":"Algu aprēķina sākums, izmaksas dienas noteikumi, e-pasta iestatījumi, atvaļinājuma termiņš, rezerves grāmatojumi, konti un dimensiju reģistri.",
       "Position group":"Amatu grupa","Role":"Loma","TSD due":"TSD termiņš",
       "Upload a CSV or XLSX for review. Accepted rows are applied only after review.":"Augšupielādējiet CSV vai XLSX failu pārskatīšanai. Apstiprinātās rindas tiek lietotas tikai pēc pārbaudes.",
-      "Invitation created":"Uzaicinājums izveidots","Share this one-time token over a trusted channel":"Nosūtiet šo vienreizējo pilnvaru pa uzticamu kanālu"
+      "Invitation created":"Uzaicinājums izveidots","Share this one-time token over a trusted channel":"Nosūtiet šo vienreizējo pilnvaru pa uzticamu kanālu","Resend invitation":"Atkārtoti nosūtīt uzaicinājumu","Revoke invitation":"Atsaukt uzaicinājumu","Invitation emailed":"Uzaicinājums nosūtīts pa e-pastu","Invitation emailed to":"Uzaicinājums nosūtīts uz","Invitation revoked":"Uzaicinājums atsaukts"
     },
     "nav": {"bureau_overview": "Uzņēmumu pārskats", "bureau_memberships": "Lietotāju pārvaldība"}
   }

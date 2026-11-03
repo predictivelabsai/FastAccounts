@@ -2535,7 +2535,25 @@
     "hosted_price": "1 € / kuu",
     "hosted_body": "Haldame toodet sinu eest FastSME taristus. 1 € toote kohta kuus."
   },
-  "periodisation": {
+  "invitation": {
+    "title": "Organisatsiooni kutse",
+    "invalid": "See kutse on aegunud, tühistatud, juba kasutatud või vigane.",
+    "wrong_account": "See kutse on mõeldud aadressile {email}. Välju ja logi kutse vastuvõtmiseks selle aadressiga sisse.",
+    "sign_out": "Logi välja",
+    "details": "Sind kutsutakse liituma organisatsiooniga {organisation} rollis {role}.",
+    "expires": "Kutse aegub {expires}.",
+    "accept": "Võta kutse vastu",
+    "sign_in": "Logi sisse",
+    "create_account": "Loo konto",
+    "rate_limited": "Kutse kontrollimisi on liiga palju. Proovi hiljem uuesti."
+  },
+  "invitation_mail": {
+    "subject": "Teid kutsutakse FastAccountsisse",
+    "body": "{inviter} kutsus teid organisatsiooniga {organisation} liituma rollis {role}.",
+    "accept": "Võta kutse vastu: {link}",
+    "expiry": "Kutse aegub {expires}."
+  },
+    "periodisation": {
     "nav": {
       "periodised": "Periodiseeritud"
     },
@@ -2970,23 +2988,5 @@
       "Invitation revoked": "Kutse tühistati"
     },
     "nav": {"bureau_overview": "Ettevõtete koondvaade", "bureau_memberships": "Kasutajate haldamine"}
-  },
-  "invitation": {
-    "title": "Organisatsiooni kutse",
-    "invalid": "See kutse on aegunud, tühistatud, juba kasutatud või vigane.",
-    "wrong_account": "See kutse on mõeldud aadressile {email}. Välju ja logi kutse vastuvõtmiseks selle aadressiga sisse.",
-    "sign_out": "Logi välja",
-    "details": "Sind kutsutakse liituma organisatsiooniga {organisation} rollis {role}.",
-    "expires": "Kutse aegub {expires}.",
-    "accept": "Võta kutse vastu",
-    "sign_in": "Logi sisse",
-    "create_account": "Loo konto",
-    "rate_limited": "Kutse kontrollimisi on liiga palju. Proovi hiljem uuesti."
-  },
-  "invitation_mail": {
-    "subject": "Teid kutsutakse FastAccountsisse",
-    "body": "{inviter} kutsus teid organisatsiooniga {organisation} liituma rollis {role}.",
-    "accept": "Võta kutse vastu: {link}",
-    "expiry": "Kutse aegub {expires}."
   }
 }

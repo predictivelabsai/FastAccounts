@@ -2535,7 +2535,25 @@
     "hosted_price": "1 € / mėnesį",
     "hosted_body": "Mes prižiūrime produktą FastSME valdomoje infrastruktūroje. 1 € už produktą per mėnesį."
   },
-  "periodisation": {
+  "invitation": {
+    "title": "Kvietimas prisijungti prie organizacijos",
+    "invalid": "Šis kvietimas nebegalioja, buvo atšauktas, jau panaudotas arba yra neteisingas.",
+    "wrong_account": "Šis kvietimas skirtas {email}. Atsijunkite ir prisijunkite naudodami šį adresą, kad jį priimtumėte.",
+    "sign_out": "Atsijungti",
+    "details": "Esate kviečiami prisijungti prie organizacijos {organisation} kaip {role}.",
+    "expires": "Šio kvietimo galiojimas baigiasi {expires}.",
+    "accept": "Priimti kvietimą",
+    "sign_in": "Prisijungti",
+    "create_account": "Sukurti paskyrą",
+    "rate_limited": "Per daug kartų tikrintas kvietimas. Bandykite vėliau."
+  },
+  "invitation_mail": {
+    "subject": "Esate kviečiami naudotis FastAccounts",
+    "body": "{inviter} kviečia jus prisijungti prie organizacijos {organisation} kaip {role}.",
+    "accept": "Priimti kvietimą: {link}",
+    "expiry": "Šio kvietimo galiojimas baigiasi {expires}."
+  },
+    "periodisation": {
     "nav": {
       "periodised": "Periodizuota"
     },
@@ -2961,7 +2979,7 @@
       "Payroll start, payday rules, email settings, leave expiry, reserve posting, posting accounts and dimension registers.":"Darbo užmokesčio pradžia, mokėjimo dienos taisyklės, el. pašto nustatymai, atostogų galiojimas, rezervo įrašai, sąskaitos ir dimensijų registrai.",
       "Position group":"Pareigybių grupė","Role":"Vaidmuo","TSD due":"TSD terminas",
       "Upload a CSV or XLSX for review. Accepted rows are applied only after review.":"Įkelkite CSV arba XLSX failą peržiūrai. Priimtos eilutės taikomos tik po peržiūros.",
-      "Invitation created":"Kvietimas sukurtas","Share this one-time token over a trusted channel":"Pasidalykite šiuo vienkartiniu žetonu patikimu kanalu"
+      "Invitation created":"Kvietimas sukurtas","Share this one-time token over a trusted channel":"Pasidalykite šiuo vienkartiniu žetonu patikimu kanalu","Resend invitation":"Išsiųsti kvietimą dar kartą","Revoke invitation":"Atšaukti kvietimą","Invitation emailed":"Kvietimas išsiųstas el. paštu","Invitation emailed to":"Kvietimas išsiųstas adresu","Invitation revoked":"Kvietimas atšauktas"
     },
     "nav": {"bureau_overview": "Įmonių apžvalga", "bureau_memberships": "Naudotojų valdymas"}
   }
