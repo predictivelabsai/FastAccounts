@@ -4,6 +4,18 @@ Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as
 delivered.
 
+## 2026-11-03: Account settings and password setup
+
+- Added signed-in account settings for display names, password changes, Google-only
+  password setup links and shortcuts to MFA and language selection. Password
+  changes update the password timestamp, invalidate other sessions, retain the
+  active session, apply failed-current-password throttling and send a best-effort
+  notification.
+- Updated sign-in copy for open signup and password setup emails for accounts
+  without an existing password. Added translated copy to the locale catalogues.
+- Focused account, MFA, browser and localisation tests pass: 132 passed. One
+  existing pytest parametrisation deprecation warning remains.
+
 ## 2026-10-29: Payroll dimensions and bureau overview (Build 10 complete; UAT pending)
 
 - Added migration 0070 for frozen employee-level dimensions on payroll run

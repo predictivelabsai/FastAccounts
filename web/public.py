@@ -507,7 +507,7 @@ def login_page(error: str = "", lang: str = i18n.DEFAULT_LANG, *, tab: str = "si
             Div(
                 Span(T("login.kicker"), cls="kicker"),
                 H1(T("login.headline")),
-                P(T("login.body")),
+                P(T("login.body_open" if google_auth.open_signup() else "login.body")),
                 *_auth_messages(message, notice),
                 A(T("login.continue_google") if google_auth.enabled() else T("login.not_configured"),
                   href="/auth/google" + ("?next=" + quote(next_path, safe="") if next_path else ""),
@@ -571,6 +571,39 @@ def mfa_page(account: dict | None = None, lang: str = "en", *, csrf: str = "",
     return public_page(Section(Div(H1(T("mfa_title")), *_auth_messages(error, notice), *content,
                                    cls="auth-card"), cls="auth-wrap"),
                        title=T("mfa_title"), current="/mfa", lang=lang)
+
+
+def account_page(account: dict, lang: str = "en", *, csrf: str = "", error: str = "", notice: str = ""):
+    T = lambda key: i18n.t(f"auth.{key}", lang)
+    password_form = Form(Input(type="hidden", name="csrf_token", value=csrf),
+                         _auth_field("account-current-password", "current_password", T("current_password"),
+                                     type="password", autocomplete="current-password", required=True, maxlength="1024"),
+                         _auth_field("account-new-password", "new_password", T("password_new"),
+                                     type="password", autocomplete="new-password", required=True,
+                                     minlength="10", maxlength="1024"),
+                         _auth_field("account-confirm-password", "confirm_password", T("confirm_password"),
+                                     type="password", autocomplete="new-password", required=True,
+                                     minlength="10", maxlength="1024"),
+                         Button(T("change_password"), type="submit", cls="fs-btn fs-btn-primary auth-submit"),
+                         method="post", action="/account/password", cls="auth-form")
+    if not account["password_hash"]:
+        password_form = Form(Input(type="hidden", name="csrf_token", value=csrf),
+                             P(T("account_set_password_help")),
+                             Button(T("account_set_password"), type="submit", cls="fs-btn fs-btn-primary auth-submit"),
+                             method="post", action="/account/password", cls="auth-form")
+    name_form = Form(Input(type="hidden", name="csrf_token", value=csrf),
+                     _auth_field("account-name", "name", T("name"), value=account.get("name") or "",
+                                 autocomplete="name", maxlength="120", required=True),
+                     Button(T("save_name"), type="submit", cls="fs-btn fs-btn-primary auth-submit"),
+                     method="post", action="/account/name", cls="auth-form")
+    return public_page(Section(Div(H1(T("account_title")), *_auth_messages(error, notice),
+                                   P(f"{T('email')}: {account['email']}"), H2(T("account_name_title")), name_form,
+                                   H2(T("account_password_title")), password_form,
+                                   A(T("mfa_title"), href="/mfa", cls="auth-link"),
+                                   A("Eesti", href="/set-lang/et?next=/account", cls="auth-link"),
+                                   A("English", href="/set-lang/en?next=/account", cls="auth-link"),
+                                   cls="auth-card"), cls="auth-wrap"), title=T("account_title"),
+                       current="/account", lang=lang)
 
 
 def password_token_page(purpose: str, token: str, lang: str = i18n.DEFAULT_LANG, *, csrf: str = "",
@@ -647,6 +680,7 @@ def workspace_page(user: dict, lang: str = "en"):
                 Div(
                     Div(
                         A(T("nav.public_site"), href="/", cls="app-side-link", data_icon="external"),
+                        A(T("workspace.Account"), href="/account", cls="app-side-link", data_icon="user"),
                         A(T("workspace.Two-factor authentication"), href="/mfa", cls="app-side-link", data_icon="shield"),
                         cls="app-side-actions",
                     ),

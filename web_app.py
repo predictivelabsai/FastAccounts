@@ -25,7 +25,7 @@ from database import get_database
 from web import account_auth, google_auth, i18n
 from web.assets import CachedStaticFiles, STATIC_DIR
 from web.account_auth import accounts, client_address, csrf_ok, establish_session, form_csrf
-from web.public import (about_page, changelog_page, contact_page,
+from web.public import (about_page, account_page, changelog_page, contact_page,
                         integrations_page, landing_page, login_page, privacy_page,
                         mfa_page, password_token_page, roadmap_page, security_page,
                         terms_page, workspace_page)
@@ -367,6 +367,82 @@ def mfa_security(session, request):
     if not _mfa_pending(session) and not _mfa_user(session):
         return RedirectResponse("/login", status_code=303)
     return _mfa_response(session, request)
+
+
+def _account_current(session):
+    user = session.get("user")
+    if not account_auth.session_user_valid(user):
+        session.clear()
+        return None
+    return accounts.get(user["email"])
+
+
+def _account_response(session, request, account, *, status=200, error="", notice=""):
+    lang = _page_language(session, request)
+    page = account_page(account, lang, csrf=form_csrf(session),
+                        error=_auth_text(error, lang) if error else "",
+                        notice=_auth_text(notice, lang) if notice else "")
+    return HTMLResponse("<!doctype html>\n" + to_xml(page), status_code=status, headers=NO_STORE)
+
+
+@rt("/account")
+def account_settings(session, request):
+    account = _account_current(session)
+    if not account:
+        return RedirectResponse("/login", status_code=303)
+    return _account_response(session, request, account)
+
+
+@rt("/account/name", methods=["POST"])
+async def account_name_submit(request, session):
+    form = await _auth_form(request)
+    account = _account_current(session)
+    if not account:
+        return RedirectResponse("/login", status_code=303)
+    if not csrf_ok(session, form.get("csrf_token")):
+        return _account_response(session, request, account, status=403, error="error_session_expired")
+    updated = accounts.change_name(account["email"], form.get("name", ""))
+    if not updated:
+        return _account_response(session, request, account, status=400, error="error_invalid_input")
+    session["user"]["name"] = updated["name"] or updated["email"]
+    return _account_response(session, request, updated, notice="account_name_saved")
+
+
+@rt("/account/password", methods=["POST"])
+async def account_password_submit(request, session):
+    form = await _auth_form(request)
+    account = _account_current(session)
+    if not account:
+        return RedirectResponse("/login", status_code=303)
+    if not csrf_ok(session, form.get("csrf_token")):
+        return _account_response(session, request, account, status=403, error="error_session_expired")
+    if not account["password_hash"]:
+        if not accounts.consume(account["email"], "forgot"):
+            return _account_response(session, request, account, status=429, error="error_rate_limited")
+        accounts.request_reset(account["email"], _page_language(session, request))
+        return _account_response(session, request, account, notice="account_set_password_sent")
+    if accounts.limited(account["email"], "password_change"):
+        return _account_response(session, request, account, status=429, error="error_rate_limited")
+    new_password = form.get("new_password", "")
+    if form.get("confirm_password") != new_password or not account_auth.valid_password(new_password):
+        return _account_response(session, request, account, status=400, error="error_password_length")
+    if not account_auth.verify_password(form.get("current_password", ""), account["password_hash"]):
+        accounts.hit(account["email"], "password_change")
+        return _account_response(session, request, account, status=401, error="error_credentials")
+    method = session["user"].get("auth", "password")
+    updated = accounts.change_password(account["email"], form.get("current_password", ""), new_password)
+    if not updated:
+        accounts.hit(account["email"], "password_change")
+        return _account_response(session, request, account, status=401, error="error_credentials")
+    accounts.clear(account["email"], "password_change")
+    establish_session(session, updated, method)
+    try:
+        lang = _page_language(session, request)
+        subject, body = i18n.t("auth.password_changed_subject", lang), i18n.t("auth.password_changed_body", lang)
+        account_auth.send_email(updated["email"], subject, f"<p>{body}</p>", body)
+    except Exception:
+        account_auth.log.exception("Password change notification failed")
+    return _account_response(session, request, updated, notice="account_password_changed")
 
 
 @rt("/auth/mfa/{action}", methods=["POST"])
