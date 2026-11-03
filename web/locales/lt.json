@@ -2757,6 +2757,11 @@
   "copilot": {
     "workspace": {
       "How can I help with your books?": "Kaip galiu padėti tvarkyti apskaitą?",
+      "New chat": "Naujas pokalbis",
+      "Conversation history": "Pokalbių istorija",
+      "Delete conversation": "Ištrinti pokalbį",
+      "Delete this copilot conversation?": "Ištrinti šį copilot pokalbį?",
+      "Conversation deleted": "Pokalbis ištrintas",
       "Summarise overdue invoices": "Apibendrink pradelstas sąskaitas",
       "What needs my attention this week?": "Į ką turėčiau atkreipti dėmesį šią savaitę?",
       "Explain my VAT position": "Paaiškink mano PVM situaciją",

@@ -20,8 +20,8 @@ def test_postgres_full_migrations_and_approved_pay_item_immutability():
     database = Database(url=PG_URL, schema=schema)
     try:
         applied = database.migrate()
-        assert len(applied) == 72
-        assert applied[-1] == "0072_payroll_dimension_imports"
+        assert len(applied) == 73
+        assert applied[-1] == "0073_copilot_conversations"
         assert database.migrate() == []
 
         organisation = OrganisationService(database).create(
@@ -165,8 +165,8 @@ def test_postgres_upgrade_backfills_preserve_approved_payroll_components(tmp_pat
             )
             tx.execute("UPDATE pay_runs SET status='Approved' WHERE id=?", (source_run_id,))
         applied = database.migrate()
-        assert len(applied) == 24
-        assert applied[-1] == "0072_payroll_dimension_imports"
+        assert len(applied) == 25
+        assert applied[-1] == "0073_copilot_conversations"
         assert database.migrate() == []
 
         with pytest.raises(Exception, match="immutable"):

@@ -32,6 +32,17 @@ Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as
 delivered.
 
+## 2026-11-03: Copilot conversations
+
+- Added migration 0073 for user and organisation scoped conversations, linking
+  existing transcripts into one conversation per owner without losing messages.
+- Added conversation listing, creation, message retrieval and soft deletion, and
+  made both standard and streaming sends create or continue a conversation.
+- Added a keyboard accessible conversation selector with New chat and delete
+  controls to the copilot drawer, with en, et, lv and lt labels.
+- Added coverage for CRUD isolation, legacy backfill and sends without a
+  conversation ID.
+
 ## 2026-10-29: Payroll dimensions and bureau overview (Build 10 complete; UAT pending)
 
 - Added migration 0070 for frozen employee-level dimensions on payroll run

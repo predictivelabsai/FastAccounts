@@ -114,6 +114,80 @@ def test_migration_count_rerun_and_ci(env):
     assert f"'{catalogue()[-1]}'" in (ROOT / ".github/workflows/ci.yml").read_text()
 
 
+def test_conversation_crud_is_scoped_to_user_and_organisation(env):
+    d = env
+    other_user = "member@example.test"
+    from organisations import OrganisationService
+    organisation_service = OrganisationService(d["db"])
+    organisation_service.add_member(d["org"]["id"], ACTOR, other_user, "accountant")
+    organisation_service.add_member(d["other"]["id"], "other@example.test", ACTOR, "accountant")
+    base = d["base"] + "/copilot/conversations"
+    created = d["client"].post(base, json={}).json()
+    created_b = d["client"].post(base, json={}, headers={"X-Test-User": other_user}).json()
+    foreign_org = d["client"].post(
+        f"/organisations/{d['other']['id']}/copilot/conversations", json={}).json()
+
+    assert [row["id"] for row in d["client"].get(base).json()] == [created["id"]]
+    assert d["client"].get(
+        base + f"/{created_b['id']}/messages", headers={"X-Test-User": ACTOR}).status_code == 404
+    assert d["client"].get(
+        f"/organisations/{d['other']['id']}/copilot/conversations/{created['id']}/messages").status_code == 404
+    assert d["client"].delete(
+        base + f"/{created_b['id']}", headers={"X-Test-User": ACTOR}).status_code == 404
+    assert d["client"].get(
+        f"/organisations/{d['other']['id']}/copilot/conversations").json()[0]["id"] == foreign_org["id"]
+    assert d["client"].delete(base + f"/{created['id']}").json() == {"deleted": True}
+    assert d["client"].get(base).json() == []
+
+
+def test_legacy_messages_backfill_into_one_conversation_per_owner(tmp_path):
+    import shutil
+    import database
+    from organisations import OrganisationService
+
+    db = database.Database(path=str(tmp_path / "legacy-copilot.sqlite"))
+    old_catalogue = tmp_path / "old" / "sqlite"
+    old_catalogue.mkdir(parents=True)
+    for path in (database.MIGRATIONS / "sqlite").glob("*.sql"):
+        if path.stem < "0073_copilot_conversations":
+            shutil.copyfile(path, old_catalogue / path.name)
+    db.migrate(migrations=old_catalogue.parent)
+    first = OrganisationService(db).create(name="Legacy one", country_code="EE",
+        entity_type="EE_OU", owner_email=ACTOR)
+    second = OrganisationService(db).create(name="Legacy two", country_code="EE",
+        entity_type="EE_OU", owner_email=ACTOR)
+    with db.transaction() as tx:
+        for index, (org_id, email, role, content) in enumerate((
+                (first["id"], ACTOR, "user", "A long first question"),
+                (first["id"], ACTOR, "assistant", "An answer"),
+                (first["id"], "member@example.test", "user", "Another person's question"),
+                (second["id"], ACTOR, "user", "A different organisation"))):
+            tx.execute(
+                "INSERT INTO copilot_messages(id,organisation_id,user_email,role,content,created_at) "
+                "VALUES (?,?,?,?,?,?)",
+                (f"legacy-message-{index}", org_id, email, role, content, f"2026-01-01T00:00:0{index}+00:00"))
+    db.migrate()
+    conversations = db.rows("SELECT * FROM copilot_conversations ORDER BY organisation_id,user_email")
+    assert len(conversations) == 3
+    assert next(row for row in conversations if row["organisation_id"] == first["id"]
+                and row["user_email"] == ACTOR)["title"] == "A long first question"
+    assert db.scalar("SELECT COUNT(*) FROM copilot_messages WHERE conversation_id IS NOT NULL") == 4
+    assert db.scalar("SELECT COUNT(DISTINCT conversation_id) FROM copilot_messages") == 3
+
+
+def test_send_without_conversation_id_creates_titled_conversation(env, monkeypatch):
+    enable(env)
+    provider, _ = fake_reply("Synthetic answer")
+    monkeypatch.setattr(copilot, "chat_completion", provider)
+    response = env["client"].post(env["base"] + "/copilot/messages", json={"content": "What is VAT due?"})
+    assert response.status_code == 201, response.text
+    conversation_id = response.json()["conversation_id"]
+    conversation = env["db"].one("SELECT * FROM copilot_conversations WHERE id=?", (conversation_id,))
+    assert conversation["title"] == "What is VAT due?"
+    assert env["db"].scalar(
+        "SELECT COUNT(*) FROM copilot_messages WHERE conversation_id=?", (conversation_id,)) == 2
+
+
 def test_kill_switches_block_before_any_provider_call(env, monkeypatch):
     d = env
     monkeypatch.delenv("FASTACCOUNTS_GROK_API_KEY")
@@ -443,6 +517,12 @@ def test_workspace_copilot_drawer_offline(language, role, monkeypatch, tmp_path)
                 return request_route.fulfill(json=dict(available=state["active"], enabled=state["active"],
                                                        access=dict(granted=True), grants=[] if role != "viewer" else None,
                                                        quotas=dict(user_messages=0, messages_per_user_day=30)))
+            if path.endswith("/copilot/conversations"):
+                if request_route.request.method == "POST":
+                    return request_route.fulfill(json={"id": "conversation", "title": "New chat"}, status=201)
+                return request_route.fulfill(json=[], content_type="application/json")
+            if "/copilot/conversations/" in path and path.endswith("/messages"):
+                return request_route.fulfill(json=[], content_type="application/json")
             if path.endswith("/copilot/messages"):
                 if request_route.request.method == "POST":
                     state["sent"].append(request_route.request.post_data_json)
@@ -574,12 +654,12 @@ def test_workspace_copilot_drawer_offline(language, role, monkeypatch, tmp_path)
             assert drawer.locator('h2').all_text_contents()[0] == title_key
             playwright.expect(drawer.locator('.copilot-send')).to_be_disabled()
             drawer.locator('.copilot-attach').click()
-            drawer.locator('select').select_option('doc')
+            drawer.locator('#copilot-documents').select_option('doc')
             playwright.expect(drawer.locator('[data-copilot-attachment]')).to_contain_text('Synthetic.pdf')
             drawer.locator('[data-copilot-attachment] button').click()
             playwright.expect(drawer.locator('[data-copilot-attachment]')).to_be_hidden()
             drawer.locator('.copilot-attach').click()
-            drawer.locator('select').select_option('doc')
+            drawer.locator('#copilot-documents').select_option('doc')
             state['fail'] = True
             composer.fill('Try this')
             composer.press('Shift+Enter')

@@ -2757,6 +2757,11 @@
   "copilot": {
     "workspace": {
       "How can I help with your books?": "Kā varu palīdzēt ar grāmatvedību?",
+      "New chat": "Jauna saruna",
+      "Conversation history": "Sarunu vēsture",
+      "Delete conversation": "Dzēst sarunu",
+      "Delete this copilot conversation?": "Dzēst šo copilot sarunu?",
+      "Conversation deleted": "Saruna izdzēsta",
       "Summarise overdue invoices": "Apkopo kavētos rēķinus",
       "What needs my attention this week?": "Kam šonedēļ jāpievērš uzmanība?",
       "Explain my VAT position": "Izskaidro manu PVN situāciju",

@@ -1223,6 +1223,7 @@ class CopilotMessageIn(BaseModel):
     page: str | None = Field(default=None, min_length=1, max_length=64, pattern=r"^[a-z][a-z0-9_-]*$")
     content: str = Field(min_length=1, max_length=8000)
     attachment_ids: list[str] = Field(default_factory=list, max_length=3)
+    conversation_id: str | None = Field(default=None, min_length=1, max_length=128)
 
 
 class CopilotScanIn(BaseModel):
@@ -1248,17 +1249,48 @@ def copilot_messages(organisation_id: str, limit: int = 50,
     return CopilotService().messages(organisation_id, user.email, limit=min(max(limit, 1), 100))
 
 
+@api.get('/organisations/{organisation_id}/copilot/conversations')
+def copilot_conversations(organisation_id: str, user: User = Depends(current_user)):
+    _require(organisation_id, user, READ_ROLES)
+    return CopilotService().conversations(organisation_id, user.email)
+
+
+@api.post('/organisations/{organisation_id}/copilot/conversations', status_code=201)
+def copilot_create_conversation(organisation_id: str, user: User = Depends(require_csrf)):
+    _require(organisation_id, user, READ_ROLES)
+    return CopilotService().create_conversation(organisation_id, user.email)
+
+
+@api.get('/organisations/{organisation_id}/copilot/conversations/{conversation_id}/messages')
+def copilot_conversation_messages(organisation_id: str, conversation_id: str,
+                                 limit: int = 100, user: User = Depends(current_user)):
+    _require(organisation_id, user, READ_ROLES)
+    return CopilotService().messages(organisation_id, user.email,
+                                     limit=min(max(limit, 1), 100),
+                                     conversation_id=conversation_id)
+
+
+@api.delete('/organisations/{organisation_id}/copilot/conversations/{conversation_id}')
+def copilot_delete_conversation(organisation_id: str, conversation_id: str,
+                               user: User = Depends(require_csrf)):
+    _require(organisation_id, user, READ_ROLES)
+    CopilotService().delete_conversation(organisation_id, user.email, conversation_id)
+    return {'deleted': True}
+
+
 @api.post('/organisations/{organisation_id}/copilot/messages', status_code=201)
 def copilot_send(organisation_id: str, payload: CopilotMessageIn, request: Request,
                  user: User = Depends(require_csrf)):
     _require(organisation_id, user, READ_ROLES)
     if 'text/event-stream' in request.headers.get('accept', ''):
         events = CopilotService().stream(organisation_id, user.email, payload.content,
-                                         attachment_ids=payload.attachment_ids, page=payload.page)
+                                         attachment_ids=payload.attachment_ids, page=payload.page,
+                                         conversation_id=payload.conversation_id)
         return StreamingResponse(events, media_type='text/event-stream',
                                  headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
     return CopilotService().send(organisation_id, user.email, payload.content,
-                                 attachment_ids=payload.attachment_ids, page=payload.page)
+                                 attachment_ids=payload.attachment_ids, page=payload.page,
+                                 conversation_id=payload.conversation_id)
 
 
 @api.post('/organisations/{organisation_id}/copilot/scan', status_code=201)
