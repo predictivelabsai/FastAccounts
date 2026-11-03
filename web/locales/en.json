@@ -1008,6 +1008,7 @@
     "mfa_recovery_help": "Save these codes somewhere safe. Each works once. They will not be shown again.",
     "mfa_acknowledge": "I have stored the codes safely",
     "mfa_back": "Back to workspace",
+    "account_back": "Back to workspace",
     "mfa_error_code": "The code is invalid or has already been used.",
     "mfa_error_state": "Setup is unavailable. Reload this page and try again.",
     "mfa_error_expired": "Your sign-in has expired. Sign in again."

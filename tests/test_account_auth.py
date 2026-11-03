@@ -621,6 +621,15 @@ def test_account_display_name_change(env):
     assert accounts.get(OWNER)["name"] == "Updated Owner"
 
 
+def test_signed_in_account_page_has_workspace_and_sign_out_links(env):
+    c = _signed_in_account(env)
+    html = c.get("/account").text
+    assert 'href="/app"' in html
+    assert 'href="/logout"' in html
+    assert 'href="/login"' not in html
+    assert "Sign In" not in html and "Logi sisse" not in html
+
+
 @pytest.mark.parametrize("lang", ["en", "et"])
 @pytest.mark.parametrize("open_signup", [False, True])
 def test_login_copy_reflects_signup_mode(env, monkeypatch, lang, open_signup):
