@@ -5,7 +5,7 @@ import io
 import json
 from decimal import Decimal, InvalidOperation
 
-from core_utils import audit, new_id, utc_now
+from core_utils import audit, new_id, parse_decimal_ee, utc_now
 from payroll import PayrollConflict, PayrollService
 
 ALIASES = {
@@ -40,10 +40,17 @@ def _key(value):
 
 def parse_tor_csv(content: bytes):
     try:
-        text = content.decode('utf-8-sig')
+        try:
+            text = content.decode('utf-8-sig')
+        except UnicodeDecodeError:
+            text = content.decode('cp1257')
     except UnicodeDecodeError as exc:
         raise ValueError('TÖR CSV must be UTF-8 encoded') from exc
-    reader = csv.DictReader(io.StringIO(text))
+    try:
+        delimiter = csv.Sniffer().sniff(text[:8192], delimiters=',;\t').delimiter
+    except csv.Error:
+        delimiter = ','
+    reader = csv.DictReader(io.StringIO(text), delimiter=delimiter)
     if not reader.fieldnames:
         raise ValueError('CSV header row is missing')
     columns = {_key(header): header for header in reader.fieldnames}
@@ -71,7 +78,7 @@ def parse_tor_csv(content: bytes):
         row['contract_type'] = kind
         if row['fte']:
             try:
-                workload = Decimal(row['fte'].rstrip('%')) / (Decimal('100') if row['fte'].endswith('%') else Decimal('1'))
+                workload = parse_decimal_ee(row['fte'].rstrip('%')) / (Decimal('100') if row['fte'].endswith('%') else Decimal('1'))
                 if not workload.is_finite() or not 0 < workload <= 1:
                     raise ValueError
                 row['fte'] = format(workload, 'f')

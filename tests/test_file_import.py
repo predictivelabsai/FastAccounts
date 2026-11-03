@@ -58,6 +58,13 @@ def test_parses_semicolon_estonian_aliases_and_status_values():
     assert records[0]["gross_salary"] == Decimal("2000.00")
 
 
+def test_parses_bom_employee_csv_with_estonian_thousands_salary():
+    content = "\ufeffNimi;Palk\nÕnne Ülemõisa;1 234,56\n"
+    records = FileImportConnector(content, {}).pull("employee").records
+    assert records[0]["name"] == "Õnne Ülemõisa"
+    assert records[0]["gross_salary"] == Decimal("1234.56")
+
+
 def test_parses_tab_delimiter_and_omits_blank_or_zero_salary():
     content = "ID\tName\tBase salary\n1\tHourly One\t0\n2\tHourly Two\t\n"
 

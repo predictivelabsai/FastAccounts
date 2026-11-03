@@ -14,7 +14,7 @@ from decimal import Decimal, InvalidOperation
 from typing import Any
 from openpyxl.utils.exceptions import InvalidFileException
 
-from core_utils import money
+from core_utils import money, parse_decimal_ee
 
 from .base import ConnectorResult
 
@@ -182,7 +182,7 @@ class FileImportConnector:
             elif canonical == "gross_salary":
                 if value:
                     try:
-                        salary = money(value)
+                            salary = money(parse_decimal_ee(value))
                     except (InvalidOperation, ValueError) as error:
                         raise ValueError(
                             f"CSV row {row_number} has invalid money in header '{header}'"
@@ -284,7 +284,13 @@ def parse_payroll_history_file(content: str | bytes, object_type: str, filename:
             finally:
                 book.close()
         else:
-            text = raw.decode("utf-8-sig")
+            try:
+                text = raw.decode("utf-8-sig")
+            except UnicodeDecodeError:
+                try:
+                    text = raw.decode("cp1257")
+                except UnicodeDecodeError:
+                    text = raw.decode("cp1252")
             reader = csv.reader(io.StringIO(text, newline=""), delimiter=FileImportConnector._delimiter(text), strict=True)
             rows = list(reader)
     except ValueError:
@@ -404,7 +410,7 @@ def parse_journal_workbook(content: bytes) -> list[dict[str, Any]]:
                             raise ValueError("Journal formulas must be replaced with values")
                         if field in {"debit", "credit"}:
                             if value not in (None, ""):
-                                amount = Decimal(str(value).replace(" ", "").replace("\u00a0", "").replace(",", "."))
+                                amount = parse_decimal_ee(value)
                                 if not amount.is_finite() or amount < 0:
                                     raise ValueError("Journal amounts must be non-negative finite numbers")
                                 if money(amount) != amount:

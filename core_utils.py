@@ -3,8 +3,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from datetime import date, datetime, timezone
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from uuid import uuid4
 
 
@@ -26,6 +27,35 @@ def today() -> str:
 
 def decimal(value: object) -> Decimal:
     return value if isinstance(value, Decimal) else Decimal(str(value or 0))
+
+
+def parse_decimal_ee(value: object) -> Decimal:
+    """Parse unambiguous decimal text from Estonian accounting exports."""
+    if isinstance(value, Decimal):
+        result = value
+    else:
+        text = str(value).strip()
+        text = re.sub(r"\s*(?:EUR|€)\s*$", "", text, flags=re.IGNORECASE).strip()
+        text = text.replace("\u00a0", "").replace("\u202f", "").replace(" ", "")
+        if not text or not re.fullmatch(r"[+-]?(?:\d+(?:[.,]\d+)?|\d{1,3}(?:[.,]\d{3})+(?:[.,]\d+)?)", text):
+            raise ValueError(f"Invalid decimal value: {value!r}")
+        if "," in text and "." in text:
+            decimal_separator = "," if text.rfind(",") > text.rfind(".") else "."
+            thousands_separator = "." if decimal_separator == "," else ","
+            text = text.replace(thousands_separator, "").replace(decimal_separator, ".")
+        elif "," in text:
+            if text.count(",") > 1:
+                raise ValueError(f"Invalid decimal value: {value!r}")
+            text = text.replace(",", ".")
+        elif text.count(".") > 1:
+            raise ValueError(f"Invalid decimal value: {value!r}")
+        try:
+            result = Decimal(text)
+        except InvalidOperation as error:
+            raise ValueError(f"Invalid decimal value: {value!r}") from error
+    if not result.is_finite():
+        raise ValueError(f"Invalid decimal value: {value!r}")
+    return result
 
 
 def money(value: object) -> Decimal:

@@ -9,7 +9,7 @@ import json
 import re
 from decimal import Decimal, InvalidOperation
 
-from core_utils import audit
+from core_utils import audit, parse_decimal_ee
 from database import get_database
 from database import Database
 from master_data_repository import ImportRepository
@@ -58,7 +58,7 @@ class Items:
         for column in ('sale_price', 'purchase_price'):
             if fields.get(column):
                 try:
-                    value = Decimal(fields[column])
+                    value = parse_decimal_ee(fields[column])
                     if not value.is_finite() or value < 0 or value >= Decimal('10000000000000000') or value.as_tuple().exponent < -4:
                         raise ValueError()
                     fields[column] = format(value, 'f')
@@ -89,7 +89,11 @@ class MasterDataImportService:
             raise ValueError('Supply CSV text within the 2000000 character limit')
         adapter = KINDS[kind]
         source = io.StringIO(csv_content.lstrip('\ufeff'))
-        reader = csv.reader(source, strict=True)
+        try:
+            delimiter = csv.Sniffer().sniff(source.getvalue()[:8192], delimiters=',;\t').delimiter
+        except csv.Error:
+            delimiter = ','
+        reader = csv.reader(source, delimiter=delimiter, strict=True)
         try:
             headers = next(reader)
         except (StopIteration, csv.Error) as exc:
