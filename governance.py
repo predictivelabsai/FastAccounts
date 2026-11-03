@@ -60,6 +60,40 @@ class GovernanceService:
             audit(tx, invitation["organisation_id"], email, "invitation.accepted", "invitation", invitation["id"])
         return OrganisationService(self.db).get(invitation["organisation_id"])
 
+    def invitation_by_token(self, token: str) -> dict | None:
+        if not token or len(token) > 200:
+            return None
+        digest = hashlib.sha256(token.encode()).hexdigest()
+        row = self.db.one("SELECT i.*,o.name AS organisation_name FROM invitations i "
+                          "JOIN organisations o ON o.id=i.organisation_id WHERE i.token_hash=?", (digest,))
+        return row
+
+    def revoke_invitation(self, organisation_id: str, invitation_id: str, *, actor: str) -> None:
+        OrganisationService(self.db).require(organisation_id, actor, {"owner", "administrator"})
+        with self.db.transaction() as tx:
+            row = tx.one("SELECT id,status FROM invitations WHERE id=? AND organisation_id=?",
+                         (invitation_id, organisation_id))
+            if not row or row["status"] != "Pending":
+                raise ValueError("Invitation is not pending")
+            tx.execute("UPDATE invitations SET status='Revoked' WHERE id=?", (invitation_id,))
+            audit(tx, organisation_id, actor, "invitation.revoked", "invitation", invitation_id)
+
+    def resend_invitation(self, organisation_id: str, invitation_id: str, *, actor: str) -> tuple[dict, str]:
+        OrganisationService(self.db).require(organisation_id, actor, {"owner", "administrator"})
+        token, now = secrets.token_urlsafe(32), utc_now()
+        expires = (datetime.now(timezone.utc) + timedelta(days=7)).isoformat(timespec="seconds")
+        with self.db.transaction() as tx:
+            row = tx.one("SELECT id FROM invitations WHERE id=? AND organisation_id=? AND status='Pending'",
+                         (invitation_id, organisation_id))
+            if not row:
+                raise ValueError("Invitation is not pending")
+            tx.execute("UPDATE invitations SET token_hash=?,expires_at=?,created_at=? WHERE id=?",
+                       (hashlib.sha256(token.encode()).hexdigest(), expires, now, invitation_id))
+            audit(tx, organisation_id, actor, "invitation.resent", "invitation", invitation_id,
+                  {"expires_at": expires})
+        return self.db.one("SELECT id,organisation_id,email,role,status,expires_at,created_at FROM invitations WHERE id=?",
+                           (invitation_id,)) or {}, token
+
     def checklist(self, period_id: str) -> list[dict]:
         period = self.db.one("SELECT * FROM fiscal_periods WHERE id=?", (period_id,))
         if not period:

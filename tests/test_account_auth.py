@@ -5,6 +5,7 @@ import hashlib
 import logging
 import re
 import time
+from urllib.parse import quote
 
 import pytest
 from starlette.testclient import TestClient
@@ -541,3 +542,89 @@ def test_without_the_flag_strangers_stay_rejected(env, monkeypatch):
 def google_access(email):
     from web.google_auth import access_allowed
     return access_allowed(email)
+
+
+def test_invitation_email_uses_configured_link_and_escapes_user_text(env, monkeypatch):
+    from governance import GovernanceService
+    with env["db"].transaction() as tx:
+        tx.execute("UPDATE organisations SET name=? WHERE id=?", ("<Books & Co>", env["org"]["id"]))
+    invitation, token = GovernanceService(env["db"]).invite(env["org"]["id"], email="invitee@example.test",
+                                                            role="viewer", actor=OWNER)
+    register_and_verify(client(), env, email=OWNER)
+    with env["db"].transaction() as tx:
+        tx.execute("UPDATE user_accounts SET name=? WHERE email=?", ("<Owner & Co>", OWNER))
+    assert account_auth.send_invitation_email(invitation, token, OWNER, "en")
+    mail = env["mails"][-1]
+    assert f"https://books.example.test/invite/{token}" in mail["text"]
+    assert "<Books & Co>" not in mail["html"] and "&lt;Books &amp; Co&gt;" in mail["html"]
+    assert "&lt;Owner &amp; Co&gt;" in mail["html"] and "viewer" in mail["text"]
+    assert account_auth.send_invitation_email(invitation, token, OWNER, "et")
+    assert "vaataja" in env["mails"][-1]["text"]
+
+
+def test_invitation_email_unconfigured_returns_fallback(env, monkeypatch):
+    from governance import GovernanceService
+    monkeypatch.delenv("FASTACCOUNTS_PUBLIC_URL")
+    monkeypatch.delenv("FASTSME_PUBLIC_URL", raising=False)
+    invitation, token = GovernanceService(env["db"]).invite(env["org"]["id"], email="invitee@example.test",
+                                                            role="viewer", actor=OWNER)
+    assert not account_auth.send_invitation_email(invitation, token, OWNER, "et")
+    assert token
+
+
+def test_invitation_accept_page_matches_user_and_requires_csrf(env):
+    from governance import GovernanceService
+    invitation, token = GovernanceService(env["db"]).invite(env["org"]["id"], email="invitee@example.test",
+                                                            role="viewer", actor=OWNER)
+    c = client()
+    register_and_verify(c, env, email="invitee@example.test")
+    page = c.get(f"/invite/{token}")
+    assert page.status_code == 200 and "Accept invitation" in page.text
+    assert c.post(f"/invite/{token}", data={}).status_code == 403
+    response = c.post(f"/invite/{token}", data={"csrf_token": csrf(c, f"/invite/{token}")}, follow_redirects=False)
+    assert response.status_code == 303 and response.headers["location"].startswith("/app?organisation_id=")
+    assert env["db"].scalar("SELECT status FROM invitations WHERE id=?", (invitation["id"],)) == "Accepted"
+
+
+def test_invitation_page_mismatch_expired_revoked_and_safe_next(env):
+    from governance import GovernanceService
+    service = GovernanceService(env["db"])
+    mismatch, mismatch_token = service.invite(env["org"]["id"], email="someone-else@example.test",
+                                              role="viewer", actor=OWNER)
+    service.invite(env["org"]["id"], email="different@example.test", role="viewer", actor=OWNER)
+    c = client()
+    register_and_verify(c, env, email="different@example.test")
+    assert "someone-else@example.test" in c.get(f"/invite/{mismatch_token}").text
+    register_path = f"/login?tab=register&next={quote(f'/invite/{mismatch_token}', safe='')}"
+    assert 'value="someone-else@example.test"' in c.get(register_path).text
+    assert c.get("/login?next=https%3A%2F%2Fevil.example").status_code == 200
+    c.get("/logout")
+    login_page = c.get("/login?next=https%3A%2F%2Fevil.example")
+    login_csrf = CSRF.search(login_page.text).group(1)
+    redirected = c.post("/auth/local/login", data={"csrf_token": login_csrf,
+                       "email": "different@example.test", "password": PASSWORD,
+                       "next": "https://evil.example"}, follow_redirects=False)
+    assert redirected.status_code == 303 and "evil.example" not in redirected.headers["location"]
+    expired, expired_token = service.invite(env["org"]["id"], email="expired@example.test", role="viewer", actor=OWNER)
+    with env["db"].transaction() as tx:
+        tx.execute("UPDATE invitations SET expires_at='2000-01-01T00:00:00+00:00' WHERE id=?", (expired["id"],))
+    assert "expired" in c.get(f"/invite/{expired_token}").text.lower()
+    revoked, revoked_token = service.invite(env["org"]["id"], email="revoked@example.test", role="viewer", actor=OWNER)
+    service.revoke_invitation(env["org"]["id"], revoked["id"], actor=OWNER)
+    assert "revoked" in c.get(f"/invite/{revoked_token}").text.lower()
+
+
+def test_invitation_api_hides_token_when_mailed_and_returns_fallback(env, monkeypatch):
+    c = client()
+    register_and_verify(c, env, email=OWNER)
+    csrf_token = c.get("/api/csrf").json()["csrf_token"]
+    url = f"/api/organisations/{env['org']['id']}/invitations"
+    payload = {"email": "api-invitee@example.test", "role": "viewer", "valid_days": 7}
+    mailed = c.post(url, json=payload, headers={"X-CSRF-Token": csrf_token})
+    assert mailed.status_code == 201
+    assert mailed.json()["mail_sent"] is True and mailed.json()["accept_token"] is None
+    monkeypatch.delenv("FASTACCOUNTS_PUBLIC_URL")
+    fallback = c.post(url, json={**payload, "email": "fallback@example.test"},
+                      headers={"X-CSRF-Token": csrf_token})
+    assert fallback.status_code == 201
+    assert fallback.json()["mail_sent"] is False and fallback.json()["accept_token"]

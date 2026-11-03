@@ -22,12 +22,13 @@ import integrations
 import version
 from api_app import api
 from database import get_database
+from governance import GovernanceService
 from web import account_auth, google_auth, i18n
 from web.assets import CachedStaticFiles, STATIC_DIR
 from web.account_auth import accounts, client_address, csrf_ok, establish_session, form_csrf
 from web.public import (about_page, changelog_page, contact_page,
                         integrations_page, landing_page, login_page, privacy_page,
-                        mfa_page, password_token_page, roadmap_page, security_page,
+                        invitation_page, mfa_page, password_token_page, roadmap_page, security_page,
                         terms_page, workspace_page)
 
 
@@ -117,7 +118,12 @@ def login(session, request, error: str = "", tab: str = "signin", notice: str = 
     lang = _page_language(session, request)
     message = i18n.t(f"auth.notice_{notice}", lang) if notice in NOTICES else ""
     next_path = _safe_return_path(next) if next else ""
-    return login_page(error, lang, tab=tab, notice=message, csrf=form_csrf(session),
+    email = ""
+    if tab == "register" and next_path.startswith("/invite/"):
+        invite = GovernanceService().invitation_by_token(next_path.rsplit("/", 1)[-1])
+        if invite and invite.get("status") == "Pending":
+            email = invite["email"]
+    return login_page(error, lang, tab=tab, notice=message, csrf=form_csrf(session), email=email,
                       next_path="" if next_path == "/" else next_path)
 
 
@@ -186,6 +192,45 @@ def test_login(session, email: str = "demo@fastaccounts.local"):
 
 # ---------------------------------------------------------------- email and password
 NO_STORE = {"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"}
+
+
+@rt("/invite/{token}", methods=["GET", "POST"])
+async def invitation(token: str, request, session):
+    token = token[:200]
+    if not accounts.consume(client_address(request), "invite_token_ip"):
+        return HTMLResponse("<!doctype html>\n" + to_xml(invitation_page(None, _page_language(session, request),
+                            token=token, error=i18n.t("invitation.rate_limited", _page_language(session, request)))),
+                            status_code=429, headers=NO_STORE)
+    service = GovernanceService()
+    invitation = service.invitation_by_token(token)
+    if invitation and invitation["status"] == "Pending":
+        from datetime import datetime, timezone
+        if datetime.fromisoformat(invitation["expires_at"]) < datetime.now(timezone.utc):
+            invitation = None
+    user = session.get("user")
+    if user and not account_auth.session_user_valid(user):
+        session.pop("user", None)
+        user = None
+    if request.method == "POST":
+        form = await _auth_form(request)
+        if not csrf_ok(session, form.get("csrf_token")):
+            page = invitation_page(invitation, _page_language(session, request), token=token,
+                                   user_email=(user or {}).get("email", ""),
+                                   error=i18n.t("auth.error_session_expired", _page_language(session, request)))
+            return HTMLResponse("<!doctype html>\n" + to_xml(page), status_code=403, headers=NO_STORE)
+        if not user:
+            return RedirectResponse(f"/login?next={quote(f'/invite/{token}', safe='')}", status_code=303)
+        try:
+            organisation = service.accept_invitation(token, email=user["email"])
+        except ValueError:
+            invitation = service.invitation_by_token(token)
+            page = invitation_page(invitation, _page_language(session, request), token=token,
+                                   user_email=user["email"], error=i18n.t("invitation.invalid", _page_language(session, request)))
+            return HTMLResponse("<!doctype html>\n" + to_xml(page), status_code=400, headers=NO_STORE)
+        return RedirectResponse(f"/app?organisation_id={quote(organisation['id'], safe='')}", status_code=303)
+    page = invitation_page(invitation, _page_language(session, request), token=token,
+                           csrf=form_csrf(session), user_email=(user or {}).get("email", ""))
+    return HTMLResponse("<!doctype html>\n" + to_xml(page), headers=NO_STORE)
 
 
 def _auth_text(key: str, lang: str) -> str:
