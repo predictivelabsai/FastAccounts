@@ -53,6 +53,7 @@ LIMITS: dict[str, tuple[int, int]] = {
     "forgot": (5, 60 * 60),
     "forgot_ip": (20, 60 * 60),
     "token_ip": (20, 15 * 60),     # verify/reset form submissions per client
+    "password_change": (5, 15 * 60),
 }
 
 # OWASP-equivalent scrypt cost (N=2^14, r=8, p=5) with a modest 16 MiB footprint.
@@ -180,8 +181,13 @@ def _send_link(email: str, name: str, purpose: str, token: str, lang: str) -> bo
             and not mail_configured()):
         label = "sign-up verification" if purpose == "verify" else "password reset"
         log.warning("Local dev link (%s): %s", label, link)
-    subject = T(f"mail_{purpose}_subject")
-    lines = [T("mail_greeting").format(name=name or email), T(f"mail_{purpose}_body"),
+    mail_purpose = purpose
+    if purpose == "reset":
+        account = accounts.get(email)
+        if account and not account["password_hash"]:
+            mail_purpose = "welcome"
+    subject = T(f"mail_{mail_purpose}_subject")
+    lines = [T("mail_greeting").format(name=name or email), T(f"mail_{mail_purpose}_body"),
              T(f"mail_{purpose}_expiry"), T("mail_ignore")]
     text = "\n\n".join([lines[0], lines[1], link, *lines[2:]])
     body = (f"<p>{html.escape(lines[0])}</p><p>{html.escape(lines[1])}</p>"
@@ -326,6 +332,30 @@ class AccountStore:
         with self.db.transaction() as tx:
             token = self._issue(tx, account["id"], "reset", RESET_TTL)
         _send_link(email, account["name"], "reset", token, lang)
+
+    def change_password(self, email: str, current_password: str, new_password: str) -> dict | None:
+        if not valid_password(new_password):
+            return None
+        with self.db.transaction() as tx:
+            account = tx.one("SELECT * FROM user_accounts WHERE email=?", (normalize_email(email),))
+            if (not account or not account["password_hash"]
+                    or not verify_password(current_password or "", account["password_hash"])):
+                return None
+            now = utc_now()
+            tx.execute("DELETE FROM auth_tokens WHERE account_id=? AND used_at IS NULL", (account["id"],))
+            tx.execute("UPDATE user_accounts SET password_hash=?,session_version=session_version+1,"
+                       "password_changed_at=?,updated_at=? WHERE id=?",
+                       (hash_password(new_password), now, now, account["id"]))
+            return tx.one("SELECT * FROM user_accounts WHERE id=?", (account["id"],))
+
+    def change_name(self, email: str, name: str) -> dict | None:
+        name = (name or "").strip()[:120]
+        with self.db.transaction() as tx:
+            account = tx.one("SELECT * FROM user_accounts WHERE email=?", (normalize_email(email),))
+            if not account:
+                return None
+            tx.execute("UPDATE user_accounts SET name=?,updated_at=? WHERE id=?", (name, utc_now(), account["id"]))
+            return tx.one("SELECT * FROM user_accounts WHERE id=?", (account["id"],))
 
     def reset_password(self, token: str, password: str) -> dict | None:
         if not valid_password(password):

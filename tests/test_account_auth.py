@@ -541,3 +541,92 @@ def test_without_the_flag_strangers_stay_rejected(env, monkeypatch):
 def google_access(email):
     from web.google_auth import access_allowed
     return access_allowed(email)
+
+def test_reset_mail_uses_welcome_copy_for_account_without_password(env):
+    accounts.link_google("new-google@example.test", "Google Person")
+    accounts.request_reset("new-google@example.test", "en")
+    mail = env["mails"][-1]
+    assert mail["subject"] == "Set your FastAccounts password"
+    assert "set a password" in mail["text"]
+    assert "/auth/local/reset/" in mail["text"]
+
+
+def test_reset_mail_uses_reset_copy_for_existing_password(env):
+    register_and_verify(client(), env)
+    accounts.request_reset(OWNER, "en")
+    assert env["mails"][-1]["subject"] == "Reset your FastAccounts password"
+
+
+def _signed_in_account(env, *, email=OWNER, password=PASSWORD):
+    c = client()
+    if not accounts.get(email):
+        register_and_verify(c, env, email=email, password=password)
+    assert post(c, "/auth/local/login", {"email": email, "password": password}).status_code == 303
+    return c
+
+
+def test_account_password_change_keeps_current_session_and_invalidates_other(env):
+    first = _signed_in_account(env)
+    second = _signed_in_account(env)
+    response = post(first, "/account/password", {"current_password": PASSWORD,
+                  "new_password": "a different password", "confirm_password": "a different password"}, "/account")
+    assert response.status_code == 200 and "password has been changed" in response.text
+    assert first.get("/account").status_code == 200
+    assert second.get("/account", follow_redirects=False).status_code == 303
+    assert accounts.authenticate(OWNER, "a different password")
+    assert env["db"].one("SELECT password_changed_at FROM user_accounts WHERE email=?", (OWNER,))["password_changed_at"]
+    assert env["mails"][-1]["subject"] == "Your FastAccounts password was changed"
+
+
+def test_account_password_rejects_wrong_current_password_and_throttles(env):
+    c = _signed_in_account(env)
+    for _ in range(account_auth.LIMITS["password_change"][0]):
+        response = post(c, "/account/password", {"current_password": "wrong", "new_password": "a different password",
+                      "confirm_password": "a different password"}, "/account")
+        assert response.status_code == 401
+    response = post(c, "/account/password", {"current_password": PASSWORD, "new_password": "a different password",
+                  "confirm_password": "a different password"}, "/account")
+    assert response.status_code == 429
+
+
+def test_account_password_requires_csrf(env):
+    c = _signed_in_account(env)
+    response = c.post("/account/password", data={"current_password": PASSWORD,
+                          "new_password": "a different password", "confirm_password": "a different password"})
+    assert response.status_code == 403
+
+
+def test_google_only_account_gets_own_password_setup_link(env, monkeypatch):
+    email = "google-only@example.test"
+    accounts.link_google(email, "Google Person")
+    monkeypatch.setenv("FASTACCOUNTS_ALLOW_TEST_AUTH", "true")
+    c = client()
+    assert c.get(f"/auth/test?email={email}", follow_redirects=False).status_code == 303
+    page = c.get("/account")
+    assert "Send password setup link" in page.text
+    response = post(c, "/account/password", {}, "/account")
+    assert response.status_code == 200
+    assert env["mails"][-1]["to"] == email
+    assert env["mails"][-1]["subject"] == "Set your FastAccounts password"
+
+
+def test_account_display_name_change(env):
+    c = _signed_in_account(env)
+    response = post(c, "/account/name", {"name": "Updated Owner"}, "/account")
+    assert response.status_code == 200 and "Updated Owner" in response.text
+    assert accounts.get(OWNER)["name"] == "Updated Owner"
+
+
+@pytest.mark.parametrize("lang", ["en", "et"])
+@pytest.mark.parametrize("open_signup", [False, True])
+def test_login_copy_reflects_signup_mode(env, monkeypatch, lang, open_signup):
+    from web import google_auth
+    monkeypatch.setattr(google_auth, "open_signup", lambda: open_signup)
+    c = client()
+    c.get(f"/set-lang/{lang}?next=/login")
+    html = c.get("/login?tab=signin").text
+    if open_signup:
+        expected = "verified email" if lang == "en" else "kinnitatud e-posti"
+    else:
+        expected = "invited team" if lang == "en" else "kutsutud meeskonnaliikmetel"
+    assert expected in html
