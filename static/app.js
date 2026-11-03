@@ -906,8 +906,8 @@
     const stages = Object.fromEntries((history || []).filter((x) => x.stage_proposal_json)
       .map((x) => [x.id, JSON.parse(x.stage_proposal_json)]));
     const suggestions = ['Summarise overdue invoices', 'What needs my attention this week?', 'Explain my VAT position'];
-    const empty = `<div class="copilot-empty"><p>${esc(active ? t('How can I help with your books?') : notice)}</p>` +
-      (active ? `<div class="copilot-suggestions">${suggestions.map((text) => `<button type="button" class="button" data-suggestion="${tr(text)}">${tr(text)}</button>`).join('')}</div>` : '') + `</div>`;
+    const empty = active ? `<div class="copilot-empty"><p>${esc(t('How can I help with your books?'))}</p>` +
+      `<div class="copilot-suggestions">${suggestions.map((text) => `<button type="button" class="button" data-suggestion="${tr(text)}">${tr(text)}</button>`).join('')}</div></div>` : '';
     const composer = `<form class="copilot-composer"><div data-copilot-attachment hidden></div><div class="copilot-compose-row">` +
       `<button type="button" class="button copilot-attach" aria-label="${tr('Attach document')}" aria-expanded="false" aria-controls="copilot-documents">${icon('paperclip')}</button>` +
       `<textarea name="content" rows="1" maxlength="8000" aria-label="${tr('Message')}" placeholder="${tr('Ask about your books')}" required></textarea>` +

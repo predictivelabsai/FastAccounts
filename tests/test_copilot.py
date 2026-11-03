@@ -496,6 +496,7 @@ def test_workspace_copilot_drawer_offline(language, role, monkeypatch, tmp_path)
         composer = page.locator("[data-copilot-chat] [name=content]")
         playwright.expect(composer).to_be_disabled()
         assert notice_key in page.locator("[data-copilot-notice]").inner_text()
+        assert drawer.get_by_text(notice_key, exact=True).count() == 1
         assert page.locator('[data-copilot-admin]').count() == (0 if role == "viewer" else 1)
         if role != "viewer":
             page.locator('[data-copilot-gear]').click()

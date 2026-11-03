@@ -16,6 +16,12 @@
   horizontally when needed and follow the workspace table styling.
 - Added browser assertions for rendered cells, alignment and unsafe markup.
 
+## 2026-11-03: Single copilot unavailable notice
+
+- Removed the duplicate unavailable-service message from the empty transcript;
+  the persistent drawer notice remains the single source of that message.
+- Added a browser assertion that the unavailable notice appears once.
+
 Keep this file synchronized with `docs/product_roadmap.md`. Entries describe
 implemented and verified product changes; planning status alone is not marked as
 delivered.
