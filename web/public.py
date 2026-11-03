@@ -53,14 +53,18 @@ def _language_switcher(lang: str, current: str):
     )
 
 
-def _nav(lang: str, current: str):
+def _nav(lang: str, current: str, *, signed_in: bool = False):
     T = lambda key: i18n.t(key, lang)
     return fs_nav(
         FASTPRODUCT,
         [(T("nav.product"), "/#why"), (T("nav.for_bureaus"), "/#bureaus"),
          (T("nav.integrations"), "/integrations"), (T("nav.pricing"), "/#pricing"),
          (T("nav.security"), "/security"), (T("nav.changelog"), "/changelog")],
-        [_language_switcher(lang, current), fs_button(T("nav.sign_in"), "/login", "primary")],
+        [_language_switcher(lang, current), *(
+            [fs_button(T("nav.workspace"), "/app", "primary"),
+             A(T("nav.sign_out"), href="/logout", cls="fs-nav-link")]
+            if signed_in else [fs_button(T("nav.sign_in"), "/login", "primary")]
+        )],
         menu_label=T("nav.open_navigation"),
     )
 
@@ -90,7 +94,7 @@ def _footer(lang: str):
     )
 
 
-def public_page(*content, title: str, current: str, lang: str):
+def public_page(*content, title: str, current: str, lang: str, signed_in: bool = False):
     return Html(
         Head(
             Title(f"{title} · FastAccounts"),
@@ -136,7 +140,7 @@ def public_page(*content, title: str, current: str, lang: str):
             """)),
         ),
         Body(A(i18n.t("nav.skip_content", lang), href="#main-content", cls="fs-skip"),
-             _nav(lang, current), Main(*content, id="main-content", tabindex="-1"), _footer(lang)),
+             _nav(lang, current, signed_in=signed_in), Main(*content, id="main-content", tabindex="-1"), _footer(lang)),
         lang=lang,
     )
 
@@ -567,10 +571,10 @@ def mfa_page(account: dict | None = None, lang: str = "en", *, csrf: str = "",
                         form("activate", factor=True), form("enroll", password=True, regenerate=True)]
         else:
             content += [P(T("mfa_enroll_help")), form("enroll", password=True, regenerate=bool(account["totp_secret"]))]
-        content.append(A(T("mfa_back"), href="/app", cls="auth-link"))
+        content.insert(0, A(T("mfa_back"), href="/app", cls="auth-link"))
     return public_page(Section(Div(H1(T("mfa_title")), *_auth_messages(error, notice), *content,
                                    cls="auth-card"), cls="auth-wrap"),
-                       title=T("mfa_title"), current="/mfa", lang=lang)
+                       title=T("mfa_title"), current="/mfa", lang=lang, signed_in=bool(account))
 
 
 def account_page(account: dict, lang: str = "en", *, csrf: str = "", error: str = "", notice: str = ""):
@@ -596,14 +600,14 @@ def account_page(account: dict, lang: str = "en", *, csrf: str = "", error: str 
                                  autocomplete="name", maxlength="120", required=True),
                      Button(T("save_name"), type="submit", cls="fs-btn fs-btn-primary auth-submit"),
                      method="post", action="/account/name", cls="auth-form")
-    return public_page(Section(Div(H1(T("account_title")), *_auth_messages(error, notice),
+    return public_page(Section(Div(A(T("account_back"), href="/app", cls="auth-link"), H1(T("account_title")), *_auth_messages(error, notice),
                                    P(f"{T('email')}: {account['email']}"), H2(T("account_name_title")), name_form,
                                    H2(T("account_password_title")), password_form,
                                    A(T("mfa_title"), href="/mfa", cls="auth-link"),
                                    A("Eesti", href="/set-lang/et?next=/account", cls="auth-link"),
                                    A("English", href="/set-lang/en?next=/account", cls="auth-link"),
                                    cls="auth-card"), cls="auth-wrap"), title=T("account_title"),
-                       current="/account", lang=lang)
+                       current="/account", lang=lang, signed_in=True)
 
 
 def password_token_page(purpose: str, token: str, lang: str = i18n.DEFAULT_LANG, *, csrf: str = "",
