@@ -1,5 +1,12 @@
 # FastAccounts Change Log
 
+## 2026-11-03: PostgreSQL copilot usage upsert
+
+- Qualified the copilot usage counters with the table name in the
+  `ON CONFLICT ... DO UPDATE` clause. PostgreSQL rejected the bare column
+  references as ambiguous, so every copilot message failed on production.
+- Added an opt-in PostgreSQL check that repeated usage records accumulate.
+
 ## 2026-11-03: PostgreSQL literal percent handling
 
 - Escaped literal percent signs in parameterised PostgreSQL wrapper queries before

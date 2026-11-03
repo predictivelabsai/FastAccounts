@@ -685,9 +685,10 @@ class CopilotService:
                 "INSERT INTO copilot_usage(organisation_id,user_email,day,messages,"
                 "scans,prompt_chars,tokens_in,tokens_out) VALUES (?,?,?,?,?,?,?,?) "
                 "ON CONFLICT(organisation_id,user_email,day) DO UPDATE SET "
-                "messages=messages+excluded.messages,scans=scans+excluded.scans,"
-                "prompt_chars=prompt_chars+excluded.prompt_chars,"
-                "tokens_in=tokens_in+excluded.tokens_in,"
-                "tokens_out=tokens_out+excluded.tokens_out",
+                "messages=copilot_usage.messages+excluded.messages,"
+                "scans=copilot_usage.scans+excluded.scans,"
+                "prompt_chars=copilot_usage.prompt_chars+excluded.prompt_chars,"
+                "tokens_in=copilot_usage.tokens_in+excluded.tokens_in,"
+                "tokens_out=copilot_usage.tokens_out+excluded.tokens_out",
                 (organisation_id, user_email, day or _day(), messages, scans, prompt_chars,
                  tokens_in, tokens_out))

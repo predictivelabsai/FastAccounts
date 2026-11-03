@@ -55,6 +55,25 @@ def test_postgres_copilot_messages_with_interrupted_literal():
     assert [message["id"] for message in messages] == ["pg-message"]
 
 
+
+@pytest.mark.skipif(not os.getenv("TEST_POSTGRES_URL"), reason="set TEST_POSTGRES_URL for PostgreSQL integration")
+def test_postgres_copilot_usage_upsert_accumulates():
+    from copilot import CopilotService
+
+    schema = "fast_accounts_test_" + uuid4().hex[:10]
+    db = Database(url=os.environ["TEST_POSTGRES_URL"], schema=schema)
+    db.migrate()
+    org = OrganisationService(db).create(
+        name="Postgres Copilot Usage", country_code="EE", entity_type="EE_OU",
+        owner_email="usage@example.test",
+    )
+    service = CopilotService(db)
+    for _ in range(2):
+        service._record_usage(org["id"], "usage@example.test", messages=1, scans=0,
+                              prompt_chars=10, tokens_in=3, tokens_out=4, day="2026-11-03")
+    row = db.one("SELECT messages,prompt_chars,tokens_out FROM copilot_usage WHERE organisation_id=?", (org["id"],))
+    assert (row["messages"], row["prompt_chars"], row["tokens_out"]) == (2, 20, 8)
+
 @pytest.mark.skipif(not os.getenv("TEST_POSTGRES_URL"), reason="set TEST_POSTGRES_URL for PostgreSQL integration")
 def test_postgres_prepayment_events():
     from decimal import Decimal
