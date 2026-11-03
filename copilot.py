@@ -444,6 +444,7 @@ class CopilotService:
         error = None
         def event(kind, data):
             return "event: " + kind + "\ndata: " + json.dumps(data, ensure_ascii=False) + "\n\n"
+        yield event("start", {"conversation_id": prepared["conversation_id"]})
         try:
             for delta in stream_completion(prepared["prompt"], client=client, **prepared["options"]):
                 text = delta["content"]

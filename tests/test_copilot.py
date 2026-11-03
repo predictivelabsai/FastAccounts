@@ -996,6 +996,27 @@ def test_stream_deltas_usage_persistence_and_tenancy(env, monkeypatch):
     assert denied.status_code == 403 and len(seen) == 1
 
 
+def test_new_stream_starts_with_conversation_id_for_follow_up(env, monkeypatch):
+    enable(env)
+    streaming_transport(monkeypatch, [
+        {'choices': [{'delta': {'content': 'First reply'}}]}, '[DONE]'])
+    first = env['client'].post(env['base'] + '/copilot/messages',
+                               headers={'Accept': 'text/event-stream'},
+                               json={'content': 'First question'})
+    events = stream_events(first)
+    assert events[0][0] == 'start'
+    conversation_id = events[0][1]['conversation_id']
+
+    streaming_transport(monkeypatch, [
+        {'choices': [{'delta': {'content': 'Second reply'}}]}, '[DONE]'])
+    second = env['client'].post(env['base'] + '/copilot/messages',
+                                headers={'Accept': 'text/event-stream'},
+                                json={'content': 'Follow-up', 'conversation_id': conversation_id})
+    assert stream_events(second)[0][1]['conversation_id'] == conversation_id
+    assert env['db'].scalar(
+        'SELECT COUNT(DISTINCT conversation_id) FROM copilot_messages') == 1
+
+
 @pytest.mark.parametrize('failure', ['network', 'error_event', 'truncated', 'malformed'])
 def test_stream_partial_failure_and_retry(env, monkeypatch, failure):
     enable(env)
@@ -1057,12 +1078,14 @@ def test_stream_close_persists_partial_once_and_completion_before_final_event(en
     streaming_transport(monkeypatch, [{'choices': [{'delta': {'content': 'Some text'}}]}, '[DONE]'])
     service = copilot.CopilotService(env['db'])
     stream = service.stream(env['org']['id'], ACTOR, 'hi')
+    assert next(stream).startswith('event: start')
     assert 'Some text' in next(stream)
     stream.close()
     history = service.messages(env['org']['id'], ACTOR)
     assert history[0]['retryable'] and 'interrupted' in history[0]['content']
     stream = service.stream(env['org']['id'], ACTOR, 'again')
-    next(stream)
+    assert next(stream).startswith('event: start')
+    assert 'Some text' in next(stream)
     assert next(stream).startswith('event: done')
     stream.close()
     history = service.messages(env['org']['id'], ACTOR)
